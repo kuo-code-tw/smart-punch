@@ -4,7 +4,7 @@ const html=fs.readFileSync(path.join(__dirname,'../aqc-efficiency/index.html'),'
 const {rankMonth}=require('../assets/port79-personnel-ranking.js');
 function extract(name){const start=html.indexOf('function '+name+'(');assert(start>=0,name);const end=html.indexOf('\n}',start);assert(end>start,name);return html.slice(start,end+2);}
 const official=[
- {empId:'A1',name:'現職甲',employmentStatus:'active',jobTitle:'AQC',group:'A組'},
+ {empId:'A1',attNo:'ATT-A1',name:'現職甲',employmentStatus:'active',jobTitle:'AQC',group:'A組'},
  {empId:'B1',name:'離職乙',employmentStatus:'resigned',jobTitle:'AQC',group:'B組'},
  {empId:'C1',name:'現職丙',employmentStatus:'active',jobTitle:'AQC',group:'C組'}
 ];
@@ -23,6 +23,7 @@ ctx.store={setOwner(){},lookup(month,person){
 vm.createContext(ctx);
 for(const name of ['currentOfficialJobTitle','isAqcEmployee','people','operationGroupForRecord'])vm.runInContext(extract(name),ctx);
 assert.equal(ctx.operationGroupForRecord({empId:'A1',name:'現職甲',workDate:'2026-11-10'}),'A組','HR-verified unique schedule alias resolves false missing employee');
+assert.equal(ctx.operationGroupForRecord({empId:'ATT-A1',name:'現職甲',workDate:'2026-11-10'}),'A組','HR-attested attendance ID resolves to the official scheduled employee');
 assert.equal(ctx.operationGroupForRecord({empId:'OTHER',name:'現職甲',workDate:'2026-11-10'}),'排班身分／組別待核對','unknown real ID cannot impersonate an HR employee');
 assert.equal(ctx.operationGroupForRecord({empId:'B1',name:'離職乙',workDate:'2026-11-10'}),'排班身分／組別待核對','resigned employee gets no live group');
 const source=[

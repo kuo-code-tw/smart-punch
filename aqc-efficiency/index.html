@@ -4920,8 +4920,11 @@ function operationGroupForRecord(r){
     const norm=v=>normalizePersonName(displayPersonName(v||''));
     const reportName=norm(r?.name),rawId=String(r?.empId||r?.employeeId||'').trim().toUpperCase();
     const employeeId=e=>String(e?.empId||e?.employeeId||e?.id||e?.['工號']||e?.attNo||e?.attendanceNo||e?.attendanceId||e?.['考勤號碼']||'').trim().toUpperCase();
+    const knownIds=e=>[employeeId(e),e?.attNo,e?.attendanceNo,e?.attendanceId,e?.['考勤號碼']].map(v=>String(v||'').trim().toUpperCase()).filter(Boolean);
     const employees=Array.isArray(systemEmployees)?systemEmployees:[];
-    const byId=rawId&&!rawId.startsWith('NAME:')?employees.filter(e=>employeeId(e)===rawId):[];
+    // Official employee/attendance numbers may differ from old report identifiers.
+    // Reconcile only when exactly one HR record holds that ID AND the name agrees.
+    const byId=rawId&&!rawId.startsWith('NAME:')?employees.filter(e=>knownIds(e).includes(rawId)):[];
     const byName=reportName?employees.filter(e=>norm(e.name||e.employeeName||e['姓名'])===reportName):[];
     // A wrong real employee ID must not silently be reassigned to somebody else.
     const official=byId.length===1&&norm(byId[0].name||byId[0].employeeName||byId[0]['姓名'])===reportName?byId[0]:
@@ -16343,7 +16346,7 @@ C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業
 
 });
 </script>
-<script src="../assets/port79-aqc-schedule-groups.js?v=20261026-group-identity-v2"></script>
+<script src="../assets/port79-aqc-schedule-groups.js?v=20261117-roster-identity-v3"></script>
 <script src="../assets/port79-vessel-monthly-report.js?v=20261102-operation-count-hide-zeros-v1"></script>
 <script src="../assets/port79-seven-top.js?v=20261109-working-sheet-service&org=20261112-unit-source-v2&menu=20261113-terminal-system-v1&auth=20261115-recovery-v2"></script>
 

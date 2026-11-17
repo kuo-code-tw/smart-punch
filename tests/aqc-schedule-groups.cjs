@@ -15,4 +15,37 @@ test('incomplete responses fail while conflicting personnel only flag that emplo
 test('identical employee duplicates preserve unique name matching',()=>{store.apply('2027-04',{ok:true,employees:[...employees,employees[0]],schedules:[]});assert.equal(store.lookup('2027-04',{name:'Driver A'}).group,'A組');});
 test('an empty override role retains the base schedule role',()=>{store.apply('2027-03',{ok:true,employees,schedules:[{month:'2027-03',empId:'A1',schedule:{__personnel:{group:'C組'}}}]});assert.equal(store.lookup('2027-03',{empId:'A1'}).group,'C組');});
 test('failed refresh invalidation and account changes clear previously read groups',()=>{store.invalidate('2026-10');assert.equal(store.lookup('2026-10',{empId:'A1'}).status,'unavailable');store.setOwner('session-b');assert.equal(store.lookup('2026-09',{empId:'A1'}).status,'unavailable');});
+
+test('monthly schedule-only employee IDs still resolve group without changing live roster',()=>{
+ const s=createStore();s.setOwner('session-schedule-only');
+ s.apply('2026-11',{ok:true,month:'2026-11',
+  employees:[{empId:'E1',name:'In roster',jobTitle:'AQC',group:'A組'}],
+  schedules:[{empId:'E2',month:'2026-11',schedule:{__personnel:{role:'AQC',group:'C組'}}}]});
+ assert.equal(s.lookup('2026-11',{empId:'E2',name:'Has monthly schedule'}).group,'C組');
+ assert.equal(s.lookup('2026-11',{empId:'E2'}).status,'ok');
+ assert.deepEqual(s.personnel('2026-11').map(e=>e.empId),['E1'],'do not re-create an active employee from historical schedule only');
+});
+test('explicit alternate attendance ID maps to the same named employee',()=>{
+ const s=createStore();s.setOwner('attendance');
+ s.apply('2026-11',{ok:true,employees:[{empId:'E1',attNo:'ATT-001',name:'Staff',jobTitle:'AQC',group:'B組'}],schedules:[]});
+ assert.equal(s.lookup('2026-11',{empId:'ATT-001',name:'Staff'}).group,'B組');
+ assert.equal(s.lookup('2026-11',{empId:'NOT-REGISTERED',name:'Staff'}).status,'missing','a random real ID must never match by name');
+});
+test('ambiguous alternate IDs are rejected without corrupting primary IDs',()=>{
+ const s=createStore();s.setOwner('ambiguous');
+ s.apply('2026-11',{ok:true,employees:[
+  {empId:'A',attNo:'SHARED',name:'Staff A',jobTitle:'AQC',group:'A組'},
+  {empId:'B',attNo:'SHARED',name:'Staff B',jobTitle:'AQC',group:'B組'}
+ ],schedules:[]});
+ assert.equal(s.lookup('2026-11',{empId:'SHARED'}).status,'ambiguous');
+ assert.equal(s.lookup('2026-11',{empId:'A'}).group,'A組');
+ assert.equal(s.lookup('2026-11',{empId:'B'}).group,'B組');
+});
+test('top-level verified month allows schedule rows without duplicated row.month',()=>{
+ const s=createStore();s.setOwner('month');
+ s.apply('2026-11',{ok:true,month:'2026-11',employees:[],schedules:[{empId:'X',schedule:{__personnel:{role:'AQC',group:'D組'}}}]});
+ assert.equal(s.lookup('2026-11',{empId:'X'}).group,'D組');
+ s.apply('2026-10',{ok:true,month:'2026-11',employees:[],schedules:[{empId:'X',schedule:{__personnel:{role:'AQC',group:'D組'}}}]});
+ assert.equal(s.lookup('2026-10',{empId:'X'}).status,'missing','foreign month payload must not contaminate local month');
+});
 console.log(JSON.stringify({passed,failed:0,scope:'Read-only schedule employee/month personnel semantics; no backend writes'}));
