@@ -45,7 +45,54 @@ test('top-level verified month allows schedule rows without duplicated row.month
  const s=createStore();s.setOwner('month');
  s.apply('2026-11',{ok:true,month:'2026-11',employees:[],schedules:[{empId:'X',schedule:{__personnel:{role:'AQC',group:'D組'}}}]});
  assert.equal(s.lookup('2026-11',{empId:'X'}).group,'D組');
- s.apply('2026-10',{ok:true,month:'2026-11',employees:[],schedules:[{empId:'X',schedule:{__personnel:{role:'AQC',group:'D組'}}}]});
- assert.equal(s.lookup('2026-10',{empId:'X'}).status,'missing','foreign month payload must not contaminate local month');
+ assert.throws(()=>s.apply('2026-10',{ok:true,month:'2026-11',employees:[],schedules:[{empId:'X',schedule:{__personnel:{role:'AQC',group:'D組'}}}]}),'foreign month response must be rejected');
+ assert.equal(s.lookup('2026-10',{empId:'X'}).status,'unavailable','foreign month payload must not contaminate local month');
+});
+
+test('monthly schedule group prevails over an unrelated HR default',()=>{
+ const s=createStore();s.setOwner('authority');
+ s.apply('2026-11',{ok:true,month:'2026-11',
+  employees:[{empId:'A1',name:'Alice',jobTitle:'AQC',group:'D組'}],
+  schedules:[{empId:'A1',month:'2026-11',schedule:{__personnel:{role:'AQC',group:'B組',groupExplicit:true}}}]});
+ assert.equal(s.lookup('2026-11',{empId:'A1'}).group,'B組');
+ assert.equal(s.needsHistory('2026-11'),false);
+});
+test('same schedule-month inheritance as the real roster page',()=>{
+ const s=createStore();s.setOwner('historic');
+ s.apply('2026-11',{ok:true,month:'2026-11',
+  employees:[{empId:'A1',name:'Alice',jobTitle:'AQC',group:'不分組'}],
+  schedules:[{empId:'A1',month:'2026-11',schedule:{__personnel:{role:'AQC',group:'不分組',groupExplicit:false}}}]});
+ assert.equal(s.needsHistory('2026-11'),true);
+ s.applyHistory('2026-11','2026-10',{ok:true,month:'2026-10',schedules:[
+  {empId:'A1',month:'2026-10',schedule:{__personnel:{role:'AQC',group:'C組',groupExplicit:true}}}]});
+ assert.equal(s.lookup('2026-11',{empId:'A1'}).group,'C組');
+ assert.equal(s.needsHistory('2026-11'),false);
+});
+test('earlier-month assignment cannot override this month explicit unassignment',()=>{
+ const s=createStore();s.setOwner('explicit');
+ s.apply('2026-11',{ok:true,month:'2026-11',employees:[
+  {empId:'A1',name:'Alice',jobTitle:'AQC',group:'A組'}],
+  schedules:[{empId:'A1',month:'2026-11',schedule:{__personnel:{role:'AQC',group:'不分組',groupExplicit:true}}}]});
+ s.applyHistory('2026-11','2026-10',{ok:true,month:'2026-10',schedules:[
+  {empId:'A1',month:'2026-10',schedule:{__personnel:{role:'AQC',group:'B組',groupExplicit:true}}}]});
+ assert.equal(s.lookup('2026-11',{empId:'A1'}).group,'不分組');
+ assert.equal(s.needsHistory('2026-11'),false);
+});
+test('blank carry-forward month does not erase older explicit group',()=>{
+ const s=createStore();s.setOwner('two-history');
+ s.apply('2026-11',{ok:true,month:'2026-11',employees:[
+  {empId:'A1',name:'Alice',jobTitle:'AQC',group:'不分組'}],schedules:[]});
+ s.applyHistory('2026-11','2026-10',{ok:true,month:'2026-10',schedules:[
+  {empId:'A1',month:'2026-10',schedule:{__personnel:{role:'AQC',group:'不分組',groupExplicit:false}}}]});
+ assert.equal(s.needsHistory('2026-11'),true);
+ s.applyHistory('2026-11','2026-09',{ok:true,month:'2026-09',schedules:[
+  {empId:'A1',month:'2026-09',schedule:{__personnel:{role:'AQC',group:'D組',groupExplicit:true}}}]});
+ assert.equal(s.lookup('2026-11',{empId:'A1'}).group,'D組');
+});
+test('reject wrong month history instead of borrowing a foreign group',()=>{
+ const s=createStore();s.setOwner('month-isolation');
+ s.apply('2026-11',{ok:true,month:'2026-11',employees:[{empId:'A1',jobTitle:'AQC',group:'不分組'}],schedules:[]});
+ assert.throws(()=>s.applyHistory('2026-11','2026-10',{ok:true,month:'2026-09',schedules:[]}));
+ assert.equal(s.lookup('2026-11',{empId:'A1'}).group,'不分組');
 });
 console.log(JSON.stringify({passed,failed:0,scope:'Read-only schedule employee/month personnel semantics; no backend writes'}));

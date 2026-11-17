@@ -4913,7 +4913,11 @@ function operationGroupForRecord(r){
   const store=currentOperationScheduleStore(),month=String(r?.workDate||'').slice(0,7);
   if(!store)return '排班組別元件未載入';
   const found=store.lookup(month,{empId:r?.empId,name:r?.name});
-  if(found.status==='ok'||found.status==='conflict'||found.status==='ambiguous'||found.status==='not-aqc')return found.group;
+  if(found.status==='ok'){
+    if(found.group==='不分組'&&operationScheduleReads.get(month)?.historyLoading)return '讀取歷史排班組別中…';
+    return found.group;
+  }
+  if(found.status==='conflict'||found.status==='ambiguous'||found.status==='not-aqc')return found.group;
   // WORKING REPORT may use an older identifier. Only a freshly verified HR identity
   // can reconcile it with a unique official schedule name; never guess from history.
   if(found.status==='missing'&&p79AqcHeadcountVerified===true){
@@ -4937,11 +4941,7 @@ function operationGroupForRecord(r){
       // schedule-name alias; duplicate schedule names remain an explicit warning.
       const alias=store.lookup(month,{empId:'NAME:'+reportName,name:official.name});
       if(alias.status==='ok')return alias.group;
-      // For the current month, HR's explicit A-D assignment is safer than
-      // the stale schedule employee list. Never apply today's group to past months.
-      const currentMonth=new Date().toISOString().slice(0,7);
-      const hrGroup=String(official.group||official.groupName||official.scheduleGroup||official['組別']||'').trim();
-      if(month===currentMonth&&personnelGroupCode(hrGroup))return hrGroup;
+      // Schedule assignments alone determine AQC groups; HR confirms identity only.
     }
     return '排班身分／組別待核對';
   }
@@ -4965,7 +4965,7 @@ function renderOperationScheduleStatus(rows){
   if(months.length){
     if(!window.P79AqcScheduleGroups)text='排班組別元件尚未載入，請重新整理。';
     else if(!String(gcToken||''))text='尚未取得登入驗證，請重新登入後讀取排班組別。';
-    else text=months.map(month=>{const state=operationScheduleReads.get(month);return state?.status==='ready'?`${month} 已讀取排班 AQC 組別`:state?.status==='loading'?`${month} 正在讀取排班組別${state.retrying?'，服務忙碌後重試中':''}`:state?.status==='error'?`${month}：${state.error||'排班讀取失敗'}`:`${month} 尚未讀取排班組別`;}).join('；');
+    else text=months.map(month=>{const state=operationScheduleReads.get(month);return state?.status==='ready'?`${month} 已讀取排班 AQC 組別${state.historyUnverified?'（歷史分組待核對）':''}`:state?.status==='loading'?`${month} 正在讀取${state.historyLoading?'歷史':''}排班組別${state.retrying?'，服務忙碌後重試中':''}`:state?.status==='error'?`${month}：${state.error||'排班讀取失敗'}`:`${month} 尚未讀取排班組別`;}).join('；');
   }
   ['driverVesselGroupState','workloadScheduleGroupState','weeklyScheduleGroupState','rankingScheduleGroupState','dispatchScheduleGroupState'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=text;});
 }
@@ -5009,8 +5009,33 @@ function pumpOperationScheduleGroups(){
           }
         }
         if(task.owner!==String(gcToken||''))return;
-        currentOperationScheduleStore().apply(task.month,data);
-        operationScheduleReads.set(task.month,{at:Date.now(),status:'ready'});
+        const store=currentOperationScheduleStore();
+        store.apply(task.month,data);
+        let historyUnverified=false;
+        if(store.needsHistory?.(task.month)){
+          // Match the schedule page's verified group inheritance: search up to
+          // four earlier months, newest first, without modifying any shifts.
+          operationScheduleReads.set(task.month,{at:Date.now(),status:'loading',historyLoading:true});
+          refreshOperationGroupView();
+          const parts=task.month.split('-').map(Number);
+          for(let distance=1;distance<=4&&store.needsHistory(task.month);distance++){
+            const d=new Date(Date.UTC(parts[0],parts[1]-1-distance,1));
+            const earlier=d.toISOString().slice(0,7);
+            try{
+              const history=await apiGetQuick('getScheduleDataSecure',{month:earlier},10000);
+              if(task.owner!==String(gcToken||''))return;
+              store.applyHistory(task.month,earlier,history);
+              refreshOperationGroupView();
+            }catch(error){
+              // Keep the valid current-month roster on a historical read failure.
+              historyUnverified=true;
+              console.warn('AQC 排班歷史編組待核對',earlier,error);
+              break;
+            }
+          }
+        }
+        if(task.owner!==String(gcToken||''))return;
+        operationScheduleReads.set(task.month,{at:Date.now(),status:'ready',historyUnverified});
       }catch(error){
         if(task.owner===String(gcToken||'')){
           currentOperationScheduleStore()?.invalidate(task.month);
@@ -16346,7 +16371,7 @@ C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業
 
 });
 </script>
-<script src="../assets/port79-aqc-schedule-groups.js?v=20261117-roster-identity-v3"></script>
+<script src="../assets/port79-aqc-schedule-groups.js?v=20261117-schedule-history-v4"></script>
 <script src="../assets/port79-vessel-monthly-report.js?v=20261102-operation-count-hide-zeros-v1"></script>
 <script src="../assets/port79-seven-top.js?v=20261109-working-sheet-service&org=20261112-unit-source-v2&menu=20261113-terminal-system-v1&auth=20261115-recovery-v2"></script>
 
