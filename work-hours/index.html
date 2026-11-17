@@ -17655,6 +17655,12 @@ window.P79WorkhoursCacheContext={
   state.appliedCacheBundle=bundle.version;
   p79OvertimeCalculationCache=null;initDropdowns();
   clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);
+  // The dashboard receives the completed account-scoped month directly,
+  // rather than discovering it during another 12-second status check.
+  try{
+   if(typeof window.dispatchEvent==='function'&&typeof CustomEvent==='function')
+    window.dispatchEvent(new CustomEvent('p79-workhours-data-changed',{detail:{month,preview:bundle.preview===true}}));
+  }catch(_){};
  },
  invalidatePreview:month=>{const state=p79WorkOvertimeMonths.get(month);if(state){state.ready=false;state.rows=[];state.covers=[];state.leaveRecords=[];state.cachePreview=false;state.canDelete=false;state.appliedCacheBundle=null;}p79OvertimeCalculationCache=null;},
  failed:(month,error)=>{const state=p79WorkOvertimeMonths.get(month)||{token:currentPort79SsoToken(),rows:[]};state.at=Date.now();state.pending=false;state.error=String(error?.message||error);state.canDelete=false;p79WorkOvertimeMonths.set(month,state);renderOvertimeStats();}
