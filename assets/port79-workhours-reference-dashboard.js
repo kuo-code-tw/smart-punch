@@ -30,9 +30,30 @@
    el.dataset.signature=signature;
   }
  }
- function attendanceSessions(recordsSource,allow,from,to){
+ function attendanceSessions(recordsSource,scope,from,to){
   if(typeof buildDailyAttendanceRows!=='function'||typeof getAttendanceTimestamp!=='function')return[];
-  const filtered=recordsSource.filter(x=>allow.has(empId(x)));
+  const allow=new Set(scope.map(empId));
+  // The original attendance database can have older rows with an attendance
+  // number but no employee ID. Resolve only an unambiguous number in the FULL
+  // HR roster. Explicit but disallowed employee IDs may never be rescued.
+  const normalize=x=>typeof normalizeAttendanceStatsAttNo==='function'
+   ?normalizeAttendanceStatsAttNo(x):String(x||'').trim().replace(/^0+/,'');
+  const byAtt=new Map();
+  const roster=typeof employees!=='undefined'&&Array.isArray(employees)?employees:[];
+  for(const e of roster){
+   const key=normalize(e.attNo);if(!key)continue;
+   byAtt.set(key,byAtt.has(key)?null:e);
+  }
+  const owner=r=>{
+    const direct=empId(r);
+    if(direct)return allow.has(direct)?direct:null;
+    const unique=byAtt.get(normalize(r.attNo));
+    return unique&&allow.has(empId(unique))?empId(unique):null;
+  };
+  const filtered=recordsSource.filter(owner).map(r=>{
+    const resolved=owner(r);
+    return empId(r)?r:{...r,empId:resolved};
+  });
   const result=[],seen=new Set();
   for(const row of buildDailyAttendanceRows(filtered)){
    if(!row.clockIn||!row.clockOut)continue;
@@ -121,7 +142,7 @@
   const invalid=reports.filter(r=>r.unverified).length;
   const overtime=active.reduce((sum,r)=>sum+r.rawHours,0);
   const sourceRecords=typeof records!=='undefined'&&Array.isArray(records)?records:[];
-  const sessions=attendanceSessions(sourceRecords,allow,f.start,f.end);
+  const sessions=attendanceSessions(sourceRecords,scoped,f.start,f.end);
   const rawHours=round(sessions.reduce((sum,s)=>sum+s.minutes,0)/60);
   const dates=[],today=dateTaipei();
   // Date-only keys are UTC calendar dates here. Using +08:00 then slicing
