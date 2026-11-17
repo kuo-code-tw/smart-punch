@@ -64,6 +64,8 @@ assert(js.includes("document.documentElement.classList.remove('p79-leave-balance
 assert(js.includes('tr.hidden=!keep.has(tr)'), 'pagination only toggles row visibility');
 assert(js.includes("document.getElementById('p79LeaveVisualJob')"),'quota uses selected job in a separate dropdown');
 assert(js.includes('p79LeaveUnitOfPerson(e)===unit'),'quota cannot show balances from another unit');
+assert(js.includes("getElementById('filterDept')?.addEventListener('change',updateQuota)"),'unit changes must immediately clear stale quota values');
+assert(js.includes("getElementById('p79LeaveVisualJob')?.addEventListener('change',updateQuota)"),'job changes must immediately clear stale quota values');
 assert(css.includes('.p79-leave-visual-person-filters'),'two-column job/name quota fields must be styled only in leave');
 assert(!js.includes('p79PixelGroup'), 'removed duplicate header group dropdown must not be recreated');
 assert(js.includes('headingRight.replaceChildren();headingRight.hidden=true;'), 'remove only duplicated in-page header controls');

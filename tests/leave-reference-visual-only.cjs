@@ -99,7 +99,7 @@ const mkSelect=()=>({value:'',dataset:{},children:[],
 });
 const unit={value:'A單位'},job=mkSelect(),person=mkSelect();
 const doc={getElementById:id=>id==='filterDept'?unit:null,createElement:tag=>({tag,value:'',textContent:''})};
-const checks=Function('people','permitted','document','jobSelect','personSelect','p79LeaveUnitOfPerson','leaveEmployeeIsActive','window',
+const checks=Function('people','permitted','document','jobSelect','personSelect','p79LeaveUnitOfPerson','leaveEmployeeIsActive','window','unit',
  pickerSource+`
  updatePeople();
  const initial={jobs:jobSelect.children.map(x=>x.textContent),people:personSelect.children.map(x=>x.textContent)};
@@ -113,7 +113,7 @@ const checks=Function('people','permitted','document','jobSelect','personSelect'
  unit.value='';updatePeople();
  const noUnit={jobs:jobSelect.children.map(x=>x.textContent),people:personSelect.children.map(x=>x.textContent),person:personSelect.value};
  return {initial,aNames,bInitial,bNames,noUnit};`)(
- ()=>people,()=>true,doc,job,person,x=>x.section,x=>x.status==='在職',{});
+ ()=>people,()=>true,doc,job,person,x=>x.section,x=>x.status==='在職',{},unit);
 assert.deepEqual(checks.initial.jobs,['請選擇職稱','司機','技術員']);
 assert.deepEqual(checks.initial.people,['請先選擇職稱'],'do not show all employee names before job is chosen');
 assert.deepEqual(checks.aNames,['請選擇姓名','王子明','黃柏源'],'A unit drivers only, names by stroke');

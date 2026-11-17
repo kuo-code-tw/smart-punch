@@ -225,6 +225,8 @@ function init(){
    }
   }
   person?.addEventListener('change',updateQuota);
+  document.getElementById('p79LeaveVisualJob')?.addEventListener('change',updateQuota);
+  document.getElementById('filterDept')?.addEventListener('change',updateQuota);
   const recordsBody=document.getElementById('adminLeaveBody');
   if(recordsBody)new MutationObserver(updateQuota).observe(recordsBody,{childList:true});
   updateQuota();
