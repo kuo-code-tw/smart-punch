@@ -2,7 +2,7 @@
 'use strict';
 // Explicit, account-scoped month bundles. Generic no-store/auth/mutation reads
 // keep their existing semantics; save/revoke/export audit routes never use this.
-const flights=new Map(),metaFlights=new Map(),metaMemo=new Map(),memory=new Map();
+const flights=new Map(),metaFlights=new Map(),metaMemo=new Map(),memory=new Map(),verifiedMemo=new Map();
 // Every consumer of a shared read receives its display preview, including a
 // table opened while startup is already checking the same month.
 const observers=new Map();
@@ -18,7 +18,7 @@ function deliver(callback,value){try{if(callback)callback(copy(value));}catch(_)
 function publish(k,type,value){const entry=observers.get(k);if(!entry)return;if(type==='onPreview')entry.preview=value;if(type==='onRoster')entry.roster=value;if(type==='onAttendance')entry.attendance=value;if(type==='onInvalidate'){entry.preview=null;entry.roster=null;entry.attendance=null;entry.invalidated=value;}for(const options of entry.listeners){if(type==='onPreview'&&options.force===true)continue;deliver(options[type],value);}}
 let generation=0,startupFlight=null;
 const copy=x=>JSON.parse(JSON.stringify(x));
-function remember(k,b){memory.delete(k);memory.set(k,b);while(memory.size>3)memory.delete(memory.keys().next().value);}
+function remember(k,b){memory.delete(k);memory.set(k,b);while(memory.size>3){const oldest=memory.keys().next().value;memory.delete(oldest);verifiedMemo.delete(oldest);}}
 const context=()=>g.P79WorkhoursCacheContext;
 function mutationStamp(){try{return String(g.sessionStorage?.getItem('port79_cache_mutated_at')||'');}catch(_){return '';}}
 function identity(){const c=context(),token=c?.token?.(),viewer=g.Port79DataCache?.viewerKey?.(),url=c?.url?.();if(!token||!viewer||!url||!c.canRead()||c.cacheAccess?.()===false)throw Error('登入或加班查看權限已失效');const endpoint=new URL(url);if(endpoint.origin!=='https://script.google.com'||!/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(endpoint.pathname))throw Error('GAS 網址不正確');return {token,viewer,url,generation,stamp:mutationStamp()};}
@@ -51,15 +51,23 @@ function compatible(b,m){
 function load(month,options={}){
  const s=identity(),k=key(s,month)+'|'+s.token+'|'+s.stamp+'|'+s.generation;
  observe(k,options);
+ // A memory-resident, account-scoped month must paint in the same turn; even
+ // a healthy cloud metadata call must not block the already loaded local view.
+ if(!options.force&&!flights.has(k)){
+  const hot=memory.get(key(s,month)),stamp=Number(s.stamp)||0;
+  if(valid(hot,month,s)&&Number(hot.savedAt||0)>=stamp)
+   publish(k,'onPreview',{...copy(hot),preview:true,source:'本機快取，背景核對中'});
+ }
  if(flights.has(k))return flights.get(k).then(b=>{assert(s);return copy(b);});
  const p=(async()=>{
   const metaRead=meta(s,month,options.force===true);metaRead.catch(()=>{});
   const prior=await saved(s,month);assert(s);
   // Preview is explicitly marked unverified; no accounting/save operation gets
   // this result. UI still filters people through the current authenticated scope.
-  if(prior)publish(k,'onPreview',{...copy(prior),preview:true,source:'本機快取，背景核對中'});
+  if(prior&&!observers.get(k)?.preview)publish(k,'onPreview',{...copy(prior),preview:true,source:'本機快取，背景核對中'});
   let before=await metaRead;assert(s);
-  if(prior&&prior.version===before.version){const hit={...prior,source:'本機有效快取',preview:false,meta:before};remember(key(s,month),hit);return hit;}
+  if(prior&&prior.version===before.version){const hit={...prior,source:'本機有效快取',preview:false,meta:before};remember(key(s,month),hit);verifiedMemo.set(key(s,month),{version:hit.version,token:s.token,stamp:s.stamp});return hit;}
+  verifiedMemo.delete(key(s,month));
   // A scope/HR revision change must immediately stop showing old scoped data.
   if(prior&&prior.meta?.revisions?.scope!==before.revisions.scope)publish(k,'onInvalidate',month);
   for(let attempt=0;attempt<2;attempt++){
@@ -93,7 +101,7 @@ function load(month,options={}){
    if(!valid(b,month,s))throw Error('完整班表或跨月考勤尚未讀齊，未覆蓋原快取');
    const after=await meta(s,month,true);assert(s);
    if(before.version!==after.version||!compatible(b,after)){before=after;continue;}
-   b.meta=after;b.savedAt=Date.now();b.source='雲端已核對，已保存本機';b.preview=false;remember(key(s,month),b);
+   b.meta=after;b.savedAt=Date.now();b.source='雲端已核對，已保存本機';b.preview=false;remember(key(s,month),b);verifiedMemo.set(key(s,month),{version:b.version,token:s.token,stamp:s.stamp});
    const row={key:key(s,month),kind:'system',system:'workhours',month,savedAt:b.savedAt,size:JSON.stringify(b).length,data:copy(b)};
    // Cache/disk failures cannot hold the rendered result hostage. Account/scope
    // remain in the row key; a late write cannot validate a later version.
@@ -103,7 +111,17 @@ function load(month,options={}){
   throw Error('雲端資料持續更新，未確認快取版本；請重新讀取');
  })().finally(()=>{flights.delete(k);observers.delete(k);});flights.set(k,p);return p.then(b=>{assert(s);return copy(b);});
 }
-function invalidate(){generation++;metaMemo.clear();memory.clear();startupFlight=null;}
+// Dashboard may reuse ONLY a month already confirmed by the same authenticated
+// version check. This avoids downloading three raw attendance months again.
+function verifiedRawMonths(month,token){
+ try{
+  const s=identity(),k=key(s,month),b=memory.get(k),verified=verifiedMemo.get(k);
+  if(token!==s.token||!verified||verified.token!==s.token||verified.stamp!==s.stamp||
+     !valid(b,month,s)||b.version!==verified.version||Number(b.savedAt||0)<(Number(s.stamp)||0))return null;
+  return monthsFor(month).map(m=>({month:m,records:copy(b.raw[m].records)}));
+ }catch(_){return null;}
+}
+function invalidate(){generation++;metaMemo.clear();memory.clear();verifiedMemo.clear();startupFlight=null;}
 function startup(){
  const s=identity(),month=context().month(),k=key(s,month)+'|'+s.token+'|'+s.stamp+'|'+s.generation;
  if(startupFlight?.key===k)return startupFlight.promise;
@@ -116,6 +134,6 @@ function startup(){
   try{const b=await load(month,{onPreview:b=>context().applyBundle(b),onRoster:b=>context().applyRoster?.(b),onAttendance:b=>context().applyBundle(b),onInvalidate:()=>context().invalidatePreview?.(month)});assert(s);finished=true;context().applyBundle(b);return true;}catch(e){finished=true;context().failed?.(month,e);return false;}
  })().finally(()=>{if(startupFlight===flight)startupFlight=null;});return flight.promise;
 }
-g.P79WorkhoursCache={load,startup,invalidate,monthsFor,enabled:()=>!!context()?.canRead?.()&&context()?.cacheAccess?.()!==false};
+g.P79WorkhoursCache={load,startup,invalidate,verifiedRawMonths,monthsFor,enabled:()=>!!context()?.canRead?.()&&context()?.cacheAccess?.()!==false};
 })(window);
 
