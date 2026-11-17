@@ -2218,12 +2218,19 @@ function people(){
   return [...map.values()];
 }
 function updateCurrentAqcHeadcount(){
-  const el=document.getElementById('kpiPeople');
-  if(!el)return;
-  el.textContent=p79AqcHeadcountVerified?String(people().length):'—';
-  el.title=p79AqcHeadcountVerified
-    ?'依最新人資主檔計算目前在職 AQC 人員（不含離職、退休及留停）'
-    :'最新人資名冊尚未核對，暫不顯示可能過期的現職人數';
+  const el=document.getElementById('kpiPeople');if(!el)return;
+  if(p79AqcHeadcountVerified){
+    el.textContent=String(people().length);
+    el.title='依最新人資主檔計算在職 AQC 人數（不含離職與留停）';
+    return;
+  }
+  // Employee status comes from the authenticated monthly schedule roster,
+  // never from old WORKING REPORT names or old local personnel caches.
+  const month=(typeof isoTodayLocal==='function'?isoTodayLocal():new Date().toISOString().slice(0,10)).slice(0,7),store=typeof currentOperationScheduleStore==='function'?currentOperationScheduleStore():null;
+  const verified=store?.has(month)&&operationScheduleReads.get(month)?.status==='ready';
+  el.textContent=verified?String(store.personnel(month).length):'—';
+  el.title=verified?'依當月正式排班表 AQC 在職人員統計；人資端仍可另行核對':
+    '正在讀取當月正式排班編組，不以歷史作業紀錄推算人數';
 }
 function displayPersonName(v){
   return String(v||'')
@@ -4984,6 +4991,7 @@ function retryOperationScheduleGroups(){
 }
 
 function refreshOperationGroupView(){
+  if(typeof updateCurrentAqcHeadcount==='function')updateCurrentAqcHeadcount();
   const active=activeEfficiencyTabName();
   if(active==='dispatch')window.P79PersonnelDispatch?.render();
   else if(active==='weekly'){renderWeeklyEfficiency();renderMonthlyRanking();}
@@ -7394,11 +7402,11 @@ function renderMonthlyRanking(){
   const month=input.value,sourceRows=monthlyRankingRecords();
   ensureOperationScheduleGroups(sourceRows.length?sourceRows:[{workDate:month+'-01'}]);
   if(typeof p79EnsureFreshOfficialAqcRoster==='function')p79EnsureFreshOfficialAqcRoster();
-  const verified=p79VerifiedAqcReportView(sourceRows);
+  const verified=p79AqcHeadcountVerified?p79VerifiedAqcReportView(sourceRows):p79ScheduledAqcReportView(sourceRows,month);
   if(!verified.verified){
-    body.innerHTML='<tr><td colspan="12" class="p-5 text-amber-700">正在核對人資最新在職 AQC 名冊；不以歷史 WORKING REPORT 或舊排班名冊顯示現職人員。</td></tr>';
+    body.innerHTML='<tr><td colspan="12" class="p-5 text-amber-700">正在讀取當月正式排班 AQC 編組；歷史 WORKING REPORT 不會自動新增現職員工。</td></tr>';
     const count=document.getElementById('rankingCount');
-    if(count)count.textContent=month+'｜人資名冊待核對，現職排名暫不顯示；原始作業紀錄保留。';
+    if(count)count.textContent=month+'｜排班編組讀取中，作業資料仍保留。';
     const group=document.getElementById('rankingGroup');
     if(group)group.innerHTML='<option value="">全部組別</option>';
     return;
@@ -7406,13 +7414,14 @@ function renderMonthlyRanking(){
   const rows=verified.rows;
   // A monthly schedule roster may still contain departed employees. Only the
   // verified, currently active HR roster may contribute a ranked person.
-  const roster=people().map(p=>({empId:p.empId,name:p.name,group:operationGroupForRecord({empId:p.empId,name:p.name,workDate:month+'-01'})}));
+  const roster=verified.source==='schedule'?verified.roster:people().map(p=>({empId:p.empId,name:p.name,group:operationGroupForRecord({empId:p.empId,name:p.name,workDate:month+'-01'})}));
   const ranked=window.P79PersonnelRanking.rankMonth({month,records:rows,roster,metrics:workloadRecordMetrics,groupFor:r=>operationGroupForRecord(r.originalWorkDate?{...r,workDate:r.originalWorkDate}:r),normalize:normalizePersonName,sortBy:document.getElementById('rankingSort')?.value||'eff'});
   const group=document.getElementById('rankingGroup'),previous=group?.value||'',groups=[...new Set(ranked.flatMap(p=>p.groups))].sort(compareDriverNames);
   if(group){group.innerHTML='<option value="">全部組別</option>'+groups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');group.value=groups.includes(previous)?previous:'';}
   const name=normalizePersonName(document.getElementById('rankingName')?.value||''),shown=ranked.filter(p=>(!group?.value||p.groups.includes(group.value))&&(!name||normalizePersonName(p.name).includes(name)));
   body.innerHTML=shown.map(p=>`<tr><td class="font-black">${p.rank??'—'}</td><td class="font-bold">${esc(displayPersonName(p.name))}</td><td>${esc(p.groups.join('、')||'未取得排班組別')}</td><td>${p.ships}</td><td>${p.count}</td><td>${p.hours.toFixed(2)}</td><td>${p.disc}</td><td>${p.load}</td><td>${p.hc}</td><td class="font-bold">${p.containers}</td><td>${p.eff===null?'—':p.eff.toFixed(2)}</td><td>${!p.count?'尚無作業資料':p.hours<=0?'缺少有效時數':'已有作業資料'}</td></tr>`).join('')||'<tr><td colspan="12" class="p-5 text-slate-400">此條件尚無人員資料</td></tr>';
   const count=document.getElementById('rankingCount');if(count)count.textContent=`${month}｜顯示 ${shown.length}／${ranked.length} 人｜${rows.length} 筆作業紀錄。篩選保留全員原名次；效率以顯示的兩位小數判定同分。${store?.has(month)?'':'排班名冊尚未讀取，暫列現有人員及有作業紀錄的人員。'}`;
+  const store=currentOperationScheduleStore();
   const key=String(gcToken||'')+'|'+month,state=monthlyRankingReads.get(key),load=document.getElementById('rankingLoadState');
   if(load)load.textContent=state?.status==='loading'?'正在讀取整月雲端與歷史資料…':state?.status==='ready'?'整月雲端與歷史資料已讀取；排行依目前已匯入的作業資料計算。':state?.status==='partial'?'部分來源讀取失敗，以下為已取得資料的暫時排行，請重新讀取。':state?.status==='error'?'整月資料讀取失敗，以下僅以本機資料暫排，請重新讀取。':'尚未完成整月雲端讀取，以下為本機資料暫時排行。';
   if(!state&&String(gcToken||''))void loadMonthlyRanking(false);
@@ -7565,9 +7574,66 @@ function renderPersonnelGroupCards(persons){
 
 // Personnel overview must not infer current AQC membership from historical WORKING REPORT.
 let p79PersonnelRosterReadPromise=null,p79PersonnelRosterReadAt=0;
+// When the HR-only API is unavailable, show verified current schedule
+// personnel instead of leaving every A/B/C/D group blank. A historical report
+// alone is never treated as proof of current employment or group membership.
+function p79ScheduledAqcReportView(sourceRows,preferredMonth=''){
+  const source=Array.isArray(sourceRows)?sourceRows:[];
+  const store=typeof window!=='undefined'?currentOperationScheduleStore():null;
+  const months=[...new Set([preferredMonth,
+    ...source.map(r=>String(r?.workDate||'').slice(0,7))]
+    .filter(m=>/^20\d{2}-(0[1-9]|1[0-2])$/.test(m)))];
+  if(!store)return {verified:false,rows:[],persons:[],rosterCount:0,excluded:source.length,source:'schedule'};
+  const byMonth=new Map(),all=new Map();
+  for(const month of months){
+    if(!store.has(month)||operationScheduleReads.get(month)?.status!=='ready')continue;
+    const roster=store.personnel(month).filter(p=>!!p.name&&!!p.empId);
+    const ids=new Map(roster.map(p=>[String(p.empId).trim().toUpperCase(),p]));
+    const names=new Map();
+    for(const p of roster){
+      const name=normalizePersonName(displayPersonName(p.name));
+      if(!names.has(name))names.set(name,[]);
+      names.get(name).push(p);
+      if(!all.has(p.empId))all.set(p.empId,p);
+    }
+    byMonth.set(month,{roster,ids,names});
+  }
+  if(!byMonth.size)return {verified:false,rows:[],persons:[],rosterCount:0,excluded:source.length,source:'schedule'};
+  const included=[],persons=new Map();
+  for(const r of source){
+    const month=String(r?.workDate||'').slice(0,7),snapshot=byMonth.get(month);
+    if(!snapshot)continue;
+    const id=String(r?.empId||r?.employeeId||'').trim().toUpperCase();
+    const name=normalizePersonName(displayPersonName(r?.name||''));
+    const match=store.lookup(month,{empId:id,name:r?.name});
+    if(match.status!=='ok')continue;
+    // Do not treat a schedule-only historic row as an active employee.
+    const who=snapshot.ids.get(String(match.empId||'').trim().toUpperCase());
+    if(!who||normalizePersonName(displayPersonName(who.name))!==name)continue;
+    // An employee with a known real ID may only match the exact schedule ID
+    // or a declared official attendance-ID alias, never a same-name guess.
+    const workRow={...r,empId:who.empId,name:who.name};
+    included.push(workRow);
+    const key=String(who.empId).trim().toUpperCase(),m=workloadRecordMetrics(workRow);
+    const group=operationGroupForRecord(workRow),date=String(r.workDate||'');
+    if(!persons.has(key))persons.set(key,{empId:who.empId,name:who.name,group,groupDate:'',hasVerifiedGroup:false,
+      rows:[],hours:0,disc:0,load:0,hc:0,containers:0});
+    const person=persons.get(key);
+    const valid=!!personnelGroupCode(group);
+    if((valid&&(!person.hasVerifiedGroup||date>=person.groupDate))||(!person.hasVerifiedGroup&&date>=person.groupDate)){
+      person.group=group;person.groupDate=date;person.hasVerifiedGroup=valid;
+    }
+    person.rows.push(workRow);person.hours+=m.hours;person.disc+=m.disc;
+    person.load+=m.load;person.hc+=m.hc;person.containers+=m.containers;
+  }
+  return {verified:true,source:'schedule',rows:included,
+    persons:[...persons.values()].map(p=>({...p,eff:p.hours>0?(p.containers+p.hc)/p.hours:0})),
+    roster:[...all.values()],rosterCount:all.size,excluded:source.length-included.length,
+    partial:byMonth.size<months.length};
+}
 function p79VerifiedAqcReportView(sourceRows){
   const rows=Array.isArray(sourceRows)?sourceRows:[];
-  if(p79AqcHeadcountVerified!==true)return {verified:false,rows:[],persons:[],rosterCount:0,excluded:rows.length};
+  if(p79AqcHeadcountVerified!==true)return typeof p79ScheduledAqcReportView==='function'?p79ScheduledAqcReportView(rows):{verified:false,rows:[],persons:[],rosterCount:0,excluded:rows.length};
   const official=Array.isArray(systemEmployees)?systemEmployees:[];
   const employeeId=e=>String(e?.empId||e?.employeeId||e?.id||e?.['工號']||e?.attNo||e?.attendanceNo||e?.attendanceId||e?.['考勤號碼']||'').trim().toUpperCase();
   const employeeName=e=>String(e?.name||e?.employeeName||e?.['姓名']||'').trim();
@@ -7614,7 +7680,7 @@ function p79VerifiedAqcReportView(sourceRows){
     person.rows.push(row);
     person.hours+=measure.hours;person.disc+=measure.disc;person.load+=measure.load;person.hc+=measure.hc;person.containers+=measure.containers;
   }
-  return {verified:true,rows:matched,persons:[...persons.values()].map(p=>({...p,eff:p.hours>0?(p.containers+p.hc)/p.hours:0})),rosterCount:rosterIds.size,excluded:rows.length-matched.length};
+  return {verified:true,source:'hr',rows:matched,persons:[...persons.values()].map(p=>({...p,eff:p.hours>0?(p.containers+p.hc)/p.hours:0})),rosterCount:rosterIds.size,excluded:rows.length-matched.length};
 }
 function p79EnsureFreshOfficialAqcRoster(){
   if(typeof requireEfficiencyAccess!=='function'||!requireEfficiencyAccess()||!String(gcToken||''))return;
@@ -7770,7 +7836,7 @@ function renderWeeklyEfficiency(){
   const personBody=document.getElementById('weeklyPersonBody');
   if(personBody){
     if(!filteredPersons.length){
-      personBody.innerHTML='<tr><td colspan="10" class="text-center text-slate-500">'+(verifiedLive.verified?'此條件沒有符合的在職人員資料':'最新人資名冊尚未核對，暫不列出現職姓名；歷史 WORKING REPORT 作業統計仍可查看。')+'</td></tr>';
+      personBody.innerHTML='<tr><td colspan="10" class="text-center text-slate-500">'+(verifiedLive.verified?'此條件沒有符合的在職人員資料':'排班 AQC 名冊尚未讀取，組別人員暫不顯示；歷史作業統計仍可查看。')+'</td></tr>';
     }else{
       personBody.innerHTML=filteredPersons.map(p=>`<tr>
         <td class="font-black text-indigo-700">${p.effRank===null?'—':p.effRank}</td>
@@ -7795,14 +7861,14 @@ function renderWeeklyEfficiency(){
   if(verifiedLive.verified)renderPersonnelGroupCards(filteredPersons);
   else {
     const groupHost=document.getElementById('personnelGroupCards');
-    if(groupHost)groupHost.innerHTML='<div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800">正式在職 AQC 名冊尚未核對，組別人員排名暫不顯示；不影響已匯入的歷史作業統計。</div>';
+    if(groupHost)groupHost.innerHTML='<div class="rounded-xl border border-amber-200 bg-amber-50 p-3 text-amber-800">正式排班 AQC 編組尚未讀取；原始 WORKING REPORT 統計正常顯示。</div>';
     const unassignedHost=document.getElementById('personnelUnassigned');
     if(unassignedHost)unassignedHost.innerHTML='';
   }
   renderPersonnelRecords(rs);
   if(typeof p79VerifiedAqcReportView==='function'&&typeof window!=='undefined'){
     const hrView=p79VerifiedAqcReportView(rs);
-    window.P79PersonnelReference?.render({rows:hrView.rows,sourceRows:rs,persons:rankedPersonnelEfficiencyPersons(hrView.persons),metrics:workloadRecordMetrics,groupCode:personnelGroupCode,rosterVerified:hrView.verified,rosterCount:hrView.rosterCount,excludedRows:hrView.excluded});
+    window.P79PersonnelReference?.render({rows:hrView.rows,sourceRows:rs,persons:rankedPersonnelEfficiencyPersons(hrView.persons),metrics:workloadRecordMetrics,groupCode:personnelGroupCode,rosterVerified:hrView.verified,rosterSource:hrView.source||'hr',rosterCount:hrView.rosterCount,excludedRows:hrView.excluded});
   }
 }
 
@@ -16573,7 +16639,7 @@ window.addEventListener('load',function(){
 #p79GateImportDialogStatus[data-kind="success"]{color:#047857}
 .p79-gate-dialog-actions{display:flex;justify-content:flex-end}
 </style>
-<script src="./personnel-reference-dashboard.js?v=20261117-report-visibility-v2"></script>
+<script src="./personnel-reference-dashboard.js?v=20261117-schedule-roster-v3"></script>
 <script src="../assets/port79-gate-dialog.js?v=20261110-parent-dialog-v6"></script>
 <link rel="stylesheet" href="./driver-workstation-dashboard.css?v=20261117-trend-v3">
 <script src="./driver-workstation-dashboard.js?v=20261117-trend-v3"></script>

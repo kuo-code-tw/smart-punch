@@ -5,6 +5,14 @@ function createStore(normalizeName=v=>String(v||'').replace(/\s+/g,'')){
  const months=new Map();let owner='';
  const meaningfulGroup=g=>{const v=String(g||'').trim();return !!v&&v!=='不分組'&&v!=='不輪班';};
  const aqcRole=value=>/^AQC(?:$|[\s(（／/・·:\-]|司機|操作|人員)/.test(String(value||'').normalize('NFKC').trim().toUpperCase());
+ function isLiveEmployee(e){
+  const state=String(e?.employmentStatus||e?.employeeStatus||e?.employment_status||e?.['在職狀態']||e?.['員工狀態']||e?.status||'').trim().normalize('NFKC').toLowerCase();
+  if(/^(resigned|terminated|retired|inactive|quit|leave|loa|離職|已離職|退休|退職|資遣|解雇|解僱|留職停薪|留停)$/.test(state))return false;
+  const terminated=String(e?.terminationDate||e?.lastWorkDate||'').trim().slice(0,10);
+  const today=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'});
+  if(/^\d{4}-\d{2}-\d{2}$/.test(terminated)&&terminated<today)return false;
+  return true;
+ }
  // Match the schedule page: month-specific A-D group > most recent meaningful
  // previous-month schedule assignment > this month's stored default.
  // Explicit unassignment is a barrier; it must not be overwritten by history.
@@ -72,7 +80,7 @@ function createStore(normalizeName=v=>String(v||'').replace(/\s+/g,'')){
   });
   for(const employee of data.employees){
    const id=normId(employee.empId||employee.employeeId||employee.id||employee['工號']);if(!id||id==='ADMIN')continue;
-   const base={id,name:String(employee.name||'').trim(),role:String(employee.jobTitle||employee.deptDetail||employee.role||employee.dept||'AQC').trim(),group:String(employee.group||'不分組').trim()};
+   const base={id,name:String(employee.name||'').trim(),role:String(employee.jobTitle||employee.deptDetail||employee.role||employee.dept||'AQC').trim(),group:String(employee.group||'不分組').trim(),active:isLiveEmployee(employee)};
    const override=overrides.get(id),person=override?{...base,role:override.role||base.role,group:override.group||base.group,baseGroup:base.group}:{...base,baseGroup:base.group};
    const previous=byId.get(id);
    if(previous){
@@ -122,7 +130,7 @@ function createStore(normalizeName=v=>String(v||'').replace(/\s+/g,'')){
   const resolved=effectiveGroup(snapshot,match.id,match.baseGroup||match.group);
   return {group:resolved.group,status:'ok',empId:match.id};
  }
- return {setOwner,apply,applyHistory,needsHistory,lookup,personnel:month=>[...(months.get(month)?.byId.values()||[])].filter(p=>p.role.toUpperCase()==='AQC').map(p=>({empId:p.id,name:p.name,group:lookup(month,{empId:p.id}).group})),has:month=>months.has(month),invalidate:month=>months.delete(month),clear:()=>months.clear()};
+ return {setOwner,apply,applyHistory,needsHistory,lookup,personnel:month=>[...(months.get(month)?.byId.values()||[])].filter(p=>p.active&&aqcRole(p.role)).map(p=>({empId:p.id,name:p.name,group:lookup(month,{empId:p.id}).group})),has:month=>months.has(month),invalidate:month=>months.delete(month),clear:()=>months.clear()};
 }
 const api={createStore};
 if(typeof module==='object'&&module.exports)module.exports=api;else {root.P79AqcScheduleGroups=api;root.dispatchEvent?.(new Event('p79-aqc-schedule-groups-ready'));}

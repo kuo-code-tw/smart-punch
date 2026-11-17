@@ -36,7 +36,7 @@ const rank=rankMonth({month:'2026-11',records:filtered,roster:official.filter(e=
 assert.deepEqual(rank.map(r=>r.name),['現職甲','現職丙']);
 assert.equal(rank[0].groups.join('、'),'A組');
 assert(!rank.some(r=>r.groups.includes('排班無此司機')),'stale schedule failure label is not considered a group');
-assert(html.includes('const verified=p79VerifiedAqcReportView(sourceRows)'),'monthly ranking must gate on current verified HR');
+assert(html.includes("const verified=p79AqcHeadcountVerified?p79VerifiedAqcReportView(sourceRows):p79ScheduledAqcReportView(sourceRows,month);"),'monthly ranking must use current schedule roster if HR API is unavailable');
 assert(html.includes('const verifiedLive=p79VerifiedAqcReportView(sourceRows)'),'weekly personnel ranking must gate on verified HR');
 assert(html.includes('const rs=sourceRows;'),'raw report statistics cannot be gated by HR availability');
 assert(html.includes('const personnelRows=verifiedLive.rows;'),'live person names still require HR verification');

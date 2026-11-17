@@ -60,7 +60,7 @@ assert.equal(el('p79prPeople').textContent,'2');
 assert.equal(el('p79prCount').textContent,'9','all historical WORKING REPORT records remain visible after HR verification');
 assert.match(el('p79prFreshness').textContent,/人資在職 AQC 3 人/);
 assert.match(el('p79prFreshness').textContent,/已排除 6 筆/);
-assert.match(html,/personnel-reference-dashboard\.js\?v=20261117-report-visibility-v2/,'new script version invalidates previous cached personnel dashboard');
+assert.match(html,/personnel-reference-dashboard\.js\?v=20261117-schedule-roster-v3/,'new script version invalidates previous cached personnel dashboard');
 assert.match(html,/const hrView=p79VerifiedAqcReportView\(rs\)/);
 assert.match(html,/apiGet\('gcGetEmployees'\)/,'current HR roster must be read through dedicated endpoint');
 for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){
