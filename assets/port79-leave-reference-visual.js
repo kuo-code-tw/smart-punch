@@ -109,8 +109,8 @@ function init(){
  // Left: job title. Right: names belonging to the selected UNIT and job.
  // The unit comes from the official existing #filterDept control. Never show
  // an all-company name list when the unit is unselected.
- const titlePolicy=window.Port79JobTitleVisibility;
  const leaveStrokeCollator=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true,sensitivity:'variant'});
+ const titlePolicy=window.Port79JobTitleVisibility;
  const personTitle=x=>String(x?.jobTitle||x?.deptDetail||x?.position||'未設定職稱').trim();
  const personName=x=>String(x?.name||x?.empName||x?.empId||'').trim();
  const quotaUnitSelect=document.getElementById('p79LeaveVisualUnit');

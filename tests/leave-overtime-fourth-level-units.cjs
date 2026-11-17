@@ -21,7 +21,7 @@ const records=[
 ];
 const nodes=new Map();
 const node=id=>{if(!nodes.has(id))nodes.set(id,{id,value:'',innerHTML:'',dataset:{}});return nodes.get(id)};
-const lctx={window:{Port79OrgContext:Org},employees:staff,leaveRecords:records,$:node,
+const lctx={window:{Port79OrgContext:Org,Port79JobTitleVisibility:{ready:()=>true,isVisible:()=>true}},employees:staff,leaveRecords:records,$:node,
  String,Object,Array,Set,Intl,console,esc:x=>String(x??'')};
 vm.createContext(lctx);
 vm.runInContext(between(leave,'function p79LeaveUnitOfPerson(','function normalizeLeaveFilterDate('),lctx);
