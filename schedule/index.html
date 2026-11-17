@@ -3450,6 +3450,42 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
       // 實際打卡只顯示綠色提示，不再決定誰出現在名單裡。
       const groups={早:[],中:[],晚:[],休假:[],其他:[],加班代班:[]};
       const leaveShiftCodes=new Set(['休','特','年','事','病','公','喪','颱','離']);
+      // Only display saved, effective reports or cloud leave-cover assignments.
+      // Do not interpret a stale overtime flag as a revoked official report.
+      const coverRosterVerified=typeof p79ScheduleHasOfficialData==='function'?p79ScheduleHasOfficialData():true;
+      const dailyOvertimeEvidence=(empId,dayMeta)=>{
+        const id=String(empId||'').trim().toUpperCase();
+        const metadata=monthlyScheduleMeta?.[id]||{};
+        let confirmedReport=false,reportIsCover=false;
+        for(const [workDate,entry] of Object.entries(metadata)){
+          if(!/^\d{4}-\d{2}-\d{2}$/.test(workDate)||!entry||typeof entry!=='object'||entry.overtimeExcluded===true)continue;
+          const reports=[entry.overtimeReport,...(Array.isArray(entry.overtimeReports)?entry.overtimeReports:[])];
+          for(const report of reports){
+            const reportId=String(report?.id||'').trim();
+            if(!reportId)continue;
+            const accountingDate=String(report.overtimeDate||workDate).trim().slice(0,10).replace(/\//g,'-');
+            if(accountingDate!==dateKey)continue;
+            if((entry.overtimeRevocations||[]).some(r=>r?.confirmed===true&&String(r.reportId)===reportId))continue;
+            confirmedReport=true;
+            if(report.category==='代'||report.type==='substitute')reportIsCover=true;
+          }
+        }
+        const current=dayMeta&&typeof dayMeta==='object'?dayMeta:{};
+        const hasStoredReport=[current.overtimeReport,...(Array.isArray(current.overtimeReports)?current.overtimeReports:[])]
+          .some(report=>!!String(report?.id||'').trim());
+        const hasRevokedReport=Array.isArray(current.overtimeRevocations)&&
+          current.overtimeRevocations.some(revoke=>revoke?.confirmed===true);
+        const legacyAllowed=current.overtimeExcluded!==true&&!hasStoredReport&&!hasRevokedReport;
+        const legacyOvertime=legacyAllowed&&!!current.overtime;
+        const legacyCover=legacyAllowed&&(current.type==='substitute'||!!current.forEmpId);
+        const savedCover=typeof p79LeaveCoverOnDay==='function'&&
+          p79LeaveCoverOnDay(id,dateKey).some(link=>link.kind==='worker');
+        return {
+          has:confirmedReport||legacyOvertime||legacyCover||savedCover,
+          hasOvertime:(confirmedReport&&!reportIsCover)||legacyOvertime,
+          hasCover:reportIsCover||legacyCover||savedCover
+        };
+      };
 
       (employees||[]).forEach(emp=>{
         if(!scheduleEmployeeEligibleForMonth(emp,dateKey.slice(0,7)))return;
@@ -3459,9 +3495,10 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
         if(/主任|課長|副理|經理|協理|處長|部長|總監|副總|總經理|董事長|執行長|廠長/.test(role))return;
         const shift=String(monthlyScheduleData?.[emp.id]?.[dateKey]||'').trim();
         const meta=monthlyScheduleMeta?.[emp.id]?.[dateKey]||{};
+        const todayOvertime=dailyOvertimeEvidence(emp.id,meta);
         const approvedLeave=approvedLeaveForEmployee(emp?.id,dateKey,emp?.name);
         const item={
-          emp,shift,meta,dateKey,
+          emp,shift,meta,dateKey,todayOvertime,
           leave:approvedLeave,
           leaveLabel:scheduleRosterLeaveLabel(shift,approvedLeave)
         };
@@ -3479,7 +3516,7 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
           groups.其他.push(item);
         }
 
-        if(meta && (meta.overtime || meta.type==='substitute' || meta.forEmpId)){
+        if(todayOvertime.has){
           groups.加班代班.push(item);
         }
       });
@@ -3523,7 +3560,7 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
       kpi('p79RefPresentCount',currentAttendance?checkedIn+' 人':'待核對');
       kpi('p79RefAbsentCount',currentAttendance?Math.max(0,allIncluded.size-checkedIn)+' 人':'待核對');
       kpi('p79RefLeaveCount',leaveCount+' 人');
-      kpi('p79RefCoverCount',groups.加班代班.length+' 人');
+      kpi('p79RefCoverCount',coverRosterVerified?groups.加班代班.length+' 人':'待核對');
       kpi('p79RefPresentNote',currentAttendance?'目前出勤中（未簽退）':'等待正式考勤同步');
 
       summaryEl.textContent='';
@@ -3541,7 +3578,7 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
         ['中班',groups.中.length,'bg-amber-50 text-amber-700 border-amber-200'],
         ['晚班 '+nightDateKey.slice(5).replace('-','/'),nightSource?groups.晚.length:'待讀取','bg-purple-50 text-purple-700 border-purple-200'],
         ['休假',leaveCount,'bg-rose-50 text-rose-700 border-rose-200'],
-        ['加班／代班',groups.加班代班.length,'bg-sky-50 text-sky-700 border-sky-200']
+        ['加班／代班',coverRosterVerified?groups.加班代班.length:'待核對','bg-sky-50 text-sky-700 border-sky-200']
       ];
       countsEl.innerHTML=countCards.map(x=>
         `<div class="rounded-lg border ${x[2]}"><div class="today-count-label font-bold">${x[0]}</div><div class="today-count-value font-black">${x[1]}</div></div>`
@@ -3549,8 +3586,10 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
 
       const personRow=x=>{
         const badges=[];
-        if(x.meta?.overtime)badges.push('<span class="today-person-badge bg-sky-100 text-sky-700">加</span>');
-        if(x.meta?.forEmpId||x.meta?.type==='substitute')badges.push('<span class="today-person-badge bg-fuchsia-100 text-fuchsia-700">代</span>');
+        if(x.todayOvertime?.hasOvertime||(!x.todayOvertime&&x.meta?.overtime))
+          badges.push('<span class="today-person-badge bg-sky-100 text-sky-700">加</span>');
+        if(x.todayOvertime?.hasCover||(!x.todayOvertime&&(x.meta?.forEmpId||x.meta?.type==='substitute')))
+          badges.push('<span class="today-person-badge bg-fuchsia-100 text-fuchsia-700">代</span>');
 
         const isLeave=!!x.leave || leaveShiftCodes.has(String(x.shift||''));
         const leaveBadge=isLeave
@@ -3595,7 +3634,10 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
       ];
       if(groups.其他.length)blocks.push(block('其他排班',groups.其他,'text-indigo-700','fa-user-clock'));
       // Keep the reference's fifth colored column even with no overtime/coverage.
-      blocks.push(groups.加班代班.length
+      blocks.push(!coverRosterVerified
+        ?'<div class="today-shift-block p79-ref-no-cover"><div class="today-shift-title text-sky-700"><span><i class="fa-solid fa-right-left mr-1"></i>加班／代班</span><span>待核對</span></div>'+
+         '<div class="p79-ref-empty-cover"><i class="fa-regular fa-clock"></i><b>加班／代班名單待雲端核對</b><p>班表尚未完成正式讀取，請按「重新讀取」後核對。</p></div></div>'
+               :groups.加班代班.length
         ?block('加班／代班',groups.加班代班,'text-sky-700','fa-right-left')
         :'<div class="today-shift-block p79-ref-no-cover"><div class="today-shift-title text-sky-700"><span><i class="fa-solid fa-right-left mr-1"></i>加班／代班</span><span>0 人</span></div>'+
          '<div class="p79-ref-empty-cover"><i class="fa-regular fa-calendar-check"></i><b>今日無加班／代班安排</b><p>需要調整時，請到月排班表選擇日期與人員。</p>'+
