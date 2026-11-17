@@ -1671,12 +1671,12 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 @media(max-width:480px){#adminCreateLeaveDialog .p79-create-dates{grid-template-columns:1fr 1fr}#adminCreateLeaveDialog .p79-create-dates>.field:last-child{grid-column:1/-1}#adminCreateLeaveDialog .p79-create-body{padding:10px;gap:8px}#adminCreateLeaveDialog .p79-create-two{gap:8px}}
 </style>
 <dialog id="adminCreateLeaveDialog">
- <div class="p79-create-heading"><h2>智慧請假代班｜統一指派</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
+ <div class="p79-create-heading"><h2>新增人員請假</h2><button type="button" class="btn btn-sec" onclick="document.getElementById('adminCreateLeaveDialog').close()">關閉</button></div>
  <div class="p79-create-body">
   <div class="p79-workflow-steps" aria-label="請假代班加班三階段">
-   <div class="p79-workflow-step p79-workflow-leave"><strong>① 請假與代班</strong><small>每天獨立選人</small></div>
-   <div class="p79-workflow-step p79-workflow-check"><strong>② 系統核對</strong><small>核對正式資料與衝突</small></div>
-   <div class="p79-workflow-step p79-workflow-overtime"><strong>③ 加班待申報</strong><small>儲存後再核對申報</small></div>
+   <div class="p79-workflow-step p79-workflow-leave"><strong>① 申請資料</strong><small>選擇請假人員與日期</small></div>
+   <div class="p79-workflow-step p79-workflow-check"><strong>② 代班安排</strong><small>原系統逐日代班核對</small></div>
+   <div class="p79-workflow-step p79-workflow-overtime"><strong>③ 確認送出</strong><small>儲存並核對雲端資料</small></div>
   </div>
   <div class="p79-create-two">
    <div class="field"><label for="adminCreateLeaveType">假別</label><select id="adminCreateLeaveType"></select></div>
@@ -1701,8 +1701,16 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
   </div>
   <p id="adminCreateLeaveRecommendation" class="note" role="status" aria-live="polite">選擇請假人員後，系統將核對正式班表並推薦代班人員。</p>
   <div id="adminCreateLeaveDailyRows" hidden></div>
-  <input id="adminCreateLeaveReason" type="hidden" value="">
+  <div class="p79-create-reason-card"><b>▤ 事由說明（選填）</b><div class="field" style="margin-top:9px!important"><textarea id="adminCreateLeaveReason" placeholder="請輸入請假事由或補登原因；保留原有儲存規則"></textarea></div></div>
   <p id="adminCreateLeaveMessage" role="status"></p>
+   <aside id="p79CreatePreview" aria-label="年假與送出預覽">
+     <h3>▣ 年假與送出預覽</h3><div class="p79-preview-person" id="p79CreatePreviewPerson">尚未選擇請假人員</div>
+     <div class="p79-preview-row"><span>目前核對年假餘額</span><b id="p79CreatePreviewBalance">—</b></div>
+     <div class="p79-preview-row"><span>匯入後另核准天數</span><b id="p79CreatePreviewUsed">—</b></div>
+     <div class="p79-preview-row"><span>本次預計扣抵年假</span><b id="p79CreatePreviewDays">—</b></div>
+     <div class="p79-preview-row total"><span>申請後預估剩餘年假</span><b id="p79CreatePreviewAfter">待確認</b></div>
+     <div class="p79-preview-note" id="p79CreatePreviewStatus">選擇正式在職員工與日期後，顯示預估數字；正式儲存仍須核對雲端。</div>
+   </aside>
  </div>
  <div class="p79-create-actions"><button class="btn btn-sec" type="button" onclick="document.getElementById('adminCreateLeaveDialog').close()">取消</button><button id="adminCreateLeaveSave" class="btn btn-pri" type="button" onclick="saveAdminCreateLeave()">儲存請假並安排代班</button></div>
 </dialog>
@@ -2445,6 +2453,8 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 
 <script src="../assets/port79-leave-daily-simple.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1"></script>
 <script>window.Port79OrgContext.configure({system:'leave',people:()=>employees,render:()=>{populateDepartments();renderAll();}});</script>
+<link rel="stylesheet" href="../assets/port79-leave-ui-v115.css?v=20261117-production-v115">
+<script defer src="../assets/port79-leave-ui-v115.js?v=20261117-production-v115"></script>
 </body>
 </html>
 
