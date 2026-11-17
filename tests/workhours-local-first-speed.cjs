@@ -52,5 +52,5 @@ assert.notEqual(changed,first,'cloud revision change invalidates old computed ev
 assert.equal(cacheCalls,2);assert.equal(cloudCalls,0,'new verified bundle is reused too');
 token='OTHER';
 assert.equal(read('2026-11'),null,'a different user must not see the old account raw evidence');
-assert.equal(cloudCalls,0,'an asynchronous restricted read never serves the previous account');
+assert.equal(cloudCalls,3,'another account must perform new authenticated raw-month reads instead of inheriting a cache');
 console.log('PASS workhours fast local load, verified-month sharing, stable rendering, revision and account isolation');
