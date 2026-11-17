@@ -5,7 +5,7 @@ const source=fs.readFileSync(path.join(root,'assets/port79-home-cloud-status.js'
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const styles=fs.readFileSync(path.join(root,'assets/port79-home-original-shell.css'),'utf8');
 assert.doesNotThrow(()=>new Function(source));
-assert.match(html,/port79-home-cloud-status\.js\?v=20261117-live-cloud-v1/);
+assert.match(html,/port79-home-cloud-status\.js\?v=20261117-live-cloud-v2/);
 assert.match(source,/action=getCloudActivity/,'must use the same cloud activity backend as other systems');
 assert.match(source,/setInterval\(poll,15000\)/,'must poll real state every 15 seconds');
 assert.match(source,/getFolderSyncStatus/,'computer sync must be real, not simulated');
