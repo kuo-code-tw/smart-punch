@@ -7,6 +7,32 @@ if(window.__port79HomeCloudStatusLive)return;
 window.__port79HomeCloudStatusLive=true;
 const d=document;
 const keys=['attendance','workhours','leave','schedule','efficiency','hr','history'];
+const readHistory=new Map();
+// Automatic dashboard polling is a read operation, not a manual system update.
+// Require a persistent read before surfacing it; show writes immediately.
+function stabilizeActivity(data){
+ if(!data?.ok||!data.systems)return data;
+ const systems={...data.systems};
+ for(const key of keys){
+  const info=systems[key];if(!info)continue;
+  const jobs=Array.isArray(info.active)?info.active:[];
+  const reads=jobs.filter(job=>job?.operation==='read');
+  const substantial=jobs.some(job=>job?.operation!=='read');
+  const signature=reads.map(job=>String(job.action||job.label||'讀取')).sort().join('|');
+  if(reads.length&&!substantial){
+   const prior=readHistory.get(key);
+   const hits=prior?.signature===signature?prior.hits+1:1;
+   readHistory.set(key,{signature,hits});
+  }else readHistory.delete(key);
+  const stable=(!substantial&&reads.length&&(readHistory.get(key)?.hits||0)<2)?[]:jobs;
+  const last=info.lastCompleted;
+  const lastAction=String(last?.action||'');
+  const passiveCompletion=last?.operation==='read'||(!last?.operation&&/^(get|list|ping|fetch|read)/i.test(lastAction));
+  systems[key]={...info,active:stable,lastCompleted:passiveCompletion?null:last};
+ }
+ return {...data,systems};
+}
+
 let busy=false,computerBusy=false,started=false,lastValid=false,consecutivePollFailures=0;
 function visibleHost(){
  if(d.visibilityState==='hidden'||!d.body?.classList.contains('p79-workspace')||
@@ -90,7 +116,7 @@ async function poll(){
   });
   if(!res.ok)throw new Error('HTTP '+res.status);
   const data=await res.json();
-  if(!render(data))throw new Error('無效的雲端狀態回應');
+  if(!render(stabilizeActivity(data)))throw new Error('無效的雲端狀態回應');
   consecutivePollFailures=0;
  }catch(_){
   // Keep the last confirmed state on a brief network failure; transient GAS timeouts
