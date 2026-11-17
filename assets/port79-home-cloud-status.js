@@ -44,7 +44,7 @@ function describe(job){
  try{return String(window.P79Messages?.operation?.(v)||v)}catch(_){return v}
 }
 function render(data){
- if(!data||data.ok!==true)return false;
+ if(!data?.ok)return false;
  const systems={...(data.systems||{})};
  if(!systems.workhours)systems.workhours={active:[],passive:true};
  for(const key of keys){
