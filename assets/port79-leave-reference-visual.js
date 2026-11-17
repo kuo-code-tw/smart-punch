@@ -196,7 +196,7 @@ function init(){
    showDays('p79LeaveVisualEntitled',info?.entitled??null);
    showDays('p79LeaveVisualUsed',info?.used??null);
    showDays('p79LeaveVisualRemain',info?.effectiveRemaining??null);
-   document.getElementById('p79LeaveVisualQuotaNote').textContent=!titlePolicy?.ready?.()?'尚未核對人資隱藏職稱設定，暫不顯示職稱及人員。':!selectedUnit()?'請先在請假額度選擇單位。':!jobSelect.value?'請先選擇職稱。':!e?'請選擇姓名。':info?.effectiveRemaining==null?'此人員尚無可核實的年假餘額。':'原有年假基準月份：'+String(e.leaveBalance?.asOf||'未註明');
+   document.getElementById('p79LeaveVisualQuotaNote').textContent=!titlePolicy?.ready?.()?(titlePolicy?.status?.()==='error'?'無法讀取人資隱藏職稱設定（雲端或權限），暫停職稱選擇。請重新整理或確認人資查看權限。':'正在核對人資隱藏職稱設定，暫不顯示職稱及人員。'):!selectedUnit()?'請先在請假額度選擇單位。':!jobSelect.value?'請先選擇職稱。':!e?'請選擇姓名。':info?.effectiveRemaining==null?'此人員尚無可核實的年假餘額。':'原有年假基準月份：'+String(e.leaveBalance?.asOf||'未註明');
  }
  function updateStats(rs,m,unverified=false){
    if(unverified){
@@ -245,6 +245,9 @@ function init(){
        document.documentElement.classList.remove('p79-leave-cloud-unverified');
        return;
      }
+     // Login and HR roster load asynchronously. Retry the verified-settings
+     // read once the real admin session exists, even when it was absent at init.
+     syncTitleVisibility();
      updatePeople();updateQuota();
      const rs=records().filter(permitted),m=month();
      // A failed getLeaveData with HR-only fallback must never paint a
