@@ -9,6 +9,10 @@ assert.match(html,/<h2>79號碼頭 船舶作業 × 考勤人力 智慧管理中�
 assert.match(html,/<span class="name">效率系統<\/span>/);
 assert.match(html,/<span class="name">人資管理系統<\/span>/);
 assert.match(js,/function decorateHome\(\)/);
+assert.match(js,/function enforceSidebarContrast\(\)/,'sidebar must enforce contrast after rendering');
+assert.match(js,/shell\.style\.setProperty\('background',gradient,'important'\)/,'dark background must override conflicting themes');
+assert.match(js,/a\.style\.setProperty\('opacity',disabled\?'0\.96':'1','important'\)/,'disabled links must remain readable');
+assert(!js.includes("a.style.opacity='0.55'"),'do not fade disabled menu links to unreadable opacity');
 assert(!js.includes("intro.innerHTML="),'homepage script must not overwrite native title');
 assert(!js.includes("card.querySelector('.name').textContent="),'native system names stay unchanged');
 assert(!js.includes("card.querySelector('.icon').innerHTML="),'native system icons stay unchanged');
