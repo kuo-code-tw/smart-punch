@@ -114,18 +114,33 @@ function syncHomeFunctionMenu(){
  }
  const state=d.getElementById('p79SevenStatus');
  if(state){
-  state.replaceChildren();
+  // Preserve the status DOM. The live cloud-activity listener updates these nodes;
+  // recreating them on every permission sync would erase genuine read/write states.
+  if(!state.querySelector('.cloud-title')){
+   const cloud=d.createElement('span');cloud.className='cloud-title';cloud.textContent='☁️ 雲端';
+   state.prepend(cloud);
+  }
+  const statusSystems=[['attendance','考勤管理','🕒'],['workhours','加班管理','📊'],
+   ['leave','請假管理','📝'],['schedule','排班管理','📅'],
+   ['efficiency','船舶管理','🚢'],['hr','人資管理','👥'],['history','歷史資料管理','🗄️']];
   const ids={attendance:'cardAttendance',schedule:'cardSchedule',efficiency:'cardEfficiency',
    hr:'cardHr',workhours:'cardWorkhours',leave:'cardLeave',history:'cardHistory'};
-  for(const key of order){
+  for(const [key,title,symbol] of statusSystems){
    const source=d.getElementById(ids[key]);
    const permitted=!!source&&!source.hidden&&!source.disabled&&source.style.display!=='none'&&homeNavAllowed(key,source);
-   const item=d.createElement('span');item.className='sys '+(permitted?'is-available':'is-unavailable');
-   item.setAttribute('aria-label',meta[key][0]+'：'+(permitted?'可使用':'不可使用'));
-   const lamp=d.createElement('i');lamp.className='p79-status-light';lamp.setAttribute('aria-hidden','true');
-   const name=d.createElement('b');name.textContent=meta[key][0];
-   const available=d.createElement('span');available.textContent=permitted?'可使用':'不可使用';
-   item.append(lamp,name,available);state.append(item);
+   let item=state.querySelector('[data-sys="'+key+'"]');
+   if(!item){
+    item=d.createElement('span');item.className='sys';item.dataset.sys=key;
+    const pict=d.createElement('span');pict.className='p79-sys-icon';pict.textContent=symbol;pict.setAttribute('aria-hidden','true');
+    const lamp=d.createElement('i');lamp.className='p79-status-light';lamp.setAttribute('aria-hidden','true');
+    const name=d.createElement('b');name.textContent=title;
+    const live=d.createElement('span');live.className='p79-sys-state';live.textContent='狀態準備中…';
+    item.append(pict,name,lamp,live);state.append(item);
+   }
+   item.classList.toggle('is-unavailable',!permitted);
+   item.classList.toggle('is-available',permitted);
+   if(!permitted){item.dataset.state='unavailable';item.querySelector('.p79-sys-state').textContent='無權限';item.title=title+'｜此帳號尚無此系統權限';}
+   else if(item.dataset.state==='unavailable'){item.dataset.state='waiting';item.querySelector('.p79-sys-state').textContent='狀態準備中…';item.title=title+'｜等待取得真實雲端狀態';}
   }
  }
 }
@@ -169,7 +184,9 @@ function buildShell(){const sys=d.body.dataset.p79System||'home';shell=home?d.cr
  // All seven systems already show their names in the persistent sidebar.
  // Keep native homepage content, but do not insert a redundant title/breadcrumb/date panel.
  if(home)decorateHome();
- decorateNav();navObserver=new MutationObserver(decorateNav);navObserver.observe(nav,{childList:true});return true;
+ decorateNav();navObserver=new MutationObserver(decorateNav);navObserver.observe(nav,{childList:true});
+ if(home)window.dispatchEvent(new Event('p79-home-status-ready'));
+ return true;
 }
 function decorateHome(){const intro=d.querySelector('.p79-modern-home-intro');if(intro){
  // Keep the original title, subtitle and system-entry wording from index.html.
