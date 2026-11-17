@@ -135,3 +135,28 @@
 #view-personstats .p79driver-calc small{font-size:11px;color:#627e98}
 @media(max-width:1200px){#view-personstats .p79driver-analysis-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#view-personstats .p79driver-analysis-card:last-child{grid-column:1/-1}}
 @media(max-width:760px){#view-personstats .p79driver-panel{padding:12px}#view-personstats .p79driver-analysis-grid{grid-template-columns:1fr}#view-personstats .p79driver-analysis-card:last-child{grid-column:auto}#view-personstats .p79driver-day-table td,#view-personstats .p79driver-day-table th{font-size:12px}}
+
+
+/* v3 — full-width independent daily container/GPH charts, accessible values. */
+#view-personstats .p79driver-analysis-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}
+#view-personstats .p79driver-analysis-grid>.p79driver-analysis-card:first-child{grid-column:1/-1}
+#view-personstats .p79driver-analysis-grid>.p79driver-analysis-card:last-child{grid-column:auto}
+#view-personstats .p79driver-trend{width:100%;min-width:0}
+#view-personstats .p79driver-trend-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 15px}
+#view-personstats .p79driver-trend-stats>div{min-width:0;background:#edf5ff;border:1px solid #d5e6f7;border-radius:11px;padding:11px 14px;display:grid;gap:3px}
+#view-personstats .p79driver-trend-stats span{font-size:12px;font-weight:750;color:#526e89}
+#view-personstats .p79driver-trend-stats strong{font-size:24px;font-weight:900;line-height:1.35;color:#124f88;font-variant-numeric:tabular-nums}
+#view-personstats .p79driver-trend-graphs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+#view-personstats .p79driver-trend-chart{min-width:0;border:1px solid #dce8f5;background:#fff;border-radius:12px;padding:12px 10px 4px}
+#view-personstats .p79driver-trend-chart-title{font-size:14px;font-weight:900;color:#204c78;padding:1px 8px 9px}
+#view-personstats .p79driver-trend-scroll{width:100%;overflow-x:auto;overflow-y:hidden}
+#view-personstats .p79driver-trend svg.p79driver-trend-svg{display:block;width:100%;height:auto;min-width:440px;max-height:none;overflow:visible}
+#view-personstats .p79driver-trend-table-scroll{margin-top:14px;width:100%;overflow-x:auto;border:1px solid #dae7f5;border-radius:10px}
+#view-personstats .p79driver-trend-table{width:100%;border-collapse:collapse;text-align:right;font-size:13px;min-width:570px;font-variant-numeric:tabular-nums}
+#view-personstats .p79driver-trend-table th{background:#e8f2ff;color:#174b7c;font-weight:850;padding:10px 12px;border-bottom:1px solid #d4e4f3}
+#view-personstats .p79driver-trend-table td{color:#345572;padding:10px 12px;border-bottom:1px solid #e8eef7}
+#view-personstats .p79driver-trend-table tbody tr:last-child td{border-bottom:0}
+#view-personstats .p79driver-trend-table th:first-child,#view-personstats .p79driver-trend-table td:first-child{text-align:left;white-space:nowrap}
+#view-personstats .p79driver-trend-table td strong{color:#1265a5}
+@media(max-width:1200px){#view-personstats .p79driver-trend-graphs{grid-template-columns:1fr}}
+@media(max-width:760px){#view-personstats .p79driver-analysis-grid{grid-template-columns:1fr}#view-personstats .p79driver-analysis-grid>.p79driver-analysis-card:first-child{grid-column:auto}#view-personstats .p79driver-trend-stats{grid-template-columns:1fr}#view-personstats .p79driver-trend-stats strong{font-size:21px}}

@@ -159,7 +159,8 @@
     return true;
   }
   function trendMarkup(days) {
-    var data = days.slice(0, 7).reverse(), width = 570, base = 202, top = 30, left = 50, chartWidth = 480;
+    // Work dates come from WORKING REPORT; missing dates are not zero-filled.
+    var data = days.slice(0, 7).reverse();
     if (!data.length) return '<p class="p79driver-empty">此篩選範圍沒有作業日期，沒有可分析的資料。</p>';
     if (data.length === 1) {
       var one = data[0], v = one.totals;
@@ -167,23 +168,60 @@
         '<strong>' + fmt(v.containers) + ' <small>櫃</small></strong><div>卸櫃 ' + fmt(v.disc) + ' ｜ 裝櫃 ' + fmt(v.load) + ' ｜ H/C ' + fmt(v.hc) + '</div>' +
         '<div>作業 ' + fmt(v.hours) + ' 小時 ｜ 平均效率 ' + fmt(v.gph) + ' GPH</div></div>';
     }
-    var peak = Math.max(1, ...data.map(function (x) { return x.totals.containers; }));
-    var maxGph = Math.max(1, ...data.map(function (x) { return x.totals.gph || 0; }));
-    var span = chartWidth / data.length;
-    var bars = data.map(function (d, i) {
-      var bh = (d.totals.containers / peak) * (base - top), x = left + i * span + span * .22;
-      return '<rect x="' + x.toFixed(1) + '" y="' + (base - bh).toFixed(1) + '" width="' + (span * .52).toFixed(1) + '" height="' + bh.toFixed(1) + '" rx="2" fill="#3d9fea" opacity=".7"><title>' + html(d.date) + '：' + fmt(d.totals.containers) + ' 櫃</title></rect>' +
-        '<text x="' + (left + (i + .5) * span).toFixed(1) + '" y="224" font-size="13" text-anchor="middle" fill="#334155">' + html(d.date.slice(5)) + '</text>';
-    }).join('');
-    var pts = data.filter(function (d) { return d.totals.gph !== null; }).map(function (d) {
-      var i = data.indexOf(d);
-      return { x: left + (i + .5) * span, y: base - d.totals.gph / maxGph * (base - top) };
-    });
-    var line = pts.length > 1 ? '<polyline points="' + pts.map(function (p) { return p.x.toFixed(1) + ',' + p.y.toFixed(1); }).join(' ') + '" fill="none" stroke="#128642" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>' : '';
-    var dots = pts.map(function (p) { return '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="5" fill="#fff" stroke="#128642" stroke-width="3"/>'; }).join('');
-    var grid = [0, .25, .5, .75, 1].map(function (v) { var y = base - v * (base - top); return '<line x1="50" y1="' + y + '" x2="540" y2="' + y + '" stroke="#e4ebf4"/><text x="42" y="' + (y + 4) + '" text-anchor="end" font-size="12" fill="#64748b">' + fmt(fixed(peak * v)) + '</text>'; }).join('');
-    return '<div class="p79driver-chart-legend"><span><i class="p79driver-legend-bar"></i>總櫃數</span><span><i class="p79driver-legend-line"></i>效率 GPH</span></div>' +
-      '<svg viewBox="0 0 ' + width + ' 235" role="img" aria-label="' + html('近 ' + data.length + ' 個有作業日期的櫃數與效率趨勢') + '">' + grid + bars + line + dots + '</svg>';
+    var totalContainers = fixed(data.reduce(function (s, d) { return s + (+d.totals.containers || 0); }, 0));
+    var totalHc = fixed(data.reduce(function (s, d) { return s + (+d.totals.hc || 0); }, 0));
+    var totalHours = fixed(data.reduce(function (s, d) { return s + (+d.totals.hours || 0); }, 0));
+    var weightedGph = totalHours > 0 ? fixed((totalContainers + totalHc) / totalHours) : null;
+    function chart(kind) {
+      var isGph = kind === 'gph', W = 640, H = 290, left = 60, right = 620, top = 40, bottom = 244;
+      var span = (right - left) / data.length, height = bottom - top;
+      var rawPeak = Math.max(1, ...data.map(function (d) { return +(isGph ? d.totals.gph : d.totals.containers) || 0; }));
+      var peak = isGph ? Math.ceil(rawPeak / 5) * 5 : Math.ceil(rawPeak / 4) * 4;
+      function xAt(i) { return left + (i + .5) * span; }
+      function yAt(value) { return bottom - (+value || 0) / peak * height; }
+      var grid = [0, .25, .5, .75, 1].map(function (v) {
+        var y = bottom - v * height;
+        return '<line x1="' + left + '" y1="' + y + '" x2="' + right + '" y2="' + y + '" stroke="#dce7f2" stroke-width="1"/>' +
+          '<text x="' + (left - 9) + '" y="' + (y + 5) + '" text-anchor="end" font-size="14" fill="#4d6784">' + fmt(fixed(peak * v)) + '</text>';
+      }).join('');
+      var labels = data.map(function (d, i) {
+        return '<text x="' + xAt(i).toFixed(1) + '" y="273" text-anchor="middle" font-size="14" font-weight="700" fill="#274865">' + html(d.date.slice(5)) + '</text>';
+      }).join('');
+      var graph = '';
+      if (isGph) {
+        var points = data.map(function (d, i) {
+          var v = d.totals.gph;
+          return v === null || v === undefined || !Number.isFinite(+v) ? null : { x:xAt(i), y:yAt(v), value:v, date:d.date, hours:d.totals.hours };
+        });
+        graph += points.slice(1).map(function (p, i) {
+          var previous = points[i];
+          return previous && p ? '<line x1="' + previous.x.toFixed(1) + '" y1="' + previous.y.toFixed(1) + '" x2="' + p.x.toFixed(1) + '" y2="' + p.y.toFixed(1) + '" stroke="#14834c" stroke-width="4" stroke-linecap="round"/>' : '';
+        }).join('');
+        graph += points.map(function (p, i) {
+          return p
+            ? '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="6" fill="#fff" stroke="#14834c" stroke-width="3"><title>' + html(p.date) + '：' + fmt(p.value) + ' GPH，作業 ' + fmt(p.hours) + ' 小時</title></circle>' +
+              '<text x="' + p.x.toFixed(1) + '" y="' + Math.max(20,p.y-13).toFixed(1) + '" text-anchor="middle" font-size="15" font-weight="800" fill="#12623d">' + fmt(p.value) + '</text>'
+            : '<text x="' + xAt(i).toFixed(1) + '" y="' + (bottom-12) + '" text-anchor="middle" font-size="15" fill="#64748b">—</text>';
+        }).join('');
+      } else {
+        graph = data.map(function (d, i) {
+          var value = +d.totals.containers || 0, y = yAt(value), h = bottom - y, bw = Math.min(78,span * .5), x = xAt(i) - bw/2;
+          return '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0,h).toFixed(1) + '" rx="5" fill="#3699e7"><title>' + html(d.date) + '：' + fmt(value) + ' 櫃（卸 ' + fmt(d.totals.disc) + '／裝 ' + fmt(d.totals.load) + '）</title></rect>' +
+            '<text x="' + xAt(i).toFixed(1) + '" y="' + Math.max(20,y-10).toFixed(1) + '" text-anchor="middle" font-size="16" font-weight="850" fill="#145c99">' + fmt(value) + '</text>';
+        }).join('');
+      }
+      var name = isGph ? '每日 GPH 效率（櫃／小時）' : '每日總櫃數（櫃）';
+      return '<div class="p79driver-trend-chart"><div class="p79driver-trend-chart-title">' + name + '</div>' +
+        '<div class="p79driver-trend-scroll"><svg class="p79driver-trend-svg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + name + '，日期依先後排序">' + grid + graph + labels + '</svg></div></div>';
+    }
+    return '<div class="p79driver-trend-stats">' +
+      '<div><span>實際作業日</span><strong>' + fmt(data.length) + ' 日</strong></div>' +
+      '<div><span>期間總櫃數</span><strong>' + fmt(totalContainers) + ' 櫃</strong></div>' +
+      '<div><span>期間 GPH</span><strong>' + fmt(weightedGph) + '</strong></div></div>' +
+      '<div class="p79driver-trend-graphs">' + chart('containers') + chart('gph') + '</div>' +
+      '<div class="p79driver-trend-table-scroll"><table class="p79driver-trend-table"><thead><tr><th>作業日期</th><th>卸櫃</th><th>裝櫃</th><th>總櫃數</th><th>作業時數</th><th>GPH</th></tr></thead><tbody>' +
+      data.map(function (d) { var v=d.totals; return '<tr><td>' + html(d.date) + '</td><td>' + fmt(v.disc) + '</td><td>' + fmt(v.load) + '</td><td><strong>' + fmt(v.containers) + '</strong></td><td>' + fmt(v.hours) + '</td><td><strong>' + fmt(v.gph) + '</strong></td></tr>'; }).join('') +
+      '</tbody></table></div>';
   }
   function craneBarsMarkup(cranes) {
     if (!cranes.length) return '<p class="p79driver-empty">沒有 AQC 明細。</p>';
@@ -249,9 +287,9 @@
       return '<tr><td>' + html(r.date || '未填') + '</td><td class="p79driver-cell-strong">' + html(r.workingNo || '—') + '</td><td>' + html(vessel || '—') + '</td><td>AQC ' + html(r.aqc) + '</td><td>' + html(r.group || '—') + '</td><td class="p79driver-cell-strong">' + html(r.driver) + '</td><td>' + html(r.period) + '</td><td>' + fmt(r.disc) + '</td><td>' + fmt(r.load) + '</td><td>' + fmt(r.bundle) + '</td><td>' + fmt(r.hc) + '</td><td class="em">' + fmt(r.containers) + '</td><td>' + fmt(r.hours) + '</td><td>' + fmt(r.gph) + '</td></tr>';
     }).join('') || '<tr><td colspan="14" class="p79driver-empty">本範圍沒有 WORKING REPORT 司機作業資料。</td></tr>';
     var single = model.days.length === 1;
-    document.getElementById('p79driverTrendTitle').textContent = single ? '單日作業摘要（不是趨勢）' : '每日櫃數與 GPH 趨勢';
+    document.getElementById('p79driverTrendTitle').textContent = single ? '單日作業摘要（不是趨勢）' : '每日櫃數與 GPH 趨勢（分開顯示）';
     document.getElementById('p79driverTrend').innerHTML = trendMarkup(model.days);
-    document.getElementById('p79driverTrendHelp').textContent = !model.days.length ? '未取得日期資料。' : single ? '只有 1 個有作業紀錄的日期，不能畫成多日趨勢；上方已列出這一天的原始司機作業明細。' : '僅比較最近 ' + Math.min(model.days.length,7) + ' 個有紀錄的日期；沒有作業紀錄的日期不會自動視為 0。';
+    document.getElementById('p79driverTrendHelp').textContent = !model.days.length ? '未取得日期資料。' : single ? '只有 1 個有作業紀錄的日期，不能畫成多日趨勢；上方已列出這一天的原始司機作業明細。' : '按日期由早到晚顯示最近 ' + Math.min(model.days.length,7) + ' 個有紀錄的作業日；櫃數與 GPH 使用獨立刻度，沒有作業紀錄的日期不當成 0。';
     document.getElementById('p79driverCraneBars').innerHTML = craneBarsMarkup(model.visibleCranes);
     document.getElementById('p79driverComposition').innerHTML = compositionMarkup(d);
     document.getElementById('p79driverCalculation').innerHTML = '<div class="p79driver-calc"><b>本次計算</b><div>總櫃數 = ' + fmt(d.disc) + '（卸）＋' + fmt(d.load) + '（裝）＝ <strong>' + fmt(d.containers) + ' 櫃</strong></div><div>H/C 為 ' + fmt(d.hc) + '，不計入總櫃數。</div><div>GPH =（' + fmt(d.containers) + '＋' + fmt(d.hc) + '）÷ ' + fmt(d.hours) + ' 小時＝ <strong>' + fmt(d.gph) + '</strong></div><small>Bundle 扣除：' + fmt(d.bundle) + '（已反映於 WORKING REPORT 的 DISC／LOAD，不會再次扣除）</small></div>';
