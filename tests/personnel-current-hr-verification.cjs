@@ -52,13 +52,15 @@ const ui={window,document:d,Intl,Number,Math,String,Map,Array};
 vm.createContext(ui);vm.runInContext(reference,ui);assert.equal(typeof window.P79PersonnelReference.render,'function');
 window.P79PersonnelReference.render({rows,persons:result.persons,rosterVerified:false,metrics:c.workloadRecordMetrics,groupCode:()=>''});
 assert.equal(el('p79prPeople').textContent,'—','unverified roster never displays historic 39-style headcounts');
+assert.equal(el('p79prCount').textContent,'9','HR outage does not hide source work records');
+assert(el('p79prDailyChart').innerHTML.includes('<svg'),'HR outage does not blank original daily trend');
 assert.match(el('p79prFreshness').textContent,/人資正式名冊待核對/);
-window.P79PersonnelReference.render({rows:result.rows,persons:result.persons,rosterVerified:true,rosterCount:result.rosterCount,excludedRows:result.excluded,metrics:c.workloadRecordMetrics,groupCode:()=>''});
+window.P79PersonnelReference.render({rows:result.rows,sourceRows:rows,persons:result.persons,rosterVerified:true,rosterCount:result.rosterCount,excludedRows:result.excluded,metrics:c.workloadRecordMetrics,groupCode:()=>''});
 assert.equal(el('p79prPeople').textContent,'2');
-assert.equal(el('p79prCount').textContent,'3');
+assert.equal(el('p79prCount').textContent,'9','all historical WORKING REPORT records remain visible after HR verification');
 assert.match(el('p79prFreshness').textContent,/人資在職 AQC 3 人/);
 assert.match(el('p79prFreshness').textContent,/已排除 6 筆/);
-assert.match(html,/personnel-reference-dashboard\.js\?v=20261112-verified-aqc-v1/,'new script version invalidates previous cached personnel dashboard');
+assert.match(html,/personnel-reference-dashboard\.js\?v=20261117-report-visibility-v2/,'new script version invalidates previous cached personnel dashboard');
 assert.match(html,/const hrView=p79VerifiedAqcReportView\(rs\)/);
 assert.match(html,/apiGet\('gcGetEmployees'\)/,'current HR roster must be read through dedicated endpoint');
 for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){

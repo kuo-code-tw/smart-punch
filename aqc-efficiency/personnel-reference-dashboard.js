@@ -113,11 +113,11 @@
       const ranking=document.getElementById('p79prRankBody');
       if(ranking)ranking.innerHTML='<tr><td colspan="5">人資名冊待核對，現職排名暫不顯示。</td></tr>';
       const warning=document.getElementById('p79prGroupWarning');if(warning)warning.hidden=true;
-      if(fresh)fresh.textContent='WORKING REPORT 歷史作業統計：'+fmt.format(original.length)+' 筆｜現職 AQC 名冊待核對（原始作業資料照常顯示）';
+      if(fresh)fresh.textContent='WORKING REPORT 歷史作業統計：'+fmt.format(original.length)+' 筆｜人資正式名冊待核對（原始作業資料照常顯示）';
       return;
     }
     renderGroups(ps,code);renderCompare(ps,code);renderRanking(ps,code);
-    if(fresh)fresh.textContent='已核對在職 AQC '+fmt.format(rosterCount)+' 人｜現職期間有作業 '+fmt.format(ps.length)+' 人｜WORKING REPORT 歷史資料 '+fmt.format(original.length)+' 筆'+(excludedRows?'｜其中 '+fmt.format(excludedRows)+' 筆未列入現職人員名單（原始作業統計保留）':'');
+    if(fresh)fresh.textContent='已核對人資在職 AQC '+fmt.format(rosterCount)+' 人｜現職期間有作業 '+fmt.format(ps.length)+' 人｜WORKING REPORT 歷史資料 '+fmt.format(original.length)+' 筆'+(excludedRows?'｜已排除 '+fmt.format(excludedRows)+' 筆非現職或身分待核對紀錄，不列入現職人員名單（原始作業統計保留）':'');
   }
   window.P79PersonnelReference={render};
   window.addEventListener('load',function(){
