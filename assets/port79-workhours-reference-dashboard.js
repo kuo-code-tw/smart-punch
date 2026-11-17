@@ -364,6 +364,7 @@
   },600);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshOnChange()});
   window.addEventListener('focus',refreshOnChange);
+  window.addEventListener('p79-workhours-data-changed',refreshOnChange);
   // A changed official revision triggers paint; unchanged snapshots stay put.
   setInterval(refreshOnChange,12000);
  }
