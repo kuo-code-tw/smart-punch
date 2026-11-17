@@ -29,7 +29,7 @@ assert(ui.includes("f.start.slice(0,7)!==f.end.slice(0,7)"),'never silently blen
 assert(ui.includes("T00:00:00Z"),'do not shift Taiwan date-only trend by 1 day');
 assert(ui.includes('reportSums')&&ui.includes('sessionSums'),'donut ratio must require physical matching evidence');
 assert(ui.includes('rawHours:null')===false,'undefined hours may never be force-filled with sample data');
-assert(ui.includes('return\\'applied\\'')||ui.includes("return'applied'"),'submitted is not the same as approved');
+assert(ui.includes("return'applied'"),'submitted is not the same as approved');
 assert(ui.includes('p79OvertimeCalculationCache'),'original work-hours ledger remains source of report records');
 assert(ui.includes("em='—'"),'unknown data must display a dash rather than invented zero');
 assert(ui.includes("id('prPersonalScheduled',")===false,'cannot invent the expected hours from an attendance interval');
