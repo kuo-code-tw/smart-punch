@@ -4913,11 +4913,41 @@ function operationGroupForRecord(r){
   const store=currentOperationScheduleStore(),month=String(r?.workDate||'').slice(0,7);
   if(!store)return '排班組別元件未載入';
   const found=store.lookup(month,{empId:r?.empId,name:r?.name});
-  if(found.status!=='unavailable')return found.group;
-  const state=operationScheduleReads.get(month);
-  if(state?.status==='loading')return '讀取排班組別中…';
-  if(state?.status==='error')return '排班讀取失敗';
-  return found.group;
+  if(found.status==='ok'||found.status==='conflict'||found.status==='ambiguous'||found.status==='not-aqc')return found.group;
+  // WORKING REPORT may use an older identifier. Only a freshly verified HR identity
+  // can reconcile it with a unique official schedule name; never guess from history.
+  if(found.status==='missing'&&p79AqcHeadcountVerified===true){
+    const norm=v=>normalizePersonName(displayPersonName(v||''));
+    const reportName=norm(r?.name),rawId=String(r?.empId||r?.employeeId||'').trim().toUpperCase();
+    const employeeId=e=>String(e?.empId||e?.employeeId||e?.id||e?.['工號']||e?.attNo||e?.attendanceNo||e?.attendanceId||e?.['考勤號碼']||'').trim().toUpperCase();
+    const employees=Array.isArray(systemEmployees)?systemEmployees:[];
+    const byId=rawId&&!rawId.startsWith('NAME:')?employees.filter(e=>employeeId(e)===rawId):[];
+    const byName=reportName?employees.filter(e=>norm(e.name||e.employeeName||e['姓名'])===reportName):[];
+    // A wrong real employee ID must not silently be reassigned to somebody else.
+    const official=byId.length===1&&norm(byId[0].name||byId[0].employeeName||byId[0]['姓名'])===reportName?byId[0]:
+      (!rawId||rawId.startsWith('NAME:'))&&byName.length===1?byName[0]:null;
+    if(official&&isAqcEmployee(official)&&byName.length===1){
+      const id=employeeId(official);
+      const direct=store.lookup(month,{empId:id,name:official.name});
+      if(direct.status==='ok')return direct.group;
+      // Only after HR has confirmed exactly one identity may we check the unique
+      // schedule-name alias; duplicate schedule names remain an explicit warning.
+      const alias=store.lookup(month,{empId:'NAME:'+reportName,name:official.name});
+      if(alias.status==='ok')return alias.group;
+      // For the current month, HR's explicit A-D assignment is safer than
+      // the stale schedule employee list. Never apply today's group to past months.
+      const currentMonth=new Date().toISOString().slice(0,7);
+      const hrGroup=String(official.group||official.groupName||official.scheduleGroup||official['組別']||'').trim();
+      if(month===currentMonth&&personnelGroupCode(hrGroup))return hrGroup;
+    }
+    return '排班身分／組別待核對';
+  }
+  if(found.status==='unavailable'){
+    const state=operationScheduleReads.get(month);
+    if(state?.status==='loading')return '讀取排班組別中…';
+    if(state?.status==='error')return '排班讀取失敗';
+  }
+  return found.status==='missing'?'排班身分／組別待核對':found.group;
 }
 function operationScheduleErrorKind(error){
   const message=String(error?.message||error||'');
@@ -7333,9 +7363,22 @@ async function loadMonthlyRanking(force=false){
 function renderMonthlyRanking(){
   const input=document.getElementById('rankingMonth'),body=document.getElementById('rankingBody');if(!input||!body||!window.P79PersonnelRanking)return;
   const year=getPort79Year();if(!input.value)input.value=(document.getElementById('filterMonth')?.value||'').startsWith(year+'-')?document.getElementById('filterMonth').value:year===isoTodayLocal().slice(0,4)?isoTodayLocal().slice(0,7):year+'-01';
-  const month=input.value,rows=monthlyRankingRecords();
-  ensureOperationScheduleGroups(rows.length?rows:[{workDate:month+'-01'}]);
-  const store=currentOperationScheduleStore(),roster=store?.has(month)?store.personnel(month):people().map(p=>({empId:p.empId,name:p.name,group:operationGroupForRecord({empId:p.empId,name:p.name,workDate:month+'-01'})}));
+  const month=input.value,sourceRows=monthlyRankingRecords();
+  ensureOperationScheduleGroups(sourceRows.length?sourceRows:[{workDate:month+'-01'}]);
+  if(typeof p79EnsureFreshOfficialAqcRoster==='function')p79EnsureFreshOfficialAqcRoster();
+  const verified=p79VerifiedAqcReportView(sourceRows);
+  if(!verified.verified){
+    body.innerHTML='<tr><td colspan="12" class="p-5 text-amber-700">正在核對人資最新在職 AQC 名冊；不以歷史 WORKING REPORT 或舊排班名冊顯示現職人員。</td></tr>';
+    const count=document.getElementById('rankingCount');
+    if(count)count.textContent=month+'｜人資名冊待核對，現職排名暫不顯示；原始作業紀錄保留。';
+    const group=document.getElementById('rankingGroup');
+    if(group)group.innerHTML='<option value="">全部組別</option>';
+    return;
+  }
+  const rows=verified.rows;
+  // A monthly schedule roster may still contain departed employees. Only the
+  // verified, currently active HR roster may contribute a ranked person.
+  const roster=people().map(p=>({empId:p.empId,name:p.name,group:operationGroupForRecord({empId:p.empId,name:p.name,workDate:month+'-01'})}));
   const ranked=window.P79PersonnelRanking.rankMonth({month,records:rows,roster,metrics:workloadRecordMetrics,groupFor:r=>operationGroupForRecord(r.originalWorkDate?{...r,workDate:r.originalWorkDate}:r),normalize:normalizePersonName,sortBy:document.getElementById('rankingSort')?.value||'eff'});
   const group=document.getElementById('rankingGroup'),previous=group?.value||'',groups=[...new Set(ranked.flatMap(p=>p.groups))].sort(compareDriverNames);
   if(group){group.innerHTML='<option value="">全部組別</option>'+groups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');group.value=groups.includes(previous)?previous:'';}
@@ -7408,7 +7451,9 @@ function weeklyFilteredRecords(baseOnly=false){
 }
 
 function weeklyGroupNames(){
-  return [...new Set(weeklyFilteredRecords(true).map(operationGroupForRecord))].sort((a,b)=>a.localeCompare(b,'zh-Hant-u-co-stroke',{numeric:true}));
+  const live=p79VerifiedAqcReportView(weeklyFilteredRecords(true));
+  if(!live.verified)return [];
+  return [...new Set(live.rows.map(operationGroupForRecord).filter(g=>!!personnelGroupCode(g)))].sort((a,b)=>a.localeCompare(b,'zh-Hant-u-co-stroke',{numeric:true}));
 }
 
 function refreshWeeklyGroupFilter(){
@@ -7558,12 +7603,12 @@ function p79EnsureFreshOfficialAqcRoster(){
       p79AqcHeadcountVerified=true;
       saveLocal();
       updateCurrentAqcHeadcount();
-      if(activeEfficiencyTabName()==='weekly')renderWeeklyEfficiency();
+      if(activeEfficiencyTabName()==='weekly'){renderWeeklyEfficiency();renderMonthlyRanking();}
       return true;
     }catch(error){
       p79AqcHeadcountVerified=false;
       console.warn('人員統計人資名冊核對失敗',error);
-      if(activeEfficiencyTabName()==='weekly')renderWeeklyEfficiency();
+      if(activeEfficiencyTabName()==='weekly'){renderWeeklyEfficiency();renderMonthlyRanking();}
       return false;
     }finally{p79PersonnelRosterReadPromise=null;}
   })();
@@ -7575,7 +7620,11 @@ function renderWeeklyEfficiency(){
   preparePersonnelFilters();
   ensureOperationScheduleGroups(weeklyFilteredRecords(true));
   refreshWeeklyGroupFilter();
-  const rs=weeklyFilteredRecords();
+  const sourceRows=weeklyFilteredRecords();
+  // The raw WORKING REPORT remains in storage; live personnel summaries are
+  // based on verified active HR employees only.
+  const verifiedLive=p79VerifiedAqcReportView(sourceRows);
+  const rs=verifiedLive.rows;
 
   const peopleMap=new Map();
   // The work report can contain NAME: placeholders even when the HR roster
@@ -16378,7 +16427,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(18){width:4.0%!important;min-width:0!important}
 body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(19){width:4.0%!important;min-width:0!important}
 </style>
-<script src="/smart-punch/assets/port79-management-link.js?v=20261105.1-20261017.official1&rev=20261022-workflow&sync=20261104-leave-roster-v1&syncfix=20261114-no-loop-v1"></script><script src="../assets/port79-personnel-ranking.js?v=20261017.1"></script>
+<script src="/smart-punch/assets/port79-management-link.js?v=20261105.1-20261017.official1&rev=20261022-workflow&sync=20261104-leave-roster-v1&syncfix=20261114-no-loop-v1"></script><script src="../assets/port79-personnel-ranking.js?v=20261117-active-hr-v1"></script>
 <link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-personnel-dispatch.js?v=20261111-current-roster-v6"></script>
 <script src="../assets/port79-full-refresh.js?v=20261105.1"></script>
