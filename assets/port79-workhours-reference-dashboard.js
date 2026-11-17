@@ -14,29 +14,41 @@
  // The authoritative attendance source is getAttendanceMonthRaw, reused through
  // the application's original validated month loader. Never sum local preview
  // records and claim a full payroll month was fetched.
- const rawCloud={month:'',token:'',rows:null,readAt:0,attemptAt:0,inflight:null,error:''};
+ const rawCloud={month:'',token:'',revision:'',rows:null,readAt:0,attemptAt:0,inflight:null,error:''};
  function verifiedAttendance(month){
   if(typeof currentPort79SsoToken!=='function'||typeof p79ReadWorkRestMonth!=='function'||
      typeof p79WorkRestMonths!=='function'||typeof mergeAttendanceRecordCollections!=='function')return null;
   const token=currentPort79SsoToken();
   if(!token)return null;
-  if(rawCloud.month!==month||rawCloud.token!==token){
-    rawCloud.month=month;rawCloud.token=token;rawCloud.rows=null;
+  // A new official revision or confirmed edit must invalidate the local hours view.
+  const official=typeof p79WorkOvertimeMonths!=='undefined'?p79WorkOvertimeMonths.get(month):null;
+  const revision=JSON.stringify([official?.appliedCacheBundle||official?.revision||'',
+    typeof lastAttendanceCloudRevision==='undefined'?'':lastAttendanceCloudRevision,
+    window.sessionStorage?.getItem?.('port79_cache_mutated_at')||'']);
+  if(rawCloud.month!==month||rawCloud.token!==token||rawCloud.revision!==revision){
+    rawCloud.month=month;rawCloud.token=token;rawCloud.revision=revision;rawCloud.rows=null;
     rawCloud.readAt=0;rawCloud.attemptAt=0;rawCloud.error='';
   }
   if(Array.isArray(rawCloud.rows)&&Date.now()-rawCloud.readAt<300000)return rawCloud.rows;
+  // The main loader has already fetched and version-verified these adjacent raw
+  // months; reusing them avoids three redundant GAS reads.
+  const cached=window.P79WorkhoursCache?.verifiedRawMonths?.(month,token);
+  if(Array.isArray(cached)&&cached.length&&cached.every(x=>Array.isArray(x.records))){
+   rawCloud.rows=cached.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
+   rawCloud.readAt=Date.now();rawCloud.error='';return rawCloud.rows;
+  }
   if(rawCloud.inflight||Date.now()-rawCloud.attemptAt<15000)return null;
   rawCloud.rows=null;rawCloud.attemptAt=Date.now();
-  const requestedMonth=month,requestedToken=token;
+  const requestedMonth=month,requestedToken=token,requestedRevision=revision;
   const pending=Promise.all(p79WorkRestMonths(month).map(m=>p79ReadWorkRestMonth(m,token)));
   rawCloud.inflight=pending;
   void pending.then(batches=>{
-    if(currentPort79SsoToken()!==requestedToken||rawCloud.month!==requestedMonth||rawCloud.token!==requestedToken)return;
+    if(currentPort79SsoToken()!==requestedToken||rawCloud.month!==requestedMonth||rawCloud.token!==requestedToken||rawCloud.revision!==requestedRevision)return;
     if(batches.some(x=>!Array.isArray(x?.records)))throw Error('正式原始打卡月份資料缺失');
     rawCloud.rows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
     rawCloud.readAt=Date.now();rawCloud.error='';
   }).catch(err=>{
-    if(rawCloud.month!==requestedMonth||rawCloud.token!==requestedToken)return;
+    if(rawCloud.month!==requestedMonth||rawCloud.token!==requestedToken||rawCloud.revision!==requestedRevision)return;
     rawCloud.rows=null;rawCloud.error=String(err?.message||err);
   }).finally(()=>{
     if(rawCloud.inflight===pending)rawCloud.inflight=null;
@@ -297,13 +309,30 @@
   if(target==='report'&&typeof p79CanReportOvertime==='function'&&p79CanReportOvertime())window.P79Overtime?.openReport?.();
   if(target==='audit'&&typeof p79CanExportOvertimeApplication==='function'&&p79CanExportOvertimeApplication())window.P79OvertimeStatus?.open?.();
  }
+ function autoSignature(){
+  const month=String(id('prStart')?.value||'').slice(0,7);
+  const official=typeof p79WorkOvertimeMonths!=='undefined'?p79WorkOvertimeMonths.get(month):null;
+  return JSON.stringify([typeof currentPort79SsoToken==='function'?currentPort79SsoToken():'',
+   id('prStart')?.value||'',id('prEnd')?.value||'',official?.revision||'',
+   official?.appliedCacheBundle||'',official?.pending||false,official?.at||0,
+   typeof lastAttendanceCloudRevision==='undefined'?'':lastAttendanceCloudRevision,
+   window.sessionStorage?.getItem?.('port79_cache_mutated_at')||'',
+   window.Port79JobTitleVisibility?.status?.()||'',rawCloud.readAt,rawCloud.error]);
+ }
+ let lastAutoSignature='';
+ function refreshOnChange(){
+  if(!id('viewAdmin')?.classList.contains('p79-ref-active')||document.hidden)return;
+  const signature=autoSignature();
+  if(signature===lastAutoSignature)return;
+  lastAutoSignature=signature;refresh();
+ }
  function refresh(){if(!id('p79WorkhoursReference'))return;try{paint(compute())}
   catch(e){say('prDataStatus','無法核對正式資料：'+String(e?.message||e));id('prDataStatus').dataset.error='true'}}
  async function mount(){
   const host=id('viewAdmin')?.querySelector('.admin-desktop-content');
   if(!host||id('p79WorkhoursReference'))return;
   let markup;
-  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1',{cache:'no-store'});
+  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1',{cache:'default'});
    if(!resp.ok)throw Error('HTTP '+resp.status);markup=await resp.text();
    if(!markup.includes('id="p79WorkhoursReference"')||!markup.includes('id="prTableBody"'))throw Error('版型檔格式錯誤');
   }catch(e){console.warn('工時版型尚未讀取完成，保留原本功能',e);return}
@@ -333,9 +362,10 @@
    if(id('viewAdmin')?.querySelector('.admin-desktop-content')){clearInterval(handle);void mount()}
    else if(++attempts>=50)clearInterval(handle)
   },600);
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()});
-  window.addEventListener('focus',refresh);
-  setInterval(()=>{if(id('viewAdmin')?.classList.contains('p79-ref-active')&&!document.hidden)refresh()},12000);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshOnChange()});
+  window.addEventListener('focus',refreshOnChange);
+  // A changed official revision triggers paint; unchanged snapshots stay put.
+  setInterval(refreshOnChange,12000);
  }
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
