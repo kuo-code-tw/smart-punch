@@ -122,6 +122,9 @@ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus .
  html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys .p79-sys-state{
   color:#71849a!important;font-size:11px!important;font-weight:700!important
  }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="idle"] .p79-status-light{
+  background:#a8b7c8!important;box-shadow:0 0 0 2px #e5ebf2!important;animation:none!important
+ }
  html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="busy"] .p79-status-light{
   background:#4b9dee!important;box-shadow:0 0 0 2px #deedff,0 0 7px #4b9deea8!important;
   animation:p79HomeCloudBusy 1.25s ease-in-out infinite
