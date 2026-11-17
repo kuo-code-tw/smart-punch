@@ -871,3 +871,51 @@ html:is([data-theme="dark"],.dark) body[data-p79-system="leave"] #p79LeaveDetail
   flex-grow:1!important;
  }
 }
+
+/* Dark-mode specificity guard for the original high-priority quota/calendar rules. */
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-panel{
+ background:#172b44!important;border-color:#344e6b!important;color:#e7f1ff!important;box-shadow:none!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-panel-head{border-color:#36516e!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-panel-head strong{color:#e8f2ff!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-panel-head small,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-quota>label,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualQuotaNote{color:#b5c9e1!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelQuotaTable{
+ background:#14263d!important;border-color:#344c67!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelQuotaTable th{
+ background:#253e59!important;color:#e8f2ff!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelQuotaTable td{
+ background:#182d46!important;color:#deebff!important;border-color:#304b66!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelQuotaTable td:last-child{
+ background:#173e37!important;color:#9bf0c2!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-weekdays{
+ background:#253c58!important;color:#d4e3f8!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-calendar-day,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-calendar-empty{
+ background:#172c45!important;border-color:#304a65!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-calendar-day.has-leave,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-calendar-day.has-leave:has(.annual),
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-calendar-day.has-leave:has(.personal),
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-calendar-day.has-leave:has(.sick),
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-calendar-day.has-leave:has(.other){
+ background:#2a4665!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide .p79-leave-visual-calendar-day strong{color:#e6efff!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelPages button:not(.active){
+ background:#203753!important;color:#ddeafb!important;border-color:#405a76!important;
+}
+@media(min-width:901px) and (max-width:1180px){
+ html.p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide{
+  align-items:stretch!important;
+ }
+ html.p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide>.p79-leave-visual-panel{
+  min-height:350px!important;height:100%!important;
+ }
+}
