@@ -3,6 +3,9 @@
 <head>
 <script src="../assets/port79-attendance-review-navigation.js?v=20261030-v5"></script><script src="../assets/port79-official-calendar.js?v=20261023-special-overtime"></script><script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script>window.P79ManagementOptimizationMode=true;</script><script src="../assets/port79-attendance-edit-compare.js?v=20261021-shared-conflict"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
+<!-- Official HR hidden job-title policy: selectors only; data and calculations unchanged. -->
+<script defer src="../assets/port79-hidden-job-titles.js?v=20261117-hr-hidden-v1"></script>
+<script defer src="../assets/port79-workhours-hidden-job-ui.js?v=20261117-hr-filter-v1"></script>
 <script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261027-all-overtime-periods-v2"></script>
 <script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
@@ -17992,6 +17995,7 @@ window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261101-workhours-bleed-fix-v3&menu=20261112-clean-v1">
 <script src="../assets/port79-management-workspace.js?v=20261115-shared-user-activity-v3"></script>
 <script>window.Port79OrgContext.configure({system:'workhours',container:()=>document.getElementById('viewAdmin'),people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
+<script>window.p79WorkhoursRosterForVisibility=()=>typeof employees==='undefined'||!Array.isArray(employees)?[]:employees;</script>
 </body>
 </html>
 
