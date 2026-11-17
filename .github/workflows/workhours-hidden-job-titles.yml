@@ -1,0 +1,32 @@
+name: Verify work-hours hidden job titles
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'work-hours/index.html'
+      - 'assets/port79-hidden-job-titles.js'
+      - 'assets/port79-workhours-hidden-job-ui.js'
+      - 'tests/workhours-hidden-job-titles.cjs'
+      - 'tests/leave-hidden-job-titles.cjs'
+      - '.github/workflows/workhours-hidden-job-titles.yml'
+  pull_request:
+    paths:
+      - 'work-hours/index.html'
+      - 'assets/port79-hidden-job-titles.js'
+      - 'assets/port79-workhours-hidden-job-ui.js'
+      - 'tests/workhours-hidden-job-titles.cjs'
+      - 'tests/leave-hidden-job-titles.cjs'
+      - '.github/workflows/workhours-hidden-job-titles.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/workhours-hidden-job-titles.cjs
+      - run: node tests/leave-hidden-job-titles.cjs
+      - run: node tests/leave-overtime-fourth-level-units.cjs
