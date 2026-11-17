@@ -17586,7 +17586,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="../attendance/v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102"></script>
 
-<script src="../assets/port79-workhours-cache.js?v=20261116-attendance-preview-v1"></script>
+<script src="../assets/port79-workhours-cache.js?v=20261116-attendance-preview-v1&reuse=20261117-local-first-v2"></script>
 <script>
 // One read service for main table, monthly report and amendment/accounting views.
 window.P79WorkhoursCacheContext={
@@ -17632,7 +17632,10 @@ window.P79WorkhoursCacheContext={
   const state=target||p79WorkOvertimeMonths.get(month)||{token,rows:[],covers:[],leaveRecords:[]};
   if(state.token!==token||target&&p79WorkOvertimeMonths.get(month)!==target)return;
   if(p79WorkhoursIsEditing()){state.pending=false;state.at=0;p79DeferredOvertimeDisplay=true;return;}
-  if(state.ready&&!state.error&&state.appliedCacheBundle===bundle.version&&state.cachePreview===(bundle.preview===true)&&state.at>0&&(bundle.preview||!state.pending))return;
+  // A duplicate memory preview must not demote an already confirmed same-
+   // version month to loading when a background metadata check begins.
+   if(bundle.preview&&state.ready&&!state.pending&&!state.error&&!state.cachePreview&&state.appliedCacheBundle===bundle.version)return;
+   if(state.ready&&!state.error&&state.appliedCacheBundle===bundle.version&&state.cachePreview===(bundle.preview===true)&&state.at>0&&(bundle.preview||!state.pending))return;
   const roster=bundle.roster;
   if(Array.isArray(roster.employees))employees=mergeCloudEmployees(roster.employees.map(normalizeEmployeeIdentifiers));
   const raw=Object.values(bundle.raw||{}),loadedMonths=new Set(raw.map(x=>x.month));
@@ -17660,7 +17663,9 @@ window.p79ApplyAttendanceFullCache=async function(snapshot,options={}){
  const result=window.P79WorkhoursCacheContext.applyFull(snapshot);
  if(options.fromIndexedDb!==true&&window.P79WorkhoursCache?.enabled()){
   const month=window.P79WorkhoursCacheContext.month();
-  const bundle=await window.P79WorkhoursCache.load(month,{force:true});window.P79WorkhoursCacheContext.applyBundle(bundle);
+  // Restore the local full snapshot without forcing a second complete cloud
+   // download. The shared loader still checks the authenticated cloud version.
+   const bundle=await window.P79WorkhoursCache.load(month);window.P79WorkhoursCacheContext.applyBundle(bundle);
  }
  return result;
 };
@@ -17996,7 +18001,7 @@ window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
 <script src="../assets/port79-management-workspace.js?v=20261115-shared-user-activity-v3"></script>
 <!-- User-approved work-hours dashboard: private to this page; original controller stays intact. -->
 <link rel="stylesheet" href="../assets/port79-workhours-reference-dashboard.css?v=20261117-approved-v2">
-<script defer src="../assets/port79-workhours-reference-dashboard.js?v=20261117-approved-v2"></script>
+<script defer src="../assets/port79-workhours-reference-dashboard.js?v=20261117-approved-v2&reuse=20261117-local-first-v2"></script>
 <script>window.Port79OrgContext.configure({system:'workhours',container:()=>document.getElementById('viewAdmin'),people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
 <script>window.p79WorkhoursRosterForVisibility=()=>typeof employees==='undefined'||!Array.isArray(employees)?[]:employees;</script>
 </body>
