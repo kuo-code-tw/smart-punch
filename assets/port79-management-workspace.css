@@ -195,11 +195,11 @@ html body.p79-workspace[data-p79-system="workhours"] :is(.p79-stats-table-wrap,.
  html body.p79-workspace #p79SevenNav a.active,
  html body.p79-workspace #p79SevenNav a[aria-current="page"],
  html body.p79-workspace #p79SevenNav a:hover{
-  background:#d8ebff!important;color:#0877d7!important;
+  background:#d8ebff!important;color:#0667b3!important;
   box-shadow:0 2px 8px #bdddf247!important
  }
  html body.p79-workspace #p79SevenNav a.active svg,
- html body.p79-workspace #p79SevenNav a:hover svg{color:#0877d7!important}
+ html body.p79-workspace #p79SevenNav a:hover svg{color:#0667b3!important}
  html body.p79-workspace #p79SevenNav a[aria-disabled="true"]{
   opacity:1!important;color:#25476b!important;cursor:not-allowed
  }
