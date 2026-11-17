@@ -96,3 +96,74 @@ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus .
  html body.p79-workspace:has(#systems.show) #p79HomeFunctionMenu>summary{padding:7px 8px;font-size:12px}
  html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus{margin:5px 12px}
 }
+
+
+/* HOME ONLY: live cloud-activity states from the same endpoint as the seven-system top bar.
+   An idle chip is neutral, not a falsely glowing green "available" lamp. */
+@media screen {
+ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus{
+  flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important;
+  white-space:nowrap!important;scrollbar-width:thin;align-items:center!important;gap:5px!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus .cloud-title{
+  display:inline-flex!important;flex:0 0 auto!important;color:#647c98!important;font-size:11px!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus .sys{
+  flex:0 0 auto!important;min-height:26px!important;padding:4px 8px!important;
+  gap:5px!important;white-space:nowrap!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .p79-sys-icon{
+  display:inline-block!important;font-size:12px!important;line-height:1!important;flex:none!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys .p79-status-light{
+  background:#a8b7c8!important;box-shadow:0 0 0 2px #e5ebf2!important;
+  transition:background .2s,box-shadow .2s!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys .p79-sys-state{
+  color:#71849a!important;font-size:11px!important;font-weight:700!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="busy"] .p79-status-light{
+  background:#4b9dee!important;box-shadow:0 0 0 2px #deedff,0 0 7px #4b9deea8!important;
+  animation:p79HomeCloudBusy 1.25s ease-in-out infinite
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="busy"] .p79-sys-state{
+  color:#2873bb!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="busy"][data-operation="write"] .p79-status-light{
+  background:#ea9545!important;box-shadow:0 0 0 2px #fff0dd,0 0 7px #efab60a6!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="busy"][data-operation="write"] .p79-sys-state{
+  color:#aa671c!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="done"] .p79-status-light{
+  background:#18bc79!important;box-shadow:0 0 0 2px #d8f6e6,0 0 6px #18bc7999!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="done"] .p79-sys-state{
+  color:#137c52!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="error"] .p79-status-light,
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="offline"] .p79-status-light{
+  background:#e77676!important;box-shadow:0 0 0 2px #fde6e6!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="error"] .p79-sys-state,
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="offline"] .p79-sys-state{
+  color:#ad4242!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys[data-state="permission"] .p79-status-light{
+  background:#eead52!important;box-shadow:0 0 0 2px #fff2dc!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79SevenStatus .sys.is-unavailable .p79-status-light{
+  background:#a8b7c8!important;box-shadow:0 0 0 2px #e5ebf2!important;animation:none!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79ComputerSync{
+  font:inherit!important;cursor:pointer!important;color:#4b6786!important;background:#fff!important
+ }
+ html body.p79-workspace:has(#systems.show) #p79ComputerSync .p79-sys-state{max-width:160px;overflow:hidden;text-overflow:ellipsis}
+}
+@keyframes p79HomeCloudBusy{
+  0%,100%{opacity:.53;transform:scale(.89)}
+  50%{opacity:1;transform:scale(1.14)}
+}
+@media(prefers-reduced-motion:reduce){
+ html body.p79-workspace #p79SevenStatus .p79-status-light{animation:none!important}
+}
