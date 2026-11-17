@@ -6,7 +6,11 @@ on:
       - 'work-hours/index.html'
       - 'assets/port79-hidden-job-titles.js'
       - 'assets/port79-workhours-hidden-job-ui.js'
+      - 'assets/port79-workhours-reference-dashboard.css'
+      - 'assets/port79-workhours-reference-dashboard.js'
+      - 'assets/port79-workhours-reference-dashboard.html'
       - 'tests/workhours-hidden-job-titles.cjs'
+      - 'tests/workhours-reference-dashboard.cjs'
       - 'tests/leave-hidden-job-titles.cjs'
       - '.github/workflows/workhours-hidden-job-titles.yml'
   pull_request:
@@ -14,7 +18,11 @@ on:
       - 'work-hours/index.html'
       - 'assets/port79-hidden-job-titles.js'
       - 'assets/port79-workhours-hidden-job-ui.js'
+      - 'assets/port79-workhours-reference-dashboard.css'
+      - 'assets/port79-workhours-reference-dashboard.js'
+      - 'assets/port79-workhours-reference-dashboard.html'
       - 'tests/workhours-hidden-job-titles.cjs'
+      - 'tests/workhours-reference-dashboard.cjs'
       - 'tests/leave-hidden-job-titles.cjs'
       - '.github/workflows/workhours-hidden-job-titles.yml'
 permissions:
@@ -28,5 +36,6 @@ jobs:
         with:
           node-version: '22'
       - run: node tests/workhours-hidden-job-titles.cjs
+      - run: node tests/workhours-reference-dashboard.cjs
       - run: node tests/leave-hidden-job-titles.cjs
       - run: node tests/leave-overtime-fourth-level-units.cjs
