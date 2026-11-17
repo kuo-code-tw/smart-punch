@@ -56,15 +56,16 @@ function element(tag='span'){
   querySelector(selector){
    if(selector==='.cloud-title')return this.children.find(c=>c.className==='cloud-title')||null;
    if(selector==='.p79-sys-state')return this.children.find(c=>c.className==='p79-sys-state')||null;
-   const m=selector.match(/^\\[data-sys="([^"]+)"\\]$/);
+   const m=selector.startsWith('[data-sys="')&&selector.endsWith('"]')
+    ?[null,selector.slice(11,-2)]:null;
    return m?this.children.find(c=>c.dataset.sys===m[1])||null:null;
   }
  };
  n.classList={toggle(k,enabled){
-  const a=new Set(n.className.split(/\\s+/).filter(Boolean));
+  const a=new Set(n.className.split(' ').filter(Boolean));
   if(enabled)a.add(k);else a.delete(k);
   n.className=[...a].join(' ');
- },contains(k){return n.className.split(/\\s+/).includes(k)}};
+ },contains(k){return n.className.split(' ').includes(k)}};
  return n;
 }
 const statuses=element('div');
