@@ -75,8 +75,8 @@ const state=new Set(),classList={
 let mobile=false,prevented=0,stopped=0;
 const buttonStub=(_label,_cls,_icon,handler)=>({handler,attrs:{},setAttribute(k,v){this.attrs[k]=v}});
 const bodyStub={body:{classList}};
-const toggle=new Function('button','icon','matchMedia','d','bar',js.slice(toggleBegin,toggleEnd)+';return toggle;')(
- buttonStub,()=>'',()=>({matches:mobile}),bodyStub,{append(){}});
+const toggle=new Function('button','icon','matchMedia','d','bar','shell',js.slice(toggleBegin,toggleEnd)+';return toggle;')(
+ buttonStub,()=>'',()=>({matches:mobile}),bodyStub,{append(){}},{id:'p79WorkspaceSidebar'});
 const event={preventDefault(){prevented++},stopPropagation(){stopped++}};
 toggle.handler(event);
 assert(state.has('p79-nav-collapsed'),'first desktop click collapses sidebar');
