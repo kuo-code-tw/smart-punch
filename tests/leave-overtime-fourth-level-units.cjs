@@ -44,7 +44,7 @@ assert(!node('filterJob').innerHTML.includes('領班'));
 assert(leave.includes("(!dept||p79LeaveRecordUnit(l)===dept)"),'leave filtering must use fourth-level unit');
 assert(leave.includes("<td>\${esc(p79LeaveRecordUnit(l)||'—')}</td>"),'leave table must show unit');
 assert(leave.includes("<td>\${esc(p79LeaveUnitOfPerson(e)||'—')}</td>"),'balance table must show unit');
-assert(leave.includes('<th>人員</th><th>單位</th>'),'leave table label is unit');
+assert(/<th>[^<]*人員<\/th><th>[^<]*單位<\/th>/.test(leave),'leave table label is unit, with or without visible icons');
 const wctx={window:{Port79OrgContext:Org},employees:staff,String,Array,Set,Map,Object,Date,Intl,console,document:{getElementById:()=>null}};
 vm.createContext(wctx);
 vm.runInContext(between(work,'        function p79OvertimeUnitOfPerson(','        function initOvertimeFilters('),wctx);
