@@ -62,6 +62,31 @@ function decorateNav(){
   a.innerHTML=icon(key)+'<span>'+meta[key][0]+'</span><span class="p79-nav-arrow">›</span>';
   a.dataset.p79Decorated='1';
  });
+ enforceSidebarContrast();
+}
+/* Shared left sidebar display only: enforce background and readable labels
+   above older conflicting CSS, without changing routes or permissions. */
+function enforceSidebarContrast(){
+ if(!shell)return;
+ const gradient='linear-gradient(165deg,#193964,#152f54 45%,#0e2647)';
+ shell.style.setProperty('background',gradient,'important');
+ shell.style.setProperty('background-color','#152f54','important');
+ shell.style.setProperty('color','#edf5ff','important');
+ const brand=shell.querySelector('.p79-workspace-brand');
+ if(brand){
+  brand.querySelectorAll('strong').forEach(el=>el.style.setProperty('color','#ffffff','important'));
+  brand.querySelectorAll('small').forEach(el=>{
+   el.style.setProperty('display','block','important');
+   el.style.setProperty('color','#d8e9ff','important');
+  });
+ }
+ shell.querySelectorAll('#p79SevenNav a').forEach(a=>{
+  const disabled=a.getAttribute('aria-disabled')==='true';
+  const active=a.classList.contains('active')||a.getAttribute('aria-current')==='page';
+  a.style.setProperty('color',active?'#ffffff':disabled?'#dce8f8':'#f0f6ff','important');
+  a.style.setProperty('opacity',disabled?'0.96':'1','important');
+  a.querySelectorAll('span,svg').forEach(el=>el.style.setProperty('color','inherit','important'));
+ });
 }
 function homeNavAllowed(key,source){
  const s=account(),role=String(s.adminRole||s.role||'employee').toLowerCase();
