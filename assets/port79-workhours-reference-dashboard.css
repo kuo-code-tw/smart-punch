@@ -1,0 +1,105 @@
+/* 2026-11-17 | Screenshot-locked work-hours dashboard. This stylesheet only
+ * styles the new #p79WorkhoursReference node inside work-hours/#viewAdmin.
+ * Never changes shared sidebar, other modules or original business controls. */
+body.p79-work-hours-page #viewAdmin.p79-ref-active{width:100%!important;max-width:none!important;margin:0!important;padding:8px 10px 20px!important}
+body.p79-work-hours-page #viewAdmin.p79-ref-active .admin-desktop-shell{display:block!important;width:100%!important;max-width:none!important}
+body.p79-work-hours-page #viewAdmin.p79-ref-active .admin-desktop-content{width:100%!important;max-width:none!important;min-height:0!important;background:#eef6ff!important;border:0!important;padding:4px!important}
+body.p79-work-hours-page #viewAdmin.p79-ref-active .desktop-side-rail,
+body.p79-work-hours-page #viewAdmin.p79-ref-active .admin-page-head,
+body.p79-work-hours-page #viewAdmin.p79-ref-active #adminContentOvertime,
+body.p79-work-hours-page #viewAdmin.p79-ref-active #adminContentStats,
+body.p79-work-hours-page #viewAdmin.p79-ref-active #adminContentRecords,
+body.p79-work-hours-page #viewAdmin.p79-ref-active #adminContentLive,
+body.p79-work-hours-page #viewAdmin.p79-ref-active #adminContentSettings{display:none!important}
+body.p79-work-hours-page #viewAdmin:not(.p79-ref-active) #p79WorkhoursReference{display:none!important}
+#p79WorkhoursReference{--p79-ref-navy:#0b2458;--p79-ref-blue:#0879ef;--p79-ref-line:#d3e3f5;--p79-ref-text:#152b53;color:var(--p79-ref-text);font-family:inherit;font-size:13px;line-height:1.38;min-width:0}
+#p79WorkhoursReference,#p79WorkhoursReference *{box-sizing:border-box}
+#p79WorkhoursReference button,#p79WorkhoursReference input,#p79WorkhoursReference select{font-family:inherit}
+#p79WorkhoursReference button{cursor:pointer}
+#p79WorkhoursReference button:disabled{opacity:.45;cursor:not-allowed}
+#p79WorkhoursReference .pr-panel{border:1px solid #cbdff5;border-radius:15px;background:linear-gradient(#fff,#f9fcff);box-shadow:0 4px 10px #1b477017;min-width:0;overflow:hidden}
+#p79WorkhoursReference .pr-panel-head{min-height:37px;padding:7px 12px;display:flex;gap:9px;align-items:center;border-bottom:1px solid #dfeaf6}
+#p79WorkhoursReference .pr-panel-head strong{font-size:16px;font-weight:900;white-space:nowrap}
+#p79WorkhoursReference .pr-panel-head .pr-icon{font-size:20px;color:var(--p79-ref-blue)}
+#p79WorkhoursReference .pr-filters{display:flex;align-items:center;gap:11px;flex-wrap:wrap;padding:9px 12px;margin-bottom:12px;min-height:61px}
+#p79WorkhoursReference .pr-filter-title{font-size:17px;font-weight:900;white-space:nowrap;display:flex;align-items:center;gap:8px;margin-right:5px}
+#p79WorkhoursReference .pr-control{display:flex;align-items:center;gap:7px;flex:1 1 180px;min-width:0;white-space:nowrap}
+#p79WorkhoursReference .pr-control label{font-weight:900;font-size:13px;flex:none}
+#p79WorkhoursReference .pr-control select,#p79WorkhoursReference .pr-control input{height:37px;min-width:0;width:100%;border:1px solid #a9c5e6;border-radius:9px;background:#fff;color:#162e53;padding:5px 10px;font-size:13px;font-weight:800}
+#p79WorkhoursReference .pr-period{display:flex;gap:6px;align-items:center;flex:1.5 1 335px;min-width:235px}
+#p79WorkhoursReference .pr-period input{flex:1;width:0}
+#p79WorkhoursReference .pr-go{min-height:37px;padding:7px 20px;border-radius:9px;background:linear-gradient(#1989ff,#0063e1);border:1px solid #0066dc;color:white;font-weight:900;box-shadow:0 2px 7px #0062dd40;white-space:nowrap}
+#p79WorkhoursReference .pr-state{font-size:11px;padding:0 5px 6px;color:#597394;min-height:17px}
+#p79WorkhoursReference .pr-state[data-error="true"]{color:#b45309;font-weight:800}
+#p79WorkhoursReference .pr-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:12px}
+#p79WorkhoursReference .pr-kpi{position:relative;padding:13px 16px;min-height:118px;border-radius:14px;overflow:hidden;color:white;box-shadow:0 5px 12px #1d426522}
+#p79WorkhoursReference .pr-kpi:nth-child(1){background:linear-gradient(115deg,#0654bb,#118beb)}
+#p79WorkhoursReference .pr-kpi:nth-child(2){background:linear-gradient(115deg,#078a5b,#17ad6a)}
+#p79WorkhoursReference .pr-kpi:nth-child(3){background:linear-gradient(115deg,#056bc5,#1596ef)}
+#p79WorkhoursReference .pr-kpi:nth-child(4){background:linear-gradient(115deg,#b7ffc9,#e4ffe7);color:#124a2f}
+#p79WorkhoursReference .pr-kpi::before{content:"";position:absolute;right:-24px;bottom:-28px;width:105px;height:68px;background:#ffffff12;transform:rotate(-19deg);border-radius:50%}
+#p79WorkhoursReference .pr-kpi .pr-kpi-label{font-size:16px;font-weight:900;text-align:center}
+#p79WorkhoursReference .pr-kpi .pr-kpi-icon{position:absolute;top:16px;left:17px;font-size:34px;opacity:.94}
+#p79WorkhoursReference .pr-kpi .pr-kpi-value{font-size:clamp(23px,2.4vw,35px);font-weight:950;text-align:center;line-height:1.55;white-space:nowrap}
+#p79WorkhoursReference .pr-kpi .pr-kpi-value small{font-size:14px;font-weight:900}
+#p79WorkhoursReference .pr-kpi .pr-kpi-sub{text-align:center;font-size:11px;font-weight:800;opacity:.93}
+#p79WorkhoursReference .pr-analytics{display:grid;grid-template-columns:1.45fr .88fr 1fr;gap:12px;margin-bottom:12px;align-items:stretch}
+#p79WorkhoursReference .pr-graph-body{height:210px;padding:9px 10px}
+#p79WorkhoursReference .pr-svg{display:block;width:100%;height:100%;overflow:visible}
+#p79WorkhoursReference .pr-donut-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:center;padding:12px;min-height:210px}
+#p79WorkhoursReference .pr-donut{height:180px;width:180px;max-width:100%;aspect-ratio:1;display:grid;place-items:center;position:relative;margin:auto;border-radius:50%;background:conic-gradient(#1283fa 0 100%,#e1ebf7 100%)}
+#p79WorkhoursReference .pr-donut::before{content:"";position:absolute;width:67%;height:67%;border-radius:50%;background:#fff}
+#p79WorkhoursReference .pr-donut-center{position:relative;font-weight:900;text-align:center;line-height:1.35;color:#152a5b}
+#p79WorkhoursReference .pr-donut-center b{font-size:18px;display:block}
+#p79WorkhoursReference .pr-legend{display:flex;flex-direction:column;gap:14px;font-weight:800;font-size:11px}
+#p79WorkhoursReference .pr-key{display:inline-block;width:13px;height:13px;border-radius:3px;margin-right:7px;vertical-align:middle;background:#1687ff}
+#p79WorkhoursReference .pr-breakdown{padding:17px 12px;display:flex;flex-direction:column;gap:15px;min-height:210px}
+#p79WorkhoursReference .pr-breakdown-row{display:grid;grid-template-columns:78px 1fr 82px 48px;align-items:center;gap:7px;font-size:11px;font-weight:800}
+#p79WorkhoursReference .pr-bar{height:18px;background:#e3ebf5;border-radius:4px;overflow:hidden}
+#p79WorkhoursReference .pr-bar span{display:block;height:100%;background:linear-gradient(90deg,#0b73ea,#47baff)}
+#p79WorkhoursReference .pr-breakdown-total{background:#d9eafd;padding:9px;border-radius:8px;color:#0b4aad;font-weight:900;display:flex;justify-content:space-between}
+#p79WorkhoursReference .pr-lower{display:grid;grid-template-columns:minmax(0,2.25fr) minmax(260px,.9fr);gap:12px;align-items:start}
+#p79WorkhoursReference .pr-table-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+#p79WorkhoursReference .pr-tab{font-size:12px;min-height:29px;padding:4px 12px;background:#fff;border:1px solid #c6daf2;border-radius:8px;color:#132e5b;font-weight:900}
+#p79WorkhoursReference .pr-tab.is-current{background:linear-gradient(90deg,#138dff,#0066eb);color:white;border-color:#0066eb}
+#p79WorkhoursReference .pr-table-scroll{overflow:auto;max-height:355px;min-height:205px}
+#p79WorkhoursReference table{width:100%;border-collapse:collapse;table-layout:auto;font-size:11px}
+#p79WorkhoursReference th{background:#d8eafa;color:#15315b;font-weight:900;padding:8px 7px;text-align:center;white-space:nowrap}
+#p79WorkhoursReference td{padding:7px 6px;border-bottom:1px solid #dce6f2;text-align:center;white-space:nowrap;font-weight:700;color:#15274a}
+#p79WorkhoursReference tbody tr:hover td{background:#eaf4ff}
+#p79WorkhoursReference .pr-chip{font-size:10px;font-weight:900;padding:3px 6px;border-radius:6px;background:#def0ff;color:#005db9}
+#p79WorkhoursReference .pr-chip[data-status="review"]{background:#ffdfbd;color:#a44a00}
+#p79WorkhoursReference .pr-chip[data-status="approved"]{background:#c6f6d2;color:#10652b}
+#p79WorkhoursReference .pr-chip[data-status="rejected"]{background:#ffe1e4;color:#ae1b31}
+#p79WorkhoursReference .pr-action{font-weight:900;border:1px solid #bfd5f1;border-radius:7px;background:#f2f8ff;color:#0c60c6;padding:4px 7px}
+#p79WorkhoursReference .pr-table-footer{min-height:46px;display:flex;justify-content:space-between;align-items:center;padding:8px 12px;gap:10px}
+#p79WorkhoursReference .pr-pages{display:flex;align-items:center;gap:4px}
+#p79WorkhoursReference .pr-pages button{min-height:28px;min-width:29px;border-radius:7px;border:1px solid #bfd5f1;background:#fff;color:#114a91;font-size:12px;font-weight:900}
+#p79WorkhoursReference .pr-pages button.is-current{background:#0e72eb;color:white;border-color:#0e72eb}
+#p79WorkhoursReference .pr-side{display:flex;flex-direction:column;gap:12px}
+#p79WorkhoursReference .pr-personal{padding:10px 13px}
+#p79WorkhoursReference .pr-personal-row{display:flex;justify-content:space-between;align-items:center;padding:5px 7px;border-radius:5px;font-weight:800;font-size:12px}
+#p79WorkhoursReference .pr-personal-row:nth-child(even){background:#ebf3fd}
+#p79WorkhoursReference .pr-tools{padding:10px 12px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#p79WorkhoursReference .pr-tool{min-height:71px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:6px;border:1px solid #cae1f5;border-radius:10px;background:linear-gradient(#fff,#deefff);font-size:12px;color:#0b245c;font-weight:900}
+#p79WorkhoursReference .pr-tool span{font-size:23px;color:#097bed}
+#p79WorkhoursReference .pr-message{font-size:12px;color:#657a99;padding:30px 8px;text-align:center}
+#p79WorkhoursReference .pr-screenreader{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+@media(max-width:1350px){
+ #p79WorkhoursReference .pr-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #p79WorkhoursReference .pr-analytics{grid-template-columns:1.2fr 1fr}
+ #p79WorkhoursReference .pr-analytics .pr-panel:last-child{grid-column:1/-1}
+}
+@media(max-width:900px){
+ #p79WorkhoursReference .pr-analytics,#p79WorkhoursReference .pr-lower{grid-template-columns:minmax(0,1fr)}
+ #p79WorkhoursReference .pr-donut-grid{grid-template-columns:190px 1fr}
+ #p79WorkhoursReference .pr-kpi{min-height:98px}
+ #p79WorkhoursReference .pr-graph-body{height:175px}
+}
+@media(max-width:560px){
+ #p79WorkhoursReference .pr-kpis{grid-template-columns:1fr}
+ #p79WorkhoursReference .pr-donut-grid{grid-template-columns:1fr 1fr}
+ #p79WorkhoursReference .pr-filter-title{width:100%}
+ #p79WorkhoursReference .pr-control{flex:1 1 100%}
+ #p79WorkhoursReference .pr-period{flex:1 1 100%}
+}
