@@ -4553,6 +4553,33 @@ function clearRecordShipFilter(){
   renderRecords();
 }
 
+// WORKING REPORT order: date, start clock, end clock (earliest first).
+// Compare numeric clock minutes, not lexical time: Google sheets may give "0:19".
+function p79WorkingReportSortClock(value){
+  const match=String(value??'').trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if(!match)return Number.POSITIVE_INFINITY;
+  const hour=Number(match[1]),minute=Number(match[2]);
+  return hour<=24&&minute<60&&!(hour===24&&minute!==0)
+    ?hour*60+minute:Number.POSITIVE_INFINITY;
+}
+function compareWorkingReportChronology(a,b){
+  const dateA=String(a?.workDate||a?.date||'').slice(0,10),dateB=String(b?.workDate||b?.date||'').slice(0,10);
+  const dateOrder=dateA.localeCompare(dateB);
+  if(dateOrder)return dateOrder;
+  const startA=p79WorkingReportSortClock(a?.startTime),startB=p79WorkingReportSortClock(b?.startTime);
+  if(startA!==startB)return startA-startB;
+  const endA=p79WorkingReportSortClock(a?.endTime),endB=p79WorkingReportSortClock(b?.endTime);
+  // End 00:00 means next-day midnight when the operation starts after 00:00.
+  const extendedA=Number.isFinite(endA)&&endA<=startA?endA+1440:endA;
+  const extendedB=Number.isFinite(endB)&&endB<=startB?endB+1440:endB;
+  if(extendedA!==extendedB)return extendedA-extendedB;
+  const aqcOrder=normalizeAqcNo(a?.number||a?.gcNo).localeCompare(
+    normalizeAqcNo(b?.number||b?.gcNo),undefined,{numeric:true});
+  if(aqcOrder)return aqcOrder;
+  const sourceA=Number(a?.sourceRow),sourceB=Number(b?.sourceRow);
+  if(Number.isFinite(sourceA)&&Number.isFinite(sourceB)&&sourceA!==sourceB)return sourceA-sourceB;
+  return String(a?.id||'').localeCompare(String(b?.id||''),'zh-Hant',{numeric:true});
+}
 function filteredRecords(){
   let rows=[...baseRecordRows()].filter(r=>typeof window==='undefined'||!window.p79OrgScope||window.p79OrgScope.matches(r));
   if(!rows.length)return [];
@@ -4573,27 +4600,7 @@ function filteredRecords(){
     return true;
   });
 
-  const sort='datetime_desc';
-  const [key,dir]=sort.split('_');
-  const sign=dir==='asc'?1:-1;
-  const value=(r)=>{
-    const mv=recordMoveValues(r),c=calc(r);
-    if(key==='datetime')return `${r.workDate||''} ${r.startTime||''}`;
-    if(key==='driver')return displayPersonName(r.name);
-    if(key==='group')return recordGroupLabel(r);
-    if(key==='gc')return Number(normalizeAqcNo(r.number||r.gcNo))||0;
-    if(key==='disc')return mv.disc;
-    if(key==='load')return mv.load;
-    if(key==='hatches')return num(r.hatches);
-    if(key==='hours')return c.statHours;
-    if(key==='gph')return c.effDeduct;
-    return '';
-  };
-  rows.sort((a,b)=>{
-    const av=value(a),bv=value(b);
-    if(typeof av==='number'&&typeof bv==='number')return (av-bv)*sign;
-    return String(av).localeCompare(String(bv),'zh-Hant',{numeric:true})*sign;
-  });
+  rows.sort(compareWorkingReportChronology);
   return rows;
 }
 
@@ -5021,7 +5028,7 @@ function renderDriverVesselAqcSummary(all,visible){
   }).join('');
 }
 function renderDriverVesselDetailTable(rows){
-  const sorted=[...rows].sort((a,b)=>normalizeAqcNo(a.number||a.gcNo).localeCompare(normalizeAqcNo(b.number||b.gcNo),undefined,{numeric:true})||`${b.workDate} ${b.startTime}`.localeCompare(`${a.workDate} ${a.startTime}`));
+  const sorted=[...rows].sort((a,b)=>normalizeAqcNo(a.number||a.gcNo).localeCompare(normalizeAqcNo(b.number||b.gcNo),undefined,{numeric:true})||compareWorkingReportChronology(a,b));
   let previous=null,index=-1;
   return sorted.map(r=>{
     const aqc=normalizeAqcNo(r.number||r.gcNo),m=workloadRecordMetrics(r);let header='';
@@ -7254,7 +7261,7 @@ function renderPersonStats(){
   const idx=buildWorkloadIndex();
   renderWorkloadSheetAudit(pid?workloadRowsInRange(idx.byPerson.get(pid)||[]):workloadImportedRows(),idx.rows);
   let rs=pid?(activeEfficiencyTabName()==='weekly'?weeklyFilteredRecords():workloadRowsInRange(idx.byPerson.get(pid)||[])):[];
-  rs=[...rs].sort((a,b)=>`${b.workDate||''} ${b.startTime||''}`.localeCompare(`${a.workDate||''} ${a.startTime||''}`));
+  rs=[...rs].sort(compareWorkingReportChronology);
   ensureOperationScheduleGroups(rs);
 
   const put=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
@@ -7374,7 +7381,7 @@ function preparePersonnelFilters(){
 }
 function renderPersonnelRecords(rows){
   const body=document.getElementById('personnelRecordBody');if(!body)return;
-  const ordered=[...rows].sort((a,b)=>String(b.workDate||'').localeCompare(String(a.workDate||''))||compareDriverNames(a.name,b.name)||String(a.startTime||'').localeCompare(String(b.startTime||'')));
+  const ordered=[...rows].sort(compareWorkingReportChronology);
   body.innerHTML=ordered.map(r=>{const m=workloadRecordMetrics(r);return `<tr><td>${esc(r.workDate||'')}</td><td class="font-bold">${esc(displayPersonName(r.name))}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(r.workingNo||'—')}</td><td>${esc(vesselLabelForRecord(r))}</td><td>${esc(normalizeAqcNo(r.number||r.gcNo))}</td><td>${esc(r.startTime||'')}</td><td>${esc(r.endTime||'')}</td><td>${m.hours.toFixed(2)}</td><td>${m.disc}</td><td>${m.load}</td><td>${m.hc}</td><td class="font-bold">${m.containers}</td><td>${m.eff.toFixed(2)}</td></tr>`;}).join('')||'<tr><td colspan="14" class="p-5 text-slate-400">此條件沒有作業紀錄</td></tr>';
   const count=document.getElementById('personnelRecordCount');if(count)count.textContent=`共 ${rows.length} 筆作業紀錄；與上方人員、船舶統計使用相同篩選條件。`;
   const pid=document.getElementById('personStatPerson')?.value||'',detail=document.getElementById('view-workload');
@@ -14917,7 +14924,7 @@ function vesselDetailFilteredRows(){
     if(p&&!samePersonName(r.name,p))return false;
     if(q&&!`${r.name} ${r.number} ${r.gcNo} ${r.shift} ${r.note}`.toLowerCase().includes(q))return false;
     return true;
-  }).sort((x,y)=>`${x.workDate} ${x.startTime}`.localeCompare(`${y.workDate} ${y.startTime}`));
+  }).sort(compareWorkingReportChronology);
 }
 function renderVesselDetailRows(){
   const rs=vesselDetailFilteredRows(),body=document.getElementById('vdBody');if(!body)return;
@@ -14939,7 +14946,7 @@ function renderVesselDetailRows(){
 }
 function clearVesselDetailFilters(){['vdDate','vdAqc','vdPerson','vdSearch'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});renderVesselDetailRows();}
 function shipSummaryExportRows(){return vesselJobRows().map(x=>[x.workingNo,x.vessel,x.voyageI,x.voyageE,x.wharf,x.totalContainers,x.bundleDeduct,x.hatches,x.totalMoves,x.shiftMoves,x.aqcCount,round(num(x.gph),2),round(num(x.gphHC),2),round(num(x.vph),2),round(num(x.vphHC),2)]);}
-function operationExportRows(list){return list.map(r=>{
+function operationExportRows(list){return [...(list||[])].sort(compareWorkingReportChronology).map(r=>{
   const c=calc(r),p=people().find(x=>x.empId===String(r.empId||''))||people().find(x=>samePersonName(x.name,r.name))||{empId:r.empId,name:r.name};
   const mv=recoveredMoveSplit(r),b=effectiveBundleRecord(r);
   const bundle=num(b.bundleDeduct)>0?`${num(b.bundleBn)}BN/${num(b.bundleFl)}${b.bundleInfo?.[0]?.unit||'FR/FL'}`:'';
