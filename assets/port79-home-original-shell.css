@@ -1,41 +1,44 @@
 /* HOME ONLY — restore the established compact shell; never restyle child systems.
    This loads after homepage dashboard styles so cached light-sidebar rules cannot win. */
 @media screen{
-html body.p79-workspace:has(#systems.show):not(.p79-nav-collapsed){
-  --p79-w-width:204px!important;
-}
+html body.p79-workspace:has(#systems.show){--p79-w-width:230px!important}
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar.p79-workspace-sidebar{
-  background:linear-gradient(165deg,#193964,#152f54 45%,#0e2647)!important;
-  background-color:#152f54!important;
-  background-image:linear-gradient(165deg,#193964,#152f54 45%,#0e2647)!important;
-  color:#e9f3ff!important;
-  border-right:1px solid #254467!important;
-  box-shadow:none!important;
+  background:#f1f8ff!important;background-image:none!important;background-color:#f1f8ff!important;
+  color:#193b63!important;border-right:1px solid #dceaf8!important;box-shadow:none!important
 }
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar .p79-workspace-brand{
-  min-height:68px!important;max-height:68px!important;padding:12px 15px!important;
-  background:transparent!important;border-bottom:1px solid #365175!important;
+  min-height:72px!important;max-height:72px!important;padding:10px 17px!important;
+  background:transparent!important;border-bottom:0!important
 }
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar .p79-workspace-brand strong{
-  color:#fff!important;font-size:17px!important;white-space:nowrap!important;
+  color:#16385f!important;font-size:19px!important;white-space:nowrap!important
 }
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar .p79-workspace-brand small{
-  display:block!important;color:#d2e6ff!important;font-size:11px!important;
+  display:block!important;color:#31587d!important;font-size:11px!important;
   letter-spacing:1px!important;line-height:1.4!important
 }
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a{
-  color:#e1edff!important;background:transparent!important;
-  padding:11px 14px!important;min-height:51px!important;
+  color:#203d61!important;background:transparent!important;
+  padding:10px 13px!important;min-height:46px!important;opacity:1!important
 }
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a.active,
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a:hover{
-  background:linear-gradient(110deg,#1c82ff,#0868ee)!important;color:#fff!important;
+  background:#d8ebff!important;color:#0877d7!important;box-shadow:0 2px 8px #bdddf247!important
 }
-html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a svg{color:#c8ddfa!important}
+html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a svg{color:#284e76!important}
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a.active svg,
-html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a:hover svg{color:#fff!important}
-html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a[aria-disabled="true"]{opacity:.82!important}
-html body.p79-workspace:has(#systems.show) #port79CalendarModeBox{display:none!important}
+html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a:hover svg{color:#0877d7!important}
+html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a[aria-disabled="true"]{
+  color:#25476b!important;opacity:1!important
+}
+html body.p79-workspace:has(#systems.show) #port79CalendarModeBox{
+  display:flex!important;left:16px!important;right:auto!important;bottom:14px!important;
+  z-index:11004!important;background:#ffffffed!important;color:#244566!important;
+  border:1px solid #dce8f5!important
+}
+html body.p79-workspace:has(#systems.show).p79-nav-collapsed #port79CalendarModeBox{
+  display:none!important
+}
 /* Keep the original hero title as text, not a script-replaced label. */
 html body.p79-workspace:has(#systems.show) #systems>.p79-modern-home-intro h2{
   display:block!important;visibility:visible!important;opacity:1!important;
@@ -87,8 +90,9 @@ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus .
  html body.p79-workspace:has(#systems.show) #p79WorkspaceTopbar .p79-toolbar-user-caption{display:none!important}
 }
 @media screen and (max-width:900px){
- html body.p79-workspace:has(#systems.show):not(.p79-nav-collapsed){--p79-w-width:0px!important}
- html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar.p79-workspace-sidebar{width:min(244px,84vw)!important}
+ html body.p79-workspace:has(#systems.show){--p79-w-width:0px!important}
+ html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar.p79-workspace-sidebar{width:min(230px,84vw)!important}
+ html body.p79-workspace:has(#systems.show):not(.p79-nav-open) #port79CalendarModeBox{display:none!important}
  html body.p79-workspace:has(#systems.show) #p79HomeFunctionMenu>summary{padding:7px 8px;font-size:12px}
  html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus{margin:5px 12px}
 }
