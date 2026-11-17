@@ -87,31 +87,37 @@
     const list=rank(persons).filter(p=>p.refRank!==null&&p.refRank<=5);
     body.innerHTML=list.length?list.map(p=>'<tr><td><span class="p79pr-rank '+(p.refRank===1?'gold':'')+'">'+p.refRank+'</span></td><td>'+safe(p.name)+'</td><td>'+safe(groupCode(p.group)||'待核')+'</td><td>'+fmt.format(p.containers)+'</td><td>'+f(p.eff)+'</td></tr>').join(''):'<tr><td colspan="5">沒有具有效時數的排名資料</td></tr>';
   }
-  function render({rows,persons,metrics,groupCode,rosterVerified=false,rosterCount=0,excludedRows=0}={}){
+  function render({rows,sourceRows,persons,metrics,groupCode,rosterVerified=false,rosterCount=0,excludedRows=0}={}){
     if(!document.getElementById('p79prGroups'))return;
     const fresh=document.getElementById('p79prFreshness');
-    if(!rosterVerified){
-      for(const [id] of kpis)put(id,'—');
-      const groups=document.getElementById('p79prGroups');
-      if(groups)groups.innerHTML='<div class="p79pr-group-alert" role="status">尚未取得人資管理最新在職 AQC 名冊，暫不顯示可能含離職人員的作業人數及效率；原始 WORKING REPORT 保留。</div>';
-      for(const id of ['p79prDailyChart','p79prCompareChart','p79prRankBody']){const node=document.getElementById(id);if(node)node.innerHTML='';}
-      const warning=document.getElementById('p79prGroupWarning');if(warning)warning.hidden=true;
-      if(fresh)fresh.textContent='人資正式名冊待核對｜不採用舊人員快取或歷史作業名單推算在職人數';
-      return;
-    }
-    const rs=Array.isArray(rows)?rows:[],ps=Array.isArray(persons)?persons:[],metric=typeof metrics==='function'?metrics:()=>({}),code=typeof groupCode==='function'?groupCode:()=>''; 
-    const total=rs.reduce((a,r)=>{const m=metric(r);a.hours+=n(m.hours);a.disc+=n(m.disc);a.load+=n(m.load);a.hc+=n(m.hc);return a;},{hours:0,disc:0,load:0,hc:0});
+    const original=Array.isArray(sourceRows)?sourceRows:Array.isArray(rows)?rows:[];
+    const ps=Array.isArray(persons)?persons:[],metric=typeof metrics==='function'?metrics:()=>({}),code=typeof groupCode==='function'?groupCode:()=>'';
+    // Source counters and date trends belong to WORKING REPORT, and are not an
+    // inference about whether the named workers are still employed.
+    const total=original.reduce((a,r)=>{const m=metric(r);a.hours+=n(m.hours);a.disc+=n(m.disc);a.load+=n(m.load);a.hc+=n(m.hc);return a;},{hours:0,disc:0,load:0,hc:0});
     const containers=total.disc+total.load,eff=total.hours>0?(containers+total.hc)/total.hours:null;
-    put('p79prPeople',fmt.format(ps.length));
-    put('p79prCount',fmt.format(rs.length));
+    put('p79prPeople',rosterVerified?fmt.format(ps.length):'—');
+    put('p79prCount',fmt.format(original.length));
     put('p79prHours',h(total.hours));
     put('p79prDisc',fmt.format(total.disc));
     put('p79prLoad',fmt.format(total.load));
     put('p79prHC',fmt.format(total.hc));
     put('p79prContainers',fmt.format(containers));
     put('p79prEff',eff===null?'—':f(eff));
-    renderGroups(ps,code);renderTrend(rs,metric);renderCompare(ps,code);renderRanking(ps,code);
-    if(fresh)fresh.textContent='已核對人資在職 AQC '+fmt.format(rosterCount)+' 人｜本期間有作業 '+fmt.format(ps.length)+' 人｜'+fmt.format(rs.length)+' 筆有效作業明細'+(excludedRows?'｜已排除 '+fmt.format(excludedRows)+' 筆非現職或身分待核對紀錄（原始資料保留）':'');
+    renderTrend(original,metric);
+    if(!rosterVerified){
+      const groups=document.getElementById('p79prGroups');
+      if(groups)groups.innerHTML='<div class="p79pr-group-alert" role="status">歷史 WORKING REPORT 作業量已正常顯示。最新人資在職 AQC 名冊尚未核對，暫不顯示可能包含離職人員的現職組別與排名。</div>';
+      const compare=document.getElementById('p79prCompareChart');
+      if(compare)compare.innerHTML='<div class="p79pr-group-alert" role="status">人資名冊待核對，暫不計算現職組別效率。</div>';
+      const ranking=document.getElementById('p79prRankBody');
+      if(ranking)ranking.innerHTML='<tr><td colspan="5">人資名冊待核對，現職排名暫不顯示。</td></tr>';
+      const warning=document.getElementById('p79prGroupWarning');if(warning)warning.hidden=true;
+      if(fresh)fresh.textContent='WORKING REPORT 歷史作業統計：'+fmt.format(original.length)+' 筆｜現職 AQC 名冊待核對（原始作業資料照常顯示）';
+      return;
+    }
+    renderGroups(ps,code);renderCompare(ps,code);renderRanking(ps,code);
+    if(fresh)fresh.textContent='已核對在職 AQC '+fmt.format(rosterCount)+' 人｜現職期間有作業 '+fmt.format(ps.length)+' 人｜WORKING REPORT 歷史資料 '+fmt.format(original.length)+' 筆'+(excludedRows?'｜其中 '+fmt.format(excludedRows)+' 筆未列入現職人員名單（原始作業統計保留）':'');
   }
   window.P79PersonnelReference={render};
   window.addEventListener('load',function(){
