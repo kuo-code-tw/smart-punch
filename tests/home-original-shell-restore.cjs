@@ -4,6 +4,7 @@ const root=path.join(__dirname,'..');
 const js=fs.readFileSync(path.join(root,'assets/port79-management-workspace.js'),'utf8');
 const css=fs.readFileSync(path.join(root,'assets/port79-home-original-shell.css'),'utf8');
 const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+const sharedCss=fs.readFileSync(path.join(root,'assets/port79-management-workspace.css'),'utf8');
 assert.doesNotThrow(()=>new Function(js));
 assert.match(html,/<h2>79號碼頭 船舶作業 × 考勤人力 智慧管理中心<\/h2>/);
 assert.match(html,/<span class="name">效率系統<\/span>/);
@@ -23,6 +24,11 @@ assert.match(html,/port79-management-workspace\.js\?v=20261117-home-original-ui-
 assert.match(html,/port79-home-original-shell\.css\?v=20261117-home-original-ui-v1/);
 assert.match(css,/#p79WorkspaceSidebar\.p79-workspace-sidebar/);
 assert.match(css,/background-color:#f1f8ff!important/,'sidebar must match the reference white background');
+assert.match(sharedCss,/color:#203d61!important/,'menu labels must be dark and readable on light background');
+assert.match(sharedCss,/background:#d8ebff!important/,'selected home menu must be pale blue');
+assert.match(sharedCss,/p79-status-light/,'system status lights require an explicit visual style');
+assert.match(sharedCss,/port79-harbor-banner\.webp/,'the original harbor photo must be kept');
+assert.match(sharedCss,/p79-nav-collapsed\{--p79-w-width:230px!important\}/,'desktop main content width must not change when closing sidebar');
 assert(!css.includes('#193964'),'dark theme must never be forced on the left sidebar');
 assert.match(css,/#port79CalendarModeBox\{\s*display:flex!important/,'original year switch remains visible');
 assert.match(css,/\.p79-workspace-brand small\{/,'cloud-system subtitle must be shown');
@@ -58,6 +64,31 @@ assert.equal(statuses.children[0].children[0].className,'p79-status-light');
 assert.equal(statuses.children[0].children[2].textContent,'可使用');
 assert.equal(statuses.children[2].className,'sys is-unavailable');
 assert.equal(statuses.children[2].children[2].textContent,'不可使用');
+// Execute the actual hamburger handler with a mock DOM; verify it never navigates.
+const toggleBegin=js.indexOf("const toggle=button('切換系統導覽'");
+const toggleEnd=js.indexOf('bar.append(toggle);',toggleBegin)+'bar.append(toggle);'.length;
+assert(toggleBegin>=0&&toggleEnd>toggleBegin,'hamburger handler exists');
+const state=new Set(),classList={
+ contains:k=>state.has(k),remove:(...keys)=>keys.forEach(k=>state.delete(k)),
+ toggle:k=>state.has(k)?(state.delete(k),false):(state.add(k),true)
+};
+let mobile=false,prevented=0,stopped=0;
+const buttonStub=(_label,_cls,_icon,handler)=>({handler,attrs:{},setAttribute(k,v){this.attrs[k]=v}});
+const bodyStub={body:{classList}};
+const toggle=new Function('button','icon','matchMedia','d','bar',js.slice(toggleBegin,toggleEnd)+';return toggle;')(
+ buttonStub,()=>'',()=>({matches:mobile}),bodyStub,{append(){}});
+const event={preventDefault(){prevented++},stopPropagation(){stopped++}};
+toggle.handler(event);
+assert(state.has('p79-nav-collapsed'),'first desktop click collapses sidebar');
+assert.equal(toggle.attrs['aria-expanded'],'false');
+toggle.handler(event);
+assert(!state.has('p79-nav-collapsed'),'second desktop click restores sidebar');
+mobile=true;
+toggle.handler(event);
+assert(state.has('p79-nav-open'),'mobile click opens drawer without changing route');
+toggle.handler(event);
+assert(!state.has('p79-nav-open'),'mobile second click closes drawer');
+assert.equal(prevented,4);assert.equal(stopped,4);
 list.children[1].click();
 assert.deepEqual(links,['cardSchedule'],'menu must invoke original native system button');
 assert.equal(menu.open,false,'close menu after navigation');
