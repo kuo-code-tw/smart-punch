@@ -20,12 +20,12 @@ body[data-p79-system="leave"] .p79-leave-admin-header>.actions{display:flex!impo
 body[data-p79-system="leave"] .p79-leave-admin-header>.actions .btn{min-height:43px!important;font-weight:750!important;border:1px solid #c9d8ed!important;background:#fff!important;color:#203e6c!important;box-shadow:0 3px 9px #233f6410;padding:9px 14px!important}
 body[data-p79-system="leave"] .p79-leave-admin-header>.actions .btn:hover{border-color:#7fb0ff!important;background:#f2f8ff!important}
 body[data-p79-system="leave"] .p79-leave-admin-header>.actions .btn-pri{background:linear-gradient(135deg,#147afd,#0060e7)!important;border:1px solid #147afd!important;color:white!important;box-shadow:0 5px 13px #0074ec2b!important}
-body[data-p79-system="leave"] #adminMode>.card>.toolbar{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:13px 16px!important;align-items:end!important;margin:12px 0 14px!important;padding:19px 20px 21px!important;background:#fff!important;border:1px solid #dce5f2!important;border-radius:16px!important;box-shadow:var(--leave-glow)!important}
-body[data-p79-system="leave"] .p79-leave-filter-title{grid-column:1/-1;font-size:17px;line-height:1.4;color:#1a355d;font-weight:900;padding:0 0 2px;display:flex;align-items:center;gap:10px}
+body[data-p79-system="leave"] #adminMode>.card>.toolbar{display:grid!important;grid-template-columns:130px repeat(4,minmax(0,1fr))!important;gap:12px!important;align-items:center!important;width:100%!important;max-width:none!important;margin:12px 0 14px!important;padding:13px 16px!important;background:#fff!important;border:1px solid #dce5f2!important;border-radius:16px!important;box-shadow:var(--leave-glow)!important}
+body[data-p79-system="leave"] .p79-leave-filter-title{grid-column:auto!important;white-space:nowrap;font-size:15px;line-height:1.4;color:#1a355d;font-weight:900;padding:0;display:flex;align-items:center;gap:8px}
 body[data-p79-system="leave"] .p79-leave-filter-title:before{content:"⚲";color:#1378ff;font-size:24px;font-weight:500}
 body[data-p79-system="leave"] #adminMode .toolbar .field{margin:0!important;min-width:0!important;width:auto!important}
 body[data-p79-system="leave"] #adminMode .toolbar .field label{font-size:13px!important;color:#61738e!important;font-weight:750!important;display:block;margin:0 0 6px!important}
-body[data-p79-system="leave"] #adminMode .toolbar .field select{width:100%!important;min-height:48px!important;font-size:15px!important;font-weight:650;color:#263e61!important;padding:9px 13px!important;border:1px solid #cddcf0!important;background:#fff!important;box-shadow:0 2px 7px #1b458007!important;border-radius:11px!important}
+body[data-p79-system="leave"] #adminMode .toolbar .field select{width:100%!important;min-height:42px!important;height:42px!important;font-size:14px!important;font-weight:650;color:#263e61!important;padding:7px 12px!important;border:1px solid #cddcf0!important;background:#fff!important;box-shadow:0 2px 7px #1b458007!important;border-radius:11px!important}
 body[data-p79-system="leave"] .p79-leave-list-info{display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;margin:7px 0 14px}
 body[data-p79-system="leave"] #adminLeaveSummary{color:#29476f!important;font-size:14px!important;font-weight:750!important;margin:0!important}
 body[data-p79-system="leave"] #adminLeaveSummary:before{content:"▣";color:#147aff;margin-right:9px}
@@ -144,6 +144,7 @@ body[data-p79-system="leave"] #adminBalancePanel summary{color:#17375f;font-weig
 @media(max-width:1100px){
 body[data-p79-system="leave"] .p79-leave-admin-header{align-items:flex-start}
 body[data-p79-system="leave"] #adminMode>.card>.toolbar{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+body[data-p79-system="leave"] .p79-leave-filter-title{grid-column:1/-1!important}
 #adminCreateLeaveDialog .p79-create-body{grid-template-columns:minmax(0,1fr)!important}
 #adminCreateLeaveDialog .p79-create-body>:not(#p79CreatePreview),#adminCreateLeaveDialog .p79-create-body>#p79CreatePreview{grid-column:1;grid-row:auto;position:static}
 #p79LeaveDetailDialog .p79-detail-columns{grid-template-columns:1fr}
