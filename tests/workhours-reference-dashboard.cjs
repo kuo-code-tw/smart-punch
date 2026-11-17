@@ -23,6 +23,10 @@ assert(ui.includes('p79WorkOvertimeOfficialReport'),'exclude non-official/revoke
 assert(ui.includes('p79WorkOvertimeLedgerMonth'),'use official overtime credit month');
 assert(ui.includes('p79WorkOvertimeIsUnconfirmedPlan'),'unconfirmed planned overtime never counts as completed');
 assert(ui.includes('buildDailyAttendanceRows'),'use original physical IN/OUT pairing');
+assert(ui.includes('p79ReadWorkRestMonth'),'fetch official authenticated raw attendance months before totaling hours');
+assert(ui.includes('mergeAttendanceRecordCollections'),'merge verified adjacent raw months through original deduplication');
+assert(ui.includes('attendanceAvailable:Array.isArray(sourceRecords)'),'unknown raw attendance must not be displayed as zero');
+assert(ui.includes('byAtt.has(key)?null:e'),'old attendance numbers are allowed only with unique HR identity');
 assert(ui.includes('getAttendanceTimestamp'),'read original actual timestamps');
 assert(ui.includes('window.Port79JobTitleVisibility.isVisible'),'respect HR-hidden job titles');
 assert(ui.includes("f.start.slice(0,7)!==f.end.slice(0,7)"),'never silently blend different payroll months');
