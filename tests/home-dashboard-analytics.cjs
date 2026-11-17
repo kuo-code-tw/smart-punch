@@ -13,5 +13,7 @@ const current=aggregate({...input,records:[record('E1','2026/10/29 23:00:00','�
 const absent=aggregate({...input,attendanceReady:false,boundariesReady:false});assert.equal(absent.attendanceReady,false);assert.equal(absent.boundariesReady,false);
 const source=fs.readFileSync('assets/port79-home-dashboard.js','utf8');assert(source.includes("method:'GET'"));assert(!/method:\s*['"]POST|setItem\(|approveLeave|saveSchedule|syncRecords|addRecord/.test(source),'home dashboard never writes records or approvals');
 assert(source.includes("!d.querySelector('.p79-photo-hero .p79-hero-greeting')"),'wait for the management shell on the first login before moving weather and logout nodes');assert(source.includes('identity()!==startIdentity'));assert(source.includes('signal=localController.signal'));assert(source.includes('localController.abort()'));
-for(const label of ['今日船邊作業總覽','今日出勤與作業概況','船舶 × 人力對照提醒','待審核項目','本月船邊作業量與效率統計','管理快捷作業','系統公告','本日作業流程'])assert(source.includes(label));
+for(const label of ['今日船邊作業總覽','今日出勤與作業概況','船舶 × 人力對照提醒','待審核項目','本月船邊作業量與效率統計','跨系統資料核對','資料讀取結果','本日營運判讀'])assert(source.includes(label));
+assert(source.includes('load({silent:true})'),'background refresh must retain the existing dashboard until data is ready');
+assert(source.includes('renderSourceStatus();')&&source.includes('renderInterpretation();'),'source verification and actual operational interpretation must render');
 console.log('PASS dashboard: canonical cross-month/multi-shift hours, unique staff-days, deleted/scope filtering, leave/revoked overtime, active shifts, immutable snapshots and read-only API guard');
