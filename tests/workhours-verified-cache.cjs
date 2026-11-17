@@ -31,6 +31,28 @@ await test('fresh attendance displays before slow config without confirming acco
  gate.resolve();const b=await p;await joined;assert.equal(b.preview,false);assert.equal(t.disk.size,1);
 });
 await test('fresh-page disk hit uses one version check and zero full data downloads',async()=>{const t=setup();await t.api.load(month);const n=setup(t.disk),preview=[];const b=await n.api.load(month,{onPreview:x=>preview.push(x)});assert.equal(n.calls.length,1);assert.equal(n.calls[0].action,'getOvertimeReportCacheMeta');assert.equal(b.source,'本機有效快取');assert.equal(preview[0].preview,true);});
+await test('warm memory presents authenticated month immediately without waiting for metadata',async()=>{
+ const t=setup();await t.api.load(month);const result=[],before=t.calls.length;
+ const pending=t.api.load(month,{onPreview:b=>result.push(b)});
+ assert.equal(result.length,1,'local preview is delivered in the same turn, before cloud verification');
+ assert.equal(result[0].preview,true);
+ assert.equal(result[0].roster.month,month);
+ await pending;
+ assert.equal(t.calls.length,before,'unchanged session does not redownload any monthly source');
+});
+await test('dashboard reuses independently verified raw months and keeps account/edit isolation',async()=>{
+ const t=setup();
+ assert.equal(t.api.verifiedRawMonths(month,'TOKEN'),null,'unverified local data cannot be passed to statistics');
+ await t.api.load(month);
+ const evidence=t.api.verifiedRawMonths(month,'TOKEN');
+ assert.equal(evidence.length,t.api.monthsFor(month).length,'all adjacent workday months are already included');
+ assert.equal(evidence.every(x=>x.records.length===1),true);
+ evidence[0].records[0].id='changed-by-screen';
+ assert.notEqual(t.api.verifiedRawMonths(month,'TOKEN')[0].records[0].id,'changed-by-screen','dashboard cannot mutate the shared cache');
+ assert.equal(t.api.verifiedRawMonths(month,'WRONG'),null,'another token cannot access this cache');
+ t.stamp(String(Date.now()+5000));
+ assert.equal(t.api.verifiedRawMonths(month,'TOKEN'),null,'a newer edit invalidates the formerly verified snapshot');
+});
 await test('main-table then accounting/status reuse the same verified month without redownload',async()=>{const t=setup();await t.api.load(month);const n=t.calls.length;const a=await t.api.load(month),b=await t.api.load(month);assert.equal(t.calls.length,n);assert.equal(a.version,b.version);assert.equal(a.preview,false);});
 await test('changed cloud version reloads full data and replaces obsolete records',async()=>{const t=setup();const a=await t.api.load(month);t.change();const b=await t.api.load(month,{force:true});assert.notEqual(a.version,b.version);assert.equal(t.calls.filter(c=>c.action==='getScheduleDataSecure').length,2);assert.equal(b.raw[month].revision,'R1x');});
 await test('POST mutation stamp invalidates recent metadata and old in-flight reads',async()=>{const t=setup();await t.api.load(month);const n=t.calls.length;t.stamp('new-write');t.change();const b=await t.api.load(month);assert(t.calls.length>n);assert.equal(b.raw[month].revision,'R1x');const x=setup(),d=x.hold('getScheduleDataSecure'),p=x.api.load(month);await new Promise(r=>setTimeout(r,5));x.stamp('mid-write');d.resolve();await assert.rejects(p,/變更/);assert.equal(x.disk.size,0);});
