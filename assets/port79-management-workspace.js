@@ -89,6 +89,43 @@ function buildHomeNav(){
  });
  return nav;
 }
+function buildHomeFunctionMenu(){
+ const menu=d.createElement('details');menu.id='p79HomeFunctionMenu';menu.className='p79-home-function-menu';
+ menu.innerHTML='<summary>功能選單</summary><div class="p79-home-function-links" role="group" aria-label="可用系統入口"></div>';
+ return menu;
+}
+function syncHomeFunctionMenu(){
+ if(!home)return;
+ const menu=d.getElementById('p79HomeFunctionMenu'),list=menu?.querySelector('.p79-home-function-links');
+ if(list){
+  list.replaceChildren();
+  const ids={attendance:'cardAttendance',schedule:'cardSchedule',efficiency:'cardEfficiency',
+   hr:'cardHr',workhours:'cardWorkhours',leave:'cardLeave',history:'cardHistory'};
+  for(const key of order){
+   const source=d.getElementById(ids[key]);
+   if(!source||source.hidden||source.disabled||source.style.display==='none'||!homeNavAllowed(key,source))continue;
+   const label=source.querySelector('.name')?.textContent?.trim()||meta[key][0];
+   list.append(button(label,'p79-home-function-link',icon(key)+'<span>'+label+'</span>',()=>{
+    menu.open=false;source.click();
+   }));
+  }
+  if(!list.children.length){const empty=d.createElement('p');empty.textContent='目前沒有可使用的系統';list.append(empty);}
+ }
+ const state=d.getElementById('p79SevenStatus');
+ if(state){
+  state.replaceChildren();
+  const ids={attendance:'cardAttendance',schedule:'cardSchedule',efficiency:'cardEfficiency',
+   hr:'cardHr',workhours:'cardWorkhours',leave:'cardLeave',history:'cardHistory'};
+  for(const key of order){
+   const source=d.getElementById(ids[key]);
+   if(!source||source.hidden||source.disabled||source.style.display==='none'||!homeNavAllowed(key,source))continue;
+   const item=d.createElement('span');item.className='sys';
+   const name=d.createElement('b');name.textContent=meta[key][0];
+   const available=d.createElement('span');available.textContent='可使用';
+   item.append(name,available);state.append(item);
+  }
+ }
+}
 function buildShell(){const sys=d.body.dataset.p79System||'home';shell=home?d.createElement('aside'):d.getElementById('p79SevenTop');if(!shell)return false;
  if(home){shell.id='p79WorkspaceSidebar';d.body.prepend(shell);}shell.classList.add('p79-workspace-sidebar');shell.setAttribute('aria-label','系統導覽');
  const brand=d.createElement('div');brand.className='p79-workspace-brand';brand.innerHTML=logo+'<div><strong>排班考勤系統</strong></div>';
@@ -100,7 +137,7 @@ function buildShell(){const sys=d.body.dataset.p79System||'home';shell=home?d.cr
  bar=d.createElement('header');bar.id='p79WorkspaceTopbar';
  const toggle=button('切換系統導覽','p79-toolbar-toggle',icon('menu'),()=>{const mobile=matchMedia('(max-width: 900px)').matches;d.body.classList.toggle(mobile?'p79-nav-open':'p79-nav-collapsed');toggle.setAttribute('aria-expanded',String(mobile?d.body.classList.contains('p79-nav-open'):!d.body.classList.contains('p79-nav-collapsed')));});toggle.setAttribute('aria-controls',shell.id);toggle.setAttribute('aria-expanded',String(!matchMedia('(max-width: 900px)').matches));bar.append(toggle);
  bar.append(button('搜尋系統功能','p79-toolbar-search',icon('search')+'<span>搜尋船舶、航次、員工、班表、報表…</span><kbd>Ctrl K</kbd>',openSearch));
- const tools=d.createElement('div');tools.className='p79-toolbar-tools';if(menuWrap){const action=shell.querySelector('.action');if(action){tools.append(action);}else tools.append(menuWrap);}
+ const tools=d.createElement('div');tools.className='p79-toolbar-tools';if(home)tools.append(buildHomeFunctionMenu());if(menuWrap){const action=shell.querySelector('.action');if(action){tools.append(action);}else tools.append(menuWrap);}
  // 舊版只在不存在系統選單時才顯示切換鈕；正式首頁有選單，因此切換鈕消失。
  // 保留舊按鈕既有的 localStorage 主題設定邏輯，不創造第二份狀態來源。
  if(home||!menuWrap){
@@ -114,25 +151,40 @@ function buildShell(){const sys=d.body.dataset.p79System||'home';shell=home?d.cr
   themeBtn.setAttribute('title',d.documentElement.getAttribute('data-theme')==='dark'?'切換亮色模式':'切換暗色模式');
   tools.append(themeBtn);
  }
- const user=d.createElement('div');user.className='p79-toolbar-user';user.innerHTML='<span class="p79-avatar">'+icon('user')+'</span><span><strong class="p79-user-name"></strong><small class="p79-user-role"></small></span>';tools.append(user);if(home&&d.getElementById('p79Dashboard')){const logout=d.getElementById('logoutBtn');if(logout)tools.append(logout);}bar.append(tools);d.body.prepend(bar);
+ const user=d.createElement('div');user.className='p79-toolbar-user';user.innerHTML=(home?'<span class="p79-toolbar-user-caption">登入人員</span>':'')+'<span class="p79-avatar">'+icon('user')+'</span><span><strong class="p79-user-name"></strong><small class="p79-user-role"></small></span>';tools.append(user);if(home&&d.getElementById('p79Dashboard')){const logout=d.getElementById('logoutBtn');if(logout)tools.append(logout);}bar.append(tools);d.body.prepend(bar);
  const backdrop=button('關閉系統導覽','p79-nav-backdrop','',()=>d.body.classList.remove('p79-nav-open'));d.body.append(backdrop);
  if(status){const tray=d.createElement('div');tray.id='p79WorkspaceStatus';tray.append(status);d.body.insertBefore(tray,shell.nextSibling);}
+ else if(home){const tray=d.createElement('div');tray.id='p79WorkspaceStatus';
+  tray.setAttribute('aria-label','可使用系統狀態');const state=d.createElement('div');state.id='p79SevenStatus';
+  state.setAttribute('role','status');tray.append(state);d.body.insertBefore(tray,shell.nextSibling);}
  // All seven systems already show their names in the persistent sidebar.
  // Keep native homepage content, but do not insert a redundant title/breadcrumb/date panel.
  if(home)decorateHome();
  decorateNav();navObserver=new MutationObserver(decorateNav);navObserver.observe(nav,{childList:true});return true;
 }
-function decorateHome(){const intro=d.querySelector('.p79-modern-home-intro');if(intro){intro.classList.add('p79-photo-hero');intro.innerHTML='<div><div class="p79-modern-home-eyebrow">79 PORT · SMART OPERATIONS</div><h2>79號碼頭船舶與考勤整合首頁</h2><p>整合船舶作業、考勤出勤、船邊作業量、櫃數、效率與人力配置<br>即時掌握船舶進度與作業表現，提升碼頭營運效率</p></div><div class="p79-hero-greeting"><strong class="p79-home-greeting"></strong><span class="p79-home-date"></span><small>掌握工作，讓管理更順暢</small></div>';}
- const map={cardAttendance:'attendance',cardSchedule:'schedule',cardLeave:'leave',cardHr:'hr',cardWorkhours:'workhours',cardEfficiency:'efficiency',cardHistory:'history'};Object.entries(map).forEach(([id,k])=>{const card=d.getElementById(id);if(!card)return;card.querySelector('.icon').innerHTML=icon(k);card.querySelector('.name').textContent=meta[k][0];const arrow=d.createElement('span');arrow.className='p79-module-arrow';arrow.innerHTML=icon('arrow');card.append(arrow);});
+function decorateHome(){const intro=d.querySelector('.p79-modern-home-intro');if(intro){
+ // Keep the original title, subtitle and system-entry wording from index.html.
+ // Only add the account greeting; never replace the user's existing home header.
+ intro.classList.add('p79-photo-hero');
+ if(!intro.querySelector('.p79-hero-greeting')){
+  const greeting=d.createElement('div');greeting.className='p79-hero-greeting';
+  greeting.innerHTML='<strong class="p79-home-greeting"></strong><span class="p79-home-date"></span><small>掌握工作，讓管理更順暢</small>';
+  const decoration=intro.querySelector('.p79-modern-home-ship');
+  if(decoration)decoration.replaceWith(greeting);else intro.append(greeting);
+ }
+}
+ // The seven native system cards keep their original names, icons, order,
+ // onclick handlers and permission checks. No visual rewrite of their contents.
+ const map={cardAttendance:'attendance',cardSchedule:'schedule',cardLeave:'leave',cardHr:'hr',cardWorkhours:'workhours',cardEfficiency:'efficiency',cardHistory:'history'};
  const preserve=d.querySelector('.p79-modern-home-preserve');if(preserve)preserve.innerHTML='<span class="p79-modern-lock" aria-hidden="true">🔒</span><div><strong>員工刷卡上下班</strong><small>維持現行介面與操作流程</small></div>';
- const side=d.createElement('section');side.className='p79-home-quick';side.innerHTML='<h2>快速操作</h2><p>前往常用工作模組</p><div class="p79-quick-grid"></div>';const ids=['cardAttendance','cardSchedule','cardWorkhours','cardEfficiency','cardHr','cardHistory'];ids.forEach(id=>{const source=d.getElementById(id);if(!source||source.hidden||source.disabled||source.style.display==='none')return;const k=map[id];side.querySelector('.p79-quick-grid').append(button(meta[k][0],'p79-quick-link',icon(k)+'<span>'+meta[k][0]+'</span>',()=>source.click()));});d.getElementById('systems').append(side);
+ const side=d.createElement('section');side.className='p79-home-quick';side.innerHTML='<h2>快速操作</h2><p>前往常用工作模組</p><div class="p79-quick-grid"></div>';const ids=['cardAttendance','cardSchedule','cardWorkhours','cardEfficiency','cardHr','cardHistory'];ids.forEach(id=>{const source=d.getElementById(id);if(!source||source.hidden||source.disabled||source.style.display==='none')return;const k=map[id];side.querySelector('.p79-quick-grid').append(button(source.querySelector('.name')?.textContent?.trim()||meta[k][0],'p79-quick-link',icon(k)+'<span>'+(source.querySelector('.name')?.textContent?.trim()||meta[k][0])+'</span>',()=>source.click()));});d.getElementById('systems').append(side);
 }
 function updateAccount(){const s=account();const name=String(s.name||s.empName||s.empId||'尚未登入');const role=String(s.adminRole||s.role||'');bar.querySelector('.p79-user-name').textContent=name;bar.querySelector('.p79-user-role').textContent=role==='superadmin'?'超級管理員':role==='admin'?'管理員':'登入狀態待確認';const date=new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',year:'numeric',month:'long',day:'numeric',weekday:'long'}).format(new Date());d.querySelectorAll('.p79-page-date,.p79-home-date').forEach(x=>{x.textContent=date;});const greeting=d.querySelector('.p79-home-greeting');if(greeting)greeting.textContent='您好，'+name;}
 function openSearch(){if(!enabled())return;let dialog=d.getElementById('p79WorkspaceSearch');if(dialog){dialog.showModal();dialog.querySelector('input').focus();return;}
  dialog=d.createElement('dialog');dialog.id='p79WorkspaceSearch';dialog.setAttribute('aria-label','搜尋系統功能');dialog.innerHTML='<div class="p79-search-head"><label for="p79WorkspaceQuery">搜尋功能</label><button type="button" aria-label="關閉搜尋">✕</button></div><input id="p79WorkspaceQuery" type="search" placeholder="輸入模組、報表或功能名稱…" autocomplete="off"><div class="p79-search-results"></div><p class="p79-search-hint">只顯示目前帳號可使用的功能</p>';d.body.append(dialog);const input=dialog.querySelector('input'),result=dialog.querySelector('.p79-search-results');dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('click',e=>{if(e.target===dialog)dialog.close();});dialog.addEventListener('close',()=>dialog.remove());
  function render(){result.replaceChildren();const q=input.value.trim().toLocaleLowerCase();const sources=[...shell.querySelectorAll('#p79SevenNav a'),...d.querySelectorAll('#p79SevenStandardMenu button[data-action]')].filter(x=>!x.disabled&&!x.hidden&&!['logout-system','reset-cloud','clearDeleted'].includes(x.dataset.action));sources.filter(x=>x.textContent.toLocaleLowerCase().includes(q)).forEach(source=>{const b=button(source.textContent.trim(),'p79-search-result','',()=>{dialog.close();source.click();});b.textContent=source.textContent.trim();result.append(b);});if(!result.children.length){const empty=d.createElement('p');empty.textContent='找不到符合的功能，請換個關鍵字。';result.append(empty);}}
  input.addEventListener('input',render);render();dialog.showModal();input.focus();}
-function syncHomePermissions(){const signature=JSON.stringify([...d.querySelectorAll('#systems .system-card')].map(x=>[x.id,x.hidden,x.disabled,x.style.display]));if(signature===homePermissionSignature)return;homePermissionSignature=signature;const old=shell.querySelector('#p79SevenNav'),nav=buildHomeNav();navObserver?.disconnect();old.replaceWith(nav);decorateNav();navObserver=new MutationObserver(decorateNav);navObserver.observe(nav,{childList:true});const ids={attendance:'cardAttendance',schedule:'cardSchedule',workhours:'cardWorkhours',efficiency:'cardEfficiency',hr:'cardHr',history:'cardHistory'};const quick=d.querySelector('.p79-quick-grid');if(quick){quick.replaceChildren();Object.entries(ids).forEach(([k,id])=>{const source=d.getElementById(id);if(!source||source.hidden||source.disabled||source.style.display==='none')return;quick.append(button(meta[k][0],'p79-quick-link',icon(k)+'<span>'+meta[k][0]+'</span>',()=>source.click()));});}}
+function syncHomePermissions(){const signature=JSON.stringify([...d.querySelectorAll('#systems .system-card')].map(x=>[x.id,x.hidden,x.disabled,x.style.display]));if(signature===homePermissionSignature){syncHomeFunctionMenu();return;}homePermissionSignature=signature;const old=shell.querySelector('#p79SevenNav'),nav=buildHomeNav();navObserver?.disconnect();old.replaceWith(nav);decorateNav();navObserver=new MutationObserver(decorateNav);navObserver.observe(nav,{childList:true});const ids={attendance:'cardAttendance',schedule:'cardSchedule',workhours:'cardWorkhours',efficiency:'cardEfficiency',hr:'cardHr',history:'cardHistory'};const quick=d.querySelector('.p79-quick-grid');if(quick){quick.replaceChildren();Object.entries(ids).forEach(([k,id])=>{const source=d.getElementById(id);if(!source||source.hidden||source.disabled||source.style.display==='none')return;quick.append(button(source.querySelector('.name')?.textContent?.trim()||meta[k][0],'p79-quick-link',icon(k)+'<span>'+(source.querySelector('.name')?.textContent?.trim()||meta[k][0])+'</span>',()=>source.click()));});}syncHomeFunctionMenu();}
 function sync(){frame=0;const on=enabled();d.body.classList.toggle('p79-workspace',!!on);if(!on){d.body.classList.remove('p79-nav-open','p79-nav-collapsed');d.getElementById('p79WorkspaceSearch')?.close();return;}if(!shell&&!buildShell())return;if(home)syncHomePermissions();updateAccount();
 }
 function queue(){if(!frame)frame=requestAnimationFrame(sync);}

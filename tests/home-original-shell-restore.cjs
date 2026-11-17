@@ -1,0 +1,47 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const root=path.join(__dirname,'..');
+const js=fs.readFileSync(path.join(root,'assets/port79-management-workspace.js'),'utf8');
+const css=fs.readFileSync(path.join(root,'assets/port79-home-original-shell.css'),'utf8');
+const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+assert.doesNotThrow(()=>new Function(js));
+assert.match(html,/<h2>79號碼頭 船舶作業 × 考勤人力 智慧管理中心<\/h2>/);
+assert.match(html,/<span class="name">效率系統<\/span>/);
+assert.match(html,/<span class="name">人資管理系統<\/span>/);
+assert.match(js,/function decorateHome\(\)/);
+assert(!js.includes("intro.innerHTML="),'homepage script must not overwrite native title');
+assert(!js.includes("card.querySelector('.name').textContent="),'native system names stay unchanged');
+assert(!js.includes("card.querySelector('.icon').innerHTML="),'native system icons stay unchanged');
+assert.match(js,/const brand=d.createElement\('div'\);brand.className='p79-workspace-brand';brand.innerHTML=logo\+'<div><strong>排班考勤系統<\/strong><\/div>'/);
+assert.match(js,/if\(home\)tools.append\(buildHomeFunctionMenu\(\)\)/);
+assert.match(html,/port79-management-workspace\.js\?v=20261117-home-original-ui-v1/);
+assert.match(html,/port79-home-original-shell\.css\?v=20261117-home-original-ui-v1/);
+assert.match(css,/#p79WorkspaceSidebar\.p79-workspace-sidebar/);
+assert.match(css,/#p79HomeFunctionMenu/);
+assert.match(css,/#port79CalendarModeBox/);
+assert.match(css,/body\.p79-workspace:has\(#systems\.show\)/,'stylesheet affects only authenticated homepage');
+assert(!css.includes('data-p79-system="leave"'),'no leave UI overrides');
+assert(!css.includes('data-p79-system="schedule"'),'no schedule UI overrides');
+function fn(name){
+ const begin=js.indexOf('function '+name+'('),end=js.indexOf('\n}',begin);
+ assert(begin>=0&&end>begin,'missing '+name);return js.slice(begin,end+2);
+}
+const links=[];
+const list={children:[],replaceChildren(){this.children=[]},append(x){this.children.push(x);}};
+const menu={open:true,querySelector:()=>list};
+const statuses={children:[],replaceChildren(){this.children=[]},append(x){this.children.push(x);}};
+const ids=['cardAttendance','cardSchedule','cardHr'];
+const sources=Object.fromEntries(ids.map((id,i)=>[id,{hidden:false,disabled:false,style:{display:''},querySelector(){return{textContent:['考勤系統','排班系統','人資管理系統'][i]}},click(){links.push(id)}}]));
+const ctx={home:true,order:['attendance','schedule','hr'],meta:{attendance:['考勤管理'],schedule:['排班管理'],hr:['人資管理']},
+ d:{getElementById(id){return id==='p79HomeFunctionMenu'?menu:id==='p79SevenStatus'?statuses:sources[id]||null;},createElement(){return{className:'',textContent:'',children:[],append(...x){this.children.push(...x)}}}},
+ homeNavAllowed:key=>key!=='hr',
+ icon:key=>key,
+ button:(name,cssName,markup,callback)=>({name,cssName,markup,click:callback})};
+const f=new Function('ctx','with(ctx){'+fn('syncHomeFunctionMenu')+';return syncHomeFunctionMenu}')(ctx);
+f();
+assert.deepEqual(list.children.map(x=>x.name),['考勤系統','排班系統'],'show original permitted system names, not modified labels');
+assert.equal(statuses.children.length,2,'show only available system status labels');
+list.children[1].click();
+assert.deepEqual(links,['cardSchedule'],'menu must invoke original native system button');
+assert.equal(menu.open,false,'close menu after navigation');
+console.log('PASS original home heading, system cards, dark-sidebar scope, top-right menu actions, permissions, and existing routes');
