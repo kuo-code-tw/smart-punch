@@ -196,6 +196,7 @@ function init(){
        typeof p79LeaveUnitOfPerson==='function'&&p79LeaveUnitOfPerson(e)===unit&&
        String(e.jobTitle||e.deptDetail||e.position||'未設定職稱').trim()===job&&
        typeof leaveEmployeeIsActive==='function'&&leaveEmployeeIsActive(e)&&
+       window.Port79JobTitleVisibility?.isVisible?.(job)===true&&
        (!window.p79OrgScope||window.p79OrgScope.matches(e))):null;
    let info=null;try{if(emp&&typeof leaveBalanceInfo==='function')info=leaveBalanceInfo(emp);}catch(_){}
    const entries=typeof leaveRecords!=='undefined'&&Array.isArray(leaveRecords)?leaveRecords:[];

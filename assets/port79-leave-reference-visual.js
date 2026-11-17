@@ -109,6 +109,7 @@ function init(){
  // Left: job title. Right: names belonging to the selected UNIT and job.
  // The unit comes from the official existing #filterDept control. Never show
  // an all-company name list when the unit is unselected.
+ const titlePolicy=window.Port79JobTitleVisibility;
  const leaveStrokeCollator=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true,sensitivity:'variant'});
  const personTitle=x=>String(x?.jobTitle||x?.deptDetail||x?.position||'未設定職稱').trim();
  const personName=x=>String(x?.name||x?.empName||x?.empId||'').trim();
@@ -124,8 +125,9 @@ function init(){
  };
  function updatePeople(){
    // Only official HR units of authorized, active employees are selectable.
-   const eligible=people().filter(x=>x&&x.empId&&String(x.empId).toUpperCase()!=='ADMIN'&&
-     permitted(x)&&activeEmployee(x));
+   const verified=titlePolicy?.ready?.()===true;
+   const eligible=verified?people().filter(x=>x&&x.empId&&String(x.empId).toUpperCase()!=='ADMIN'&&
+     permitted(x)&&activeEmployee(x)&&titlePolicy.isVisible(personTitle(x))):[];
    const units=[...new Set(eligible.map(officialUnit).filter(Boolean))]
      .sort((a,b)=>leaveStrokeCollator.compare(a,b));
    const parentUnit=String(document.getElementById('filterDept')?.value||'').trim();
@@ -156,13 +158,14 @@ function init(){
    const shown=job?allowed.filter(x=>personTitle(x)===job)
      .slice().sort((a,b)=>leaveStrokeCollator.compare(personName(a),personName(b))||
        String(a.empId).localeCompare(String(b.empId),'zh-TW',{numeric:true})):[];
-   const sig=unit+'|'+job+'|'+jobs.join(';')+'|'+jobSource.map(x=>
+   const sig=(titlePolicy?.revision?.()||0)+'|'+unit+'|'+job+'|'+jobs.join(';')+'|'+jobSource.map(x=>
      x.empId+'|'+personName(x)+'|'+personTitle(x)).join(';');
    if(sig===personSelect.dataset.sourceSignature)return;
    const previousPerson=personSelect.value;
    jobSelect.replaceChildren();
    const jobDefault=document.createElement('option');
-   jobDefault.value='';jobDefault.textContent=jobs.length?'請選擇職稱':'目前沒有可選職稱';
+   jobDefault.value='';jobDefault.textContent=!verified?'人資隱藏職稱待核對':jobs.length?'請選擇職稱':'目前沒有可選職稱';
+   jobSelect.disabled=!verified;
    jobSelect.append(jobDefault);
    for(const title of jobs){
      const opt=document.createElement('option');opt.value=title;opt.textContent=title;
@@ -171,7 +174,8 @@ function init(){
    jobSelect.value=job;
    personSelect.replaceChildren();
    const choose=document.createElement('option');choose.value='';
-   choose.textContent=!unit?'請先選擇單位':!job?'請先選擇職稱':shown.length?'請選擇姓名':'此職稱無符合人員';
+   choose.textContent=!verified?'人資職稱設定未核對':!unit?'請先選擇單位':!job?'請先選擇職稱':shown.length?'請選擇姓名':'此職稱無符合人員';
+   personSelect.disabled=!verified||!job||!unit;
    personSelect.append(choose);
    const counts=new Map();
    shown.forEach(x=>counts.set(personName(x),(counts.get(personName(x))||0)+1));
@@ -192,7 +196,7 @@ function init(){
    showDays('p79LeaveVisualEntitled',info?.entitled??null);
    showDays('p79LeaveVisualUsed',info?.used??null);
    showDays('p79LeaveVisualRemain',info?.effectiveRemaining??null);
-   document.getElementById('p79LeaveVisualQuotaNote').textContent=!selectedUnit()?'請先在請假額度選擇單位。':!jobSelect.value?'請先選擇職稱。':!e?'請選擇姓名。':info?.effectiveRemaining==null?'此人員尚無可核實的年假餘額。':'原有年假基準月份：'+String(e.leaveBalance?.asOf||'未註明');
+   document.getElementById('p79LeaveVisualQuotaNote').textContent=!titlePolicy?.ready?.()?'尚未核對人資隱藏職稱設定，暫不顯示職稱及人員。':!selectedUnit()?'請先在請假額度選擇單位。':!jobSelect.value?'請先選擇職稱。':!e?'請選擇姓名。':info?.effectiveRemaining==null?'此人員尚無可核實的年假餘額。':'原有年假基準月份：'+String(e.leaveBalance?.asOf||'未註明');
  }
  function updateStats(rs,m,unverified=false){
    if(unverified){
@@ -279,6 +283,26 @@ function init(){
  observer.observe(admin,{attributes:true,attributeFilter:['class']});
  if(balanceMode)observer.observe(balanceMode,{attributes:true,attributeFilter:['class']});
  observer.observe(document.getElementById('adminLeaveBody'),{childList:true});
+ // The official organization V2 config is the one source of hidden titles.
+ // Never guess from HR roster, and never show all jobs when a read is denied.
+ let visibilityReadAt=0;
+ function syncTitleVisibility(force=false){
+   if(!adminSession||typeof leaveRequestToken!=='function'||!titlePolicy?.load)return;
+   const token=leaveRequestToken();
+   if(!token)return;
+   const now=Date.now();
+   if(!force&&now-visibilityReadAt<45000)return;
+   visibilityReadAt=now;
+   void titlePolicy.load({gasUrl:GAS_URL,token,force}).then(()=>{
+      if(typeof populateLeaveAdminJobs==='function')populateLeaveAdminJobs();
+      refresh();
+   }).catch(()=>{
+      if(typeof populateLeaveAdminJobs==='function')populateLeaveAdminJobs();
+      refresh();
+   });
+ }
+ syncTitleVisibility();
+ window.addEventListener('focus',()=>syncTitleVisibility(true));
  const readStatus=document.getElementById('globalStatus');
  if(readStatus)observer.observe(readStatus,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
  window.addEventListener('pageshow',refresh);

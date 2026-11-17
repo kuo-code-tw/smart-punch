@@ -80,6 +80,8 @@ assert(visual.includes("quotaUnitSelect?.value||document.getElementById('filterD
 assert(visual.includes('id="p79LeaveVisualUnit"'),'quota exposes independent unit selector');
 assert(visual.includes('officialUnit(x)===unit'),'quota must match official fourth-level HR unit');
 assert(visual.includes('activeEmployee(x)'),'resigned employees must not be shown');
+assert(visual.includes('titlePolicy.isVisible(personTitle(x))'),'hidden jobs must be removed even when a current employee has them');
+assert(visual.includes('titlePolicy.load({gasUrl:GAS_URL,token,force})'),'load HR official settings, not cached guesses');
 assert(visual.includes("new Intl.Collator('zh-TW-u-co-stroke'"),'jobs and names retain stroke order');
 const sourceBegin=visual.indexOf(' const leaveStrokeCollator=');
 const sourceEnd=visual.indexOf(' const showDays=',sourceBegin);
@@ -91,7 +93,8 @@ const people=[
  {empId:'E2',name:'林小華',jobTitle:'技術員',section:'A單位',status:'在職'},
  {empId:'E4',name:'許大同',jobTitle:'司機',section:'B單位',status:'在職'},
  {empId:'E5',name:'吳怡君',jobTitle:'司機',section:'A單位',status:'離職'},
- {empId:'E6',name:'郭芳芳',jobTitle:'司機',section:'',status:'在職'}
+ {empId:'E6',name:'郭芳芳',jobTitle:'司機',section:'',status:'在職'},
+ {empId:'E7',name:'馬小軍',jobTitle:'未顯示主管',section:'A單位',status:'在職'}
 ];
 const before=JSON.stringify(people);
 const mkSelect=()=>({value:'',dataset:{},children:[],
@@ -120,7 +123,8 @@ const checks=Function('people','permitted','document','jobSelect','personSelect'
  unit.value='';localUnit.value='B單位';updatePeople();
  const localUnitNames=personSelect.children.map(x=>x.textContent);
  return {initial,aNames,bInitial,bNames,noUnit,allUnitsSelectedJob,afterUnit,localUnitNames};`)(
- ()=>people,()=>true,doc,job,person,x=>x.section,x=>x.status==='在職',{},unit,localUnit);
+ ()=>people,()=>true,doc,job,person,x=>x.section,x=>x.status==='在職',
+  {Port79JobTitleVisibility:{ready:()=>true,isVisible:title=>title!=='未顯示主管',revision:()=>1}},unit,localUnit);
 assert.deepEqual(checks.initial.jobs,['請選擇職稱','司機','技術員']);
 assert.deepEqual(checks.initial.people,['請先選擇職稱'],'do not show all employee names before job is chosen');
 assert.deepEqual(checks.aNames,['請選擇姓名','王子明','黃柏源'],'A unit drivers only, names by stroke');

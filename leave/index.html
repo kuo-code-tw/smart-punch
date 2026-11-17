@@ -793,8 +793,14 @@ function p79LeaveJobForRecord(record){
 }
 function populateLeaveAdminJobs(){
  const select=$('filterJob');if(!select)return;const dept=$('filterDept').value,current=select.value;
- const jobs=[...new Set([...employees.filter(e=>!dept||p79LeaveUnitOfPerson(e)===dept).map(e=>String(e.jobTitle||e.deptDetail||'').trim()),...leaveRecords.filter(l=>!dept||p79LeaveRecordUnit(l)===dept).map(p79LeaveJobForRecord)].filter(Boolean))].sort(new Intl.Collator('zh-TW-u-co-stroke',{numeric:true}).compare);
- select.innerHTML='<option value="">全部職稱</option>'+jobs.map(job=>`<option value="${esc(job)}">${esc(job)}</option>`).join('');select.value=jobs.includes(current)?current:'';
+ const visibility=window.Port79JobTitleVisibility;
+ const verified=visibility?.ready?.()===true;
+ const jobs=[...new Set([...employees.filter(e=>!dept||p79LeaveUnitOfPerson(e)===dept).map(e=>String(e.jobTitle||e.deptDetail||'').trim()),...leaveRecords.filter(l=>!dept||p79LeaveRecordUnit(l)===dept).map(p79LeaveJobForRecord)].filter(Boolean))]
+  .filter(job=>verified&&visibility.isVisible(job))
+  .sort(new Intl.Collator('zh-TW-u-co-stroke',{numeric:true}).compare);
+ select.innerHTML='<option value="">'+(verified?'全部職稱':'人資隱藏職稱設定待核對')+'</option>'+jobs.map(job=>`<option value="${esc(job)}">${esc(job)}</option>`).join('');
+ select.value=jobs.includes(current)?current:'';
+ select.disabled=!verified;
 }
 
 async function p79ComparisonOutput(title,rows,printMode){
@@ -2488,8 +2494,9 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 <link rel="stylesheet" href="../assets/port79-leave-reference-visual.css?v=20261116-reference-tab-stroke-v2&compat=20261117-production-reference-repaired-v1">
 <link rel="stylesheet" href="../assets/port79-leave-exact-reference.css?v=20261116-reference-match-v4&compat=20261117-production-reference-repaired-v1&topbar=20261117-restore-v1&compact=20261117-clean-header-v1&picker=20261117-unit-job-unit-v3">
 <script defer src="../assets/port79-leave-ui-v115.js?v=20261117-production-v115b"></script>
-<script src="../assets/port79-leave-reference-visual.js?v=20261116-reference-tab-stroke-v3&compat=20261117-production-reference-repaired-v1&picker=20261117-unit-job-unit-v3"></script>
-<script src="../assets/port79-leave-exact-reference.js?v=20261116-reference-match-v3&compat=20261117-production-reference-repaired-v1&compact=20261117-clean-header-v1&picker=20261117-unit-job-unit-v3"></script>
+<script src="../assets/port79-hidden-job-titles.js?v=20261117-hr-hidden-v1"></script>
+<script src="../assets/port79-leave-reference-visual.js?v=20261116-reference-tab-stroke-v3&compat=20261117-production-reference-repaired-v1&picker=20261117-hidden-job-v4"></script>
+<script src="../assets/port79-leave-exact-reference.js?v=20261116-reference-match-v3&compat=20261117-production-reference-repaired-v1&compact=20261117-clean-header-v1&picker=20261117-hidden-job-v4"></script>
 </body>
 </html>
 
