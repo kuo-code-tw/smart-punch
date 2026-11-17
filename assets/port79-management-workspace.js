@@ -103,7 +103,7 @@ function buildHomeNav(){
   const a=d.createElement('a');a.href='./'+paths[key];
   a.innerHTML=icon(key)+'<span>'+meta[key][0]+'</span><span class="p79-nav-arrow">›</span>';
   a.dataset.p79Decorated='1';
-  if(!allowed){a.setAttribute('aria-disabled','true');a.title='此帳號尚無此系統權限';a.style.opacity='0.55';}
+  if(!allowed){a.setAttribute('aria-disabled','true');a.title='此帳號尚無此系統權限';}
   a.addEventListener('click',e=>{
    e.preventDefault();
    if(!homeNavAllowed(key,source))return;
