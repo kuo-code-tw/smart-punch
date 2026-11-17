@@ -94,8 +94,10 @@
    return{ok:false,reason:'正式雲端加班及班表月份尚未核對完成，不能顯示推估數字'};
   }
   // Derived from the same native, authorized overtime calculation cache.
-  if(!p79OvertimeCalculationCache&&typeof buildOvertimeStatisticsRows==='function')buildOvertimeStatisticsRows();
-  const source=[...(p79OvertimeCalculationCache?.rows||[]),...(p79OvertimeCalculationCache?.plannedRows||[])];
+  // The original builder reuses its fingerprinted calculation cache; invoke it
+  // on each query so month changes never inherit stale roster or attendance.
+  const verifiedRows=typeof buildOvertimeStatisticsRows==='function'?buildOvertimeStatisticsRows():[];
+  const source=[...(Array.isArray(verifiedRows)?verifiedRows:[]),...(p79OvertimeCalculationCache?.plannedRows||[])];
   const reports=[],seen=new Set();
   for(const row of source){
    const report=row?.overtimeReport,who=empId(row),idKey=String(report?.id||'').trim();
@@ -122,7 +124,9 @@
   const sessions=attendanceSessions(sourceRecords,allow,f.start,f.end);
   const rawHours=round(sessions.reduce((sum,s)=>sum+s.minutes,0)/60);
   const dates=[],today=dateTaipei();
-  const startDate=Date.parse(f.start+'T00:00:00+08:00'),endDate=Date.parse(f.end+'T00:00:00+08:00');
+  // Date-only keys are UTC calendar dates here. Using +08:00 then slicing
+  // toISOString would shift the trend labels back one calendar day.
+  const startDate=Date.parse(f.start+'T00:00:00Z'),endDate=Date.parse(f.end+'T00:00:00Z');
   const allDays=Math.floor((endDate-startDate)/86400000)+1;
   for(let i=Math.max(0,allDays-30);i<allDays;i++){
    const d=new Date(startDate+i*86400000).toISOString().slice(0,10);
@@ -161,7 +165,20 @@
   say('prKpiPeopleNote',attendance?'區間內有完整打卡的人數':'完整打卡待核對');
   say('prKpiPendingNote',ok?'正式申報狀態（非預估）':'申報狀態待核對');
   id('prTrend').innerHTML=attendance?trendSvg(data.trend):'<div class="pr-message">正式資料尚未讀齊</div>';
-  const ratio=attendance&&!data.invalid&&data.rawHours>0&&data.overtime<=data.rawHours?
+  // A report can be credited to a different month than the physical punch.
+  // Do not subtract such hours from this month's clock intervals or label
+  // the remainder as normal hours unless every report has local punch evidence.
+  const reportSums=new Map();if(ok)for(const r of data.reports){
+    if(r.rawHours==null)continue;
+    const k=r.empId+'|'+r.creditDate;
+    reportSums.set(k,(reportSums.get(k)||0)+r.rawHours);
+  }
+  const sessionSums=new Map();if(ok)for(const r of data.sessions){
+    const k=r.empId+'|'+r.date;
+    sessionSums.set(k,(sessionSums.get(k)||0)+r.minutes/60);
+  }
+  const matched=ok&&[...reportSums].every(([k,h])=>sessionSums.has(k)&&h<=sessionSums.get(k));
+  const ratio=attendance&&!data.invalid&&matched&&data.rawHours>0&&data.overtime<=data.rawHours?
     Math.min(100,Math.max(0,data.overtime/data.rawHours*100)):null;
   id('prDonut').style.background=ratio===null?'conic-gradient(#dbe7f6 0 100%)':
     'conic-gradient(#087efa 0 '+(100-ratio)+'%,#18ae66 '+(100-ratio)+'% 100%)';
