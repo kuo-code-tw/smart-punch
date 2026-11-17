@@ -2042,7 +2042,7 @@ function readLocalArray(key){
 function loadLocal(){
   groups=readLocalArray(STORE.groups);
   assignments=readLocalArray(STORE.assign);
-  records=readLocalArray(STORE.records);
+  records=p79RepairKnownLegacyWorkingClocks(readLocalArray(STORE.records)).records;
   shipMasters=readLocalArray(STORE.ships);
   systemEmployees=readLocalArray(STORE.employees);
 
@@ -6353,7 +6353,7 @@ function personalAuditNormalizeIntervals(intervals){
     if(last && a<=last[1]+1)last[1]=Math.max(last[1],b);
     else merged.push([a,b]);
   });
-  return merged;
+  return p79RepairKnownLegacyWorkingClocks(merged).records;
 }
 function personalAuditIntervalsEquivalent(a,b){
   const x=personalAuditNormalizeIntervals(a),y=personalAuditNormalizeIntervals(b);
@@ -8301,6 +8301,94 @@ function saveQueue(q){
  const operation=gcQueueStorageWrites.catch(()=>{}).then(()=>p79EfficiencyDbWriteQueue(snapshot));
  gcQueueStorageWrites=operation;
  return operation.catch(error=>{if(gcQueueMemory===snapshot)gcQueueMemory=previous;throw Error('待同步資料尚未保存，請保留此頁與原始 試算表：'+(error.message||error));});
+}
+
+// One-time recovery for a verified 2026-11-07 WAN HAI 288/N115 Excel import.
+// These are only source row numbers, crane IDs and clock values; no personal names.
+const P79_WR_5260210_SOURCE_CLOCKS=[
+  ['8003',10,'09:02','12:00','2026-11-07'],
+  ['8003',16,'12:00','14:00','2026-11-07'],
+  ['8003',19,'14:00','16:00','2026-11-07'],
+  ['8003',22,'16:00','18:00','2026-11-07'],
+  ['8003',25,'18:00','20:00','2026-11-07'],
+  ['8003',28,'20:00','22:00','2026-11-07'],
+  ['8003',31,'22:00','00:00','2026-11-07'],
+  ['8003',34,'00:00','00:41','2026-11-08'],
+  ['8005',48,'09:06','12:00','2026-11-07'],
+  ['8005',54,'12:00','16:00','2026-11-07'],
+  ['8005',60,'16:00','18:00','2026-11-07'],
+  ['8005',63,'18:25','20:00','2026-11-07'],
+  ['8005',66,'20:00','22:00','2026-11-07'],
+  ['8005',69,'22:00','22:51','2026-11-07']
+];
+function p79AddClockHours(time,hours){
+  const m=String(time||'').match(/^(\\d{2}):(\\d{2})$/);
+  if(!m)return '';
+  const total=(Number(m[1])*60+Number(m[2])+hours*60+1440*2)%1440;
+  return String(Math.floor(total/60)).padStart(2,'0')+':'+String(total%60).padStart(2,'0');
+}
+function p79RepairKnownLegacyWorkingClocks(list){
+  let changed=0;
+  const out=(Array.isArray(list)?list:[]).map(row=>{
+    if(String(row?.workingNo||'').trim()!=='5260210'||String(row?.source||'')!=='working-report')return row;
+    const rule=String(row?.workingSheetRuleVersion||'');
+    if(/V20|CLOCK_REPAIRED/.test(rule)||(!/V19/.test(rule) && !(rule===''&&row.workingSheetImportedAt)))return row;
+    const aqc=normalizeAqcNo(row?.number||row?.gcNo);
+    const sourceRow=Number(row?.sourceRow);
+    const start=String(row?.startTime||'').trim(),end=String(row?.endTime||'').trim();
+    const shiftedMatches=P79_WR_5260210_SOURCE_CLOCKS.filter(x=>
+      x[0]===aqc && start===p79AddClockHours(x[2],8) && end===p79AddClockHours(x[3],8));
+    const matching=shiftedMatches.find(x=>sourceRow===x[1])||
+      (shiftedMatches.length===1 && (!Number.isFinite(sourceRow)||sourceRow<=0)?shiftedMatches[0]:null);
+    if(!matching)return row; // preserve manual edits, unknown rows and already-correct imports
+    changed++;
+    return {...row,workDate:matching[4],startTime:matching[2],endTime:matching[3],
+      workingSheetRuleVersion:(rule||'WORKING_REPORT_V19')+'_CLOCK_REPAIRED',
+      workingReportTimeRepair:'5260210_LOCAL_CLOCK_20261117'};
+  });
+  return {records:out,changed};
+}
+let p79LegacyWorkingClockRepairBusy=false;
+async function p79PersistKnownLegacyWorkingClocks(){
+  if(p79LegacyWorkingClockRepairBusy||!p79EfficiencyAuthReady||!canManageEfficiency()||
+      p79EfficiencyManualSyncActive||globalThis.P79FullRefreshRunning===true)return false;
+  p79LegacyWorkingClockRepairBusy=true;
+  const token=gcToken;
+  try{
+    await ensureGcQueueReady();
+    if(readQueue().length)return false; // never race or overwrite unconfirmed edits
+    // Authoritative 2026 cloud rows are required. Do not write from browser cache alone.
+    const live=await apiGet('gcGetData',{year:'2026'});
+    if(gcToken!==token || !Array.isArray(live?.records))return false;
+    const candidates=live.records.filter(x=>String(x?.workingNo||'').trim()==='5260210'&&
+      String(x?.source||'')==='working-report');
+    if(candidates.length<8)return false; // partial remote snapshot must never initiate a repair
+    const fixed=p79RepairKnownLegacyWorkingClocks(candidates);
+    if(!fixed.changed)return false;
+    // Reconcile with the latest cloud snapshot first, then correct exactly verified rows.
+    if(Array.isArray(live.shipMasters)&&live.shipMasters.length)
+      shipMasters=canonicalShipMasters(mergeShipMastersPreferComplete(shipMasters,live.shipMasters));
+    records=p79RepairKnownLegacyWorkingClocks(mergeCloudRecordsWithLocal(live.records,records,shipMasters)).records;
+    saveLocal();invalidateWorkloadIndex();renderEfficiencyTabFast();
+    const result=await postCloud('gcSyncAll',{groups,assignments,records,shipMasters});
+    if(!result?.ok)throw Error('修正已保存在本機，但雲端仍待確認');
+    const check=await apiGet('gcGetData',{year:'2026'});
+    if(gcToken!==token||!Array.isArray(check?.records))throw Error('讀回驗證尚未完成');
+    const after=p79RepairKnownLegacyWorkingClocks(check.records);
+    if(after.changed)throw Error('雲端仍有舊版時間，保留待同步檢查');
+    const repaired=check.records.filter(x=>String(x?.workingNo||'').trim()==='5260210'&&
+      x?.workingReportTimeRepair==='5260210_LOCAL_CLOCK_20261117');
+    if(repaired.length<fixed.changed)throw Error('雲端修正明細不完整');
+    cloudStatus('WORKING REPORT 舊時間已修正並完成雲端讀回核對');
+    console.info('[WORKING REPORT clock repair] verified',repaired.length);
+    return true;
+  }catch(error){
+    console.warn('WORKING REPORT 舊時間修正未完全核對；保留原有資料及待同步紀錄',error);
+    cloudStatus('WORKING REPORT 舊時間修正尚待雲端確認',false);
+    return false;
+  }finally{
+    p79LegacyWorkingClockRepairBusy=false;
+  }
 }
 
 function recordIdentityKey(r){
@@ -15714,6 +15802,8 @@ async function initGcPage(){
     }
 
     if(restored){
+      // Correct verified legacy clock rows in cloud without asking for a second Excel upload.
+      void p79PersistKnownLegacyWorkingClocks();
       // restoreVesselDataFromCloud 已刷新目前頁籤，版本相同時則沿用首次顯示。
       cloudStatus(`已自動拉取最新資料｜主檔 ${(shipMasters||[]).length}｜明細 ${(records||[]).length}`);
     }else{
