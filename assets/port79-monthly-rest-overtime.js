@@ -9,6 +9,36 @@ const confirmedReport=(meta,report)=>{
    x?.confirmed===true&&String(x.reportId)===String(report.id));
 };
 const id=x=>String(x||'').trim().toUpperCase(),today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+// V2026-11-17: Current-month overtime preplanning uses employment status,
+// rather than just permission scope. Never delete saved historical reports.
+function monthlyPlanPeople(staff,snapshot,month){
+ const master=new Map((snapshot?.employees||[]).map(e=>[id(e?.empId||e?.id),e]));
+ const rosters=new Map((snapshot?.schedules||[]).map(r=>[id(r?.empId),r?.schedule||{}]));
+ const current=today(),currentMonth=current.slice(0,7),target=String(month||currentMonth);
+ const dateKey=x=>{
+  const m=String(x||'').match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+  return m?m[1]+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0'):'';
+ };
+ return (staff||[]).map(raw=>{
+  const actual=master.get(id(raw?.empId||raw?.id))||{};
+  return {...raw,empId:raw?.empId||raw?.id,
+   employmentStatus:actual.employmentStatus??raw?.employmentStatus??raw?.employeeStatus??raw?.status??'',
+   terminationDate:actual.terminationDate??raw?.terminationDate??'',
+   lastWorkDate:actual.lastWorkDate??raw?.lastWorkDate??''};
+ }).filter(emp=>{
+  const status=String(emp.employmentStatus||'').trim().toLowerCase();
+  const resigned=['resigned','terminated','inactive','離職','已離職'].includes(status);
+  const onLeave=['leave','loa','留停','留職停薪'].includes(status);
+  const last=dateKey(emp.lastWorkDate||emp.terminationDate);
+  // Past-month historical review may include staff employed during that month.
+  // Current preplanning excludes people who already left, or on unpaid leave.
+  if(target<currentMonth)return !resigned||!last||target<=last.slice(0,7);
+  if(resigned||onLeave||(last&&last<current))return false;
+  const roster=rosters.get(id(emp.empId))||{};
+  return !Object.keys(roster).some(d=>
+   /^\d{4}-\d{2}-\d{2}$/.test(d)&&d<=current&&['離','離職'].includes(String(roster[d]||'').trim()));
+ }).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'zh-Hant-u-co-stroke'));
+}
 function previousMonth(month){
  if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return '';
  const year=Number(month.slice(0,4)),m=Number(month.slice(5,7));
@@ -365,7 +395,7 @@ function plan(snapshot,people,month,rules,options={}){
  for(const pair of snapshot.pairs||[]){const key=id(pair.empId)+'|'+pair.date;if(!pairsByKey.has(key))pairsByKey.set(key,[]);pairsByKey.get(key).push(pair);}
  const leaveDates=new Set(snapshot.leaveDates||[]),currentDate=today(),historical=backfillContext(month,currentDate).historical;
  const weekOf=date=>Number(date.slice(8))<=21?0:Number(date.slice(8))<=28?1:2;
- for(const emp of people){
+ for(const emp of monthlyPlanPeople(people,snapshot,month)){
   const roster=rosters.get(id(emp.empId));
   if(!roster){
    const start=String(g.p79MonthlyRestContext?.employmentStart?.(emp)||'').slice(0,10);
@@ -649,7 +679,7 @@ async function open(settings={}){
  let autoPlan=settings.autoPlan===true,explicitPlanningMode=settings.autoPlan===true;
  const manualPeople=new Map(); // preserve picks across local filters; no implicit cloud writes
  const q=s=>el.querySelector(s),setStatus=x=>{q('#mrStatus').textContent=x;if(q('#mrResult'))q('#mrResult').textContent=x;};let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[],lastFailure='',lastCheckedDay=today();
- let people=a.employees().slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh-Hant-u-co-stroke'));
+ let people=monthlyPlanPeople(a.employees(),null,q('#mrMonth').value);
  function options(values,all){return '<option value="">'+all+'</option>'+values.map(v=>'<option>'+esc(v)+'</option>').join('');}
  const job=e=>e.jobTitle||e.deptDetail||'未設定';q('#mrDept').innerHTML=options([...new Set(people.map(e=>e.dept||'一般'))],'全部部門');
  function filter(){const dept=q('#mrDept').value;return people.filter(e=>!dept||(e.dept||'一般')===dept);}
@@ -667,7 +697,9 @@ async function open(settings={}){
   for(const row of model?.rows||[])if(!row.saved&&!row.planned)row.checked=true;
  }
  function visibleExistingRows(){const ids=new Set(chosenPeople().map(e=>id(e.empId)));
-  return existingRestOvertimeRows(snapshot,loadedPeople,loadedMonth).filter(r=>ids.has(id(r.empId)));
+  const all=!q('#mrDept').value&&!q('#mrJob').value&&!q('#mrEmp').value;
+  // Existing report history is read-only; resigned staff stay in this section only.
+  return existingRestOvertimeRows(snapshot,a.employees(),loadedMonth).filter(r=>all||ids.has(id(r.empId)));
  }
  function visiblePlannedRows(){const ids=new Set(chosenPeople().map(e=>id(e.empId)));
   return (model?.plannedRows||[]).filter(r=>ids.has(id(r.empId))&&!r.saved);
@@ -842,18 +874,23 @@ async function open(settings={}){
     if(!people.length){
      setStatus('正在載入人資名冊與操作權限，完成後繼續核對…');
      await g.p79OvertimeContext?.refreshAccess?.();
-     people=a.employees().slice().sort((x,y)=>String(x.name).localeCompare(String(y.name),'zh-Hant-u-co-stroke'));
+     people=monthlyPlanPeople(a.employees(),null,loadedMonth);
      q('#mrDept').innerHTML=options([...new Set(people.map(e=>e.dept||'一般'))],'全部部門');jobs();
     }
-    g.p79RestQuota(loadedMonth);loadedPeople=people.slice();if(!loadedPeople.length)throw Error('沒有可檢視的人員');
+    g.p79RestQuota(loadedMonth);
+    if(!a.employees().length)throw Error('沒有可檢視的人員');
    const [data,ruleResponse]=await Promise.all([a.snapshot(loadedMonth,false,false,true,true),g.P79Overtime.loadRules()]);
     snapshot=data;rules=ruleResponse.rows;
+    people=monthlyPlanPeople(a.employees(),snapshot,loadedMonth);
+    loadedPeople=people.slice();
+    const allowedIds=new Set(loadedPeople.map(e=>id(e.empId)));
+    for(const empId of manualPeople.keys())if(!allowedIds.has(empId))manualPeople.delete(empId);
     // Historical employees absent from the current HR roster remain searchable
     // when the authenticated month snapshot contains their official row.
     const known=new Set(people.map(e=>id(e.empId)));
     for(const row of snapshot?.schedules||[]){
      const empId=id(row?.empId);
-     if(!empId||known.has(empId)||row.month&&String(row.month)!==loadedMonth)continue;
+     if(!empId||known.has(empId)||loadedMonth>=today().slice(0,7)||row.month&&String(row.month)!==loadedMonth)continue;
      const info=row.schedule?.__personnel||{};
      const person={empId,name:row.name||row.employeeName||empId,
       jobTitle:info.role||row.role||'未設定',dept:row.dept||row.department||'歷史人員',
