@@ -8327,9 +8327,36 @@ function p79AddClockHours(time,hours){
   const total=(Number(m[1])*60+Number(m[2])+hours*60+1440*2)%1440;
   return String(Math.floor(total/60)).padStart(2,'0')+':'+String(total%60).padStart(2,'0');
 }
+function p79RepairWorkingClockByStableId(row){
+  if(String(row?.source||'')!=='working-report')return null;
+  const rule=String(row?.workingSheetRuleVersion||'');
+  if(!/V19/.test(rule)||/CLOCK_REPAIRED|V20/.test(rule)||row?.workingReportTimeRepair||
+      row?.manualEditedAt||row?.editedAt)return null;
+  // The imported stable ID stores the original spreadsheet date and clock.
+  // Repair a proven +/-8-hour shift only. Do not modify other time differences.
+  const match=String(row?.id||'').match(/^WR_([^_]+)_([^_]+)_(20\d{2}-\d{2}-\d{2})_.+_(\d{4})_(\d{4})$/);
+  if(!match)return null;
+  if(String(row?.workingNo||'').trim()!==match[1]||
+      normalizeAqcNo(row?.number||row?.gcNo)!==normalizeAqcNo(match[2])||
+      String(row?.workDate||'')!==match[3])return null;
+  const clock=t=>{
+    const h=Number(t.slice(0,2)),m=Number(t.slice(2));
+    return h<24&&m<60?t.slice(0,2)+':'+t.slice(2):'';
+  };
+  const start=clock(match[4]),end=clock(match[5]);
+  if(!start||!end)return null;
+  const shiftedBy=hours=>String(row.startTime||'')===p79AddClockHours(start,hours)&&
+    String(row.endTime||'')===p79AddClockHours(end,hours);
+  if(!shiftedBy(8)&&!shiftedBy(-8))return null;
+  return {...row,startTime:start,endTime:end,workingSheetRuleVersion:rule+'_CLOCK_REPAIRED',
+    workingReportTimeRepair:'SOURCE_ID_CLOCK_20261117'};
+}
 function p79RepairKnownLegacyWorkingClocks(list){
   let changed=0;
-  const out=(Array.isArray(list)?list:[]).map(row=>{
+  const out=(Array.isArray(list)?list:[]).map(original=>{
+    const fromId=p79RepairWorkingClockByStableId(original);
+    if(fromId){changed++;return fromId;}
+    const row=original;
     if(String(row?.workingNo||'').trim()!=='5260210'||String(row?.source||'')!=='working-report')return row;
     const rule=String(row?.workingSheetRuleVersion||'');
     if(/V20/.test(rule)||(!/V19/.test(rule) && !(rule===''&&row.workingSheetImportedAt)))return row;
