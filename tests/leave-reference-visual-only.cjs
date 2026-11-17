@@ -112,7 +112,11 @@ const checks=Function('people','permitted','document','jobSelect','personSelect'
  const bNames=personSelect.children.map(x=>x.textContent);
  unit.value='';updatePeople();
  const noUnit={jobs:jobSelect.children.map(x=>x.textContent),people:personSelect.children.map(x=>x.textContent),person:personSelect.value};
- return {initial,aNames,bInitial,bNames,noUnit};`)(
+ jobSelect.value='司機';updatePeople();
+ const allUnitsSelectedJob={job:jobSelect.value,people:personSelect.children.map(x=>x.textContent)};
+ unit.value='A單位';updatePeople();
+ const afterUnit={job:jobSelect.value,people:personSelect.children.map(x=>x.textContent)};
+ return {initial,aNames,bInitial,bNames,noUnit,allUnitsSelectedJob,afterUnit};`)(
  ()=>people,()=>true,doc,job,person,x=>x.section,x=>x.status==='在職',{},unit);
 assert.deepEqual(checks.initial.jobs,['請選擇職稱','司機','技術員']);
 assert.deepEqual(checks.initial.people,['請先選擇職稱'],'do not show all employee names before job is chosen');
@@ -121,9 +125,14 @@ assert.deepEqual(checks.bInitial.jobs,['請選擇職稱','司機']);
 assert.deepEqual(checks.bInitial.people,['請先選擇職稱']);
 assert.equal(checks.bInitial.person,'','changing unit clears previous employee');
 assert.deepEqual(checks.bNames,['請選擇姓名','許大同'],'do not leak A unit employees into B unit');
-assert.deepEqual(checks.noUnit.jobs,['請先選擇單位']);
+assert.deepEqual(checks.noUnit.jobs,['請選擇職稱','司機','技術員'],
+ 'job dropdown must have options while unit is still 全部單位');
 assert.deepEqual(checks.noUnit.people,['請先選擇單位'],'ALL units never expands to every employee');
 assert.equal(checks.noUnit.person,'');
+assert.deepEqual(checks.allUnitsSelectedJob,{job:'司機',people:['請先選擇單位']},
+ 'choosing job under 全部單位 never leaks all employee names');
+assert.deepEqual(checks.afterUnit,{job:'司機',people:['請選擇姓名','王子明','黃柏源']},
+ 'selecting a real unit should immediately populate only its job-matching employees');
 assert.equal(JSON.stringify(people),before,'filter is read-only and cannot mutate HR roster');
 console.log('PASS leave quota: selected unit → job → name, active-only, traditional stroke order, no cross-unit leaks');
 

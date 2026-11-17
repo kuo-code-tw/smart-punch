@@ -123,21 +123,26 @@ function init(){
  };
  function updatePeople(){
    const unit=selectedUnit();
-   const allowed=unitPeople();
-   const jobs=[...new Set(allowed.map(personTitle).filter(Boolean))]
+   // Job titles are selectable even when the unit filter is on 全部單位.
+   // Names remain limited to the explicitly selected unit, never all company.
+   const eligible=people().filter(x=>x&&x.empId&&String(x.empId).toUpperCase()!=='ADMIN'&&
+     permitted(x)&&activeEmployee(x));
+   const allowed=unit?eligible.filter(x=>officialUnit(x)===unit):[];
+   const jobSource=unit?allowed:eligible;
+   const jobs=[...new Set(jobSource.map(personTitle).filter(Boolean))]
      .sort((a,b)=>leaveStrokeCollator.compare(a,b));
    const previousJob=jobSelect.value;
    const job=jobs.includes(previousJob)?previousJob:'';
    const shown=job?allowed.filter(x=>personTitle(x)===job)
      .slice().sort((a,b)=>leaveStrokeCollator.compare(personName(a),personName(b))||
        String(a.empId).localeCompare(String(b.empId),'zh-TW',{numeric:true})):[];
-   const sig=unit+'|'+job+'|'+jobs.join(';')+'|'+allowed.map(x=>
+   const sig=unit+'|'+job+'|'+jobs.join(';')+'|'+jobSource.map(x=>
      x.empId+'|'+personName(x)+'|'+personTitle(x)).join(';');
    if(sig===personSelect.dataset.sourceSignature)return;
    const previousPerson=personSelect.value;
    jobSelect.replaceChildren();
    const jobDefault=document.createElement('option');
-   jobDefault.value='';jobDefault.textContent=unit?'請選擇職稱':'請先選擇單位';
+   jobDefault.value='';jobDefault.textContent=jobs.length?'請選擇職稱':'目前沒有可選職稱';
    jobSelect.append(jobDefault);
    for(const title of jobs){
      const opt=document.createElement('option');opt.value=title;opt.textContent=title;
@@ -245,7 +250,8 @@ function init(){
  personSelect.addEventListener('change',updateQuota);
  jobSelect.addEventListener('change',()=>{personSelect.value='';updatePeople();updateQuota();});
  document.getElementById('filterDept')?.addEventListener('change',()=>{
-   jobSelect.value='';personSelect.value='';updatePeople();updateQuota();
+   // Retain the job if the new unit offers it; never retain an old employee.
+   personSelect.value='';updatePeople();updateQuota();
  });
  for(const id of ['filterMonth','filterDept','filterJob','filterStatus'])document.getElementById(id)?.addEventListener('change',refresh);
  const observer=new MutationObserver(refresh);
