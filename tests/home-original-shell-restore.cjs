@@ -9,9 +9,10 @@ assert.match(html,/<h2>79號碼頭 船舶作業 × 考勤人力 智慧管理中�
 assert.match(html,/<span class="name">效率系統<\/span>/);
 assert.match(html,/<span class="name">人資管理系統<\/span>/);
 assert.match(js,/function decorateHome\(\)/);
-assert.match(js,/function enforceSidebarContrast\(\)/,'sidebar must enforce contrast after rendering');
-assert.match(js,/shell\.style\.setProperty\('background',gradient,'important'\)/,'dark background must override conflicting themes');
-assert.match(js,/a\.style\.setProperty\('opacity',disabled\?'0\.96':'1','important'\)/,'disabled links must remain readable');
+assert(!js.includes('enforceSidebarContrast'),'old JavaScript dark sidebar override must be removed');
+assert(!js.includes("shell.style.setProperty('background'"),'do not override light CSS inline');
+assert.match(js,/className='sys '\+\(permitted\?'is-available':'is-unavailable'\)/,'permission-aware lamp class is required');
+assert.match(js,/className='p79-status-light'/,'status light element is required');
 assert(!js.includes("a.style.opacity='0.55'"),'do not fade disabled menu links to unreadable opacity');
 assert(!js.includes("intro.innerHTML="),'homepage script must not overwrite native title');
 assert(!js.includes("card.querySelector('.name').textContent="),'native system names stay unchanged');
@@ -21,9 +22,13 @@ assert.match(js,/if\(home\)tools.append\(buildHomeFunctionMenu\(\)\)/);
 assert.match(html,/port79-management-workspace\.js\?v=20261117-home-original-ui-v1/);
 assert.match(html,/port79-home-original-shell\.css\?v=20261117-home-original-ui-v1/);
 assert.match(css,/#p79WorkspaceSidebar\.p79-workspace-sidebar/);
-assert.match(css,/background-color:#152f54!important/,'home sidebar must have a dark background');
+assert.match(css,/background-color:#f1f8ff!important/,'sidebar must match the reference white background');
+assert(!css.includes('#193964'),'dark theme must never be forced on the left sidebar');
+assert.match(css,/#port79CalendarModeBox\{\s*display:flex!important/,'original year switch remains visible');
 assert.match(css,/\.p79-workspace-brand small\{/,'cloud-system subtitle must be shown');
 assert(!css.includes('p79-sidebar-footer{display:none'),'original harbor footer remains visible');
+assert.match(js,/p79-nav-collapsed/,'hamburger toggle must exist');
+assert.match(js,/event.preventDefault\(\);event.stopPropagation\(\)/,'hamburger must not launch another action');
 assert.match(css,/#p79HomeFunctionMenu/);
 assert.match(css,/#port79CalendarModeBox/);
 assert.match(css,/body\.p79-workspace:has\(#systems\.show\)/,'stylesheet affects only authenticated homepage');
@@ -40,15 +45,20 @@ const statuses={children:[],replaceChildren(){this.children=[]},append(x){this.c
 const ids=['cardAttendance','cardSchedule','cardHr'];
 const sources=Object.fromEntries(ids.map((id,i)=>[id,{hidden:false,disabled:false,style:{display:''},querySelector(){return{textContent:['考勤系統','排班系統','人資管理系統'][i]}},click(){links.push(id)}}]));
 const ctx={home:true,order:['attendance','schedule','hr'],meta:{attendance:['考勤管理'],schedule:['排班管理'],hr:['人資管理']},
- d:{getElementById(id){return id==='p79HomeFunctionMenu'?menu:id==='p79SevenStatus'?statuses:sources[id]||null;},createElement(){return{className:'',textContent:'',children:[],append(...x){this.children.push(...x)}}}},
+ d:{getElementById(id){return id==='p79HomeFunctionMenu'?menu:id==='p79SevenStatus'?statuses:sources[id]||null;},createElement(){return{className:'',textContent:'',children:[],attrs:{},setAttribute(k,v){this.attrs[k]=v},append(...x){this.children.push(...x)}}}},
  homeNavAllowed:key=>key!=='hr',
  icon:key=>key,
  button:(name,cssName,markup,callback)=>({name,cssName,markup,click:callback})};
 const f=new Function('ctx','with(ctx){'+fn('syncHomeFunctionMenu')+';return syncHomeFunctionMenu}')(ctx);
 f();
 assert.deepEqual(list.children.map(x=>x.name),['考勤系統','排班系統'],'show original permitted system names, not modified labels');
-assert.equal(statuses.children.length,2,'show only available system status labels');
+assert.equal(statuses.children.length,3,'show seven-system status entries including disabled ones');
+assert.equal(statuses.children[0].className,'sys is-available');
+assert.equal(statuses.children[0].children[0].className,'p79-status-light');
+assert.equal(statuses.children[0].children[2].textContent,'可使用');
+assert.equal(statuses.children[2].className,'sys is-unavailable');
+assert.equal(statuses.children[2].children[2].textContent,'不可使用');
 list.children[1].click();
 assert.deepEqual(links,['cardSchedule'],'menu must invoke original native system button');
 assert.equal(menu.open,false,'close menu after navigation');
-console.log('PASS original home heading, system cards, dark-sidebar scope, top-right menu actions, permissions, and existing routes');
+console.log('PASS reference white sidebar, port branding, visible year selector, status lights, hamburger safety, homepage cards and permissions');
