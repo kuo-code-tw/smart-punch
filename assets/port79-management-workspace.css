@@ -153,6 +153,8 @@ html body.p79-workspace[data-p79-system="workhours"] :is(.p79-stats-table-wrap,.
 html body.p79-workspace:not(.p79-nav-collapsed){--p79-w-width:204px!important}
 html body.p79-workspace :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{
  background:linear-gradient(165deg,#193964,#152f54 45%,#0e2647)!important;
+ background-color:#152f54!important;
+ background-image:linear-gradient(165deg,#193964,#152f54 45%,#0e2647)!important;
  border:0!important;border-right:1px solid #254467!important;color:#e9f3ff!important}
 html body.p79-workspace .p79-workspace-brand{
  height:68px!important;min-height:68px!important;max-height:68px!important;
@@ -163,7 +165,11 @@ html body.p79-workspace .p79-workspace-brand .p79-port-mark{
 html body.p79-workspace .p79-workspace-brand strong{
  color:white!important;font-size:17px!important;font-weight:900!important;
  letter-spacing:0!important;white-space:nowrap!important}
-html body.p79-workspace .p79-workspace-brand small{display:none!important}
+html body.p79-workspace .p79-workspace-brand small{
+ display:block!important;color:#d2e6ff!important;font-size:11px!important;
+ font-weight:650!important;letter-spacing:1px!important;line-height:1.4!important;
+ white-space:nowrap!important
+}
 html body.p79-workspace #p79SevenNav{
  display:flex!important;flex-direction:column!important;gap:4px!important;
  margin:12px 10px 0!important;padding:0!important;overflow-x:hidden!important}
@@ -182,6 +188,9 @@ html body.p79-workspace #p79SevenNav a:hover{
 html body.p79-workspace #p79SevenNav a.active svg,
 html body.p79-workspace #p79SevenNav a:hover svg{color:white!important}
 html body.p79-workspace #p79SevenNav .p79-nav-arrow{display:none!important}
+html body.p79-workspace #p79SevenNav a[aria-disabled="true"]{
+ opacity:.82!important
+}
 /* Restore the existing harbor photograph and footer on the original dark navigation.
    Sidebar branding, links, interactions, and all management content remain unchanged. */
 html body.p79-workspace .p79-sidebar-footer{display:flex!important}
