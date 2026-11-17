@@ -218,9 +218,9 @@ body[data-p79-system="leave"] #leaveStickyTabs .tab{flex:1 1 0!important;min-wid
 body[data-p79-system="leave"] #adminMode h2{font-size:19px!important;line-height:1.4!important;margin:0 0 5px!important}
 body[data-p79-system="leave"] #adminMode .note,body[data-p79-system="leave"] #adminMode label{font-size:13px!important;line-height:1.5}
 body[data-p79-system="leave"] #adminMode .btn{font-size:14px!important;line-height:1.4;min-height:40px!important;padding:9px 12px!important}
-/* Compact left-aligned filter panel: four controls stay on one tidy row on desktop. */
-body[data-p79-system="leave"] #adminMode>.card>.toolbar{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;align-items:end!important;gap:7px 10px!important;width:min(100%,920px)!important;max-width:100%!important;margin:10px 0 14px!important;padding:10px 12px!important}
-body[data-p79-system="leave"] #adminMode .toolbar .p79-leave-filter-title{grid-column:1/-1!important;font-size:14px!important;font-weight:800!important;line-height:1.35!important;margin:0!important}
+/* Full-width single-row filter: title + four fields side by side on desktop. */
+body[data-p79-system="leave"] #adminMode>.card>.toolbar{display:grid!important;grid-template-columns:100px repeat(4,minmax(0,1fr))!important;align-items:center!important;gap:12px!important;width:100%!important;max-width:none!important;margin:10px 0 14px!important;padding:12px 14px!important}
+body[data-p79-system="leave"] #adminMode .toolbar .p79-leave-filter-title{grid-column:auto!important;align-self:center!important;white-space:nowrap!important;font-size:14px!important;font-weight:800!important;line-height:1.35!important;margin:0!important}
 body[data-p79-system="leave"] #adminMode .toolbar .field{min-width:0!important;width:auto!important;margin:0!important}
 body[data-p79-system="leave"] #adminMode .toolbar .field label{display:block!important;font-size:12px!important;margin:0 0 4px!important}
 body[data-p79-system="leave"] #adminMode .toolbar input,body[data-p79-system="leave"] #adminMode .toolbar select{width:100%!important;min-height:36px!important;height:36px!important;font-size:13px!important;padding:5px 9px!important}
@@ -247,7 +247,7 @@ body[data-p79-system="leave"] .p79-leave-balance-head label{display:grid;gap:5px
 body[data-p79-system="leave"] .p79-leave-balance-head input{min-height:40px;padding:8px 12px;font-size:14px}
 body[data-p79-system="leave"] #adminBalanceMode .table-wrap{overflow-x:auto}
 body[data-p79-system="leave"] #adminBalanceMode table{min-width:760px}
-@media(max-width:1250px){body[data-p79-system="leave"] #adminMode>.card>.toolbar{grid-template-columns:repeat(2,minmax(0,1fr))!important;width:min(100%,560px)!important}body[data-p79-system="leave"] #adminMode .toolbar .field:first-child{grid-column:auto!important}}
+@media(max-width:900px){body[data-p79-system="leave"] #adminMode>.card>.toolbar{grid-template-columns:repeat(2,minmax(0,1fr))!important;width:100%!important}body[data-p79-system="leave"] #adminMode .toolbar .p79-leave-filter-title{grid-column:1/-1!important}body[data-p79-system="leave"] #adminMode .toolbar .field:first-child{grid-column:auto!important}}
 @media(max-width:600px){body[data-p79-system="leave"] #leaveStickyTabs{flex-wrap:wrap!important}body[data-p79-system="leave"] #leaveStickyTabs .tab{flex:1 1 calc(50% - 8px)!important;font-size:13px!important;white-space:normal!important}body[data-p79-system="leave"] #adminBalanceMode>.card{padding:12px!important}body[data-p79-system="leave"]>main{padding:10px!important}body[data-p79-system="leave"] #adminMode>.card{padding:12px!important}body[data-p79-system="leave"] #adminMode>.card>.toolbar{grid-template-columns:minmax(0,1fr)!important}body[data-p79-system="leave"] #adminMode .toolbar input,body[data-p79-system="leave"] #adminMode .toolbar select{font-size:16px!important}body[data-p79-system="leave"] #leaveStickyTabs .tab{font-size:14px!important;padding:9px!important}body[data-p79-system="leave"] #adminMode .actions{flex-wrap:wrap!important}body[data-p79-system="leave"] #leaveAdminDateRangePicker>div{min-width:0!important;width:min(340px,calc(100vw - 66px))}}
 </style>
 
@@ -393,7 +393,7 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
 </main>
 <input id="leaveBalanceImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none">
 <script>
-const APP_VERSION='2026.11.17.117';
+const APP_VERSION='2026.11.17.118';
 const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||localStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 window.GAS_URL=GAS_URL;
