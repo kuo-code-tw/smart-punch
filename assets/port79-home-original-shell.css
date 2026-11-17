@@ -26,7 +26,6 @@ html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a:h
   background:linear-gradient(110deg,#1c82ff,#0868ee)!important;color:#fff!important;
 }
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a svg{color:#c8ddfa!important}
-html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar .p79-sidebar-footer{display:none!important}
 html body.p79-workspace:has(#systems.show) #port79CalendarModeBox{display:none!important}
 /* Keep the original hero title as text, not a script-replaced label. */
 html body.p79-workspace:has(#systems.show) #systems>.p79-modern-home-intro h2{
