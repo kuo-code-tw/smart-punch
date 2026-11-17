@@ -3,6 +3,24 @@
  * employee master, permissions, approval or cloud writes. */
 (function(){
 'use strict';
+// UI-only: hide application-number labels, never record.id in authorized requests.
+function hideApplicationNumber(root){
+ if(!root)return;
+ for(const node of root.querySelectorAll('th,dt,label,small,span')){
+  if(node.children.length||String(node.textContent||'').trim()!=='申請單號')continue;
+  if(node.tagName==='TH'){
+   const table=node.closest('table'),col=node.cellIndex;
+   if(table&&col>=0){
+    for(const tr of table.querySelectorAll('tr')){
+     const cell=tr.cells?.[col];
+     if(cell)cell.hidden=true;
+    }
+   }
+   continue;
+  }
+  (node.closest('.p79-detail-cell,.field,.form-field,.form-group')||node).hidden=true;
+ }
+}
 function init(){
  const admin=document.getElementById('adminMode');
  const balanceMode=document.getElementById('adminBalanceMode');
@@ -260,6 +278,14 @@ function init(){
    prev.addEventListener('click',()=>go(-1));next.addEventListener('click',()=>go(1));
  }
 
+ // Cloud data/ID remain untouched; suppress only the unnecessary visual field.
+ hideApplicationNumber(admin);
+ new MutationObserver(()=>hideApplicationNumber(admin)).observe(admin,{childList:true,subtree:true});
+ document.addEventListener('click',event=>{
+  if(event.target.closest('[data-p79-detail-id]')){
+   queueMicrotask(()=>hideApplicationNumber(document.getElementById('p79LeaveDetailDialog')));
+  }
+ });
  document.documentElement.classList.toggle('p79-leave-pixel-admin',active());
  queueTableUpdate();
 }
