@@ -9,7 +9,7 @@ assert.match(html,/port79-home-cloud-status\.js\?v=20261117-stable-read-v4/);
 assert.match(source,/action=getCloudActivity/,'must use the same cloud activity backend as other systems');
 assert.match(source,/setInterval\(poll,15000\)/,'must poll real state every 15 seconds');
 assert(source.includes('stabilizeActivity(data)'),'background reads must be filtered before updating indicator chips');
-assert(source.includes('hits<2'),'single-cycle automatic reads must not flash as updates');
+assert(source.includes('(readHistory.get(key)?.hits||0)<2'),'single-cycle automatic reads must not flash as updates');
 assert.match(source,/getFolderSyncStatus/,'computer sync must be real, not simulated');
 assert(!source.includes("label='可使用'"),'cloud state may not be a fixed permission indicator');
 for(const k of ['busy','done','error','idle','offline']){
