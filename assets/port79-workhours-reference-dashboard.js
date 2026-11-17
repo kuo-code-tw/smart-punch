@@ -27,7 +27,7 @@
     window.sessionStorage?.getItem?.('port79_cache_mutated_at')||'']);
   if(rawCloud.month!==month||rawCloud.token!==token||rawCloud.revision!==revision){
     rawCloud.month=month;rawCloud.token=token;rawCloud.revision=revision;rawCloud.rows=null;
-    rawCloud.readAt=0;rawCloud.attemptAt=0;rawCloud.error='';
+    rawCloud.readAt=0;rawCloud.attemptAt=0;rawCloud.inflight=null;rawCloud.error='';
   }
   if(Array.isArray(rawCloud.rows)&&Date.now()-rawCloud.readAt<300000)return rawCloud.rows;
   // The main loader has already fetched and version-verified these adjacent raw
