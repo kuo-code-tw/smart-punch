@@ -23,7 +23,7 @@ const root={
 };
 const context={module:{exports:{}},window:root,console};
 vm.createContext(context);
-vm.runInContext(policy, {module:{exports:{}},console,Set,Date,AbortController,window:undefined});
+new vm.Script(policy);
 vm.runInContext(ui,context);
 const api=root.Port79WorkhoursHiddenJobUI;
 assert(api,'expose work-hours read-only presentation policy');
