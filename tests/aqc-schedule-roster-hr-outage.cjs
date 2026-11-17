@@ -70,7 +70,7 @@ win.P79PersonnelReference.render({sourceRows:records,rows:view.rows,persons:view
  rosterSource:'schedule',rosterCount:view.rosterCount,excludedRows:view.excluded});
 assert.equal(el('p79prPeople').textContent,'2');
 assert.equal(el('p79prCount').textContent,'4','original report total must not change');
-assert(el('p79prGroups').innerHTML.includes('A組')&&el('p79prGroups').innerHTML.includes('B組'));
+assert(el('p79prGroups').innerHTML.includes('aria-label="A 組"')&&el('p79prGroups').innerHTML.includes('aria-label="B 組"'),'both schedule group cards are rendered');
 assert(el('p79prRankBody').innerHTML.includes('現職甲'));
 assert(!el('p79prRankBody').innerHTML.includes('離職丙'));
 assert.match(el('p79prFreshness').textContent,/已核對正式排班表 AQC 2 人/);
