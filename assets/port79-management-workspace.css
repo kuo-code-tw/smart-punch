@@ -185,7 +185,7 @@ html body.p79-workspace #p79SevenNav .p79-nav-arrow{display:none!important}
 html body.p79-workspace .p79-sidebar-footer{display:none!important}
 }
 @media screen and (max-width:900px){
-html body.p79-workspace{--p79-w-width:0px!important}
+html body.p79-workspace:not(.p79-nav-collapsed){--p79-w-width:0px!important}
 html body.p79-workspace :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{
  width:min(244px,84vw)!important;max-width:min(244px,84vw)!important}
 }
