@@ -19,7 +19,7 @@ const d=shifted('00:00','00:41',8,'2026-11-06');
 const rows=[a,b,d];
 const out=c.p79RepairKnownLegacyWorkingClocks(rows);
 assert.equal(out.changed,3);
-assert.deepEqual(out.records.map(x=>[x.startTime,x.endTime]),[['09:02','12:00'],['22:00','00:00'],['00:00','00:41']]);
+assert.deepEqual(Array.from(out.records,x=>[x.startTime,x.endTime]),[['09:02','12:00'],['22:00','00:00'],['00:00','00:41']]);
 for(const row of out.records){assert.equal(row.disc,45);assert.equal(row.load,23);assert.equal(row.timeHours,2);assert.equal(row.gph,34.5);assert.equal(row.bundleDeduct,1);}
 assert.equal(c.p79RepairKnownLegacyWorkingClocks(out.records).changed,0);
 assert.equal(c.p79RepairKnownLegacyWorkingClocks([{...a,startTime:'03:15'}]).changed,0);
