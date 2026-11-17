@@ -42,6 +42,30 @@ assert.equal(api.build({allRows:all,visibleRows:all,audit:{status:'mismatch'},re
 assert.equal(api.build({allRows:all,visibleRows:all,audit:{status:'match'},readStatus:'ready',ambiguous:true}).status,'pending');
 const bad=[...all,{...all[0],id:'D',workDate:''}];
 assert.equal(api.build({allRows:bad,visibleRows:bad,audit:{status:'match'},readStatus:'ready'}).status,'mismatch');
+// The source detail table must match original WORKING REPORT time order, not driver name.
+const reportTimes=[
+ ['08:00','08:58','管家宏',26],['06:00','08:00','曾俊瑞',41],
+ ['04:20','06:00','楊永慶',28],['02:00','04:00','陳維新',46],
+ ['00:19','02:00','郭耀宗',35]
+].map(([startTime,endTime,name,load],i)=>({
+ id:'report-'+i,name,workingNo:'5260230',workDate:'2026-11-17',number:'8002',
+ startTime,endTime,disc:0,load,hc:0,hours:1
+}));
+const reportOrderBefore=reportTimes.map(r=>r.id).join(',');
+const reportDetail=api.build({allRows:reportTimes,visibleRows:reportTimes,audit:{status:'match'},readStatus:'ready'});
+assert.deepEqual(Array.from(reportDetail.details,r=>r.period),[
+ '00:19 ～ 02:00','02:00 ～ 04:00','04:20 ～ 06:00','06:00 ～ 08:00','08:00 ～ 08:58'
+]);
+assert.equal(reportDetail.full.containers,176);
+assert.equal(reportTimes.map(r=>r.id).join(','),reportOrderBefore,'workstation view must not mutate original records');
+const nonPadded=api.build({
+ allRows:[{...reportTimes[0],id:'time-second',startTime:'02:00'},
+          {...reportTimes[4],id:'time-first',startTime:'0:19'}],
+ visibleRows:[{...reportTimes[0],id:'time-second',startTime:'02:00'},
+          {...reportTimes[4],id:'time-first',startTime:'0:19'}],
+ audit:{status:'match'},readStatus:'ready'
+});
+assert.equal(nonPadded.details[0].period.startsWith('0:19'),'Google Sheets non-padded clock sorted first');
 const zero=api.sum([{name:'Zero',disc:0,load:0,hc:0,hours:0}]);
 assert.equal(zero.gph,null);
 assert.equal(/apiPost\(|saveLocal\(|fetch\(/.test(src),false,'Dashboard must be presentation-only');

@@ -49,8 +49,28 @@
         drivers:Array.from(new Set(rs.map(driverName))).sort(function (a,b) {return a.localeCompare(b,'zh-Hant');}) };
     }).sort(function (a,b) {return b.date.localeCompare(a.date);});
   }
+  function detailClockMinutes(value) {
+    var match=String(value == null ? '' : value).trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if(!match) return Number.POSITIVE_INFINITY;
+    var hour=Number(match[1]),minute=Number(match[2]);
+    return hour>=0&&hour<=24&&minute>=0&&minute<60&&!(hour===24&&minute!==0)
+      ?hour*60+minute:Number.POSITIVE_INFINITY;
+  }
   function detailRows(rows) {
-    return (rows || []).map(function (r) {
+    // Preserve the source rows; the WORKING REPORT should read chronologically.
+    var sorted=(rows || []).slice().sort(function (a,b) {
+      var date=String(a.workDate||'').localeCompare(String(b.workDate||''));
+      if(date)return date;
+      var start=detailClockMinutes(a.startTime)-detailClockMinutes(b.startTime);
+      if(start)return start;
+      var crane=aqcName(a).localeCompare(aqcName(b),undefined,{numeric:true});
+      if(crane)return crane;
+      var endA=detailClockMinutes(a.endTime),endB=detailClockMinutes(b.endTime);
+      var startA=detailClockMinutes(a.startTime),startB=detailClockMinutes(b.startTime);
+      var end=(endA<=startA?endA+1440:endA)-(endB<=startB?endB+1440:endB);
+      return end || driverName(a).localeCompare(driverName(b),'zh-Hant');
+    });
+    return sorted.map(function (r) {
       var m = metric(r);
       return {
         date: String(r.workDate || '').slice(0,10),
@@ -65,7 +85,7 @@
         containers:fixed(m.disc+m.load),hours:m.hours,
         gph:m.hours>0?fixed((m.disc+m.load+m.hc)/m.hours):null
       };
-    }).sort(function (a,b) {return b.date.localeCompare(a.date) || a.aqc.localeCompare(b.aqc,undefined,{numeric:true}) || a.driver.localeCompare(b.driver,'zh-Hant');});
+    });
   }
   function byAqc(rows) {
     var map = new Map();
