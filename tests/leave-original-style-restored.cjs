@@ -7,6 +7,18 @@ for(const asset of [
  'port79-leave-reference-visual.css','port79-leave-reference-visual.js',
  'port79-leave-exact-reference.css','port79-leave-exact-reference.js'
 ])assert(html.includes(asset),'reference dashboard asset missing: '+asset);
+const visualCss=fs.readFileSync('assets/port79-leave-exact-reference.css','utf8');
+const restore=visualCss.slice(visualCss.indexOf('2026-11-17: Restore the ORIGINAL shared top toolbar'));
+assert(restore.includes('#p79WorkspaceTopbar{')&&restore.includes('display:flex!important'),
+ 'the original functional top toolbar must remain visible in the admin screen');
+assert(restore.includes('#p79WorkspaceStatus{')&&restore.includes('display:block!important'),
+ 'the actual live status tray must be restored (not cloned)');
+assert(restore.includes('#p79SevenStatus{')&&restore.includes('flex-wrap:nowrap!important'),
+ 'live system status chips must be visible and scrollable');
+assert(restore.includes('.p79-nav-collapsed #p79WorkspaceTopbar'),
+ 'the original menu toggle must still open and collapse the sidebar');
+assert(html.includes('topbar=20261117-restore-v1'),
+ 'changed shared toolbar styles must not be shadowed by old browser cache');
 assert(html.indexOf('port79-leave-exact-reference.css')>html.indexOf('port79-leave-ui-v115.css'),
  'screenshot CSS must override prior V115 page styles');
 for(const marker of [
