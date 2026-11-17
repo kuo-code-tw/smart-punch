@@ -32,6 +32,20 @@ assert.match(sharedCss,/p79-status-light/,'system status lights require an expli
 assert.match(sharedCss,/port79-harbor-banner\.webp/,'the original harbor photo must be kept');
 assert.match(sharedCss,/p79-nav-collapsed\{--p79-w-width:230px!important\}/,'desktop main content width must not change when closing sidebar');
 assert(!css.includes('#193964'),'dark theme must never be forced on the left sidebar');
+
+assert.match(sharedCss,/P79 DARK SIDEBAR UNIFIED/,'shared sidebar must define coherent dark-mode theme');
+assert.match(css,/P79 HOME DARK SIDEBAR COHERENCE/,'homepage must override light-reference rules only in dark mode');
+assert.match(css,/html:is\(\.dark,\[data-theme="dark"\]\) body\.p79-workspace:has\(#systems\.show\)/,'dark overrides must be scoped to actual dark mode');
+assert.match(sharedCss,/background:#f1f8ff!important/,'light sidebar must remain white');
+assert.match(css,/background:#f1f8ff!important/,'light home sidebar must remain white');
+assert.match(css,/background:#10263f!important/,'entire dark sidebar must share the same dark canvas');
+assert.match(css,/background:transparent!important;background-image:none!important/,'nav rectangle must not have independent navy background');
+assert.match(css,/color:#dceafa!important/,'dark labels need readable light text');
+assert.match(css,/background:#26496e!important;color:#fff!important/,'dark selected row must have readable contrast');
+assert.match(css,/color:#f5f9ff!important/,'dark sidebar brand must not remain navy on navy');
+assert.match(css,/color:#e6f3ff!important/,'dark footer must remain readable');
+assert.match(css,/port79-harbor-banner\.webp/,'original shipyard photograph must be preserved');
+
 assert.match(css,/#port79CalendarModeBox\{\s*display:flex!important/,'original year switch remains visible');
 assert.match(css,/\.p79-workspace-brand small\{/,'cloud-system subtitle must be shown');
 assert(!css.includes('p79-sidebar-footer{display:none'),'original harbor footer remains visible');
