@@ -76,7 +76,8 @@ assert(visual.includes('筆數待確認'));
 // Cascade is unit (real existing admin filter) → job title → employee name.
 assert(visual.includes('id="p79LeaveVisualJob"'),'quota contains a left-hand job selector');
 assert(visual.includes('id="p79LeaveVisualPerson"'),'quota contains the right-hand name selector');
-assert(visual.includes("const selectedUnit=()=>String(document.getElementById('filterDept')?.value||'').trim()"),'quota uses the existing selected unit');
+assert(visual.includes("quotaUnitSelect?.value||document.getElementById('filterDept')?.value"),'quota uses local unit or existing review unit');
+assert(visual.includes('id="p79LeaveVisualUnit"'),'quota exposes independent unit selector');
 assert(visual.includes('officialUnit(x)===unit'),'quota must match official fourth-level HR unit');
 assert(visual.includes('activeEmployee(x)'),'resigned employees must not be shown');
 assert(visual.includes("new Intl.Collator('zh-TW-u-co-stroke'"),'jobs and names retain stroke order');
@@ -97,8 +98,8 @@ const mkSelect=()=>({value:'',dataset:{},children:[],
  replaceChildren(){this.children=[];this.value='';},
  append(child){this.children.push(child);}
 });
-const unit={value:'A單位'},job=mkSelect(),person=mkSelect();
-const doc={getElementById:id=>id==='filterDept'?unit:null,createElement:tag=>({tag,value:'',textContent:''})};
+const unit={value:'A單位'},job=mkSelect(),person=mkSelect(),localUnit=mkSelect();
+const doc={getElementById:id=>id==='filterDept'?unit:id==='p79LeaveVisualUnit'?localUnit:null,createElement:tag=>({tag,value:'',textContent:''})};
 const checks=Function('people','permitted','document','jobSelect','personSelect','p79LeaveUnitOfPerson','leaveEmployeeIsActive','window','unit',
  pickerSource+`
  updatePeople();
@@ -110,13 +111,15 @@ const checks=Function('people','permitted','document','jobSelect','personSelect'
  const bInitial={jobs:jobSelect.children.map(x=>x.textContent),people:personSelect.children.map(x=>x.textContent),person:personSelect.value};
  jobSelect.value='司機';updatePeople();
  const bNames=personSelect.children.map(x=>x.textContent);
- unit.value='';updatePeople();
+ unit.value='';localUnit.value='';updatePeople();
  const noUnit={jobs:jobSelect.children.map(x=>x.textContent),people:personSelect.children.map(x=>x.textContent),person:personSelect.value};
  jobSelect.value='司機';updatePeople();
  const allUnitsSelectedJob={job:jobSelect.value,people:personSelect.children.map(x=>x.textContent)};
  unit.value='A單位';updatePeople();
  const afterUnit={job:jobSelect.value,people:personSelect.children.map(x=>x.textContent)};
- return {initial,aNames,bInitial,bNames,noUnit,allUnitsSelectedJob,afterUnit};`)(
+ unit.value='';localUnit.value='B單位';updatePeople();
+ const localUnitNames=personSelect.children.map(x=>x.textContent);
+ return {initial,aNames,bInitial,bNames,noUnit,allUnitsSelectedJob,afterUnit,localUnitNames};`)(
  ()=>people,()=>true,doc,job,person,x=>x.section,x=>x.status==='在職',{},unit);
 assert.deepEqual(checks.initial.jobs,['請選擇職稱','司機','技術員']);
 assert.deepEqual(checks.initial.people,['請先選擇職稱'],'do not show all employee names before job is chosen');
@@ -133,6 +136,8 @@ assert.deepEqual(checks.allUnitsSelectedJob,{job:'司機',people:['請先選擇�
  'choosing job under 全部單位 never leaks all employee names');
 assert.deepEqual(checks.afterUnit,{job:'司機',people:['請選擇姓名','王子明','黃柏源']},
  'selecting a real unit should immediately populate only its job-matching employees');
+assert.deepEqual(checks.localUnitNames,['請選擇姓名','許大同'],
+ 'quota unit selector must work when the main filter is 全部單位');
 assert.equal(JSON.stringify(people),before,'filter is read-only and cannot mutate HR roster');
 console.log('PASS leave quota: selected unit → job → name, active-only, traditional stroke order, no cross-unit leaks');
 

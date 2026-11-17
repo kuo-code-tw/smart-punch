@@ -76,7 +76,7 @@ function init(){
  const rail=create('aside','p79-leave-visual-side');
  rail.id='p79LeaveVisualSide';
  const quota=create('section','p79-leave-visual-panel p79-leave-visual-quota');
- quota.innerHTML='<div class="p79-leave-visual-panel-head"><strong>♙ 請假額度</strong><small>原有年假基準</small></div><div class="p79-leave-visual-person-filters"><label for="p79LeaveVisualJob">職稱<select id="p79LeaveVisualJob" aria-label="依目前單位選擇職稱"><option value="">請先選擇單位</option></select></label><label for="p79LeaveVisualPerson">姓名<select id="p79LeaveVisualPerson" aria-label="目前單位及職稱的人員"><option value="">請先選擇職稱</option></select></label></div><div class="p79-leave-visual-quota-grid"><div><small>可休合計</small><strong id="p79LeaveVisualEntitled">—</strong></div><div><small>已休</small><strong id="p79LeaveVisualUsed">—</strong></div><div><small>目前未休</small><strong id="p79LeaveVisualRemain">—</strong></div></div><p id="p79LeaveVisualQuotaNote">僅顯示現有年假餘額資料。</p>';
+ quota.innerHTML='<div class="p79-leave-visual-panel-head"><strong>♙ 請假額度</strong><small>原有年假基準</small></div><label class="p79-leave-visual-unit-label" for="p79LeaveVisualUnit">單位<select id="p79LeaveVisualUnit" aria-label="請假額度選擇單位"><option value="">請選擇單位</option></select></label><div class="p79-leave-visual-person-filters"><label for="p79LeaveVisualJob">職稱<select id="p79LeaveVisualJob" aria-label="依目前單位選擇職稱"><option value="">請先選擇單位</option></select></label><label for="p79LeaveVisualPerson">姓名<select id="p79LeaveVisualPerson" aria-label="目前單位及職稱的人員"><option value="">請先選擇職稱</option></select></label></div><div class="p79-leave-visual-quota-grid"><div><small>可休合計</small><strong id="p79LeaveVisualEntitled">—</strong></div><div><small>已休</small><strong id="p79LeaveVisualUsed">—</strong></div><div><small>目前未休</small><strong id="p79LeaveVisualRemain">—</strong></div></div><p id="p79LeaveVisualQuotaNote">僅顯示現有年假餘額資料。</p>';
  const calendar=create('section','p79-leave-visual-panel p79-leave-visual-calendar');
  calendar.innerHTML='<div class="p79-leave-visual-panel-head"><strong>▣ 本月請假日曆</strong><small id="p79LeaveVisualMonth">—</small></div><div class="p79-leave-visual-weekdays" aria-hidden="true"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div><div id="p79LeaveVisualCalendarGrid" class="p79-leave-visual-calendar-grid" aria-label="實際請假紀錄月曆"></div><div class="p79-leave-visual-calendar-legend"><span><i class="annual"></i>特休</span><span><i class="personal"></i>事假</span><span><i class="sick"></i>病假</span><span><i class="other"></i>其他</span></div>';
  rail.append(quota,calendar);
@@ -112,7 +112,8 @@ function init(){
  const leaveStrokeCollator=new Intl.Collator('zh-TW-u-co-stroke',{numeric:true,sensitivity:'variant'});
  const personTitle=x=>String(x?.jobTitle||x?.deptDetail||x?.position||'未設定職稱').trim();
  const personName=x=>String(x?.name||x?.empName||x?.empId||'').trim();
- const selectedUnit=()=>String(document.getElementById('filterDept')?.value||'').trim();
+ const quotaUnitSelect=document.getElementById('p79LeaveVisualUnit');
+ const selectedUnit=()=>String(quotaUnitSelect?.value||document.getElementById('filterDept')?.value||'').trim();
  const officialUnit=x=>typeof p79LeaveUnitOfPerson==='function'?p79LeaveUnitOfPerson(x):
    typeof window!=='undefined'&&window.Port79OrgContext?.value?window.Port79OrgContext.value(x,'sections'):'';
  const activeEmployee=x=>typeof leaveEmployeeIsActive==='function'&&leaveEmployeeIsActive(x);
@@ -122,11 +123,30 @@ function init(){
      permitted(x)&&activeEmployee(x)&&officialUnit(x)===unit):[];
  };
  function updatePeople(){
-   const unit=selectedUnit();
-   // Job titles are selectable even when the unit filter is on 全部單位.
-   // Names remain limited to the explicitly selected unit, never all company.
+   // Only official HR units of authorized, active employees are selectable.
    const eligible=people().filter(x=>x&&x.empId&&String(x.empId).toUpperCase()!=='ADMIN'&&
      permitted(x)&&activeEmployee(x));
+   const units=[...new Set(eligible.map(officialUnit).filter(Boolean))]
+     .sort((a,b)=>leaveStrokeCollator.compare(a,b));
+   const parentUnit=String(document.getElementById('filterDept')?.value||'').trim();
+   if(quotaUnitSelect){
+     const prevUnit=quotaUnitSelect.value;
+     const wanted=parentUnit&&units.includes(parentUnit)?parentUnit:
+       units.includes(prevUnit)?prevUnit:units.length===1?units[0]:'';
+     const signature=units.join('|')+'#'+parentUnit;
+     if(quotaUnitSelect.dataset.unitsSignature!==signature){
+       quotaUnitSelect.replaceChildren();
+       const placeholder=document.createElement('option');placeholder.value='';
+       placeholder.textContent='請選擇單位';quotaUnitSelect.append(placeholder);
+       for(const title of units){
+         const option=document.createElement('option');option.value=title;
+         option.textContent=title;quotaUnitSelect.append(option);
+       }
+       quotaUnitSelect.value=wanted;
+       quotaUnitSelect.dataset.unitsSignature=signature;
+     }
+   }
+   const unit=selectedUnit();
    const allowed=unit?eligible.filter(x=>officialUnit(x)===unit):[];
    const jobSource=unit?allowed:eligible;
    const jobs=[...new Set(jobSource.map(personTitle).filter(Boolean))]
@@ -172,7 +192,7 @@ function init(){
    showDays('p79LeaveVisualEntitled',info?.entitled??null);
    showDays('p79LeaveVisualUsed',info?.used??null);
    showDays('p79LeaveVisualRemain',info?.effectiveRemaining??null);
-   document.getElementById('p79LeaveVisualQuotaNote').textContent=!selectedUnit()?'請先在上方選擇單位。':!jobSelect.value?'請先選擇職稱。':!e?'請選擇姓名。':info?.effectiveRemaining==null?'此人員尚無可核實的年假餘額。':'原有年假基準月份：'+String(e.leaveBalance?.asOf||'未註明');
+   document.getElementById('p79LeaveVisualQuotaNote').textContent=!selectedUnit()?'請先在請假額度選擇單位。':!jobSelect.value?'請先選擇職稱。':!e?'請選擇姓名。':info?.effectiveRemaining==null?'此人員尚無可核實的年假餘額。':'原有年假基準月份：'+String(e.leaveBalance?.asOf||'未註明');
  }
  function updateStats(rs,m,unverified=false){
    if(unverified){
@@ -249,6 +269,7 @@ function init(){
  }
  personSelect.addEventListener('change',updateQuota);
  jobSelect.addEventListener('change',()=>{personSelect.value='';updatePeople();updateQuota();});
+ quotaUnitSelect?.addEventListener('change',()=>{personSelect.value='';updatePeople();updateQuota();});
  document.getElementById('filterDept')?.addEventListener('change',()=>{
    // Retain the job if the new unit offers it; never retain an old employee.
    personSelect.value='';updatePeople();updateQuota();

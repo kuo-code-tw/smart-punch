@@ -188,7 +188,7 @@ function init(){
     ['婚假','marriage'],['喪假','bereavement']
   ];
   function updateQuota(){
-   const unit=String(document.getElementById('filterDept')?.value||'').trim();
+   const unit=String(document.getElementById('p79LeaveVisualUnit')?.value||document.getElementById('filterDept')?.value||'').trim();
    const job=String(document.getElementById('p79LeaveVisualJob')?.value||'').trim();
    // Do not show a previous employee's balance after unit or job changes.
    const emp=unit&&job&&typeof employees!=='undefined'&&Array.isArray(employees)?
@@ -226,6 +226,7 @@ function init(){
   }
   person?.addEventListener('change',updateQuota);
   document.getElementById('p79LeaveVisualJob')?.addEventListener('change',updateQuota);
+  document.getElementById('p79LeaveVisualUnit')?.addEventListener('change',updateQuota);
   document.getElementById('filterDept')?.addEventListener('change',updateQuota);
   const recordsBody=document.getElementById('adminLeaveBody');
   if(recordsBody)new MutationObserver(updateQuota).observe(recordsBody,{childList:true});

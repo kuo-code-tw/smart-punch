@@ -762,3 +762,13 @@ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79
  border:1px solid #cfdef2!important;border-radius:8px!important;
  background:#fff!important;color:#24416b!important;
 }
+
+/* Leave quota local unit selector, above the requested left-job/right-name row. */
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide .p79-leave-visual-unit-label{
+ display:flex!important;flex-direction:column!important;gap:3px!important;
+ font-size:11px!important;font-weight:800!important;color:#60799b!important;
+ min-width:0!important;margin:2px 0 6px!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide #p79LeaveVisualUnit{
+ width:100%!important;max-width:100%!important;min-height:35px!important;height:35px!important;
+ padding:5px 8px!important;font-size:12px!important;border-radius:8px!important;
+ border:1px solid #cfdef2!important;background:white!important;color:#24416b!important}
