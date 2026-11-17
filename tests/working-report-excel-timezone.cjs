@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 process.env.TZ = 'Asia/Taipei';
-const html = fs.readFileSync(path.resolve(__dirname, '../../aqc-efficiency/index.html'),'utf8');
+const html = fs.readFileSync(path.resolve(__dirname, '../aqc-efficiency/index.html'),'utf8');
 function extract(name){
   const regex = new RegExp('function '+name+'\\([^]*?\\n\\}');
   const match = html.match(regex);
