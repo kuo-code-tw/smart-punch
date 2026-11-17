@@ -7,7 +7,7 @@ if(window.__port79HomeCloudStatusLive)return;
 window.__port79HomeCloudStatusLive=true;
 const d=document;
 const keys=['attendance','workhours','leave','schedule','efficiency','hr','history'];
-let busy=false,computerBusy=false,started=false,lastValid=false;
+let busy=false,computerBusy=false,started=false,lastValid=false,consecutivePollFailures=0;
 function visibleHost(){
  if(d.visibilityState==='hidden'||!d.body?.classList.contains('p79-workspace')||
     !d.getElementById('systems')?.classList.contains('show'))return null;
@@ -91,8 +91,14 @@ async function poll(){
   if(!res.ok)throw new Error('HTTP '+res.status);
   const data=await res.json();
   if(!render(data))throw new Error('無效的雲端狀態回應');
+  consecutivePollFailures=0;
  }catch(_){
-  signalUnavailable(lastValid?'狀態查詢中斷':'狀態查詢失敗');
+  // Keep the last confirmed state on a brief network failure; transient GAS timeouts
+  // must not make every status chip flash offline and then return on the next poll.
+  consecutivePollFailures++;
+  if(!lastValid || consecutivePollFailures>=3){
+   signalUnavailable(lastValid?'雲端狀態暫時無法確認':'狀態查詢失敗');
+  }
  }finally{clearTimeout(stop);busy=false}
 }
 function ensureComputer(host){
