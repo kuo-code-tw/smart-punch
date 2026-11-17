@@ -122,7 +122,7 @@ body[data-p79-system="leave"] #adminBalancePanel summary{color:#17375f;font-weig
 #p79LeaveDetailDialog .p79-detail-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:19px 22px;background:#fff;border-bottom:1px solid #dfebf8}
 #p79LeaveDetailDialog .p79-detail-heading h2{margin:0;color:#13335f;font-size:22px}
 #p79LeaveDetailDialog .p79-detail-actions{display:flex;flex-wrap:wrap;gap:7px}
-#p79LeaveDetailDialog button{border-radius:9px;padding:9px 13px;background:#fff;border:1px solid #cedef0;color:#275174;cursor:pointer;font:800 13px inherit}
+#p79LeaveDetailDialog button{border-radius:9px;padding:9px 13px;background:#fff;border:1px solid #cedef0;color:#275174;cursor:pointer;font-size:13px;font-weight:800;font-family:inherit}
 #p79LeaveDetailDialog button.primary{background:#13905e;color:white;border-color:#13905e}
 #p79LeaveDetailDialog button.reject{background:#fff1f1;color:#be2442;border-color:#f6b8c4}
 #p79LeaveDetailDialog button.delete{background:#eff2f6;color:#405773}
