@@ -9795,14 +9795,26 @@ async function manualCloudSync(){
 
 async function checkRevision(){if(!requireEfficiencyAccess()||globalThis.P79FullRefreshRunning===true||p79EfficiencyManualSyncActive||document.visibilityState==='hidden')return;try{await flushQueue();const d=await apiGetQuick('gcGetSyncMeta',{},6000),local=localStorage.getItem(STORE.rev)||'';if((typeof p79EfficiencyReadbackRequired!=='undefined'&&p79EfficiencyReadbackRequired)||String(d.revision)!==String(local))await syncFromCloud(true)}catch(e){console.warn('快速版本檢查失敗，保留本機資料',e)}}
 function excelTime(v){
- if(v==null||v==='')return''; if(typeof v==='number'){let mins=Math.round((v%1)*1440);if(mins===1440)mins=0;return `${String(Math.floor(mins/60)%24).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`}
+ if(v==null||v==='')return'';
+ // XLSX cellDates=true returns Excel wall-clock values as UTC-based Date objects.
+ // Formatting them with String(Date) converts them to the browser timezone (+8h in Taiwan).
+ if(v instanceof Date){
+   if(Number.isNaN(v.getTime()))return'';
+   return `${String(v.getUTCHours()).padStart(2,'0')}:${String(v.getUTCMinutes()).padStart(2,'0')}`;
+ }
+ if(typeof v==='number'){let mins=Math.round((v%1)*1440);if(mins===1440)mins=0;return `${String(Math.floor(mins/60)%24).padStart(2,'0')}:${String(mins%60).padStart(2,'0')}`}
  const s=String(v).trim(),m=s.match(/(\d{1,2}):(\d{2})/);return m?`${m[1].padStart(2,'0')}:${m[2]}`:''
 }
 const gcExcelTime=excelTime;
 
 function excelDateTime(v){
   if(v==null||v==='')return null;
-  if(v instanceof Date)return v;
+  if(v instanceof Date){
+    if(Number.isNaN(v.getTime()))return null;
+    // Excel's UTC-encoded Date is a local worksheet time, not a UTC instant.
+    return new Date(v.getUTCFullYear(),v.getUTCMonth(),v.getUTCDate(),
+      v.getUTCHours(),v.getUTCMinutes(),v.getUTCSeconds());
+  }
   if(typeof v==='number'){
     const p=XLSX.SSF.parse_date_code(v);
     if(!p)return null;
@@ -10346,8 +10358,8 @@ function workingValueDatePart(v){
   if(v==null||v==='')return null;
 
   if(v instanceof Date){
-    if(v.getFullYear()>=2000){
-      return new Date(v.getFullYear(),v.getMonth(),v.getDate());
+    if(v.getUTCFullYear()>=2000){
+      return new Date(v.getUTCFullYear(),v.getUTCMonth(),v.getUTCDate());
     }
     return null;
   }
@@ -10381,8 +10393,8 @@ function workingValueTimePart(v){
   if(v==null||v==='')return null;
 
   if(v instanceof Date){
-    // 試算表 時間若用 cellDates=true，可能會是 1899/1900 年。
-    return {h:v.getHours(),m:v.getMinutes(),s:v.getSeconds()};
+    // cellDates=true stores the original Excel clock in UTC fields; do not add +8h.
+    return {h:v.getUTCHours(),m:v.getUTCMinutes(),s:v.getUTCSeconds()};
   }
 
   if(typeof v==='number'){
@@ -10410,11 +10422,11 @@ function combineWorkingDateTimeValues(values){
 
   // 先找同一格就同時有日期＋時間的情況。
   for(const v of list){
-    if(v instanceof Date && v.getFullYear()>=2000){
-      // Date 物件若本身已有時間就直接使用；00:00 仍可能是日期格，
-      // 後面若另有時間格會在下一步重新組合。
-      if(v.getHours()||v.getMinutes()||v.getSeconds()){
-        return new Date(v.getTime());
+    if(v instanceof Date && v.getUTCFullYear()>=2000){
+      // SheetJS Date is UTC-encoded Excel wall time; preserve its worksheet date
+      // and clock, including 16:00-23:59 values that would otherwise cross days.
+      if(v.getUTCHours()||v.getUTCMinutes()||v.getUTCSeconds()){
+        return excelDateTime(v);
       }
     }
 
@@ -12188,7 +12200,7 @@ async function importExcel(file) {
     const productivity=parseWorkingReportProductivity(book,summary);
     Object.assign(summary,productivity);
     const workingSheetImportedAt=new Date().toISOString();
-    const workingSheetRuleVersion='IN_HATCH_X1__SHIFT_X2__BILL_DISC_LOAD__V19';
+    const workingSheetRuleVersion='IN_HATCH_X1__SHIFT_X2__BILL_DISC_LOAD__V20_EXCEL_LOCAL_CLOCK';
 
     // 標準 WAN HAI Working Sheet 必須至少讀到船名、NO、總櫃數。
     // 讀不到就停止，避免把半套資料寫入雲端。
