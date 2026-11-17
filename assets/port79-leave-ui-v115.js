@@ -13,7 +13,7 @@ const viewType=v=>/^(特休假|特休|特別休假|年假)$/.test(String(v||''))
 function personList(){try{return Array.isArray(employees)?employees:[]}catch(_){return [];}}
 function records(){try{return Array.isArray(leaveRecords)?leaveRecords:[]}catch(_){return [];}}
 function leaveValue(emp){try{return leaveBalanceInfo(emp)}catch(_){return {effectiveRemaining:null,newlyApproved:0,entitled:null,used:null}}}
-function fmt(v){return Number.isFinite(Number(v))?Number(v).toFixed(1)+' 天':'尚無匯入資料'}
+function fmt(v){return v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v).toFixed(1)+' 天':'—'}
 function updateCreatePreview(){
  const root=byId('p79CreatePreview');if(!root)return;
  const selected=byId('adminCreateLeaveEmployee')?.value;
