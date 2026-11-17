@@ -28,6 +28,7 @@ const ctx={
  p79WorkRestMonths:()=>['2026-10','2026-11','2026-12'],
  p79ReadWorkRestMonth:async month=>{cloudCalls++;return {month,records:[]}},
  mergeAttendanceRecordCollections:(a,b)=>[...a,...b],
+ refresh:()=>{},
  window:{
   sessionStorage:{getItem:()=>''},
   P79WorkhoursCache:{verifiedRawMonths:(month,who)=>{
