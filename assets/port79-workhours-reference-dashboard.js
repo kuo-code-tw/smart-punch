@@ -11,6 +11,39 @@
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const dateTaipei=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  const state={tab:'all',page:1,all:[],current:null};
+ // The authoritative attendance source is getAttendanceMonthRaw, reused through
+ // the application's original validated month loader. Never sum local preview
+ // records and claim a full payroll month was fetched.
+ const rawCloud={month:'',token:'',rows:null,readAt:0,attemptAt:0,inflight:null,error:''};
+ function verifiedAttendance(month){
+  if(typeof currentPort79SsoToken!=='function'||typeof p79ReadWorkRestMonth!=='function'||
+     typeof p79WorkRestMonths!=='function'||typeof mergeAttendanceRecordCollections!=='function')return null;
+  const token=currentPort79SsoToken();
+  if(!token)return null;
+  if(rawCloud.month!==month||rawCloud.token!==token){
+    rawCloud.month=month;rawCloud.token=token;rawCloud.rows=null;
+    rawCloud.readAt=0;rawCloud.attemptAt=0;rawCloud.error='';
+  }
+  if(Array.isArray(rawCloud.rows)&&Date.now()-rawCloud.readAt<300000)return rawCloud.rows;
+  if(rawCloud.inflight||Date.now()-rawCloud.attemptAt<15000)return null;
+  rawCloud.rows=null;rawCloud.attemptAt=Date.now();
+  const requestedMonth=month,requestedToken=token;
+  const pending=Promise.all(p79WorkRestMonths(month).map(m=>p79ReadWorkRestMonth(m,token)));
+  rawCloud.inflight=pending;
+  void pending.then(batches=>{
+    if(currentPort79SsoToken()!==requestedToken||rawCloud.month!==requestedMonth||rawCloud.token!==requestedToken)return;
+    if(batches.some(x=>!Array.isArray(x?.records)))throw Error('正式原始打卡月份資料缺失');
+    rawCloud.rows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
+    rawCloud.readAt=Date.now();rawCloud.error='';
+  }).catch(err=>{
+    if(rawCloud.month!==requestedMonth||rawCloud.token!==requestedToken)return;
+    rawCloud.rows=null;rawCloud.error=String(err?.message||err);
+  }).finally(()=>{
+    if(rawCloud.inflight===pending)rawCloud.inflight=null;
+    refresh();
+  });
+  return null;
+ }
  const job=e=>String(e?.jobTitle||e?.deptDetail||'未設定職稱').trim();
  const empId=e=>String(e?.empId||'').trim().toUpperCase();
  const unit=e=>String(typeof p79OvertimeUnitOfPerson==='function'?p79OvertimeUnitOfPerson(e):'').trim();
@@ -141,8 +174,8 @@
   const active=reports.filter(r=>r.rawHours!=null);
   const invalid=reports.filter(r=>r.unverified).length;
   const overtime=active.reduce((sum,r)=>sum+r.rawHours,0);
-  const sourceRecords=typeof records!=='undefined'&&Array.isArray(records)?records:[];
-  const sessions=attendanceSessions(sourceRecords,scoped,f.start,f.end);
+  const sourceRecords=verifiedAttendance(month);
+  const sessions=sourceRecords?attendanceSessions(sourceRecords,scoped,f.start,f.end):[];
   const rawHours=round(sessions.reduce((sum,s)=>sum+s.minutes,0)/60);
   const dates=[],today=dateTaipei();
   // Date-only keys are UTC calendar dates here. Using +08:00 then slicing
@@ -154,7 +187,7 @@
    dates.push({date:d,hours:round(sessions.filter(r=>r.date===d).reduce((a,r)=>a+r.minutes,0)/60),
     overtime:round(active.filter(r=>r.creditDate===d).reduce((a,r)=>a+r.rawHours,0))});
   }
-  return{ok:true,month,scope:scoped,selectedPerson:person,attendanceAvailable:sourceRecords.length>0,
+  return{ok:true,month,scope:scoped,selectedPerson:person,attendanceAvailable:Array.isArray(sourceRecords),attendanceError:rawCloud.error,
    sessions,rawHours,overtime,invalid,reports:reports.sort((a,b)=>b.creditDate.localeCompare(a.creditDate)||b.id.localeCompare(a.id)),
    trend:dates,attenders:new Set(sessions.map(s=>s.empId)).size,
    pending:reports.filter(r=>r.status==='review').length};
@@ -175,8 +208,8 @@
  function paint(data){
   state.current=data;
   const ok=data.ok,attendance=ok&&data.attendanceAvailable;
-  say('prDataStatus',ok?'資料來源：已核對的正式加班申報與目前已同步打卡配對。區間時數不是薪資結算工時。':'資料狀態：'+data.reason);
-  id('prDataStatus').dataset.error=ok?'false':'true';
+  say('prDataStatus',ok?(data.attendanceAvailable?'資料來源：正式原始打卡月份已核對，正式加班申報已核對；打卡區間時數不等於薪資結算工時。':data.attendanceError?'正式加班已核對；原始打卡讀取失敗：'+data.attendanceError:'正式加班已核對；原始打卡月份仍在讀取，不顯示推估工時。'):'資料狀態：'+data.reason);
+  id('prDataStatus').dataset.error=ok&&data.attendanceAvailable?'false':'true';
   say('prKpiWork',attendance?format(data.rawHours):em);
   say('prKpiOvertime',ok&&!data.invalid?format(round(data.overtime)):em);
   say('prKpiPeople',attendance?format(data.attenders):em);
