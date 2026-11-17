@@ -17994,6 +17994,9 @@ window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
 
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261101-workhours-bleed-fix-v3&menu=20261112-clean-v1">
 <script src="../assets/port79-management-workspace.js?v=20261115-shared-user-activity-v3"></script>
+<!-- User-approved work-hours dashboard: private to this page; original controller stays intact. -->
+<link rel="stylesheet" href="../assets/port79-workhours-reference-dashboard.css?v=20261117-approved-v1">
+<script defer src="../assets/port79-workhours-reference-dashboard.js?v=20261117-approved-v1"></script>
 <script>window.Port79OrgContext.configure({system:'workhours',container:()=>document.getElementById('viewAdmin'),people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
 <script>window.p79WorkhoursRosterForVisibility=()=>typeof employees==='undefined'||!Array.isArray(employees)?[]:employees;</script>
 </body>
