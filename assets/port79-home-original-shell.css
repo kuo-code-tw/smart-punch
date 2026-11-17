@@ -6,6 +6,8 @@ html body.p79-workspace:has(#systems.show):not(.p79-nav-collapsed){
 }
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar.p79-workspace-sidebar{
   background:linear-gradient(165deg,#193964,#152f54 45%,#0e2647)!important;
+  background-color:#152f54!important;
+  background-image:linear-gradient(165deg,#193964,#152f54 45%,#0e2647)!important;
   color:#e9f3ff!important;
   border-right:1px solid #254467!important;
   box-shadow:none!important;
@@ -17,6 +19,10 @@ html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar .p79-workspace-b
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar .p79-workspace-brand strong{
   color:#fff!important;font-size:17px!important;white-space:nowrap!important;
 }
+html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar .p79-workspace-brand small{
+  display:block!important;color:#d2e6ff!important;font-size:11px!important;
+  letter-spacing:1px!important;line-height:1.4!important
+}
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a{
   color:#e1edff!important;background:transparent!important;
   padding:11px 14px!important;min-height:51px!important;
@@ -26,6 +32,9 @@ html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a:h
   background:linear-gradient(110deg,#1c82ff,#0868ee)!important;color:#fff!important;
 }
 html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a svg{color:#c8ddfa!important}
+html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a.active svg,
+html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a:hover svg{color:#fff!important}
+html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar #p79SevenNav a[aria-disabled="true"]{opacity:.82!important}
 html body.p79-workspace:has(#systems.show) #port79CalendarModeBox{display:none!important}
 /* Keep the original hero title as text, not a script-replaced label. */
 html body.p79-workspace:has(#systems.show) #systems>.p79-modern-home-intro h2{
