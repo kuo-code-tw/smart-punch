@@ -1,7 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
 const html=fs.readFileSync('aqc-efficiency/index.html','utf8'),a=html.indexOf('function mergeCloudRecordsWithLocal('),code=html.slice(a,html.indexOf('\n}',a)+2);
 const stamp='2026-10-19T06:00:00Z';
-const c={Map,Set,Array,String,Object,Date,num:x=>Number(x)||0,recordIdentityKey:r=>r.id,shipMasters:[{workingNo:'SHIP1',workingSheetSource:{importedAt:stamp,reportRecordIds:['new1','new2']}}]};
+const c={Map,Set,Array,String,Object,Date,num:x=>Number(x)||0,recordIdentityKey:r=>r.id,p79RepairKnownLegacyWorkingClocks:rows=>({records:rows,changed:0}),shipMasters:[{workingNo:'SHIP1',workingSheetSource:{importedAt:stamp,reportRecordIds:['new1','new2']}}]};
 vm.createContext(c);vm.runInContext(code,c);
 const local=[{id:'new1',workingNo:'SHIP1',workingSheetImportedAt:stamp,source:'working-report',workingSheetRuleVersion:'SHIFT_X2',disc:381,load:0},{id:'new2',workingNo:'SHIP1',workingSheetImportedAt:stamp,source:'working-report',workingSheetRuleVersion:'SHIFT_X2',disc:0,load:390}];
 const remote=[{id:'old-extra',workingNo:'SHIP1',disc:102},{id:'new1',workingNo:'SHIP1',disc:400},{id:'other',workingNo:'SHIP2',disc:100},{id:'child',workingNo:'SHIP1-1',disc:20}];
