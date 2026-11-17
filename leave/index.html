@@ -350,20 +350,21 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
 
   <section id="adminMode" class="hidden">
     <div class="card">
-      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
-        <div><h2 style="margin-bottom:5px">管理員請假審核</h2><div id="adminWho" class="note"></div></div>
-        <div class="actions"><button class="btn btn-sec" onclick="p79ExportLeaveComparison(false)">匯出請假比對</button><button class="btn btn-sec" onclick="p79ExportLeaveComparison(true)">列印比對</button><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">🔄 重新整理</button></div>
+      <div class="p79-leave-admin-header">
+        <div class="p79-leave-admin-headline"><div><h2>管理員請假審核</h2><div class="note">管理請假申請、審核進度與剩餘年假</div><div id="adminWho" class="note"></div></div></div>
+        <div class="actions"><button class="btn btn-sec" onclick="p79ExportLeaveComparison(false)">⇩ 匯出請假比對</button><button class="btn btn-sec" onclick="p79ExportLeaveComparison(true)">▣ 列印比對</button><button id="adminCreateLeaveBtn" type="button" class="btn btn-pri hidden" onclick="openAdminCreateLeave()">＋ 新增人員請假</button><button class="btn btn-sec" onclick="loadCloud(true)">⟳ 重新整理</button></div>
       </div>
       <div class="toolbar">
+        <div class="p79-leave-filter-title">篩選條件</div>
         <div class="field"><label for="filterMonth">請假月份</label><select id="filterMonth" onchange="renderAdmin()"><option value="">全部月份</option></select></div>
         <div class="field"><label>單位</label><select id="filterDept" onchange="populateLeaveAdminJobs();renderAdmin()"><option value="">全部單位</option></select></div>
         <div class="field"><label for="filterJob">職稱</label><select id="filterJob" onchange="renderAdmin()"><option value="">全部職稱</option></select></div>
         <div class="field"><label>狀態</label><select id="filterStatus" onchange="renderAdmin()"><option value="">全部狀態</option><option>待審核</option><option>已核准</option><option>已駁回</option></select></div>
       </div>
-      <div id="adminLeaveSummary" class="note" role="status" style="margin:5px 0 12px;font-weight:650"></div>
-      <button id="p79CleanupDeletedLeaveButton" type="button" class="btn" onclick="p79CleanupDeletedLeaveCovers()">清除已刪請假的代班殘留</button>
+      <div class="p79-leave-list-info"><div id="adminLeaveSummary" class="note" role="status" style="font-weight:650"></div>
+      <button id="p79CleanupDeletedLeaveButton" type="button" class="btn" onclick="p79CleanupDeletedLeaveCovers()">清除已刪請假的代班殘留</button></div>
       <div id="adminReadOnly" class="status warn hidden">此帳號只有「查看」權限，不能核准、駁回或刪除。</div>
-      <div class="table-wrap"><table class="leave-admin-table"><thead><tr><th>人員</th><th>單位</th><th>假別</th><th>日期</th><th>天數</th><th>事由</th><th>狀態</th><th>操作</th><th>剩餘年假</th></tr></thead><tbody id="adminLeaveBody"></tbody></table></div>
+      <div class="table-wrap"><table class="leave-admin-table"><thead><tr><th>♙ 人員</th><th>▥ 單位</th><th>◇ 假別</th><th>▣ 日期</th><th>☷ 天數</th><th>▤ 事由／代班</th><th>✓ 狀態</th><th>⚙ 操作</th><th>♧ 剩餘年假</th></tr></thead><tbody id="adminLeaveBody"></tbody></table></div>
     </div>
 
     <details id="adminBalancePanel" class="card" style="margin-top:16px" ontoggle="if(this.open)renderAdminBalances()">
@@ -394,7 +395,7 @@ function p79EmployeeLeaveReauth(){
  $('globalStatus').className='status warn';$('globalStatus').textContent='登入已失效，請重新登入後再申請。';
 }
 function setStatus(msg,type='info'){
- const b=$('globalStatus');b.className='status '+type;
+ const b=$('globalStatus');b.className='status '+(/雲端同步完成/.test(String(msg))?'success':type);
  if(!adminSession&&p79LeaveAuthError(msg)){p79EmployeeLeaveReauth();return;}
  b.textContent=msg;
 }
@@ -839,13 +840,13 @@ function renderAdmin(){
      ? `<span class="p79-leave-cover-inline">${coverButton}<span class="p79-leave-cover-names" title="${esc(coverText)}">${esc(coverText)}</span></span>`
      : '';
    return `<tr>
-     <td><b>${esc(l.name||'')}</b><br><span class="note">${esc(l.empId||l.attNo||'')}</span></td>
+     <td><div class="p79-leave-person"><span class="p79-leave-avatar" aria-hidden="true">♙</span><div><button type="button" class="p79-leave-person-name" data-p79-detail-id="${esc(l.id)}" title="查看這筆請假明細">${esc(l.name||'')}</button><small>${esc(l.empId||l.attNo||'')}</small></div></div></td>
      <td>${esc(p79LeaveRecordUnit(l)||'—')}</td>
      <td>${leaveTypeBadge(leaveType)}</td>
      <td class="p79-leave-date-inline">${esc(l.startTime||l.startDate||'')} ～ ${esc(l.endTime||l.endDate||l.startTime||l.startDate||'')}</td>
      <td>${esc(l.days??l.hours??'')}</td>
-     <td>${esc(l.reason||'')}</td>
-     <td><div class="p79-leave-status-inline">${badge(l.status)}${coverDisplay}</div></td>
+     <td><div class="p79-leave-reason">${l.reason?'<div class="p79-leave-reason-text">'+esc(l.reason)+'</div>':''}${coverDisplay}</div></td>
+     <td><div class="p79-leave-status-inline">${badge(l.status)}</div></td>
      <td>${leaveAccess==='manage'?`<div class="actions"><button style="background:#dcfce7;color:#166534" onclick="setLeaveStatus('${esc(l.id)}','已核准')">核准</button><button style="background:#ffe4e6;color:#9f1239" onclick="setLeaveStatus('${esc(l.id)}','已駁回')">駁回</button><button style="background:#e2e8f0;color:#334155" onclick="deleteLeave('${esc(l.id)}')">刪除</button></div>`:'只能查看'}</td>
      <td><span class="leave-remain ${remainClass}">${remainText}</span>${emp&&remain!=null?`<div class="note" style="font-size:11px">${esc(leaveBalanceExplanation(emp,info))}</div>`:''}</td>
    </tr>`;
