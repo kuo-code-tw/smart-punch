@@ -743,3 +743,22 @@ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79
  html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #leaveStickyTabs{padding:6px 9px!important}
  html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualHeading{padding:0 12px!important}
 }
+
+/* 2026-11-17: leave quota unit → job → name cascading controls.
+   This only styles the read-only right-side leave quota panel. */
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide .p79-leave-visual-person-filters{
+ display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+ align-items:start!important;gap:8px!important;margin:4px 0 6px!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide .p79-leave-visual-person-filters label{
+ display:flex!important;flex-direction:column!important;gap:4px!important;
+ min-width:0!important;margin:0!important;color:#60799b!important;
+ font-size:11px!important;font-weight:800!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide .p79-leave-visual-person-filters select{
+ width:100%!important;min-width:0!important;max-width:100%!important;
+ min-height:36px!important;height:36px!important;
+ padding:5px 6px!important;font-size:12px!important;
+ border:1px solid #cfdef2!important;border-radius:8px!important;
+ background:#fff!important;color:#24416b!important;
+}

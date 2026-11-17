@@ -73,35 +73,58 @@ assert(visual.includes('const unverified=!cloudReady;'),'unverified cloud cache 
 assert(visual.includes("tabs?.insertAdjacentElement('afterend',statusBanner)"),
  'cloud warning remains visible in annual balance tab');
 assert(visual.includes('筆數待確認'));
-// The personnel dropdown shows actual job title + name, ordered by stroke.
-assert(visual.includes("new Intl.Collator('zh-TW-u-co-stroke'"));
-assert(visual.includes("personTitle(x)+'｜'+personName(x)") );
-assert(visual.includes("sort((a,b)=>leaveStrokeCollator.compare(personName(a),personName(b))"));
+// Cascade is unit (real existing admin filter) → job title → employee name.
+assert(visual.includes('id="p79LeaveVisualJob"'),'quota contains a left-hand job selector');
+assert(visual.includes('id="p79LeaveVisualPerson"'),'quota contains the right-hand name selector');
+assert(visual.includes("const selectedUnit=()=>String(document.getElementById('filterDept')?.value||'').trim()"),'quota uses the existing selected unit');
+assert(visual.includes('officialUnit(x)===unit'),'quota must match official fourth-level HR unit');
+assert(visual.includes('activeEmployee(x)'),'resigned employees must not be shown');
+assert(visual.includes("new Intl.Collator('zh-TW-u-co-stroke'"),'jobs and names retain stroke order');
 const sourceBegin=visual.indexOf(' const leaveStrokeCollator=');
 const sourceEnd=visual.indexOf(' const showDays=',sourceBegin);
-assert(sourceBegin>0&&sourceEnd>sourceBegin,'isolate production dropdown implementation');
-const nameSource=visual.slice(sourceBegin,sourceEnd);
+assert(sourceBegin>0&&sourceEnd>sourceBegin,'production picker section available for test');
+const pickerSource=visual.slice(sourceBegin,sourceEnd);
 const people=[
- {empId:'E3',name:'黃柏源',jobTitle:'技術員'},
- {empId:'E1',name:'王子明',jobTitle:'領班'},
- {empId:'E2',name:'林小華',deptDetail:'操作員'}
+ {empId:'E3',name:'黃柏源',jobTitle:'司機',section:'A單位',status:'在職'},
+ {empId:'E1',name:'王子明',jobTitle:'司機',section:'A單位',status:'在職'},
+ {empId:'E2',name:'林小華',jobTitle:'技術員',section:'A單位',status:'在職'},
+ {empId:'E4',name:'許大同',jobTitle:'司機',section:'B單位',status:'在職'},
+ {empId:'E5',name:'吳怡君',jobTitle:'司機',section:'A單位',status:'離職'},
+ {empId:'E6',name:'郭芳芳',jobTitle:'司機',section:'',status:'在職'}
 ];
 const before=JSON.stringify(people);
-const select={
- value:'',dataset:{},children:[],
- replaceChildren(){this.children=[]},
+const mkSelect=()=>({value:'',dataset:{},children:[],
+ replaceChildren(){this.children=[];this.value='';},
  append(child){this.children.push(child);}
-};
-const documentMock={createElement:tag=>({tag,value:'',textContent:''})};
-const getChoices=Function('people','permitted','document','personSelect',
- nameSource+'\nupdatePeople();return personSelect.children.map(x=>({value:x.value,label:x.textContent}));');
-const options=getChoices(()=>people,()=>true,documentMock,select);
-assert.deepEqual(options.map(x=>x.value),['','E1','E2','E3'],
- 'names use traditional stroke order: 王, 林, 黃');
-assert.equal(options[1].label,'領班｜王子明（E1）');
-assert.equal(options[2].label,'操作員｜林小華（E2）');
-assert.equal(options[3].label,'技術員｜黃柏源（E3）');
-assert.equal(JSON.stringify(people),before,'dropdown must never mutate HR employee records');
-console.log('PASS annual-balance adjacent tab, blue workspace reference layout, official cloud unknown state, stroke-sorted job-title/name selector');
+});
+const unit={value:'A單位'},job=mkSelect(),person=mkSelect();
+const doc={getElementById:id=>id==='filterDept'?unit:null,createElement:tag=>({tag,value:'',textContent:''})};
+const checks=Function('people','permitted','document','jobSelect','personSelect','p79LeaveUnitOfPerson','leaveEmployeeIsActive','window',
+ pickerSource+`
+ updatePeople();
+ const initial={jobs:jobSelect.children.map(x=>x.textContent),people:personSelect.children.map(x=>x.textContent)};
+ jobSelect.value='司機';updatePeople();
+ const aNames=personSelect.children.map(x=>x.textContent);
+ personSelect.value='E1';
+ unit.value='B單位';jobSelect.value='';updatePeople();
+ const bInitial={jobs:jobSelect.children.map(x=>x.textContent),people:personSelect.children.map(x=>x.textContent),person:personSelect.value};
+ jobSelect.value='司機';updatePeople();
+ const bNames=personSelect.children.map(x=>x.textContent);
+ unit.value='';updatePeople();
+ const noUnit={jobs:jobSelect.children.map(x=>x.textContent),people:personSelect.children.map(x=>x.textContent),person:personSelect.value};
+ return {initial,aNames,bInitial,bNames,noUnit};`)(
+ ()=>people,()=>true,doc,job,person,x=>x.section,x=>x.status==='在職',{});
+assert.deepEqual(checks.initial.jobs,['請選擇職稱','司機','技術員']);
+assert.deepEqual(checks.initial.people,['請先選擇職稱'],'do not show all employee names before job is chosen');
+assert.deepEqual(checks.aNames,['請選擇姓名','王子明','黃柏源'],'A unit drivers only, names by stroke');
+assert.deepEqual(checks.bInitial.jobs,['請選擇職稱','司機']);
+assert.deepEqual(checks.bInitial.people,['請先選擇職稱']);
+assert.equal(checks.bInitial.person,'','changing unit clears previous employee');
+assert.deepEqual(checks.bNames,['請選擇姓名','許大同'],'do not leak A unit employees into B unit');
+assert.deepEqual(checks.noUnit.jobs,['請先選擇單位']);
+assert.deepEqual(checks.noUnit.people,['請先選擇單位'],'ALL units never expands to every employee');
+assert.equal(checks.noUnit.person,'');
+assert.equal(JSON.stringify(people),before,'filter is read-only and cannot mutate HR roster');
+console.log('PASS leave quota: selected unit → job → name, active-only, traditional stroke order, no cross-unit leaks');
 
 console.log('PASS leave reference page: only admin visual skin and read-only KPI/calendar; existing application, review, balance, cover, auth and cloud functions preserved');

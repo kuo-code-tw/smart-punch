@@ -62,6 +62,9 @@ assert(js.includes("const closeHistory=()=>"),'history tab can return to origina
 assert(js.includes("document.documentElement.classList.remove('p79-leave-balance-only');"),
  'history tab exits annual-balance-only mode, retaining the original records table');
 assert(js.includes('tr.hidden=!keep.has(tr)'), 'pagination only toggles row visibility');
+assert(js.includes("document.getElementById('p79LeaveVisualJob')"),'quota uses selected job in a separate dropdown');
+assert(js.includes('p79LeaveUnitOfPerson(e)===unit'),'quota cannot show balances from another unit');
+assert(css.includes('.p79-leave-visual-person-filters'),'two-column job/name quota fields must be styled only in leave');
 assert(!js.includes('p79PixelGroup'), 'removed duplicate header group dropdown must not be recreated');
 assert(js.includes('headingRight.replaceChildren();headingRight.hidden=true;'), 'remove only duplicated in-page header controls');
 assert(css.includes('/* 20261117 leave duplicate-header removal and compact vertical rhythm; admin only. */'), 'compact style must scope only to the leave admin');

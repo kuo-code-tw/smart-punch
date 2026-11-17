@@ -188,7 +188,15 @@ function init(){
     ['婚假','marriage'],['喪假','bereavement']
   ];
   function updateQuota(){
-   const emp=typeof employees!=='undefined'&&employees.find(e=>String(e.empId)===person?.value);
+   const unit=String(document.getElementById('filterDept')?.value||'').trim();
+   const job=String(document.getElementById('p79LeaveVisualJob')?.value||'').trim();
+   // Do not show a previous employee's balance after unit or job changes.
+   const emp=unit&&job&&typeof employees!=='undefined'&&Array.isArray(employees)?
+     employees.find(e=>String(e.empId)===person?.value&&
+       typeof p79LeaveUnitOfPerson==='function'&&p79LeaveUnitOfPerson(e)===unit&&
+       String(e.jobTitle||e.deptDetail||e.position||'未設定職稱').trim()===job&&
+       typeof leaveEmployeeIsActive==='function'&&leaveEmployeeIsActive(e)&&
+       (!window.p79OrgScope||window.p79OrgScope.matches(e))):null;
    let info=null;try{if(emp&&typeof leaveBalanceInfo==='function')info=leaveBalanceInfo(emp);}catch(_){}
    const entries=typeof leaveRecords!=='undefined'&&Array.isArray(leaveRecords)?leaveRecords:[];
    quotaBody.replaceChildren();
