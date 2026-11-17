@@ -155,3 +155,17 @@ html body.p79-workspace:has(#p79HomeDashboard) #p79IntegratedBell{border:0!impor
 
 @media screen{html body.p79-workspace:has(#p79HomeDashboard){padding-top:70px!important}html body.p79-workspace:has(#p79HomeDashboard)>.card>.body{padding-top:0!important}html body.p79-workspace:has(#p79HomeDashboard) #systems .p79-hero-greeting{height:105px!important;display:flex!important;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;padding:13px 23px!important}html body.p79-workspace:has(#p79HomeDashboard) #systems .p79-hero-greeting #todayWeather{display:none!important}html body.p79-workspace:has(#p79HomeDashboard) .p79-hero-greeting>strong{font-size:16px!important;margin:0!important}.p79-integrated-greeting-sub{font-size:12px;color:#52749b;margin-left:41px}.p79-integrated-date{font-size:12px;color:#264e85;margin-left:41px}html body.p79-workspace:has(#p79HomeDashboard) .p79-workspace-brand strong{font-size:26px!important}html body.p79-workspace:has(#p79HomeDashboard) .p79-port-mark{width:56px!important;height:56px!important}@media(max-width:600px){html body.p79-workspace:has(#p79HomeDashboard) .p79-workspace-brand strong{font-size:23px!important}}}
 @media screen{html body.p79-workspace:has(#systems.show):has(#p79HomeDashboard){padding-top:70px!important}html body.p79-workspace:has(#systems.show):has(#p79HomeDashboard) .card>.body{padding-top:0!important}}
+
+/* Home dashboard: evidence-based cross-system data readiness and operational interpretation. */
+#p79HomeDashboard .p79-dash-source-status{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#p79HomeDashboard .p79-dash-source-row{min-width:0;display:flex;align-items:center;justify-content:space-between;gap:7px;padding:11px 9px;background:var(--p79-w-soft,#f5f9ff);border:1px solid var(--p79-w-line,#dce5f1);border-radius:9px;color:var(--p79-w-ink,#15385e)}
+#p79HomeDashboard .p79-dash-source-row span{font-size:12px;font-weight:750}
+#p79HomeDashboard .p79-dash-source-row strong{font-size:11px;font-weight:900;white-space:nowrap;color:var(--p79-w-muted,#6881a0)}
+#p79HomeDashboard .p79-dash-source-row.confirmed strong{color:#0d9770}
+#p79HomeDashboard .p79-dash-source-row.incomplete strong{color:#d78a25}
+#p79HomeDashboard .p79-dash-source-status>small{grid-column:1/-1;font-size:11px;line-height:1.6;color:var(--p79-w-muted,#6881a0)}
+#p79HomeDashboard .p79-dash-interpretation{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#p79HomeDashboard .p79-dash-insight{min-width:0;padding:13px;background:var(--p79-w-soft,#f5f9ff);border:1px solid var(--p79-w-line,#dce5f1);border-radius:10px}
+#p79HomeDashboard .p79-dash-insight strong{font-size:12px;font-weight:900;color:var(--p79-w-ink,#193a60)}
+#p79HomeDashboard .p79-dash-insight p{font-size:11px;line-height:1.65;margin:7px 0 0;color:var(--p79-w-muted,#6881a0)}
+@media(max-width:650px){#p79HomeDashboard .p79-dash-source-status,#p79HomeDashboard .p79-dash-interpretation{grid-template-columns:minmax(0,1fr)}}
