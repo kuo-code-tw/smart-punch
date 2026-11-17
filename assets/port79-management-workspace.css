@@ -182,7 +182,15 @@ html body.p79-workspace #p79SevenNav a:hover{
 html body.p79-workspace #p79SevenNav a.active svg,
 html body.p79-workspace #p79SevenNav a:hover svg{color:white!important}
 html body.p79-workspace #p79SevenNav .p79-nav-arrow{display:none!important}
-html body.p79-workspace .p79-sidebar-footer{display:none!important}
+/* Restore the existing harbor photograph and footer on the original dark navigation.
+   Sidebar branding, links, interactions, and all management content remain unchanged. */
+html body.p79-workspace .p79-sidebar-footer{display:flex!important}
+html body.p79-workspace .p79-sidebar-footer strong{color:#f0f7ff!important}
+html body.p79-workspace .p79-sidebar-footer small{color:#c7d9ef!important}
+html body.p79-workspace .p79-sidebar-harbor{
+ background:linear-gradient(0deg,#0e2647,transparent 70%),url('./port79-harbor-banner.webp') center bottom/auto 190px no-repeat!important;
+ opacity:.65!important
+}
 }
 @media screen and (max-width:900px){
 html body.p79-workspace:not(.p79-nav-collapsed){--p79-w-width:0px!important}
