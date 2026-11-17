@@ -2493,6 +2493,15 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 <link rel="stylesheet" href="../assets/port79-leave-ui-v115.css?v=20261117-production-v115d-table-center">
 <link rel="stylesheet" href="../assets/port79-leave-reference-visual.css?v=20261116-reference-tab-stroke-v2&compat=20261117-production-reference-repaired-v1">
 <link rel="stylesheet" href="../assets/port79-leave-exact-reference.css?v=20261116-reference-match-v4&compat=20261117-production-reference-repaired-v1&topbar=20261117-restore-v1&compact=20261117-clean-header-v1&picker=20261117-unit-job-unit-v3">
+<style id="p79-leave-hide-redundant-title-20261117">
+/* Hide only the redundant "♧ 請假管理" in-page row; retain its DOM for existing read-only initializers. */
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] > main > #p79LeaveVisualHeading,
+html.p79-leave-reference-admin body[data-p79-system="leave"] > main > #p79LeaveVisualHeading {
+  display:none!important;
+  height:0!important;min-height:0!important;max-height:0!important;
+  margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;
+}
+</style>
 <script defer src="../assets/port79-leave-ui-v115.js?v=20261117-production-v115b"></script>
 <script src="../assets/port79-hidden-job-titles.js?v=20261117-hr-hidden-v1"></script>
 <script src="../assets/port79-leave-reference-visual.js?v=20261116-reference-tab-stroke-v3&compat=20261117-production-reference-repaired-v1&picker=20261117-hidden-job-v4"></script>
