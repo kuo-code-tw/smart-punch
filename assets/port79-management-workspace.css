@@ -148,61 +148,110 @@ html body.p79-workspace[data-p79-system="workhours"] :is(.p79-stats-table-wrap,.
  html body.p79-workspace #p79SevenStandardMenu{width:min(370px,calc(100vw - 16px))!important}
 }
 
-/* P79 RESTORE ORIGINAL DARK SIDEBAR 20261117 - shared navigation skin only */
-@media screen{
-html body.p79-workspace:not(.p79-nav-collapsed){--p79-w-width:204px!important}
-html body.p79-workspace :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{
- background:linear-gradient(165deg,#193964,#152f54 45%,#0e2647)!important;
- background-color:#152f54!important;
- background-image:linear-gradient(165deg,#193964,#152f54 45%,#0e2647)!important;
- border:0!important;border-right:1px solid #254467!important;color:#e9f3ff!important}
-html body.p79-workspace .p79-workspace-brand{
- height:68px!important;min-height:68px!important;max-height:68px!important;
- padding:12px 15px!important;gap:10px!important;background:transparent!important;
- border-bottom:1px solid #365175!important;justify-content:flex-start!important}
-html body.p79-workspace .p79-workspace-brand .p79-port-mark{
- width:35px!important;height:35px!important;flex:0 0 35px!important;background:transparent!important}
-html body.p79-workspace .p79-workspace-brand strong{
- color:white!important;font-size:17px!important;font-weight:900!important;
- letter-spacing:0!important;white-space:nowrap!important}
-html body.p79-workspace .p79-workspace-brand small{
- display:block!important;color:#d2e6ff!important;font-size:11px!important;
- font-weight:650!important;letter-spacing:1px!important;line-height:1.4!important;
- white-space:nowrap!important
+/* P79 WHITE SIDEBAR REFERENCE 20261117 — ONLY shared navigation, status lights and toggle behavior. */
+@media screen {
+ html body.p79-workspace{--p79-w-width:230px!important}
+ html body.p79-workspace :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{
+  display:flex!important;flex-direction:column!important;
+  width:var(--p79-w-width)!important;
+  background:#f1f8ff!important;background-color:#f1f8ff!important;background-image:none!important;
+  color:#193b63!important;border-right:1px solid #dceaf8!important;
+  box-shadow:none!important
+ }
+ html body.p79-workspace .p79-workspace-brand{
+  height:72px!important;min-height:72px!important;max-height:72px!important;
+  padding:10px 17px!important;gap:12px!important;background:transparent!important;
+  border-bottom:0!important;justify-content:flex-start!important
+ }
+ html body.p79-workspace .p79-workspace-brand .p79-port-mark{
+  width:48px!important;height:48px!important;flex:0 0 48px!important;background:transparent!important
+ }
+ html body.p79-workspace .p79-workspace-brand strong{
+  display:block!important;color:#16385f!important;font-size:19px!important;font-weight:850!important;
+  line-height:1.25!important;letter-spacing:0!important;white-space:nowrap!important
+ }
+ html body.p79-workspace .p79-workspace-brand small{
+  display:block!important;color:#31587d!important;font-size:11px!important;font-weight:650!important;
+  line-height:1.4!important;letter-spacing:1px!important;white-space:nowrap!important
+ }
+ html body.p79-workspace #p79SevenNav{
+  display:flex!important;flex-direction:column!important;gap:5px!important;
+  margin:10px 12px 0!important;padding:0!important;width:auto!important;overflow-x:hidden!important
+ }
+ html body.p79-workspace #p79SevenNav a{
+  display:flex!important;align-items:center!important;gap:13px!important;min-height:46px!important;
+  margin:0!important;padding:10px 13px!important;color:#203d61!important;
+  background:transparent!important;font-size:14px!important;font-weight:700!important;
+  border:0!important;border-radius:10px!important;box-shadow:none!important;opacity:1!important
+ }
+ html body.p79-workspace #p79SevenNav a span{color:inherit!important}
+ html body.p79-workspace #p79SevenNav a svg{
+  width:20px!important;height:20px!important;flex:0 0 20px!important;color:#284e76!important
+ }
+ html body.p79-workspace #p79SevenNav a .p79-nav-arrow{
+  display:inline-block!important;margin-left:auto!important;color:#9cb5d0!important;
+  font-weight:400!important;font-size:17px!important
+ }
+ html body.p79-workspace #p79SevenNav a.active,
+ html body.p79-workspace #p79SevenNav a[aria-current="page"],
+ html body.p79-workspace #p79SevenNav a:hover{
+  background:#d8ebff!important;color:#0877d7!important;
+  box-shadow:0 2px 8px #bdddf247!important
+ }
+ html body.p79-workspace #p79SevenNav a.active svg,
+ html body.p79-workspace #p79SevenNav a:hover svg{color:#0877d7!important}
+ html body.p79-workspace #p79SevenNav a[aria-disabled="true"]{
+  opacity:1!important;color:#25476b!important;cursor:not-allowed
+ }
+ html body.p79-workspace .p79-sidebar-footer{
+  display:flex!important;min-height:286px!important;padding:18px 24px 64px!important;
+  background:transparent!important
+ }
+ html body.p79-workspace .p79-sidebar-footer strong{color:#234b79!important}
+ html body.p79-workspace .p79-sidebar-footer small{color:#637f9f!important}
+ html body.p79-workspace .p79-sidebar-harbor{
+  background:linear-gradient(0deg,#f1f8ff,transparent 68%),url('./port79-harbor-banner.webp') center bottom/auto 190px no-repeat!important;
+  opacity:.60!important
+ }
+ html body.p79-workspace #p79SevenStatus .sys{
+  display:inline-flex!important;align-items:center!important;gap:6px!important;
+  white-space:nowrap!important
+ }
+ html body.p79-workspace #p79SevenStatus .sys .p79-status-light{
+  display:inline-block!important;position:relative!important;flex:0 0 8px!important;
+  width:8px!important;height:8px!important;min-width:8px!important;min-height:8px!important;
+  padding:0!important;border:0!important;border-radius:50%!important;
+  background:#0cba77!important;box-shadow:0 0 0 2px #cef6e5,0 0 7px #0cba77a6!important
+ }
+ html body.p79-workspace #p79SevenStatus .sys.is-unavailable .p79-status-light{
+  background:#a5b3c3!important;box-shadow:0 0 0 2px #e5eaf1!important
+ }
+ html body.p79-workspace #p79SevenStatus .sys.is-unavailable{color:#7b8ca0!important}
+ html body.p79-workspace #p79SevenStatus .sys.is-unavailable b{color:#657990!important}
+ html body.p79-workspace #p79WorkspaceTopbar .p79-toolbar-toggle{
+  touch-action:manipulation!important
+ }
 }
-html body.p79-workspace #p79SevenNav{
- display:flex!important;flex-direction:column!important;gap:4px!important;
- margin:12px 10px 0!important;padding:0!important;overflow-x:hidden!important}
-html body.p79-workspace #p79SevenNav a{
- display:flex!important;align-items:center!important;gap:13px!important;min-height:51px!important;
- margin:0!important;padding:11px 14px!important;color:#e1edff!important;
- background:transparent!important;font-size:15px!important;font-weight:800!important;
- border:0!important;border-radius:9px!important;box-shadow:none!important}
-html body.p79-workspace #p79SevenNav a svg{
- width:22px!important;height:22px!important;flex:0 0 22px!important;color:#c8ddfa!important}
-html body.p79-workspace #p79SevenNav a.active,
-html body.p79-workspace #p79SevenNav a[aria-current="page"],
-html body.p79-workspace #p79SevenNav a:hover{
- background:linear-gradient(110deg,#1c82ff,#0868ee)!important;color:white!important;
- box-shadow:0 3px 11px #051e4652!important}
-html body.p79-workspace #p79SevenNav a.active svg,
-html body.p79-workspace #p79SevenNav a:hover svg{color:white!important}
-html body.p79-workspace #p79SevenNav .p79-nav-arrow{display:none!important}
-html body.p79-workspace #p79SevenNav a[aria-disabled="true"]{
- opacity:.82!important
+/* On desktop keep the content and topbar anchored while hiding only the sidebar.
+   This prevents the three-line menu from shifting the page. */
+@media screen and (min-width:901px) {
+ html body.p79-workspace.p79-nav-collapsed{--p79-w-width:230px!important}
+ html body.p79-workspace.p79-nav-collapsed :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{
+  display:flex!important;transform:translateX(-100%)!important;
+  visibility:hidden!important;pointer-events:none!important
+ }
+ html body.p79-workspace:not(.p79-nav-collapsed) :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{
+  transform:translateX(0)!important;visibility:visible!important;pointer-events:auto!important
+ }
 }
-/* Restore the existing harbor photograph and footer on the original dark navigation.
-   Sidebar branding, links, interactions, and all management content remain unchanged. */
-html body.p79-workspace .p79-sidebar-footer{display:flex!important}
-html body.p79-workspace .p79-sidebar-footer strong{color:#f0f7ff!important}
-html body.p79-workspace .p79-sidebar-footer small{color:#c7d9ef!important}
-html body.p79-workspace .p79-sidebar-harbor{
- background:linear-gradient(0deg,#0e2647,transparent 70%),url('./port79-harbor-banner.webp') center bottom/auto 190px no-repeat!important;
- opacity:.65!important
-}
-}
-@media screen and (max-width:900px){
-html body.p79-workspace:not(.p79-nav-collapsed){--p79-w-width:0px!important}
-html body.p79-workspace :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{
- width:min(244px,84vw)!important;max-width:min(244px,84vw)!important}
+/* Mobile keeps the original slide-out drawer and does not resize main content. */
+@media screen and (max-width:900px) {
+ html body.p79-workspace{--p79-w-width:0px!important}
+ html body.p79-workspace :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{
+  width:min(230px,84vw)!important;max-width:min(230px,84vw)!important;
+  transform:translateX(-100%)!important
+ }
+ html body.p79-workspace.p79-nav-open :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{
+  transform:translateX(0)!important;visibility:visible!important
+ }
 }
