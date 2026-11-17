@@ -71,72 +71,11 @@ function init(){
   recordsTab.classList.toggle('hidden',adminTab.classList.contains('hidden'));
  }
 
- // Match the screenshot header using safe view filters; the original
- // department/job controls remain in the real records toolbar below.
+ // Remove only the duplicate presentation row (company/unit/group/bell/user).
+ // The original top toolbar and account remain intact. The real department,
+ // job and status selectors below still use their authorized live handlers.
  const headingRight=heading.querySelector('.p79-leave-visual-heading-right');
- let updateGroups=()=>{};
- if(headingRight){
-  headingRight.textContent='';
-  const company=make('select','p79-pixel-header-filter');
-  const companyOpt=document.createElement('option');companyOpt.textContent='全部公司';companyOpt.value='';
-  company.append(companyOpt);company.disabled=true;company.title='目前公司範圍依登入權限';
-  const unit=make('select','p79-pixel-header-filter');
-  const group=make('select','p79-pixel-header-filter');
-  group.id='p79PixelGroup';
-  for(const [source,target,fallback] of [
-   [document.getElementById('filterDept'),unit,'全部單位']
-  ]){
-    const original=source;
-    function sync(){
-     const value=target.value;
-     target.replaceChildren();
-     if(original){
-      for(const opt of original.options){
-       const copy=make('option','',opt.textContent);
-       copy.value=opt.value;target.append(copy);
-      }
-      target.value=original.value;
-     }else{
-      const x=make('option','',fallback);target.append(x);
-     }
-    }
-    sync();original?.addEventListener('change',sync);
-    // Read-only mirror: selecting in the header uses the EXISTING filter,
-    // including its original change handler and permissions.
-    target.addEventListener('change',()=>{
-     if(!original)return;
-     original.value=target.value;
-     original.dispatchEvent(new Event('change',{bubbles:true}));
-    });
-    // Original options can repopulate after a cloud read.
-    if(original)new MutationObserver(sync).observe(original,{childList:true,subtree:true});
-  }
-  const employeeGroup=e=>String(e?.group||e?.groupName||e?.team||e?.teamName||'').trim();
-  updateGroups=function(){
-   const prior=group.value;
-   const groups=[...new Set((typeof employees!=='undefined'&&Array.isArray(employees)?employees:[])
-     .map(employeeGroup).filter(Boolean))].sort(new Intl.Collator('zh-TW-u-co-stroke').compare);
-   const signature=groups.join('|');
-   if(group.dataset.sourceSignature===signature)return;
-   group.dataset.sourceSignature=signature;
-   group.replaceChildren();
-   const all=make('option','','全部組別');all.value='';group.append(all);
-   for(const name of groups){const option=make('option','',name);option.value=name;group.append(option);}
-   if(groups.includes(prior))group.value=prior;
-  }
-  updateGroups();
-  const bell=make('span','p79-pixel-header-bell','♧');
-  bell.setAttribute('aria-hidden','true');
-  const account=make('span','p79-pixel-header-user','登入人員');
-  const userName=document.querySelector('.p79-user-name');
-  function updateAccount(){
-   const name=userName?.textContent?.trim();
-   account.textContent=name||'登入人員';
-  }
-  updateAccount();
-  if(userName)new MutationObserver(updateAccount).observe(userName,{childList:true,characterData:true,subtree:true});
-  headingRight.append(company,unit,group,bell,account);
- }
+ if(headingRight){headingRight.replaceChildren();headingRight.hidden=true;}
 
  // Reuse every live original button and select. Moves are structural only,
  // preserving inline onclick, permission attributes and value listeners.
@@ -186,16 +125,9 @@ function init(){
   if(!active())return;
   const all=[...body.querySelectorAll(':scope > tr')];
   const keyword=search.value.trim().toLocaleLowerCase('zh-TW');
-  const chosenGroup=document.getElementById('p79PixelGroup')?.value||'';
-  const rendered=typeof p79LeaveComparisonRows!=='undefined'&&Array.isArray(p79LeaveComparisonRows)?
-   p79LeaveComparisonRows:[];
-  const matches=all.filter((tr,i)=>{
-   if(keyword&&!tr.textContent.toLocaleLowerCase('zh-TW').includes(keyword))return false;
-   if(!chosenGroup)return true;
-   const record=rendered[i],emp=typeof employees!=='undefined'&&Array.isArray(employees)?
-     employees.find(e=>String(e.empId||'').toUpperCase()===String(record?.empId||'').toUpperCase()):null;
-   return !!emp&&String(emp.group||emp.groupName||emp.team||emp.teamName||'').trim()===chosenGroup;
-  });
+  // Display-only search. All department/job/status filtering remains
+  // delegated to the original official leave table controller.
+  const matches=all.filter(tr=>!keyword||tr.textContent.toLocaleLowerCase('zh-TW').includes(keyword));
   const maxPage=Math.max(1,Math.ceil(matches.length/pageSize));
   currentPage=Math.min(currentPage,maxPage);
   const keep=new Set(matches.slice((currentPage-1)*pageSize,currentPage*pageSize));
@@ -217,9 +149,8 @@ function init(){
  function queueTableUpdate(reset=false){
   if(reset)currentPage=1;
   if(queued)return;queued=true;
-  Promise.resolve().then(()=>{queued=false;updateGroups();updateTable()});
+  Promise.resolve().then(()=>{queued=false;updateTable()});
  }
- document.getElementById('p79PixelGroup')?.addEventListener('change',()=>queueTableUpdate(true));
  search.addEventListener('input',()=>queueTableUpdate(true));
  searchButton.addEventListener('click',()=>queueTableUpdate(true));
  for(const id of ['filterMonth','filterDept','filterJob','filterStatus']){

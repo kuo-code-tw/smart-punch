@@ -62,4 +62,9 @@ assert(js.includes("const closeHistory=()=>"),'history tab can return to origina
 assert(js.includes("document.documentElement.classList.remove('p79-leave-balance-only');"),
  'history tab exits annual-balance-only mode, retaining the original records table');
 assert(js.includes('tr.hidden=!keep.has(tr)'), 'pagination only toggles row visibility');
+assert(!js.includes('p79PixelGroup'), 'removed duplicate header group dropdown must not be recreated');
+assert(js.includes('headingRight.replaceChildren();headingRight.hidden=true;'), 'remove only duplicated in-page header controls');
+assert(css.includes('/* 20261117 leave duplicate-header removal and compact vertical rhythm; admin only. */'), 'compact style must scope only to the leave admin');
+assert(css.includes('#p79WorkspaceTopbar{') && css.includes('#p79WorkspaceStatus{'), 'original top tools and live status stay present');
+assert(html.includes('compact=20261117-clean-header-v1'), 'new header resources must bypass browser cache');
 console.log('PASS leave reference visual: header/nav/KPIs/records/quotas/calendar aligned, original operations and cloud data retained');

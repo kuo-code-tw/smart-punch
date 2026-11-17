@@ -715,3 +715,31 @@ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79
   padding:5px 12px!important;
  }
 }
+
+/* 20261117 leave duplicate-header removal and compact vertical rhythm; admin only. */
+/* Keep the REAL shared toolbar and status sources. Remove ONLY the invented
+   in-page company/unit/group and synthetic bell/user duplicate. */
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualHeading .p79-leave-visual-heading-right{display:none!important}
+/* Use the available viewport rather than stacking several spacious banners. */
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79WorkspaceStatus{min-height:34px!important;padding:3px 12px!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79SevenStatus{padding:1px 0!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualHeading{
+ height:52px!important;min-height:52px!important;max-height:52px!important;padding:0 18px!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #leaveStickyTabs{
+ min-height:58px!important;height:auto!important;margin-bottom:7px!important;padding:6px 16px!important;gap:9px!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #leaveStickyTabs .tab{
+ height:42px!important;min-height:42px!important;padding:7px 16px!important;font-size:14px!important;
+}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #adminMode{row-gap:8px!important;column-gap:12px!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualStats{gap:8px!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualStats .p79-leave-visual-stat{height:86px!important;min-height:86px!important;padding:8px 10px!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79PixelFilterBar{min-height:52px!important;padding:6px 0!important;margin:0!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79PixelTableFooter{min-height:42px!important;padding:6px 10px!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide{gap:9px!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #globalStatus:not(.error):not(.warn){margin-top:2px!important;margin-bottom:0!important}
+@media(max-width:900px){
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #leaveStickyTabs{padding:6px 9px!important}
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualHeading{padding:0 12px!important}
+}
