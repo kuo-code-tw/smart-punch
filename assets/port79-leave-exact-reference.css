@@ -772,3 +772,102 @@ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79
  width:100%!important;max-width:100%!important;min-height:35px!important;height:35px!important;
  padding:5px 8px!important;font-size:12px!important;border-radius:8px!important;
  border:1px solid #cfdef2!important;background:white!important;color:#24416b!important}
+
+/* 2026-11-17: Dark theme must cover the entire leave-admin workspace.
+   Visual-only: preserve all actual leave records, filters and commands. */
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"]{
+ --p79-pixel-bg:#0b1628;
+ --p79-leave-ink:#e5efff;
+ --p79-leave-line:#30445d;
+ --p79-leave-surface:#14243a;
+ --p79-leave-canvas:#0b1628;
+ background:#0b1628!important;color:#e5efff!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] :is(#p79WorkspaceTopbar,#p79WorkspaceStatus){
+ background:#152a43!important;border-color:#324863!important;color:#e5efff!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualHeading,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #leaveStickyTabs{
+ background:#13253d!important;border-color:#2d4260!important;box-shadow:none!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #leaveStickyTabs .tab:not(.active){
+ background:#1a2e49!important;color:#e2edff!important;border-color:#39516f!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualHeading .p79-leave-visual-heading-title strong{color:#e8f2ff!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualStats .p79-leave-visual-stat,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualStats .p79-leave-visual-stat-pending,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualStats .p79-leave-visual-stat-approved,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualStats .p79-leave-visual-stat-rejected,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualStats .p79-leave-visual-stat-month,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualStats .p79-leave-visual-stat-days{
+ background:#172c45!important;border-color:#334b68!important;box-shadow:none!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin .p79-leave-visual-stat-title,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualStats .p79-leave-visual-stat-amount{color:#e4f0ff!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelFilterBar{border-color:#304761!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelFilterBar .field label{color:#c4d9f4!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelFilterBar :is(.field select,.p79-pixel-search,.p79-pixel-extra>summary),
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79LeaveVisualSide :is(select,input){
+ background:#1b304d!important;color:#e8f2ff!important;border-color:#45607d!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelFilterBar .p79-pixel-extra[open],
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelFilterBar .p79-pixel-extra[open]>.actions{background:#1b304d!important;border-color:#45607d!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #adminMode .table-wrap,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #adminMode table.leave-admin-table,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelTableFooter,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #adminBalanceMode .card{
+ background:#14263d!important;border-color:#304760!important;color:#dbeafe!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #adminMode table.leave-admin-table th{
+ background:#203a58!important;color:#edf5ff!important;border-color:#3b526e!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #adminMode table.leave-admin-table td{
+ background:#14263d!important;color:#e0ecff!important;border-color:#29415c!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #adminMode table.leave-admin-table tbody tr:nth-child(even) td{background:#1a2f49!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #adminMode table.leave-admin-table tbody tr:hover td{background:#254364!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #adminMode table.leave-admin-table td:first-child b{color:#e9f2ff!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #adminMode table.leave-admin-table td .note,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #p79PixelTableFooter #adminLeaveSummary{color:#adc2dc!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin .p79-leave-visual-panel{
+ background:#172b44!important;border-color:#344c68!important;color:#dfebff!important;box-shadow:none!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin .p79-leave-visual-panel-head{border-color:#344c68!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin :is(.p79-leave-visual-panel-head strong,.p79-leave-visual-person-label,.p79-leave-visual-quota-grid strong,.p79-leave-visual-calendar-day strong){color:#e8f2ff!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin :is(.p79-leave-visual-panel-head small,.p79-leave-visual-quota-grid small,.p79-leave-visual-calendar-legend,#p79LeaveVisualQuotaNote,.p79-leave-visual-person-filters label,.p79-leave-visual-unit-label){color:#b0c6e0!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin .p79-leave-visual-quota-grid>div,
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin .p79-leave-visual-quota-grid>div:nth-child(1),
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin .p79-leave-visual-quota-grid>div:nth-child(3){
+ background:#203a55!important;border-color:#395371!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin .p79-leave-visual-weekdays{background:#223954!important;color:#dbe8fa!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin :is(.p79-leave-visual-calendar-day,.p79-leave-visual-calendar-empty){
+ background:#172c45!important;border-color:#2e4663!important;
+}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin .p79-leave-visual-calendar-day.has-leave{background:#263e61!important}
+html:is([data-theme="dark"],.dark).p79-leave-reference-admin.p79-leave-pixel-admin #globalStatus{background:#1c3554!important;color:#dcecff!important;border-color:#365272!important}
+html:is([data-theme="dark"],.dark) body[data-p79-system="leave"] #p79LeaveDetailDialog,
+html:is([data-theme="dark"],.dark) body[data-p79-system="leave"] #p79LeaveDetailDialog .p79-detail-heading,
+html:is([data-theme="dark"],.dark) body[data-p79-system="leave"] #p79LeaveDetailDialog .p79-detail-card{
+ background:#15283f!important;color:#e7f0ff!important;border-color:#36506b!important;
+}
+html:is([data-theme="dark"],.dark) body[data-p79-system="leave"] #p79LeaveDetailDialog :is(h2,h3,.p79-detail-cell b){color:#e8f2ff!important;border-color:#344e6a!important}
+html:is([data-theme="dark"],.dark) body[data-p79-system="leave"] #p79LeaveDetailDialog :is(.p79-detail-cell small,.p79-detail-card p){color:#aec5e1!important}
+html:is([data-theme="dark"],.dark) body[data-p79-system="leave"] #p79LeaveDetailDialog :is(.p79-detail-note,.p79-detail-balance){background:#233d5a!important;color:#e8f2ff!important}
+html:is([data-theme="dark"],.dark) body[data-p79-system="leave"] #p79LeaveDetailDialog button:not(.primary):not(.reject){background:#233c59!important;color:#e7f1ff!important;border-color:#42607d!important}
+
+/* Equal visual bottom edges for the two admin columns; no record data is altered. */
+@media(min-width:1181px){
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #adminMode{
+  align-items:stretch!important;
+ }
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #adminMode>.card{
+  align-self:stretch!important;min-height:100%!important;
+ }
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide{
+  align-self:stretch!important;height:100%!important;
+ }
+ html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #p79LeaveVisualSide>.p79-leave-visual-panel:last-child{
+  flex-grow:1!important;
+ }
+}
