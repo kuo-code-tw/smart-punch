@@ -62,31 +62,7 @@ function decorateNav(){
   a.innerHTML=icon(key)+'<span>'+meta[key][0]+'</span><span class="p79-nav-arrow">›</span>';
   a.dataset.p79Decorated='1';
  });
- enforceSidebarContrast();
-}
-/* Shared left sidebar display only: enforce background and readable labels
-   above older conflicting CSS, without changing routes or permissions. */
-function enforceSidebarContrast(){
- if(!shell)return;
- const gradient='linear-gradient(165deg,#193964,#152f54 45%,#0e2647)';
- shell.style.setProperty('background',gradient,'important');
- shell.style.setProperty('background-color','#152f54','important');
- shell.style.setProperty('color','#edf5ff','important');
- const brand=shell.querySelector('.p79-workspace-brand');
- if(brand){
-  brand.querySelectorAll('strong').forEach(el=>el.style.setProperty('color','#ffffff','important'));
-  brand.querySelectorAll('small').forEach(el=>{
-   el.style.setProperty('display','block','important');
-   el.style.setProperty('color','#d8e9ff','important');
-  });
- }
- shell.querySelectorAll('#p79SevenNav a').forEach(a=>{
-  const disabled=a.getAttribute('aria-disabled')==='true';
-  const active=a.classList.contains('active')||a.getAttribute('aria-current')==='page';
-  a.style.setProperty('color',active?'#ffffff':disabled?'#dce8f8':'#f0f6ff','important');
-  a.style.setProperty('opacity',disabled?'0.96':'1','important');
-  a.querySelectorAll('span,svg').forEach(el=>el.style.setProperty('color','inherit','important'));
- });
+
 }
 function homeNavAllowed(key,source){
  const s=account(),role=String(s.adminRole||s.role||'employee').toLowerCase();
@@ -143,11 +119,13 @@ function syncHomeFunctionMenu(){
    hr:'cardHr',workhours:'cardWorkhours',leave:'cardLeave',history:'cardHistory'};
   for(const key of order){
    const source=d.getElementById(ids[key]);
-   if(!source||source.hidden||source.disabled||source.style.display==='none'||!homeNavAllowed(key,source))continue;
-   const item=d.createElement('span');item.className='sys';
+   const permitted=!!source&&!source.hidden&&!source.disabled&&source.style.display!=='none'&&homeNavAllowed(key,source);
+   const item=d.createElement('span');item.className='sys '+(permitted?'is-available':'is-unavailable');
+   item.setAttribute('aria-label',meta[key][0]+'：'+(permitted?'可使用':'不可使用'));
+   const lamp=d.createElement('i');lamp.className='p79-status-light';lamp.setAttribute('aria-hidden','true');
    const name=d.createElement('b');name.textContent=meta[key][0];
-   const available=d.createElement('span');available.textContent='可使用';
-   item.append(name,available);state.append(item);
+   const available=d.createElement('span');available.textContent=permitted?'可使用':'不可使用';
+   item.append(lamp,name,available);state.append(item);
   }
  }
 }
@@ -160,7 +138,13 @@ function buildShell(){const sys=d.body.dataset.p79System||'home';shell=home?d.cr
  shell.prepend(brand);shell.append(nav);
  const footer=d.createElement('div');footer.className='p79-sidebar-footer';footer.innerHTML='<div class="p79-sidebar-harbor"></div><strong>79號碼頭</strong><small>專業 · 高效 · 安全</small><small>連接海洋，創造未來</small>';shell.append(footer);
  bar=d.createElement('header');bar.id='p79WorkspaceTopbar';
- const toggle=button('切換系統導覽','p79-toolbar-toggle',icon('menu'),()=>{const mobile=matchMedia('(max-width: 900px)').matches;d.body.classList.toggle(mobile?'p79-nav-open':'p79-nav-collapsed');toggle.setAttribute('aria-expanded',String(mobile?d.body.classList.contains('p79-nav-open'):!d.body.classList.contains('p79-nav-collapsed')));});toggle.setAttribute('aria-controls',shell.id);toggle.setAttribute('aria-expanded',String(!matchMedia('(max-width: 900px)').matches));bar.append(toggle);
+ const toggle=button('切換系統導覽','p79-toolbar-toggle',icon('menu'),event=>{
+  event.preventDefault();event.stopPropagation();
+  const mobile=matchMedia('(max-width: 900px)').matches;
+  if(mobile){d.body.classList.remove('p79-nav-collapsed');d.body.classList.toggle('p79-nav-open');}
+  else{d.body.classList.remove('p79-nav-open');d.body.classList.toggle('p79-nav-collapsed');}
+  toggle.setAttribute('aria-expanded',String(mobile?d.body.classList.contains('p79-nav-open'):!d.body.classList.contains('p79-nav-collapsed')));
+ });toggle.setAttribute('aria-controls',shell.id);toggle.setAttribute('aria-expanded',String(!matchMedia('(max-width: 900px)').matches));bar.append(toggle);
  bar.append(button('搜尋系統功能','p79-toolbar-search',icon('search')+'<span>搜尋船舶、航次、員工、班表、報表…</span><kbd>Ctrl K</kbd>',openSearch));
  const tools=d.createElement('div');tools.className='p79-toolbar-tools';if(home)tools.append(buildHomeFunctionMenu());if(menuWrap){const action=shell.querySelector('.action');if(action){tools.append(action);}else tools.append(menuWrap);}
  // 舊版只在不存在系統選單時才顯示切換鈕；正式首頁有選單，因此切換鈕消失。
@@ -213,6 +197,6 @@ function syncHomePermissions(){const signature=JSON.stringify([...d.querySelecto
 function sync(){frame=0;const on=enabled();d.body.classList.toggle('p79-workspace',!!on);if(!on){d.body.classList.remove('p79-nav-open','p79-nav-collapsed');d.getElementById('p79WorkspaceSearch')?.close();return;}if(!shell&&!buildShell())return;if(home)syncHomePermissions();updateAccount();
 }
 function queue(){if(!frame)frame=requestAnimationFrame(sync);}
-function start(){sync();const target=home?d.getElementById('systems'):d.documentElement;if(target)new MutationObserver(queue).observe(target,{attributes:true,attributeFilter:['class']});if(home&&target){const observer=new MutationObserver(queue);target.querySelectorAll('.system-card').forEach(card=>observer.observe(card,{attributes:true,attributeFilter:['hidden','disabled','style']}));}d.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'&&enabled()){e.preventDefault();openSearch();}if(e.key==='Escape')d.body.classList.remove('p79-nav-open');});window.addEventListener('resize',()=>{if(!matchMedia('(max-width: 900px)').matches)d.body.classList.remove('p79-nav-open');});if(!home&&!shell){const ob=new MutationObserver(()=>{if(d.getElementById('p79SevenTop')){ob.disconnect();queue();}});ob.observe(d.body,{childList:true});}}
+function start(){sync();const target=home?d.getElementById('systems'):d.documentElement;if(target)new MutationObserver(queue).observe(target,{attributes:true,attributeFilter:['class']});if(home&&target){const observer=new MutationObserver(queue);target.querySelectorAll('.system-card').forEach(card=>observer.observe(card,{attributes:true,attributeFilter:['hidden','disabled','style']}));}d.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'&&enabled()){e.preventDefault();openSearch();}if(e.key==='Escape')d.body.classList.remove('p79-nav-open');});window.addEventListener('resize',()=>{const mobile=matchMedia('(max-width: 900px)').matches;if(mobile)d.body.classList.remove('p79-nav-collapsed');else d.body.classList.remove('p79-nav-open');const btn=bar?.querySelector('.p79-toolbar-toggle');if(btn)btn.setAttribute('aria-expanded',String(mobile?d.body.classList.contains('p79-nav-open'):!d.body.classList.contains('p79-nav-collapsed')));});if(!home&&!shell){const ob=new MutationObserver(()=>{if(d.getElementById('p79SevenTop')){ob.disconnect();queue();}});ob.observe(d.body,{childList:true});}}
 if(d.readyState==='loading')d.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
