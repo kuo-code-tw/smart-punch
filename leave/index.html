@@ -236,9 +236,16 @@ body[data-p79-system="leave"] .leave-admin-table .p79-cover-again{font-size:14px
 body[data-p79-system="leave"] .leave-admin-table .actions{gap:6px!important;flex-wrap:nowrap!important}
 body[data-p79-system="leave"] .leave-admin-table .actions .btn{font-size:13px!important;min-height:36px!important;padding:7px 9px!important}
 body[data-p79-system="leave"] .leave-admin-table .leave-remain{font-size:16px!important;font-weight:800}
-body[data-p79-system="leave"] #adminBalancePanel>summary{font-size:16px!important;padding:4px 0}
+body[data-p79-system="leave"] #adminBalanceMode>.card{padding:18px!important}
+body[data-p79-system="leave"] .p79-leave-balance-head{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;margin-bottom:14px}
+body[data-p79-system="leave"] .p79-leave-balance-head h2{font-size:20px;margin:0 0 6px}
+body[data-p79-system="leave"] .p79-leave-balance-head p{margin:0}
+body[data-p79-system="leave"] .p79-leave-balance-head label{display:grid;gap:5px;font-size:13px;font-weight:700;min-width:min(270px,100%)}
+body[data-p79-system="leave"] .p79-leave-balance-head input{min-height:40px;padding:8px 12px;font-size:14px}
+body[data-p79-system="leave"] #adminBalanceMode .table-wrap{overflow-x:auto}
+body[data-p79-system="leave"] #adminBalanceMode table{min-width:760px}
 @media(max-width:1050px){body[data-p79-system="leave"] #adminMode>.card>.toolbar{grid-template-columns:repeat(2,minmax(0,1fr))!important}body[data-p79-system="leave"] #adminMode .toolbar .field:first-child{grid-column:auto!important}}
-@media(max-width:600px){body[data-p79-system="leave"]>main{padding:10px!important}body[data-p79-system="leave"] #adminMode>.card{padding:12px!important}body[data-p79-system="leave"] #adminMode>.card>.toolbar{grid-template-columns:minmax(0,1fr)!important}body[data-p79-system="leave"] #adminMode .toolbar input,body[data-p79-system="leave"] #adminMode .toolbar select{font-size:16px!important}body[data-p79-system="leave"] #leaveStickyTabs .tab{font-size:14px!important;padding:9px!important}body[data-p79-system="leave"] #adminMode .actions{flex-wrap:wrap!important}body[data-p79-system="leave"] #leaveAdminDateRangePicker>div{min-width:0!important;width:min(340px,calc(100vw - 66px))}}
+@media(max-width:600px){body[data-p79-system="leave"] #leaveStickyTabs{flex-wrap:wrap!important}body[data-p79-system="leave"] #leaveStickyTabs .tab{flex:1 1 calc(50% - 8px)!important;font-size:13px!important;white-space:normal!important}body[data-p79-system="leave"] #adminBalanceMode>.card{padding:12px!important}body[data-p79-system="leave"]>main{padding:10px!important}body[data-p79-system="leave"] #adminMode>.card{padding:12px!important}body[data-p79-system="leave"] #adminMode>.card>.toolbar{grid-template-columns:minmax(0,1fr)!important}body[data-p79-system="leave"] #adminMode .toolbar input,body[data-p79-system="leave"] #adminMode .toolbar select{font-size:16px!important}body[data-p79-system="leave"] #leaveStickyTabs .tab{font-size:14px!important;padding:9px!important}body[data-p79-system="leave"] #adminMode .actions{flex-wrap:wrap!important}body[data-p79-system="leave"] #leaveAdminDateRangePicker>div{min-width:0!important;width:min(340px,calc(100vw - 66px))}}
 </style>
 
 <style id="p79-leave-type-colors-20261014">
@@ -293,6 +300,7 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
   <div id="leaveStickyTabs" class="tabs">
     <button id="tabEmployee" class="tab active" onclick="switchMode('employee')">👷 員工請假</button>
     <button id="tabAdmin" class="tab hidden" onclick="switchMode('admin')">🛡️ 管理／審核</button>
+    <button id="tabBalance" class="tab hidden" onclick="switchMode('balance')">🏖️ 員工年假剩餘天數</button>
   </div>
 
   <section id="employeeMode">
@@ -367,15 +375,22 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
       <div class="table-wrap"><table class="leave-admin-table"><thead><tr><th>♙ 人員</th><th>▥ 單位</th><th>◇ 假別</th><th>▣ 日期</th><th>☷ 天數</th><th>▤ 事由／代班</th><th>✓ 狀態</th><th>⚙ 操作</th><th>♧ 剩餘年假</th></tr></thead><tbody id="adminLeaveBody"></tbody></table></div>
     </div>
 
-    <details id="adminBalancePanel" class="card" style="margin-top:16px" ontoggle="if(this.open)renderAdminBalances()">
-      <summary style="cursor:pointer;font-size:18px;font-weight:700;padding:6px 0">🏖️ 員工年假剩餘天數 <span class="note">（點選展開／收合）</span></summary>
-      <p id="adminBalanceMonthSummary" class="note" role="status"></p><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>工號</th><th>姓名</th><th>單位</th><th>基準月份</th><th>遞延</th><th>今年年假</th><th>已休</th><th>目前未休</th></tr></thead><tbody id="adminBalanceBody"></tbody></table></div>
-    </details>
+  </section>
+  <section id="adminBalanceMode" class="hidden" aria-labelledby="adminBalanceTitle">
+    <div id="adminBalancePanel" class="card">
+      <div class="p79-leave-balance-head">
+        <div><h2 id="adminBalanceTitle">🏖️ 員工年假剩餘天數</h2>
+        <p class="note">依每月匯入的年假基準與已核准請假紀錄核對餘額，僅顯示授權範圍的人員。</p></div>
+        <label for="balanceKeyword">搜尋員工 <input id="balanceKeyword" type="search" placeholder="工號、姓名或單位" oninput="renderAdminBalances()" autocomplete="off"></label>
+      </div>
+      <p id="adminBalanceMonthSummary" class="note" role="status"></p>
+      <div class="table-wrap"><table><thead><tr><th>工號</th><th>姓名</th><th>單位</th><th>基準月份</th><th>遞延</th><th>今年年假</th><th>已休</th><th>目前未休</th></tr></thead><tbody id="adminBalanceBody"></tbody></table></div>
+    </div>
   </section>
 </main>
 <input id="leaveBalanceImportFile" type="file" accept=".xlsx,.xls,.csv" style="display:none">
 <script>
-const APP_VERSION='2026.11.17.115';
+const APP_VERSION='2026.11.17.116';
 const DEFAULT_GAS_URL='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 let GAS_URL=String(sessionStorage.getItem('port79_gas_url')||localStorage.getItem('port79_gas_url')||DEFAULT_GAS_URL).trim();
 window.GAS_URL=GAS_URL;
@@ -622,7 +637,7 @@ async function restoreAdmin(){
    if(leaveAccess==='none')throw new Error('此帳號沒有請假系統權限');
    adminSession={empId:String(d.empId||''),name:String(d.name||''),adminRole:role,systemPermissions:p,finePermissions:d.finePermissions||{},overtimePermissions:d.systemPermissions||{}};
    try{history.replaceState(null,'',location.pathname+location.search)}catch{}
-   $('tabAdmin').classList.remove('hidden');$('adminWho').textContent=`${adminSession.name||adminSession.empId}｜${role==='superadmin'?'超級管理員':'管理員'}｜${leaveAccess==='manage'?'可管理':'只能查看'}`;$('adminReadOnly').classList.toggle('hidden',leaveAccess==='manage');
+   $('tabAdmin').classList.remove('hidden');$('tabBalance').classList.remove('hidden');$('adminWho').textContent=`${adminSession.name||adminSession.empId}｜${role==='superadmin'?'超級管理員':'管理員'}｜${leaveAccess==='manage'?'可管理':'只能查看'}`;$('adminReadOnly').classList.toggle('hidden',leaveAccess==='manage');
    switchMode('admin');p79UpdateLeaveHandoffBanner();return true;
   }catch(e){
    last=e;console.warn('管理員 SSO 第 '+(i+1)+' 次驗證失敗',e);
@@ -635,7 +650,20 @@ async function restoreAdmin(){
  setStatus('管理員 SSO 暫時無法驗證：'+(last?.message||last)+'；可按功能選單「重新整理雲端」再試','warn');
  return false;
 }
-function switchMode(m){if(m==='admin'&&!adminSession)return;document.documentElement.classList.toggle('p79-leave-simple',m!=='admin');currentMode=m;$('employeeMode').classList.toggle('hidden',m!=='employee');$('adminMode').classList.toggle('hidden',m!=='admin');$('tabEmployee').classList.toggle('active',m==='employee');$('tabAdmin').classList.toggle('active',m==='admin');if(m==='admin'){renderAdmin();renderAdminBalances()}}
+function switchMode(m){
+ if(!['employee','admin','balance'].includes(m))return;
+ if(m!=='employee'&&!adminSession)return;
+ document.documentElement.classList.toggle('p79-leave-simple',m==='employee');
+ currentMode=m;
+ $('employeeMode').classList.toggle('hidden',m!=='employee');
+ $('adminMode').classList.toggle('hidden',m!=='admin');
+ $('adminBalanceMode').classList.toggle('hidden',m!=='balance');
+ $('tabEmployee').classList.toggle('active',m==='employee');
+ $('tabAdmin').classList.toggle('active',m==='admin');
+ $('tabBalance').classList.toggle('active',m==='balance');
+ if(m==='admin')renderAdmin();
+ if(m==='balance')renderAdminBalances();
+}
 function employeeLogin(){
  const raw=$('empLoginInput').value.trim(),digits=raw.replace(/\D/g,'');if(!raw){setStatus('請輸入考勤號、工號或電話','warn');return}
  const matches=employees.filter(e=>leaveEmployeeIsActive(e)&&(String(e.empId||'').trim().toUpperCase()===raw.toUpperCase()||String(e.attNo??'').trim()===raw|| (digits&&String(e.phone||'').replace(/\D/g,'')===digits)));
@@ -853,7 +881,7 @@ function renderAdmin(){
  }).join(''):'<tr><td colspan="9">'+(leaveRecords.length?(month?'所選月份沒有符合資料。':'目前篩選條件沒有符合資料，請調整單位、職稱或狀態。'):(month?'所選月份沒有請假紀錄':'目前沒有請假紀錄'))+'</td></tr>';
 }
 function renderAdminBalances(){
- if(!$('adminBalancePanel')?.open)return;
+ if(currentMode!=='balance'||!adminSession)return;
  const body=$('adminBalanceBody');if(!body)return;const kw=String($('balanceKeyword')?.value||'').trim().toLowerCase();
  const rows=employees.filter(e=>typeof window==='undefined'||!window.p79OrgScope||window.p79OrgScope.matches(e)).filter(e=>e&&e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining))).filter(e=>!kw||`${e.empId||''} ${e.name||''} ${p79LeaveUnitOfPerson(e)}`.toLowerCase().includes(kw)).sort((a,b)=>String(a.empId||'').localeCompare(String(b.empId||''),'zh-Hant',{numeric:true}));
  const summary=leaveBalanceMonthSummary(employees.filter(e=>e.empId&&String(e.empId).toUpperCase()!=='ADMIN'&&leaveEmployeeIsActive(e)&&e.leaveBalance&&Number.isFinite(Number(e.leaveBalance.remaining))));
