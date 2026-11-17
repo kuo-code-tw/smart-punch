@@ -6353,7 +6353,7 @@ function personalAuditNormalizeIntervals(intervals){
     if(last && a<=last[1]+1)last[1]=Math.max(last[1],b);
     else merged.push([a,b]);
   });
-  return p79RepairKnownLegacyWorkingClocks(merged).records;
+  return merged;
 }
 function personalAuditIntervalsEquivalent(a,b){
   const x=personalAuditNormalizeIntervals(a),y=personalAuditNormalizeIntervals(b);
@@ -8524,7 +8524,7 @@ function mergeCloudRecordsWithLocal(cloudRecords,localRecords,replacementMasters
     }
   });
 
-  return merged;
+  return p79RepairKnownLegacyWorkingClocks(merged).records;
 }
 function shipMasterDateMatchesMonth(s,month){
   if(!month)return true;
