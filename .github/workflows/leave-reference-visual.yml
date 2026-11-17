@@ -1,4 +1,4 @@
-name: Leave original appearance and data safety
+name: Leave reference dashboard and data safety
 on:
   pull_request:
     paths:
@@ -8,6 +8,8 @@ on:
       - 'assets/port79-leave-exact-reference.css'
       - 'assets/port79-leave-exact-reference.js'
       - 'tests/leave-original-style-restored.cjs'
+      - 'tests/leave-reference-visual-only.cjs'
+      - 'tests/leave-exact-reference-layout.cjs'
       - '.github/workflows/leave-reference-visual.yml'
   push:
     branches: [main]
@@ -18,6 +20,8 @@ on:
       - 'assets/port79-leave-exact-reference.css'
       - 'assets/port79-leave-exact-reference.js'
       - 'tests/leave-original-style-restored.cjs'
+      - 'tests/leave-reference-visual-only.cjs'
+      - 'tests/leave-exact-reference-layout.cjs'
       - '.github/workflows/leave-reference-visual.yml'
 permissions:
   contents: read
@@ -30,5 +34,7 @@ jobs:
         with:
           node-version: '22'
       - run: node tests/leave-original-style-restored.cjs
+      - run: node tests/leave-reference-visual-only.cjs
+      - run: node tests/leave-exact-reference-layout.cjs
       - run: node tests/leave-admin-month-filter.cjs
       - run: node tests/leave-cover-short-form.cjs

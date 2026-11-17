@@ -646,3 +646,9 @@ html.p79-leave-reference-admin.p79-leave-pixel-admin.p79-leave-balance-only body
   display:grid!important;grid-template-columns:1fr!important;
  }
 }
+
+/* 20261117-production-reference-repaired-v1: independent annual-balance section compatibility. */
+html.p79-leave-pixel-admin #tabBalance{display:none!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #adminMode.hidden{display:none!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #adminBalanceMode:not(.hidden){display:block!important;max-width:none!important;margin:12px 0 0!important}
+html.p79-leave-reference-admin.p79-leave-pixel-admin body.p79-workspace[data-p79-system="leave"] #adminBalanceMode .card{border:1px solid #d4e2f5!important;border-radius:13px!important;background:#fff!important;box-shadow:0 3px 12px #1d4a8e14!important;padding:18px!important}

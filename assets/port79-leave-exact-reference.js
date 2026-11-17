@@ -5,6 +5,7 @@
 'use strict';
 function init(){
  const admin=document.getElementById('adminMode');
+ const balanceMode=document.getElementById('adminBalanceMode');
  const card=admin?.querySelector(':scope > .card');
  const tabs=document.getElementById('leaveStickyTabs');
  const heading=document.getElementById('p79LeaveVisualHeading');
@@ -17,7 +18,7 @@ function init(){
   const x=document.createElement(tag);if(cls)x.className=cls;
   if(text!==undefined)x.textContent=text;return x;
  };
- const active=()=>!admin.classList.contains('hidden');
+ const active=()=>!admin.classList.contains('hidden')||!!balanceMode&&!balanceMode.classList.contains('hidden');
  const monthSelect=document.getElementById('filterMonth');
  const title=heading.querySelector('.p79-leave-visual-heading-title strong');
  if(title)title.textContent='請假管理';
@@ -231,6 +232,7 @@ function init(){
   if(open)queueTableUpdate();
  });
  scopeObserver.observe(admin,{attributes:true,attributeFilter:['class']});
+ if(balanceMode)scopeObserver.observe(balanceMode,{attributes:true,attributeFilter:['class']});
 
  // Right: show the actual imported ANNUAL balance, and read-only approved
  // usage for other leave types. No fabricated category entitlements.

@@ -5,6 +5,7 @@
 function init(){
  const main=document.querySelector('body[data-p79-system="leave"] > main');
  const admin=document.getElementById('adminMode');
+ const balanceMode=document.getElementById('adminBalanceMode');
  if(!main||!admin||document.getElementById('p79LeaveVisualStats'))return;
  const create=(tag,cls)=>{const x=document.createElement(tag);if(cls)x.className=cls;return x;};
  const heading=create('div','p79-leave-visual-heading');
@@ -35,8 +36,8 @@ function init(){
    };
    balanceTab.addEventListener('click',()=>{
      if(adminTab.classList.contains('hidden'))return;
-     if(typeof switchMode==='function')switchMode('admin');
-     if(admin.classList.contains('hidden'))return;
+     if(typeof switchMode==='function')switchMode('balance');
+     if(!balanceMode||balanceMode.classList.contains('hidden'))return;
      document.documentElement.classList.add('p79-leave-balance-only');
      adminTab.classList.remove('active');
      balanceTab.classList.add('active');
@@ -79,7 +80,9 @@ function init(){
  const calendar=create('section','p79-leave-visual-panel p79-leave-visual-calendar');
  calendar.innerHTML='<div class="p79-leave-visual-panel-head"><strong>▣ 本月請假日曆</strong><small id="p79LeaveVisualMonth">—</small></div><div class="p79-leave-visual-weekdays" aria-hidden="true"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div><div id="p79LeaveVisualCalendarGrid" class="p79-leave-visual-calendar-grid" aria-label="實際請假紀錄月曆"></div><div class="p79-leave-visual-calendar-legend"><span><i class="annual"></i>特休</span><span><i class="personal"></i>事假</span><span><i class="sick"></i>病假</span><span><i class="other"></i>其他</span></div>';
  rail.append(quota,calendar);
- admin.insertBefore(rail,document.getElementById('adminBalancePanel')||null);
+ // The balance panel now lives in a separate section. Insert the rail in the
+ // actual admin grid; insertBefore with a non-child throws NotFoundError.
+ admin.append(rail);
  const personSelect=document.getElementById('p79LeaveVisualPerson');
  const people=()=>typeof employees!=='undefined'&&Array.isArray(employees)?employees:[];
  const records=()=>typeof leaveRecords!=='undefined'&&Array.isArray(leaveRecords)?leaveRecords:[];
@@ -177,7 +180,7 @@ function init(){
    if(queued)return;queued=true;
    Promise.resolve().then(()=>{
      queued=false;
-     const active=!admin.classList.contains('hidden');
+     const active=!admin.classList.contains('hidden')||!!balanceMode&&!balanceMode.classList.contains('hidden');
      document.documentElement.classList.toggle('p79-leave-reference-admin',active);
      if(!active){
        statusBanner.hidden=true;
@@ -214,6 +217,7 @@ function init(){
  for(const id of ['filterMonth','filterDept','filterJob','filterStatus'])document.getElementById(id)?.addEventListener('change',refresh);
  const observer=new MutationObserver(refresh);
  observer.observe(admin,{attributes:true,attributeFilter:['class']});
+ if(balanceMode)observer.observe(balanceMode,{attributes:true,attributeFilter:['class']});
  observer.observe(document.getElementById('adminLeaveBody'),{childList:true});
  const readStatus=document.getElementById('globalStatus');
  if(readStatus)observer.observe(readStatus,{childList:true,subtree:true,attributes:true,attributeFilter:['class']});
