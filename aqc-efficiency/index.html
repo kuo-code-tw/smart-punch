@@ -11437,7 +11437,9 @@ function p79RouteChineseName(code){
   const key=p79RouteServiceCode(code);
   const catalog=typeof window!=='undefined'?window.P79RouteNameAuto:null;
   // The periodically refreshed same-origin catalogue can add newly verified routes.
-  return catalog?.lookup(key)||P79_ROUTE_CHINESE_NAMES[key]||(key?('航線 '+key+'（中文名稱查詢中）'):'未分類');
+  const english=catalog?.english?.(key);
+  return catalog?.lookup(key)||P79_ROUTE_CHINESE_NAMES[key]||
+    (english?('航線 '+key+'（'+english+'；中文待核實）'):key?('航線 '+key+'（中文名稱查詢中）'):'未分類');
 }
 if(typeof window!=='undefined')window.addEventListener?.('p79-route-name-updated',()=>{
   if(document.getElementById('view-compare')?.classList?.contains('hidden'))return;

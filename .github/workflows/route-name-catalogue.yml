@@ -1,0 +1,42 @@
+name: Refresh public AQC route name catalogue
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: refresh-route-name-catalogue
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test public-source service parser without network
+        run: |
+          node tests/route-name-refresh.cjs
+          node tests/route-name-autofill.cjs
+          node tests/route-name-dictionary.cjs
+          node tests/route-month-cards.cjs
+          node tests/route-management-reference-layout.cjs
+      - name: Refresh public shipping service names
+        run: node scripts/refresh-route-service-names.cjs
+      - name: Publish verified new service names to main
+        run: |
+          if git diff --quiet -- data-sources/route-service-names.json; then
+            echo 'No changes to the public source name catalogue'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data-sources/route-service-names.json
+          git commit -m 'data(routes): auto-refresh verified public service names'
+          git pull --rebase origin main
+          git push origin HEAD:main

@@ -4,7 +4,7 @@
 if(!root)return;
 const CACHE='port79_route_names_verified_v1',DAY=24*60*60*1000;
 const validCode=code=>/^[A-Z0-9]{2,8}$/.test(String(code||''));
-const names=Object.create(null);
+const names=Object.create(null),unresolved=Object.create(null);
 let checkedAt=0,loading=null,loaded=false;
 function apply(data){
  if(!data||data.schema_version!==1||!data.routes||typeof data.routes!=='object')return false;
@@ -15,6 +15,12 @@ function apply(data){
   if(!validCode(code)||zh.length<2||zh.length>90||!/[\u3400-\u9fff]/.test(zh)||/[<>]/.test(zh))continue;
   if(names[code]!==zh){names[code]=zh;changed=true;}
  }
+ for(const [key,record] of Object.entries(data.unresolved||{})){
+  const code=String(key||'').trim().toUpperCase();
+  const en=String(record?.english||'').trim();
+  if(validCode(code)&&en.length>2&&en.length<100&&/^[A-Za-z0-9 .,&\/-]+$/.test(en))
+    unresolved[code]=en;
+ }
  return changed;
 }
 try{
@@ -22,6 +28,7 @@ try{
  if(saved&&typeof saved.at==='number'&&saved.data){apply(saved.data);checkedAt=saved.at;}
 }catch(_){}
 function lookup(code){const key=String(code||'').trim().toUpperCase();return validCode(key)?(names[key]||''):'';}
+function english(code){const key=String(code||'').trim().toUpperCase();return validCode(key)?(unresolved[key]||''):'';}
 function ensure(force=false){
  const now=Date.now();
  if(loading)return loading;
@@ -42,5 +49,5 @@ function ensure(force=false){
   .finally(()=>{loading=null;});
  return loading;
 }
-root.P79RouteNameAuto={lookup,ensure,isLoaded:()=>loaded,_apply:apply};
+root.P79RouteNameAuto={lookup,english,ensure,isLoaded:()=>loaded,_apply:apply};
 })(typeof window!=='undefined'?window:globalThis);

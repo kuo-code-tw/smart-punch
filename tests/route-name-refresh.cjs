@@ -1,0 +1,27 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {discoverCodes,englishService,translateEnglish,refresh}=require('../scripts/refresh-route-service-names.cjs');
+assert.deepEqual(discoverCodes('航線代碼 : ABC(N)｜航線代碼：ZX3(S) 航線代碼：BADZZZZZ'),['ABC','ZX3']);
+const page='<html><head><title>WHLC ABC Service - JAPAN - VIETNAM SERVICE | Flexport</title></head><meta name="description" content="WHLC:ABC (Japan-vietnam Service) is Wan Hai"></html>';
+assert.equal(englishService(page,'ABC'),'JAPAN - VIETNAM SERVICE | Flexport');
+assert.equal(englishService(page,'ZZZ'),'');
+assert.equal(translateEnglish('JAPAN - VIETNAM SERVICE'),'日本－越南航線');
+assert.equal(translateEnglish('NORTH CHINA-TAIWAN SERVICE'),'華北－台灣航線');
+assert.equal(translateEnglish('INVENTED GARBAGE SERVICE'),'');
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),'route-verify-')),file=path.join(dir,'catalog.json');
+fs.writeFileSync(file,JSON.stringify({schema_version:1,updated_at:'2026-11-18',routes:{},unresolved:{}}));
+const response={};
+response['https://www.tpct.com.tw/global-coverage/']='航線代碼：ABC(N) 航線代碼：XYZ(S)';
+response['https://atlas.flexport.com/service/code%3AWHLC%3AABC']='<title>WHLC ABC Service - JAPAN - VIETNAM SERVICE</title><meta content="WHLC:ABC (Japan-vietnam Service) is Wan Hai">';
+response['https://atlas.flexport.com/service/code%3AWHLC%3AXYZ']='<title>WHLC XYZ Service - UNKNOWN FAKE SERVICE</title><meta content="WHLC:XYZ (Unknown Fake Service) is Wan Hai">';
+(async()=>{
+ const result=await refresh({file,read:async url=>{if(!(url in response))throw Error(url);return response[url]}});
+ const updated=JSON.parse(fs.readFileSync(file,'utf8'));
+ assert.equal(result.checked,2);assert.equal(updated.routes.ABC.zh,'日本－越南航線');
+ assert.equal(updated.unresolved.XYZ.english,'UNKNOWN FAKE SERVICE','unknown geography remains untranslated, not invented');
+ const before=fs.readFileSync(file,'utf8');
+ await refresh({file,read:async url=>response[url]});
+ assert.equal(fs.readFileSync(file,'utf8'),before,'no needless commits for unchanged sources');
+ console.log('PASS discovery, verified-code match, safe auto Chinese translation, unresolved English and stable refresh');
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -17,6 +17,7 @@ on:
       - 'schedule/**'
       - 'work-hours/**'
       - 'aqc-efficiency/**'
+      - 'data-sources/route-service-names.json'
       - 'hr/**'
       - 'history-data/**'
       - 'data-cache/**'
