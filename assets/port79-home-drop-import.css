@@ -108,29 +108,3 @@ html[data-theme=dark] #p79HomeDropImport>h2{color:#f1f7ff}
  border-color:#2563eb;background:#dbeafe;box-shadow:0 0 0 2px #93c5fd;
 }
 @media(max-width:700px){#p79HomeImportDialog{width:calc(100vw - 18px)}}
-
-/* Download mode preserves the screenshot's compact three-tile layout. */
-#p79HomeDropImport[data-p79-mode=download] .p79-home-drop-zone{
- box-sizing:border-box;appearance:none;-webkit-appearance:none;width:100%;min-width:0;
- font-family:inherit;line-height:normal;cursor:pointer;
-}
-#p79HomeDropImport[data-p79-mode=download] .p79-home-drop-zone:disabled{
- cursor:not-allowed;opacity:.55;box-shadow:none;
-}
-#p79HomeDropImport[data-p79-mode=download] .p79-download-arrow{
- display:inline-flex;align-items:center;justify-content:center;
- width:18px;height:18px;border-radius:50%;font-size:16px;font-weight:900;
- color:#1477bf;
-}
-#p79HomeDownloadStatus{
- display:block;box-sizing:border-box;margin:-4px 0 12px;padding:9px 12px;
- background:#eff6ff;border:1px solid #bfdbfe;border-radius:9px;
- color:#194b80;font-size:12px;font-weight:700;line-height:1.65;
-}
-#p79HomeDownloadStatus[hidden]{display:none!important}
-#p79HomeDownloadStatus[data-tone=error]{background:#fff1f2;border-color:#fecdd3;color:#be123c}
-#p79HomeDownloadStatus[data-tone=success]{background:#ecfdf5;border-color:#a7f3d0;color:#047857}
-html[data-theme=dark] #p79HomeDownloadStatus{background:#172554;color:#dbeafe;border-color:#2d4f86}
-html[data-theme=dark] #p79HomeDownloadStatus[data-tone=error]{background:#3f0d18;color:#fecdd3;border-color:#9f1239}
-html[data-theme=dark] #p79HomeDownloadStatus[data-tone=success]{background:#052e24;color:#a7f3d0;border-color:#047857}
-html[data-theme=dark] #p79HomeDropImport[data-p79-mode=download] .p79-download-arrow{color:#68bcff}
