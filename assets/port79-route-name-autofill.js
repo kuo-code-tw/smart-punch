@@ -18,8 +18,9 @@ function apply(data){
  for(const [key,record] of Object.entries(data.unresolved||{})){
   const code=String(key||'').trim().toUpperCase();
   const en=String(record?.english||'').trim();
-  if(validCode(code)&&en.length>2&&en.length<100&&/^[A-Za-z0-9 .,&\/-]+$/.test(en))
-    unresolved[code]=en;
+  if(validCode(code)&&en.length>2&&en.length<100&&/^[A-Za-z0-9 .,&\/-]+$/.test(en)&&unresolved[code]!==en){
+    unresolved[code]=en;changed=true;
+  }
  }
  return changed;
 }
