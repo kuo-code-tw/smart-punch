@@ -45,7 +45,7 @@ const c={
   console:{warn(){}}
 };
 vm.createContext(c);
-vm.runInContext('globalThis.Port79CalendarRange={syncAll:()=>{syncs++}}',c);
+vm.runInContext('globalThis.Port79CalendarRange={syncAll:()=>{globalThis.p79CalendarSyncCount=(globalThis.p79CalendarSyncCount||0)+1}}',c);
 for(const name of ['personnelStatisticsMonthRange','syncPersonnelStatisticsMonthFilter','setPersonnelStatisticsMonth','weeklyFilteredRecords'])
   vm.runInContext(fn(name),c);
 c.syncPersonnelStatisticsMonthFilter();
@@ -75,5 +75,5 @@ assert.equal(el('weeklyStart').value,'');
 assert.equal(el('weeklyEnd').value,'');
 assert.equal(c.weeklyFilteredRecords(true).length,3,'all-month choice still respects system-selected year');
 assert(fetches.some(x=>x.year==='2024'),'all-month choice fetches the selected year');
-assert(renders>=3&&syncs>=3);
+assert(renders>=3&&c.p79CalendarSyncCount>=3);
 console.log('PASS personnel monthly picker, full-month filter, leap day, year change, custom dates, rank sync and cloud reads');
