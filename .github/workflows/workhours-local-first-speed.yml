@@ -10,6 +10,7 @@ on:
       - 'tests/workhours-local-first-speed.cjs'
       - 'tests/workhours-verified-cache.cjs'
       - 'tests/workhours-reference-dashboard.cjs'
+      - 'tests/workhours-no-spurious-refresh.cjs'
       - 'tests/overtime-load-speed.cjs'
       - '.github/workflows/workhours-local-first-speed.yml'
   pull_request:
@@ -20,6 +21,7 @@ on:
       - 'tests/workhours-local-first-speed.cjs'
       - 'tests/workhours-verified-cache.cjs'
       - 'tests/workhours-reference-dashboard.cjs'
+      - 'tests/workhours-no-spurious-refresh.cjs'
       - 'tests/overtime-load-speed.cjs'
       - '.github/workflows/workhours-local-first-speed.yml'
 permissions:
@@ -41,6 +43,8 @@ jobs:
         run: node tests/overtime-load-speed.cjs
       - name: Verify original screenshot and permission guard
         run: node tests/workhours-reference-dashboard.cjs
+      - name: Verify no flicker without real HR or attendance changes
+        run: node tests/workhours-no-spurious-refresh.cjs
       - name: Verify editing and read pressure guards
         run: |
           node tests/workhours-attendance-render-lock-pressure.cjs
