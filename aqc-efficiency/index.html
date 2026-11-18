@@ -7530,7 +7530,7 @@ function renderMonthlyRanking(){
   if(!input.value)input.value=(document.getElementById('filterMonth')?.value||'').startsWith(year+'-')?document.getElementById('filterMonth').value:year===isoTodayLocal().slice(0,4)?isoTodayLocal().slice(0,7):year+'-01';
   const month=input.value;
   // Use exactly the same source rows as the upper personnel statistics and Excel.
-  const sourceRows=weeklyFilteredRecords();
+  const sourceRows=typeof weeklyFilteredRecords==='function'?weeklyFilteredRecords():(typeof monthlyRankingRecords==='function'?monthlyRankingRecords():[]);
   const period=typeof personnelStatisticsPeriod==='function'?personnelStatisticsPeriod():{month,start:month+'-01',end:month+'-31',custom:false};
   const personKey=document.getElementById('personStatPerson')?.value||'',groupKey=document.getElementById('weeklyGroupFilter')?.value||'';
   const dateNarrowed=!!(document.getElementById('weeklyStart')?.value||document.getElementById('weeklyEnd')?.value);
