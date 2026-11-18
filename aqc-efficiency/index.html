@@ -1214,7 +1214,8 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
     </div>
   </div>
 </section>
-<script src="./route-management-dashboard.js?v=20261111-nct-name-v2"></script>
+<script src="../assets/port79-route-name-autofill.js?v=20261118-v1"></script>
+<script src="./route-management-dashboard.js?v=20261118-autofill-v3"></script>
 
 <style id="p79-terminal-ops-style-v1">
 #efficiencyMainTabs .tab[data-tab="terminal"]:not(.active){background:#dcfce7!important;color:#065f46!important;border:1px solid #86efac}
@@ -11420,18 +11421,28 @@ const P79_ROUTE_CHINESE_NAMES=Object.freeze({
   CL1:'中國－呂宋一線',
   FOC:'福州－廈門－台灣航線',
   HPH:'台灣－海防航線',
+  JSH:'日本－華南－越南航線',
   JST:'日本關西－泰國航線',
   JSV:'日本關西－越南航線',
+  JTS:'日本關東－東南亞航線',
   JTT:'日本關東－泰國航線',
+  KVS:'韓國－越南－東南亞航線',
   MHT:'民答那峨－香港－台灣航線',
-  // NCT: Wan Hai North China–Taiwan Service (萬通船務代理／Flexport 航線資料)
   NCT:'中國大陸華北－台灣航線',
-  TPI:'台灣－中國大陸－印尼航線'
+  NT2:'華北－台灣二線',
+  TPI:'台灣－中國大陸－印尼航線',
+  TPS:'台灣－菲律賓航線'
 });
 function p79RouteChineseName(code){
   const key=p79RouteServiceCode(code);
-  return P79_ROUTE_CHINESE_NAMES[key]||'中文名稱待補';
+  const catalog=typeof window!=='undefined'?window.P79RouteNameAuto:null;
+  // The periodically refreshed same-origin catalogue can add newly verified routes.
+  return catalog?.lookup(key)||P79_ROUTE_CHINESE_NAMES[key]||(key?('航線 '+key+'（中文名稱查詢中）'):'未分類');
 }
+if(typeof window!=='undefined')window.addEventListener?.('p79-route-name-updated',()=>{
+  if(document.getElementById('view-compare')?.classList?.contains('hidden'))return;
+  renderRouteData();
+});
 let p79RouteSelected='';
 let p79RouteSummaryCache=[];
 let p79RouteMonthRows=[];
@@ -11518,6 +11529,8 @@ function p79SelectRoute(index){
 }
 function renderRouteData(){
   const grid=document.getElementById('routeCardsGrid');if(!grid)return;
+  // One bounded catalogue read per day, triggered when visiting the route screen.
+  if(typeof window!=='undefined')void window.P79RouteNameAuto?.ensure();
   const month=p79RouteMonthOptions();
   const all=routeStatsForShips(routeDataRows());
   const query=String(document.getElementById('routeSearch')?.value||'').trim().toUpperCase();

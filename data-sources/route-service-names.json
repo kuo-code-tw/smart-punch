@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-11-18",
+  "routes": {
+    "CIX": {
+      "zh": "中國－印度快線",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3ACIX"
+    },
+    "CL1": {
+      "zh": "中國－呂宋一線",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3ACL1"
+    },
+    "FOC": {
+      "zh": "福州－廈門－台灣航線",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3AFOC"
+    },
+    "HPH": {
+      "zh": "台灣－海防航線",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3AHPH"
+    },
+    "JSH": {
+      "zh": "日本－華南－越南航線",
+      "source": "https://financialfilings.com/filings/wanhai-2615/annual-report/2026/37361000/"
+    },
+    "JST": {
+      "zh": "日本關西－泰國航線",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3AJST"
+    },
+    "JSV": {
+      "zh": "日本關西－越南航線",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3AJSV"
+    },
+    "JTS": {
+      "zh": "日本關東－東南亞航線",
+      "source": "https://financialfilings.com/filings/wanhai-2615/annual-report/2026/37361000/"
+    },
+    "JTT": {
+      "zh": "日本關東－泰國航線",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3AJTT"
+    },
+    "KVS": {
+      "zh": "韓國－越南－東南亞航線",
+      "source": "https://financialfilings.com/filings/wanhai-2615/annual-report/2026/37361000/"
+    },
+    "MHT": {
+      "zh": "民答那峨－香港－台灣航線",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3AMHT"
+    },
+    "NCT": {
+      "zh": "中國大陸華北－台灣航線",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3ANCT"
+    },
+    "NT2": {
+      "zh": "華北－台灣二線",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3ANT2"
+    },
+    "TPI": {
+      "zh": "台灣－中國大陸－印尼航線",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3ATPI"
+    },
+    "TPS": {
+      "zh": "台灣－菲律賓航線",
+      "source": "https://www.yangming.com/en-us/esolution/long_term_schedule_detail?voyage=TPS2619N"
+    }
+  },
+  "unresolved": {}
+}

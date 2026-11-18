@@ -64,9 +64,12 @@ vm.runInContext(html.slice(from,to),ctx);
   assert(nodes.routeSummaryTableBody.innerHTML.includes('日本關東－泰國航線'));
   assert(nodes.routeSummaryTableFoot.innerHTML.includes('當月合計'));
   const chineseNames=vm.runInContext("Object.entries(P79_ROUTE_CHINESE_NAMES)",ctx);
-  assert.equal(chineseNames.length,9);
+  assert.equal(chineseNames.length,15);
   for(const [code,name] of chineseNames){assert(code&&name&&!name.includes('待補'));}
-  assert.equal(vm.runInContext("p79RouteChineseName('OTHER')",ctx),'中文名稱待補');
+  assert.equal(vm.runInContext("p79RouteChineseName('OTHER')",ctx),'航線 OTHER（中文名稱查詢中）');
+  for(const [code,expected] of Object.entries({"JSH":"日本－華南－越南航線","JTS":"日本關東－東南亞航線","KVS":"韓國－越南－東南亞航線","NT2":"華北－台灣二線","TPS":"台灣－菲律賓航線"})){
+    assert.equal(vm.runInContext("p79RouteChineseName("+JSON.stringify(code)+")",ctx),expected);
+  }
   assert(nodes.routeCardsGrid.innerHTML.includes('--route-accent:'));
   assert(nodes.routeCardsGrid.innerHTML.includes('進口艘次'));
   assert(nodes.routeCardsGrid.innerHTML.includes('總櫃數'));

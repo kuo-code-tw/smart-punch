@@ -32,7 +32,7 @@ assert.match(css,/p79-rm-chart-panel/);
 assert.match(css,/body:has\(#view-compare:not\(\.hidden\)\) #efficiencyHeader/,'screenshot nav replaces old header only on route view');
 assert(!css.includes('background-image:url('),'screen must be functional HTML, not a pasted screenshot');
 assert(html.includes('route-management-dashboard.css?v=20261110-reference-v1'));
-assert(html.includes('route-management-dashboard.js?v=20261111-nct-name-v2'));
+assert(html.includes('route-management-dashboard.js?v=20261118-autofill-v3'));
 assert(html.includes('WORKING NO.')&&html.includes('SERVICE'),'live working-sheet data still drives statistics');
 const node=()=>({dataset:{},innerHTML:'',textContent:'',hidden:false,style:{},options:[],value:'',
   setAttribute(name,value){this[name]=value;},querySelector(){return null;},querySelectorAll(){return []},
@@ -128,5 +128,12 @@ api.render({month:'2026-11',rows:[nctRow],all:[nctRow],selected:nctRow,historyMa
 assert(nodes.routeManagerTableBody.innerHTML.includes('中國大陸華北－台灣航線'),'NCT manager row uses verified name');
 assert(nodes.routeManagerDetailBody.innerHTML.includes('中國大陸華北－台灣航線'),'NCT detail uses verified name');
 assert(!nodes.routeManagerTableBody.innerHTML.includes('中文名稱待補'));
+for(const [code,expected] of Object.entries({"JSH":"日本－華南－越南航線","JTS":"日本關東－東南亞航線","KVS":"韓國－越南－東南亞航線","NT2":"華北－台灣二線","TPS":"台灣－菲律賓航線"})){
+  const row={...nctRow,route:code};
+  api.setTab('basic');
+  api.render({month:'2026-11',rows:[row],all:[row],selected:row,historyMasters:[]});
+  assert(nodes.routeManagerTableBody.innerHTML.includes(expected),code+' table Chinese label');
+  assert(nodes.routeManagerDetailBody.innerHTML.includes(expected),code+' details Chinese label');
+}
 new vm.Script(script);
 console.log('PASS route management reference layout: six KPIs, one-table + right detail, month, search/source guard, trend/no fabricated data, 4 tabs, sorting, grid toggle and one-time selected route');
