@@ -2020,6 +2020,29 @@ let groups=[], assignments=[], records=[], shipMasters=[], systemEmployees=[], c
 let p79EfficiencyCloudReadPromise=null;
 // 每次進站需經專用人資 API 核對；舊 localStorage / 船舶快照不可冒充最新在職名冊。
 let p79AqcHeadcountVerified=false;
+// Authenticated, in-memory, singleflight HR roster fetch. Current employees
+// are never inferred from historical WORKING REPORT or persisted GC snapshots.
+let p79AqcRosterRequest=null,p79AqcRosterOwner='',p79AqcRosterVerifiedAt=0,p79AqcRosterVerifiedResponse=null;
+function p79ReadOfficialAqcRoster(force=false){
+ const owner=String(gcToken||'');
+ if(!owner)return Promise.reject(Error('尚未取得人資名冊的登入憑證'));
+ if(owner!==p79AqcRosterOwner){
+  p79AqcRosterOwner=owner;p79AqcRosterRequest=null;
+  p79AqcRosterVerifiedAt=0;p79AqcRosterVerifiedResponse=null;
+ }
+ if(p79AqcRosterRequest)return p79AqcRosterRequest;
+ if(!force&&p79AqcRosterVerifiedResponse&&Date.now()-p79AqcRosterVerifiedAt<60000)
+  return Promise.resolve(p79AqcRosterVerifiedResponse);
+ const request=Promise.resolve().then(()=>apiGetQuick('gcGetEmployees',{},20000)).then(result=>{
+  if(owner!==String(gcToken||''))throw Error('登入身分已變更，已取消舊人資查詢');
+  if(!Array.isArray(result?.employees)||!result.employees.length)throw Error('人資 API 沒有回傳可核對的在職名冊');
+  p79AqcRosterVerifiedResponse=result;p79AqcRosterVerifiedAt=Date.now();
+  return result;
+ });
+ p79AqcRosterRequest=request;
+ void request.then(()=>{},()=>{}).finally(()=>{if(p79AqcRosterRequest===request)p79AqcRosterRequest=null;});
+ return request;
+}
 const SHIP_CHANGE_SEEN_STORE='gc_ship_change_seen_v1';
 const SHIP_CHANGE_FIELDS={
   workingNo:'NO.',vessel:'船名',voyageI:'航次I',voyageE:'航次E',wharf:'碼頭',
@@ -2297,7 +2320,7 @@ async function ensureEmployeeDataForGroups(){
   if(complete)return;
 
   try{
-    const direct=await apiGet('gcGetEmployees');
+    const direct=await p79ReadOfficialAqcRoster();
     if(Array.isArray(direct?.employees)&&direct.employees.length){
       systemEmployees=direct.employees.map(normalizeCloudEmployee).filter(Boolean);
       p79AqcHeadcountVerified=true;
@@ -4307,7 +4330,7 @@ async function reloadEmployeeData(){
     cloudStatus('直接讀取人資主檔...',false);
 
     let direct=null;
-    try{direct=await apiGet('gcGetEmployees')}catch(e){console.warn(e)}
+    try{direct=await p79ReadOfficialAqcRoster(true)}catch(e){console.warn(e)}
 
     if(!direct || !Array.isArray(direct.employees) || !direct.employees.length){
       toast('人資主檔專用 API 沒有回傳資料；請確認 GAS 已重新部署最新版本');
@@ -7377,6 +7400,29 @@ function renderPersonStats(){
   }).join('')||'<tr><td colspan="13" class="text-center text-slate-400">此區間沒有作業紀錄</td></tr>';
 }
 const monthlyRankingReads=new Map();
+// Keep the full-year cloud history read out of the critical personnel-summary
+// path. Load automatically only when its lower monthly ranking comes into view.
+let p79RankingViewportObserver=null,p79RankingFallbackTimer=null;
+function p79QueueVisibleMonthlyRanking(month){
+ if(!/^20\d{2}-(0[1-9]|1[0-2])$/.test(month))return;
+ const section=document.getElementById('view-ranking');
+ if(!section||section.classList?.contains('hidden'))return;
+ if(p79RankingViewportObserver){p79RankingViewportObserver.disconnect();p79RankingViewportObserver=null;}
+ if(p79RankingFallbackTimer){clearTimeout(p79RankingFallbackTimer);p79RankingFallbackTimer=null;}
+ const start=()=>{
+  if(activeEfficiencyTabName()==='weekly'&&document.getElementById('rankingMonth')?.value===month&&
+     !monthlyRankingReads.has(String(gcToken||'')+'|'+month))void loadMonthlyRanking(false);
+ };
+ if(typeof IntersectionObserver==='function'){
+  p79RankingViewportObserver=new IntersectionObserver(entries=>{
+   if(!entries.some(entry=>entry.isIntersecting))return;
+   p79RankingViewportObserver?.disconnect();p79RankingViewportObserver=null;start();
+  },{rootMargin:'200px 0px'});
+  p79RankingViewportObserver.observe(section);
+ }else{
+  p79RankingFallbackTimer=setTimeout(()=>{p79RankingFallbackTimer=null;start();},5000);
+ }
+}
 function monthlyRankingRecords(){
   const month=document.getElementById('rankingMonth')?.value||'';
   const index=shipCompletionIndex(shipMasters||[]);
@@ -7400,6 +7446,7 @@ function renderMonthlyRanking(){
   const input=document.getElementById('rankingMonth'),body=document.getElementById('rankingBody');if(!input||!body||!window.P79PersonnelRanking)return;
   const year=getPort79Year();if(!input.value)input.value=(document.getElementById('filterMonth')?.value||'').startsWith(year+'-')?document.getElementById('filterMonth').value:year===isoTodayLocal().slice(0,4)?isoTodayLocal().slice(0,7):year+'-01';
   const month=input.value,sourceRows=monthlyRankingRecords();
+  const store=currentOperationScheduleStore();
   ensureOperationScheduleGroups(sourceRows.length?sourceRows:[{workDate:month+'-01'}]);
   if(typeof p79EnsureFreshOfficialAqcRoster==='function')p79EnsureFreshOfficialAqcRoster();
   const verified=p79AqcHeadcountVerified?p79VerifiedAqcReportView(sourceRows):p79ScheduledAqcReportView(sourceRows,month);
@@ -7421,10 +7468,9 @@ function renderMonthlyRanking(){
   const name=normalizePersonName(document.getElementById('rankingName')?.value||''),shown=ranked.filter(p=>(!group?.value||p.groups.includes(group.value))&&(!name||normalizePersonName(p.name).includes(name)));
   body.innerHTML=shown.map(p=>`<tr><td class="font-black">${p.rank??'—'}</td><td class="font-bold">${esc(displayPersonName(p.name))}</td><td>${esc(p.groups.join('、')||'未取得排班組別')}</td><td>${p.ships}</td><td>${p.count}</td><td>${p.hours.toFixed(2)}</td><td>${p.disc}</td><td>${p.load}</td><td>${p.hc}</td><td class="font-bold">${p.containers}</td><td>${p.eff===null?'—':p.eff.toFixed(2)}</td><td>${!p.count?'尚無作業資料':p.hours<=0?'缺少有效時數':'已有作業資料'}</td></tr>`).join('')||'<tr><td colspan="12" class="p-5 text-slate-400">此條件尚無人員資料</td></tr>';
   const count=document.getElementById('rankingCount');if(count)count.textContent=`${month}｜顯示 ${shown.length}／${ranked.length} 人｜${rows.length} 筆作業紀錄。篩選保留全員原名次；效率以顯示的兩位小數判定同分。${store?.has(month)?'':'排班名冊尚未讀取，暫列現有人員及有作業紀錄的人員。'}`;
-  const store=currentOperationScheduleStore();
   const key=String(gcToken||'')+'|'+month,state=monthlyRankingReads.get(key),load=document.getElementById('rankingLoadState');
   if(load)load.textContent=state?.status==='loading'?'正在讀取整月雲端與歷史資料…':state?.status==='ready'?'整月雲端與歷史資料已讀取；排行依目前已匯入的作業資料計算。':state?.status==='partial'?'部分來源讀取失敗，以下為已取得資料的暫時排行，請重新讀取。':state?.status==='error'?'整月資料讀取失敗，以下僅以本機資料暫排，請重新讀取。':'尚未完成整月雲端讀取，以下為本機資料暫時排行。';
-  if(!state&&String(gcToken||''))void loadMonthlyRanking(false);
+  if(!state&&String(gcToken||''))p79QueueVisibleMonthlyRanking(month);
 }
 
 function isoTodayLocal(){
@@ -7487,19 +7533,19 @@ function weeklyFilteredRecords(baseOnly=false){
   }));
 }
 
-function weeklyGroupNames(){
-  const live=p79VerifiedAqcReportView(weeklyFilteredRecords(true));
+function weeklyGroupNames(sourceRows){
+  const live=p79VerifiedAqcReportView(Array.isArray(sourceRows)?sourceRows:weeklyFilteredRecords(true));
   if(!live.verified)return [];
   return [...new Set(live.rows.map(operationGroupForRecord).filter(g=>!!personnelGroupCode(g)))].sort((a,b)=>a.localeCompare(b,'zh-Hant-u-co-stroke',{numeric:true}));
 }
 
-function refreshWeeklyGroupFilter(){
+function refreshWeeklyGroupFilter(sourceRows){
   const sel=document.getElementById('weeklyGroupFilter');
   const box=document.getElementById('weeklyGroupButtons');
   if(!sel || !box)return;
 
   const prev=sel.value||'';
-  const names=weeklyGroupNames();
+  const names=weeklyGroupNames(sourceRows);
 
   sel.innerHTML='<option value="">全部組別</option>'+
     names.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
@@ -7686,13 +7732,13 @@ function p79EnsureFreshOfficialAqcRoster(){
   if(typeof requireEfficiencyAccess!=='function'||!requireEfficiencyAccess()||!String(gcToken||''))return;
   if(p79PersonnelRosterReadPromise)return;
   // Revalidate the actual HR endpoint upon entering personnel statistics and periodically thereafter.
-  if(Date.now()-p79PersonnelRosterReadAt<(p79AqcHeadcountVerified?60000:10000))return;
+  if(Date.now()-Math.max(p79PersonnelRosterReadAt,p79AqcHeadcountVerified?p79AqcRosterVerifiedAt:0)<(p79AqcHeadcountVerified?60000:10000))return;
   p79PersonnelRosterReadAt=Date.now();
   // Do not blank an already verified screen while a routine refresh is pending.
   // If the refresh actually fails the catch branch still marks it unverified.
   p79PersonnelRosterReadPromise=(async()=>{
     try{
-      const result=await apiGet('gcGetEmployees');
+      const result=await p79ReadOfficialAqcRoster();
       if(!Array.isArray(result?.employees)||!result.employees.length)throw Error('人資 API 沒有回傳可驗證名冊');
       systemEmployees=result.employees.map(normalizeCloudEmployee).filter(Boolean);
       p79AqcHeadcountVerified=true;
@@ -7713,8 +7759,9 @@ function renderWeeklyEfficiency(){
   if(typeof p79EnsureFreshOfficialAqcRoster==='function')p79EnsureFreshOfficialAqcRoster();
   updateWeeklyDateRangeSummary();
   preparePersonnelFilters();
-  ensureOperationScheduleGroups(weeklyFilteredRecords(true));
-  refreshWeeklyGroupFilter();
+  const baseRows=weeklyFilteredRecords(true);
+  ensureOperationScheduleGroups(baseRows);
+  refreshWeeklyGroupFilter(baseRows);
   const sourceRows=weeklyFilteredRecords();
   // Historical WORKING REPORT quantities remain visible even when HR is offline.
   // Only live personnel names/rankings require a freshly verified HR roster.
@@ -7826,7 +7873,7 @@ function renderWeeklyEfficiency(){
     return {...p,eff:p.hours>0?(p.containers+p.hc)/p.hours:0};
   });
 
-  refreshWeeklyGroupFilter();
+  refreshWeeklyGroupFilter(baseRows);
 
   const selectedGroup=document.getElementById('weeklyGroupFilter')?.value||'';
   const filteredPersons=rankedPersonnelEfficiencyPersons(
@@ -9531,7 +9578,7 @@ async function loadOfficialEmployees(gcData){
   // 若繼續優先使用舊快照，就會讓已非 AQC 的人仍留在現職選單。
   // 因此所有同步流程一律先讀 gcGetEmployees；只有專用 API 失敗時才退回 gcGetData。
   try{
-    const direct=await apiGet('gcGetEmployees');
+    const direct=await p79ReadOfficialAqcRoster();
     if(Array.isArray(direct?.employees) && direct.employees.length){
       return {
         source:'人資員工主檔',
@@ -9835,7 +9882,7 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     // 最新人資名單改成背景補抓，不阻塞「船舶作業資料」的顯示。
     Promise.resolve().then(async()=>{
       try{
-        const direct=await apiGet('gcGetEmployees');
+        const direct=await p79ReadOfficialAqcRoster();
         const next=Array.isArray(direct?.employees)?direct.employees.map(normalizeCloudEmployee).filter(Boolean):[];
         if(next.length){
           systemEmployees=next;
@@ -9942,7 +9989,7 @@ async function syncFromCloud(force=false){
 
    Promise.resolve().then(async()=>{
      try{
-       const direct=await apiGet('gcGetEmployees');
+       const direct=await p79ReadOfficialAqcRoster();
        const next=Array.isArray(direct?.employees)?direct.employees.map(normalizeCloudEmployee).filter(Boolean):[];
        if(next.length){
          systemEmployees=next;p79AqcHeadcountVerified=true;invalidateWorkloadIndex();saveLocal();
