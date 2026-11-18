@@ -15,7 +15,7 @@ const c={document:{getElementById:el},window:{},getPort79Year:()=>year.value,
   console:{warn(){}},Array,String,Number};
 vm.createContext(c);
 vm.runInContext('globalThis.Port79CalendarRange={syncAll(){}}',c);
-for(const name of ['personnelStatisticsMonthRange','syncPersonnelStatisticsMonthFilter','personnelStatisticsPeriod','setPersonnelStatisticsMonth','weeklyFilteredRecords','clearWeeklyRange'])
+for(const name of ['personnelStatisticsMonthRange','syncPersonnelStatisticsMonthFilter','personnelStatisticsPeriod','setPersonnelStatisticsMonth','weeklyFilteredRecords','renderPersonnelAndRanking','clearWeeklyRange'])
  vm.runInContext(fn(name),c);
 c.syncPersonnelStatisticsMonthFilter();
 assert.equal(el('weeklyMonthFilter').value,'2026-11');
