@@ -28,9 +28,11 @@
   if(!endpoint||!identity)throw Error('缺少正式雲端登入資訊，職稱選單暫不開放');
   const changed=endpoint!==state.endpoint||identity!==state.identity;
   if(changed){state.endpoint=endpoint;state.identity=identity;state.status='idle';state.keys=new Set();state.updated=0;state.revision++;}
-  if(!force&&ready()&&Date.now()-state.updated<45000)return true;
+  // A same-identity background check cannot blank the last verified title policy.
+  const hadVerifiedSnapshot=!changed&&ready();
+  if(!force&&hadVerifiedSnapshot&&Date.now()-state.updated<45000)return true;
   if(state.pending)return state.pending;
-  state.status='loading';state.keys=new Set();state.revision++;
+  if(!hadVerifiedSnapshot){state.status='loading';state.keys=new Set();state.revision++;}
   const controller=typeof AbortController!=='undefined'?new AbortController():null;
   const query=endpoint+'?action=hrGetOrgOptions&token='+encodeURIComponent(identity)+'&t='+Date.now();
   const task=(async()=>{
@@ -43,7 +45,9 @@
     if(data?.ok!==true)throw Error(String(data?.error||'無權讀取人資職稱設定'));
     const list=hiddenFromConfig(data.config);
     if(endpoint===state.endpoint&&identity===state.identity){
-     state.keys=new Set(list);state.status='ready';state.updated=Date.now();state.revision++;
+     const changedTitles=!hadVerifiedSnapshot||state.keys.size!==list.length||list.some(item=>!state.keys.has(item));
+     state.keys=new Set(list);state.status='ready';state.updated=Date.now();
+     if(changedTitles)state.revision++;
     }
     return true;
    }catch(error){

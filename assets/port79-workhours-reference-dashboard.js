@@ -14,7 +14,17 @@
  // The authoritative attendance source is getAttendanceMonthRaw, reused through
  // the application's original validated month loader. Never sum local preview
  // records and claim a full payroll month was fetched.
- const rawCloud={month:'',token:'',revision:'',rows:null,readAt:0,attemptAt:0,inflight:null,error:''};
+ const rawCloud={month:'',token:'',revision:'',rows:null,fingerprint:'',readAt:0,attemptAt:0,inflight:null,error:''};
+ // The response timestamp/order must not cause a new dashboard paint.
+ function recordFingerprint(rows){
+  let sum=0,xor=0,length=0;
+  for(const row of rows){
+   const raw=JSON.stringify(row);let hash=2166136261;
+   for(let i=0;i<raw.length;i++)hash=Math.imul(hash^raw.charCodeAt(i),16777619)>>>0;
+   sum=(sum+hash)>>>0;xor=(xor^hash)>>>0;length+=raw.length;
+  }
+  return rows.length+':'+length+':'+sum+':'+xor;
+ }
  function verifiedAttendance(month){
   if(typeof currentPort79SsoToken!=='function'||typeof p79ReadWorkRestMonth!=='function'||
      typeof p79WorkRestMonths!=='function'||typeof mergeAttendanceRecordCollections!=='function')return null;
@@ -26,7 +36,7 @@
     typeof lastAttendanceCloudRevision==='undefined'?'':lastAttendanceCloudRevision,
     window.sessionStorage?.getItem?.('port79_cache_mutated_at')||'']);
   if(rawCloud.month!==month||rawCloud.token!==token||rawCloud.revision!==revision){
-    rawCloud.month=month;rawCloud.token=token;rawCloud.revision=revision;rawCloud.rows=null;
+    rawCloud.month=month;rawCloud.token=token;rawCloud.revision=revision;rawCloud.rows=null;rawCloud.fingerprint='';
     rawCloud.readAt=0;rawCloud.attemptAt=0;rawCloud.inflight=null;rawCloud.error='';
   }
   if(Array.isArray(rawCloud.rows)&&Date.now()-rawCloud.readAt<300000)return rawCloud.rows;
@@ -34,27 +44,32 @@
   // months; reusing them avoids three redundant GAS reads.
   const cached=window.P79WorkhoursCache?.verifiedRawMonths?.(month,token);
   if(Array.isArray(cached)&&cached.length&&cached.every(x=>Array.isArray(x.records))){
-   rawCloud.rows=cached.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
+   const rows=cached.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
+   rawCloud.rows=rows;rawCloud.fingerprint=recordFingerprint(rows);
    rawCloud.readAt=Date.now();rawCloud.error='';return rawCloud.rows;
   }
-  if(rawCloud.inflight||Date.now()-rawCloud.attemptAt<15000)return null;
-  rawCloud.rows=null;rawCloud.attemptAt=Date.now();
+  if(rawCloud.inflight||Date.now()-rawCloud.attemptAt<15000)return rawCloud.rows;
+  // Keep confirmed rows visible while refreshing the same official revision.
+  rawCloud.attemptAt=Date.now();
   const requestedMonth=month,requestedToken=token,requestedRevision=revision;
   const pending=Promise.all(p79WorkRestMonths(month).map(m=>p79ReadWorkRestMonth(m,token)));
   rawCloud.inflight=pending;
   void pending.then(batches=>{
     if(currentPort79SsoToken()!==requestedToken||rawCloud.month!==requestedMonth||rawCloud.token!==requestedToken||rawCloud.revision!==requestedRevision)return;
     if(batches.some(x=>!Array.isArray(x?.records)))throw Error('正式原始打卡月份資料缺失');
-    rawCloud.rows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
+    const rows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
+    const fingerprint=recordFingerprint(rows),changed=fingerprint!==rawCloud.fingerprint||!!rawCloud.error;
+    rawCloud.rows=rows;rawCloud.fingerprint=fingerprint;
     rawCloud.readAt=Date.now();rawCloud.error='';
+    if(changed)refresh();
   }).catch(err=>{
     if(rawCloud.month!==requestedMonth||rawCloud.token!==requestedToken||rawCloud.revision!==requestedRevision)return;
-    rawCloud.rows=null;rawCloud.error=String(err?.message||err);
+    const message=String(err?.message||err);
+    if(message!==rawCloud.error){rawCloud.error=message;if(!Array.isArray(rawCloud.rows))refresh();}
   }).finally(()=>{
     if(rawCloud.inflight===pending)rawCloud.inflight=null;
-    refresh();
   });
-  return null;
+  return rawCloud.rows;
  }
  const job=e=>String(e?.jobTitle||e?.deptDetail||'未設定職稱').trim();
  const empId=e=>String(e?.empId||'').trim().toUpperCase();
@@ -314,10 +329,11 @@
   const official=typeof p79WorkOvertimeMonths!=='undefined'?p79WorkOvertimeMonths.get(month):null;
   return JSON.stringify([typeof currentPort79SsoToken==='function'?currentPort79SsoToken():'',
    id('prStart')?.value||'',id('prEnd')?.value||'',official?.revision||'',
-   official?.appliedCacheBundle||'',official?.pending||false,official?.at||0,
+   official?.appliedCacheBundle||'',official?.pending||false,
    typeof lastAttendanceCloudRevision==='undefined'?'':lastAttendanceCloudRevision,
    window.sessionStorage?.getItem?.('port79_cache_mutated_at')||'',
-   window.Port79JobTitleVisibility?.status?.()||'',rawCloud.readAt,rawCloud.error]);
+   window.Port79JobTitleVisibility?.status?.()||'',window.Port79JobTitleVisibility?.revision?.()||0,
+    rawCloud.fingerprint,rawCloud.error]);
  }
  let lastAutoSignature='';
  function refreshOnChange(){
@@ -353,7 +369,7 @@
    state.page=1;refresh()
   });
   id('viewAdmin').classList.add('p79-ref-active');
-  refresh();
+  refresh();lastAutoSignature=autoSignature();
  }
  function init(){
   let attempts=0;
