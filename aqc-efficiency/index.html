@@ -1675,7 +1675,7 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
           <span class="p79pr-lead">人員作業量｜A・B・C・D 組別｜效率排名</span>
           <div class="p79pr-toolbar-right">
             <details id="weeklyDateRangePicker">
-              <summary title="選擇作業日期區間"><span id="weeklyDateRangeSummary">全部日期</span><span aria-hidden="true">▼</span></summary>
+              <summary title="選擇作業日期區間"><span id="weeklyDateRangeSummary">整月（未選日期）</span><span aria-hidden="true">▼</span></summary>
               <div class="p79pr-calendar-pop">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div><label for="weeklyStart" class="text-xs font-bold">開始日期</label><input id="weeklyStart" type="date" onchange="applyWeeklyDateRange()" class="block w-full border rounded-xl px-3 py-2"></div>
@@ -1685,15 +1685,16 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
                   <button type="button" class="btn bg-slate-100 text-xs" onclick="shiftPersonnelWeek(-1)">上一周</button>
                   <button type="button" class="btn bg-slate-100 text-xs" onclick="setCurrentWeek()">本周（日～六）</button>
                   <button type="button" class="btn bg-slate-100 text-xs" onclick="shiftPersonnelWeek(1)">下一周</button>
-                  <button type="button" class="btn bg-slate-100 text-xs" onclick="clearWeeklyRange()">全部日期</button>
+                  <button type="button" class="btn bg-slate-100 text-xs" onclick="clearWeeklyRange()">顯示整月</button>
                   <button type="button" class="p79pr-action" onclick="applyWeeklyDateRange(true,true)">套用</button>
                 </div>
               </div>
             </details>
-            <div class="flex items-center gap-1"><label for="weeklyMonthFilter" class="text-xs font-bold text-slate-600">月份</label><select id="weeklyMonthFilter" class="p79pr-select" aria-label="人員統計月份" title="選擇月份後自動更新統計" onchange="setPersonnelStatisticsMonth(this.value)"><option value="">選取月份</option></select></div>
+            <div class="flex items-center gap-1"><label for="weeklyMonthFilter" class="text-xs font-bold text-slate-600">月份</label><select id="weeklyMonthFilter" class="p79pr-select" aria-label="人員統計月份" title="選擇月份後自動更新統計" onchange="setPersonnelStatisticsMonth(this.value)"><option value="">載入月份中</option></select></div>
             <select id="weeklyGroupFilter" class="p79pr-select" aria-label="組別" onchange="renderWeeklyEfficiency()"><option value="">全部組別</option></select>
             <select id="personStatPerson" class="p79pr-select" aria-label="姓名" onchange="renderWeeklyEfficiency()"><option value="">全部人員</option></select>
             <button type="button" class="p79pr-action" onclick="renderWeeklyEfficiency()">↻ 更新統計</button>
+            <button type="button" id="p79prExportExcel" class="p79pr-action" onclick="exportPersonnelStatisticsExcel()">⬇ 匯出 Excel</button>
           </div>
         </div>
         <div class="p79pr-filter-status"><span id="weeklyScheduleGroupState" role="status"></span><span id="p79prFreshness" role="status" aria-live="polite"></span><button type="button" class="text-sky-700 underline" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
@@ -4548,72 +4549,73 @@ function personnelStatisticsMonthRange(month){
 function syncPersonnelStatisticsMonthFilter(){
   const select=document.getElementById('weeklyMonthFilter');
   if(!select||select.tagName!=='SELECT')return;
-  const from=document.getElementById('weeklyStart'),to=document.getElementById('weeklyEnd');
-  if(!from||!to)return;
   const year=getPort79Year();
-  const previousYear=String(select.dataset.p79Year||'');
-  const previousMonth=String(select.value||'');
-  if(previousYear!==year){
-    // The existing system-wide year selector also controls the personnel month.
-    if(previousYear){
-      const moved=personnelStatisticsMonthRange(previousMonth)
-        ?personnelStatisticsMonthRange(year+previousMonth.slice(4)):null;
-      from.value=moved?moved.start:'';
-      to.value=moved?moved.end:'';
-      globalThis.Port79CalendarRange?.syncAll();
-    }
-    select.innerHTML='<option value="">全部月份／自訂日期</option>'+
-      Array.from({length:12},(_,i)=>{
-        const month=year+'-'+String(i+1).padStart(2,'0');
-        return '<option value="'+month+'">'+year+'年'+(i+1)+'月</option>';
-      }).join('');
+  const oldYear=String(select.dataset.p79Year||'');
+  const oldMonth=String(select.dataset.p79ActiveMonth||select.value||'');
+  const today=isoTodayLocal().slice(0,7);
+  const fallback=year+'-'+(oldMonth&&oldYear?oldMonth.slice(5,7):today.slice(5,7));
+  if(oldYear!==year){
+    select.innerHTML=Array.from({length:12},(_,i)=>{
+      const month=year+'-'+String(i+1).padStart(2,'0');
+      return '<option value="'+month+'">'+year+'年'+(i+1)+'月</option>';
+    }).join('');
+    select.value=fallback;
     select.dataset.p79Year=year;
-  }
-  if(select.dataset.p79Initialized!=='1'){
-    select.dataset.p79Initialized='1';
-    if(!from.value&&!to.value){
-      const current=personnelStatisticsMonthRange(year+'-'+isoTodayLocal().slice(5,7));
-      from.value=current.start;to.value=current.end;
+    if(oldYear){
+      const from=document.getElementById('weeklyStart'),to=document.getElementById('weeklyEnd');
+      if(from)from.value='';
+      if(to)to.value='';
       globalThis.Port79CalendarRange?.syncAll();
     }
   }
-  const range=personnelStatisticsMonthRange(String(from.value||'').slice(0,7));
-  const selected=range&&from.value===range.start&&to.value===range.end
-    &&range.start.startsWith(year+'-')?range.start.slice(0,7):'';
-  if(select.value!==selected)select.value=selected;
+  if(!select.dataset.p79Initialized){
+    select.dataset.p79Initialized='1';
+    select.value=year+'-'+today.slice(5,7);
+  }
+  if(!personnelStatisticsMonthRange(select.value))select.value=year+'-'+today.slice(5,7);
+  select.dataset.p79ActiveMonth=select.value;
+}
+function personnelStatisticsPeriod(){
+  const month=document.getElementById('weeklyMonthFilter')?.value||'';
+  const range=personnelStatisticsMonthRange(month);
+  const from=document.getElementById('weeklyStart')?.value||'';
+  const to=document.getElementById('weeklyEnd')?.value||'';
+  const year=getPort79Year();
+  const fallback=range||personnelStatisticsMonthRange(year+'-'+isoTodayLocal().slice(5,7));
+  // An explicitly selected calendar date overrides the month; otherwise the whole selected month is shown.
+  return {month:range?month:year+'-'+isoTodayLocal().slice(5,7),
+    start:from||(!to?fallback.start:fallback.start),
+    end:to||(!from?fallback.end:fallback.end),
+    custom:!!(from||to)};
 }
 function setPersonnelStatisticsMonth(month){
   const chosen=String(month||'').trim(),year=getPort79Year();
   const range=personnelStatisticsMonthRange(chosen);
-  if(chosen&&(!range||!chosen.startsWith(year+'-')))return;
+  if(!range||!chosen.startsWith(year+'-'))return;
+  const select=document.getElementById('weeklyMonthFilter');
+  const previous=select?.dataset.p79ActiveMonth||'';
   const from=document.getElementById('weeklyStart'),to=document.getElementById('weeklyEnd');
-  if(!from||!to)return;
-  const nextStart=range?range.start:'',nextEnd=range?range.end:'';
-  const changed=from.value!==nextStart||to.value!==nextEnd;
-  from.value=nextStart;to.value=nextEnd;
-  syncPersonnelStatisticsMonthFilter();
+  const changed=previous!==chosen||!!from?.value||!!to?.value;
+  if(select){select.value=chosen;select.dataset.p79ActiveMonth=chosen;}
+  if(from)from.value='';
+  if(to)to.value='';
   updateWeeklyDateRangeSummary();
   globalThis.Port79CalendarRange?.syncAll();
   document.getElementById('weeklyDateRangePicker')?.removeAttribute('open');
-  if(range){
-    const ranking=document.getElementById('rankingMonth');
-    if(ranking)ranking.value=chosen;
-  }
+  const ranking=document.getElementById('rankingMonth');
+  if(ranking)ranking.value=chosen;
   renderWeeklyEfficiency();
-  if(range&&typeof renderMonthlyRanking==='function')renderMonthlyRanking();
-  // Existing local data renders immediately; fetch selected official month/year
-  // in parallel so older months missing from local storage are not silently omitted.
+  if(typeof renderMonthlyRanking==='function')renderMonthlyRanking();
   if(changed&&String(gcToken||'')&&typeof loadEfficiencyCloudScope==='function'){
-    Promise.resolve(loadEfficiencyCloudScope(range?{month:chosen}:{year},false))
+    Promise.resolve(loadEfficiencyCloudScope({month:chosen},false))
       .catch(error=>console.warn('人員統計月份資料讀取失敗',error));
   }
 }
-
 function updateWeeklyDateRangeSummary(){
   const from=document.getElementById('weeklyStart')?.value||'';
   const to=document.getElementById('weeklyEnd')?.value||'';
   const el=document.getElementById('weeklyDateRangeSummary');
-  if(el)el.textContent=from&&to?`${friendlyDateLabel(from)} ～ ${friendlyDateLabel(to)}`:(from?`${friendlyDateLabel(from)} 起`:(to?`至 ${friendlyDateLabel(to)}`:'全部日期'));
+  if(el)el.textContent=from&&to?`${friendlyDateLabel(from)} ～ ${friendlyDateLabel(to)}`:(from?`${friendlyDateLabel(from)} 起`:(to?`至 ${friendlyDateLabel(to)}`:'整月（未選日期）'));
 }
 function applyRecordDateRange(render=true,closePicker=false){
   const fromEl=document.getElementById('recordDateFrom');
@@ -7598,7 +7600,11 @@ function weeklyFilteredRecords(baseOnly=false){
       if(pid&&!workloadRecordMatchesPerson(r,pid))return false;
       if(group&&operationGroupForRecord(r)!==group)return false;
     }
-    if(!start&&!end&&year&&!d.startsWith(year))return false;
+    if(!start&&!end){
+      const month=document.getElementById('weeklyMonthFilter')?.value||'';
+      if(typeof personnelStatisticsMonthRange==='function'&&personnelStatisticsMonthRange(month)){if(!d.startsWith(month))return false;}
+      else if(year&&!d.startsWith(year))return false;
+    }
     if(start&&d<start)return false;
     if(end&&d>end)return false;
     return true;
@@ -7827,6 +7833,102 @@ function p79EnsureFreshOfficialAqcRoster(){
   })();
 }
 
+// Export exactly the rows and verified names used by the visible personnel dashboard.
+function buildPersonnelStatisticsExcelData(){
+  const period=typeof personnelStatisticsPeriod==='function'?personnelStatisticsPeriod():{month:'',start:'',end:'',custom:false};
+  const rows=weeklyFilteredRecords();
+  const verified=p79VerifiedAqcReportView(rows);
+  const numSafe=value=>Number.isFinite(Number(value))?Number(value):0;
+  const excelText=value=>{
+    const s=String(value??'').trim();
+    return /^[=+@\t\r]/.test(s)?'\u0027'+s:s;
+  };
+  const totals={hours:0,disc:0,load:0,hc:0};
+  const byDay=new Map();
+  rows.forEach(r=>{
+    const m=workloadRecordMetrics(r),date=String(r.workDate||'').slice(0,10);
+    for(const key of Object.keys(totals))totals[key]+=numSafe(m[key]);
+    if(!byDay.has(date))byDay.set(date,{date,count:0,hours:0,disc:0,load:0,hc:0});
+    const day=byDay.get(date);day.count++;
+    for(const key of Object.keys(totals))day[key]+=numSafe(m[key]);
+  });
+  const containers=totals.disc+totals.load;
+  const eff=totals.hours>0?(containers+totals.hc)/totals.hours:null;
+  const persons=verified.verified?rankedPersonnelEfficiencyPersons(verified.persons):[];
+  const selectedGroup=document.getElementById('weeklyGroupFilter')?.value||'';
+  const selectedPerson=document.getElementById('personStatPerson');
+  const personLabel=selectedPerson?.selectedOptions?.[0]?.textContent||selectedPerson?.value||'全部人員';
+  const summary=[
+    ['人員統計 Excel 報表',''],['選取月份',period.month],
+    ['資料日期',period.start+' ～ '+period.end],['查詢方式',period.custom?'指定日期／區間':'整月（未選日期）'],
+    ['組別',excelText(selectedGroup||'全部組別')],['人員',excelText(personLabel)],
+    ['來源','WORKING REPORT（目前畫面已載入資料）'],
+    ['正式名冊',verified.verified?'已核對':'待核對（不匯出未確認的人員排行）'],
+    [],['統計指標','數值'],
+    ['作業人數',verified.verified?persons.length:'待核對'],
+    ['作業筆數',rows.length],['總作業時數',Number(totals.hours.toFixed(2))],
+    ['卸櫃 DISC',totals.disc],['裝櫃 LOAD',totals.load],['H/C',totals.hc],
+    ['作業櫃數',containers],['整體效率',eff===null?'—':Number(eff.toFixed(2))]
+  ];
+  const ranking=[['名次','工號','姓名','排班組別','作業筆數','作業時數','DISC','LOAD','H/C','櫃數','效率']];
+  persons.forEach(p=>ranking.push([p.effRank??'—',excelText(p.empId||''),excelText(displayPersonName(p.name)),excelText(p.group||'待核對'),
+    p.rows?.length||0,Number(numSafe(p.hours).toFixed(2)),numSafe(p.disc),numSafe(p.load),numSafe(p.hc),numSafe(p.containers),
+    p.hours>0?Number(numSafe(p.eff).toFixed(2)):'—']));
+  if(!verified.verified)ranking.push(['名冊未核對，暫不顯示未確認人員']);
+  const days=[['日期','作業筆數','作業時數','DISC','LOAD','H/C','作業櫃數','效率']];
+  const validBounds=/^\d{4}-\d{2}-\d{2}$/.test(period.start)&&/^\d{4}-\d{2}-\d{2}$/.test(period.end)&&period.start<=period.end;
+  if(validBounds){
+    const day=new Date(period.start+'T00:00:00Z'),last=new Date(period.end+'T00:00:00Z');
+    for(let count=0;day<=last&&count<370;count++,day.setUTCDate(day.getUTCDate()+1)){
+      const date=day.toISOString().slice(0,10),r=byDay.get(date)||{count:0,hours:0,disc:0,load:0,hc:0};
+      days.push([date,r.count,Number(r.hours.toFixed(2)),r.disc,r.load,r.hc,r.disc+r.load,
+        r.hours>0?Number(((r.disc+r.load+r.hc)/r.hours).toFixed(2)):'—']);
+    }
+  }else{
+    [...byDay.values()].sort((a,b)=>a.date.localeCompare(b.date)).forEach(r=>
+      days.push([r.date,r.count,Number(r.hours.toFixed(2)),r.disc,r.load,r.hc,r.disc+r.load,r.hours>0?Number(((r.disc+r.load+r.hc)/r.hours).toFixed(2)):'—']));
+  }
+  const detail=[['日期','工號','姓名','組別','WORKING NO.','船舶','AQC','開始','結束','作業時數','DISC','LOAD','H/C','櫃數','效率']];
+  [...rows].sort(compareWorkingReportChronology).forEach(r=>{
+    const m=workloadRecordMetrics(r);
+    detail.push([String(r.workDate||'').slice(0,10),excelText(r.empId||''),excelText(displayPersonName(r.name)),excelText(operationGroupForRecord(r)),
+      excelText(r.workingNo||''),excelText(vesselLabelForRecord(r)),excelText(normalizeAqcNo(r.number||r.gcNo)),
+      excelText(r.startTime||''),excelText(r.endTime||''),Number(numSafe(m.hours).toFixed(2)),
+      numSafe(m.disc),numSafe(m.load),numSafe(m.hc),numSafe(m.containers),m.hours>0?Number(numSafe(m.eff).toFixed(2)):'—']);
+  });
+  return {period,rowsCount:rows.length,summary,ranking,days,detail};
+}
+async function exportPersonnelStatisticsExcel(){
+  if(typeof requireEfficiencyAccess==='function'&&!requireEfficiencyAccess())return;
+  const button=document.getElementById('p79prExportExcel');
+  if(button?.disabled)return;
+  if(button){button.disabled=true;button.textContent='匯出中…';}
+  try{
+    if(typeof window.p79EnsureXlsx==='function')await window.p79EnsureXlsx();
+    if(typeof XLSX==='undefined'||!XLSX.utils?.book_new||!XLSX.writeFile)throw Error('Excel 匯出元件未載入');
+    const report=buildPersonnelStatisticsExcelData(),book=XLSX.utils.book_new();
+    for(const [name,data,widths] of [
+      ['統計摘要',report.summary,[31,49]],
+      ['人員效率排行',report.ranking,[11,17,24,16,14,14,12,12,12,14,12]],
+      ['每日作業統計',report.days,[18,13,15,13,13,13,14,12]],
+      ['作業明細',report.detail,[16,16,24,14,19,29,13,13,13,15,13,13,12,13,12]]
+    ]){
+      const sheet=XLSX.utils.aoa_to_sheet(data);
+      sheet['!cols']=widths.map(w=>({wch:w}));
+      if(data.length>1&&name!=='統計摘要')sheet['!autofilter']={ref:'A1:'+XLSX.utils.encode_cell({r:data.length-1,c:widths.length-1})};
+      XLSX.utils.book_append_sheet(book,sheet,name);
+    }
+    const dates=report.period.custom?report.period.start+'_'+report.period.end:report.period.month;
+    XLSX.writeFile(book,'人員統計_'+dates+'.xlsx');
+    if(typeof toast==='function')toast('已匯出 Excel：'+report.rowsCount+' 筆作業紀錄');
+  }catch(error){
+    console.error('人員統計 Excel 匯出失敗',error);
+    if(typeof toast==='function')toast(error?.message||'人員統計 Excel 匯出失敗');
+  }finally{
+    if(button){button.disabled=false;button.textContent='⬇ 匯出 Excel';}
+  }
+}
+
 function renderWeeklyEfficiency(){
   if(typeof syncPersonnelStatisticsMonthFilter==='function')syncPersonnelStatisticsMonthFilter();
   if(typeof p79EnsureFreshOfficialAqcRoster==='function')p79EnsureFreshOfficialAqcRoster();
@@ -7988,7 +8090,7 @@ function renderWeeklyEfficiency(){
   renderPersonnelRecords(rs);
   if(typeof p79VerifiedAqcReportView==='function'&&typeof window!=='undefined'){
     const hrView=p79VerifiedAqcReportView(rs);
-    window.P79PersonnelReference?.render({rows:hrView.rows,sourceRows:rs,persons:rankedPersonnelEfficiencyPersons(hrView.persons),metrics:workloadRecordMetrics,groupCode:personnelGroupCode,rosterVerified:hrView.verified,rosterSource:hrView.source||'hr',rosterCount:hrView.rosterCount,excludedRows:hrView.excluded});
+    window.P79PersonnelReference?.render({rows:hrView.rows,sourceRows:rs,persons:rankedPersonnelEfficiencyPersons(hrView.persons),metrics:workloadRecordMetrics,groupCode:personnelGroupCode,period:typeof personnelStatisticsPeriod==='function'?personnelStatisticsPeriod():null,rosterVerified:hrView.verified,rosterSource:hrView.source||'hr',rosterCount:hrView.rosterCount,excludedRows:hrView.excluded});
   }
 }
 
@@ -16551,7 +16653,7 @@ document.addEventListener("DOMContentLoaded",()=>{
 const C=window.Port79CalendarRange;if(!C)return;
 C.mountRange({hostId:'dashboardDateRangePicker',startId:'dashboardStartDate',endId:'dashboardEndDate',allowClear:true,emptyText:'全部日期',onChange:()=>applyDashboardDateRange()});
 C.mountRange({hostId:'recordDateRangePicker',startId:'recordDateFrom',endId:'recordDateTo',compatSummaryId:'recordDateRangeSummary',allowClear:true,emptyText:'全部日期'});
-C.mountRange({hostId:'weeklyDateRangePicker',startId:'weeklyStart',endId:'weeklyEnd',compatSummaryId:'weeklyDateRangeSummary',allowClear:true,emptyText:'全部日期'});
+C.mountRange({hostId:'weeklyDateRangePicker',startId:'weeklyStart',endId:'weeklyEnd',compatSummaryId:'weeklyDateRangeSummary',allowClear:true,emptyText:'整月（未選日期）'});
 C.mountRange({startId:'shipEditFirstDate',endId:'shipEditLastDate',label:'作業日期',allowClear:false});
 ['vdDate','rDate'].forEach(id=>C.mountSingle({inputId:id}));
 
@@ -16759,7 +16861,7 @@ window.addEventListener('load',function(){
 #p79GateImportDialogStatus[data-kind="success"]{color:#047857}
 .p79-gate-dialog-actions{display:flex;justify-content:flex-end}
 </style>
-<script src="./personnel-reference-dashboard.js?v=20261117-schedule-roster-v3"></script>
+<script src="./personnel-reference-dashboard.js?v=20261117-schedule-roster-v3&dates=20261118-full-month-v2"></script>
 <script src="../assets/port79-gate-dialog.js?v=20261110-parent-dialog-v6"></script>
 <link rel="stylesheet" href="./driver-workstation-dashboard.css?v=20261117-trend-v3">
 <script src="./driver-workstation-dashboard.js?v=20261117-trend-v3"></script>

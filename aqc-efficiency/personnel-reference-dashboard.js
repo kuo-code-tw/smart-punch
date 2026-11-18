@@ -48,28 +48,43 @@
     const warning=document.getElementById('p79prGroupWarning');
     if(warning){warning.hidden=!extra.length;warning.textContent=extra.length?'組別待核對：'+extra.length+' 人尚未能對應正式 A／B／C／D 排班組別，仍納入上方總數與作業明細。':'';}
   }
-  function renderTrend(rows,metric){
+  function renderTrend(rows,metric,period){
     const host=document.getElementById('p79prDailyChart');if(!host)return;
     const days=new Map();
-    rows.forEach(r=>{const day=String(r.workDate||'').slice(0,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return;
+    rows.forEach(r=>{
+      const day=String(r.workDate||'').slice(0,10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return;
       const v=metric(r);if(!days.has(day))days.set(day,{day,containers:0,hc:0,hours:0});
       const d=days.get(day);d.containers+=n(v.containers);d.hc+=n(v.hc);d.hours+=n(v.hours);
     });
-    const sorted=[...days.values()].sort((a,b)=>a.day.localeCompare(b.day));
-    const data=sorted.slice(-12).map(x=>({...x,eff:x.hours>0?(x.containers+x.hc)/x.hours:0}));
-    if(!data.length){host.innerHTML='<div class="p79pr-chart" style="text-align:center;color:#8aa0b7;padding:70px 12px">此日期區間尚無 WORKING REPORT 作業資料</div>';return;}
+    if(!rows.length){host.innerHTML='<div class="p79pr-chart" style="text-align:center;color:#8aa0b7;padding:70px 12px">此日期區間尚無 WORKING REPORT 作業資料</div>';return;}
+    let sorted=[...days.values()].sort((a,b)=>a.day.localeCompare(b.day));
+    const start=String(period?.start||''),end=String(period?.end||'');
+    if(/^\d{4}-\d{2}-\d{2}$/.test(start)&&/^\d{4}-\d{2}-\d{2}$/.test(end)&&start<=end){
+      const cursor=new Date(start+'T00:00:00Z'),last=new Date(end+'T00:00:00Z');
+      const full=[];
+      for(let count=0;cursor<=last&&count<370;count++,cursor.setUTCDate(cursor.getUTCDate()+1)){
+        const day=cursor.toISOString().slice(0,10);
+        full.push(days.get(day)||{day,containers:0,hc:0,hours:0});
+      }
+      if(cursor>last)sorted=full;
+    }
+    const data=sorted.map(x=>({...x,eff:x.hours>0?(x.containers+x.hc)/x.hours:0}));
+    if(!data.length)return;
     const W=520,H=205,L=37,R=12,T=19,B=28,w=W-L-R,h=H-T-B;
-    const maxC=Math.max(1,...data.map(d=>d.containers)),maxE=Math.max(1,...data.map(d=>d.eff)),step=w/data.length,barW=Math.min(27,step*.55);
+    const maxC=Math.max(1,...data.map(d=>d.containers)),maxE=Math.max(1,...data.map(d=>d.eff)),step=w/data.length,barW=Math.max(1.5,Math.min(27,step*.58));
     let svg='<svg viewBox="0 0 '+W+' '+H+'" aria-label="每日櫃數與人員效率趨勢" role="img">';
-    for(let j=0;j<=4;j++){const yy=T+h*j/4;svg+='<line x1="'+L+'" y1="'+yy+'" x2="'+(W-R)+'" y2="'+yy+'" stroke="#e5edf7"/><text x="'+(L-6)+'" y="'+(yy+3)+'" fill="#8496ae" font-size="10" text-anchor="end">'+fmt.format(Math.round(maxC*(1-j/4)))+'</text>';}
-    const points=[];
-    data.forEach((d,i)=>{const x=L+(i+.5)*step,barH=d.containers/maxC*h;const y=T+h-d.eff/maxE*h;
-      svg+='<rect x="'+(x-barW/2).toFixed(1)+'" y="'+(T+h-barH).toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+Math.max(0,barH).toFixed(1)+'" rx="3" fill="#86bceb"><title>'+safe(d.day)+'：'+d.containers+' 櫃</title></rect>';
-      svg+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" fill="#72859c" text-anchor="middle" font-size="'+(data.length>9?9:10)+'">'+safe(d.day.slice(5).replace('-','/'))+'</text>';
+    for(let k=0;k<=4;k++){const yy=T+h*k/4;svg+='<line x1="'+L+'" y1="'+yy+'" x2="'+(W-R)+'" y2="'+yy+'" stroke="#e5edf7"/><text x="'+(L-6)+'" y="'+(yy+3)+'" fill="#8496ae" font-size="10" text-anchor="end">'+fmt.format(Math.round(maxC*(1-k/4)))+'</text>';}
+    const points=[],labelStep=Math.max(1,Math.ceil(data.length/9));
+    data.forEach((d,i)=>{
+      const x=L+(i+.5)*step,barH=d.containers/maxC*h,y=T+h-d.eff/maxE*h;
+      svg+='<rect x="'+(x-barW/2).toFixed(1)+'" y="'+(T+h-barH).toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+Math.max(0,barH).toFixed(1)+'" rx="2" fill="#86bceb"><title>'+safe(d.day)+'：'+d.containers+' 櫃</title></rect>';
+      if(i%labelStep===0||i===data.length-1)
+        svg+='<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" fill="#72859c" text-anchor="middle" font-size="9">'+safe(d.day.slice(5).replace('-','/'))+'</text>';
       points.push({x,y,eff:d.eff,day:d.day});
     });
     svg+='<polyline points="'+points.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join(' ')+'" fill="none" stroke="#13a36d" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
-    points.forEach(p=>{svg+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="3.3" fill="#12a16a" stroke="#fff" stroke-width="1.2"><title>'+safe(p.day)+'：效率 '+f(p.eff)+'</title></circle>';});
+    points.forEach(p=>{svg+='<circle cx="'+p.x.toFixed(1)+'" cy="'+p.y.toFixed(1)+'" r="2.6" fill="#12a16a" stroke="#fff" stroke-width=".8"><title>'+safe(p.day)+'：效率 '+f(p.eff)+'</title></circle>';});
     host.innerHTML='<div class="p79pr-legend"><span><i></i>作業櫃數</span><span><i class="line"></i>效率（含 H/C）</span></div><div class="p79pr-chart">'+svg+'</svg></div>';
   }
   function renderCompare(persons,groupCode){
@@ -87,7 +102,7 @@
     const list=rank(persons).filter(p=>p.refRank!==null&&p.refRank<=5);
     body.innerHTML=list.length?list.map(p=>'<tr><td><span class="p79pr-rank '+(p.refRank===1?'gold':'')+'">'+p.refRank+'</span></td><td>'+safe(p.name)+'</td><td>'+safe(groupCode(p.group)||'待核')+'</td><td>'+fmt.format(p.containers)+'</td><td>'+f(p.eff)+'</td></tr>').join(''):'<tr><td colspan="5">沒有具有效時數的排名資料</td></tr>';
   }
-  function render({rows,sourceRows,persons,metrics,groupCode,rosterVerified=false,rosterSource='hr',rosterCount=0,excludedRows=0}={}){
+  function render({rows,sourceRows,persons,metrics,groupCode,period,rosterVerified=false,rosterSource='hr',rosterCount=0,excludedRows=0}={}){
     if(!document.getElementById('p79prGroups'))return;
     const fresh=document.getElementById('p79prFreshness');
     const original=Array.isArray(sourceRows)?sourceRows:Array.isArray(rows)?rows:[];
@@ -104,7 +119,7 @@
     put('p79prHC',fmt.format(total.hc));
     put('p79prContainers',fmt.format(containers));
     put('p79prEff',eff===null?'—':f(eff));
-    renderTrend(original,metric);
+    renderTrend(original,metric,period);
     if(!rosterVerified){
       const groups=document.getElementById('p79prGroups');
       if(groups)groups.innerHTML='<div class="p79pr-group-alert" role="status">歷史 WORKING REPORT 作業量已正常顯示。正在核對當月正式排班 AQC 編組與在職人員，暫不顯示未經確認的名單。</div>';
