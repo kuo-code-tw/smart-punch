@@ -10,6 +10,7 @@ on:
       - 'tests/personnel-statistics.cjs'
       - 'tests/personnel-month-selection.cjs'
       - 'tests/personnel-trend-and-excel.cjs'
+      - 'tests/personnel-selection-isolation.cjs'
       - 'tests/monthly-personnel-ranking.cjs'
       - 'tests/aqc-schedule-read.cjs'
       - 'tests/aqc-schedule-group-inheritance-integration.cjs'
@@ -46,4 +47,5 @@ jobs:
           node tests/personnel-statistics.cjs
           node tests/personnel-month-selection.cjs
           node tests/personnel-trend-and-excel.cjs
+          node tests/personnel-selection-isolation.cjs
           node tests/monthly-personnel-ranking.cjs

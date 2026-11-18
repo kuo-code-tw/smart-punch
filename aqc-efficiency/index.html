@@ -1691,9 +1691,9 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
               </div>
             </details>
             <div class="flex items-center gap-1"><label for="weeklyMonthFilter" class="text-xs font-bold text-slate-600">月份</label><select id="weeklyMonthFilter" class="p79pr-select" aria-label="人員統計月份" title="選擇月份後自動更新統計" onchange="setPersonnelStatisticsMonth(this.value)"><option value="">載入月份中</option></select></div>
-            <select id="weeklyGroupFilter" class="p79pr-select" aria-label="組別" onchange="renderWeeklyEfficiency()"><option value="">全部組別</option></select>
-            <select id="personStatPerson" class="p79pr-select" aria-label="姓名" onchange="renderWeeklyEfficiency()"><option value="">全部人員</option></select>
-            <button type="button" class="p79pr-action" onclick="renderWeeklyEfficiency()">↻ 更新統計</button>
+            <select id="weeklyGroupFilter" class="p79pr-select" aria-label="組別" onchange="renderPersonnelAndRanking()"><option value="">全部組別</option></select>
+            <select id="personStatPerson" class="p79pr-select" aria-label="姓名" onchange="renderPersonnelAndRanking()"><option value="">全部人員</option></select>
+            <button type="button" class="p79pr-action" onclick="renderPersonnelAndRanking()">↻ 更新統計</button>
             <button type="button" id="p79prExportExcel" class="p79pr-action" onclick="exportPersonnelStatisticsExcel()">⬇ 匯出 Excel</button>
           </div>
         </div>
@@ -1908,17 +1908,17 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
 
 <section id="view-ranking" class="hidden space-y-4">
 
-  <div class="p79-section" data-section-key="ranking-filters"><div><span>🏆 每月人員績效排行</span></div>
-    <div class="card p-4"><p class="text-sm text-slate-500 mb-3">依作業日期統計每位人員整月資料。效率＝（DISC＋LOAD＋H/C）÷ 作業時數；同分並列名次。沒有作業資料或無有效時數者不列效率名次。排班 AQC 名冊內無作業資料的人員也會列出。</p>
+  <div class="p79-section" data-section-key="ranking-filters"><div><span>🏆 所選日期人員績效排行</span></div>
+    <div class="card p-4"><p class="text-sm text-slate-500 mb-3">依上方選取的月份、日期、組別和姓名統計。未選日期顯示整月；已選日期只顯示該日期（或區間）有作業的人員。效率＝（DISC＋LOAD＋H/C）÷ 作業時數；同分並列。</p>
     <div class="flex flex-wrap items-end gap-3">
-      <div><label class="block text-xs font-bold" for="rankingMonth">月份</label><input id="rankingMonth" type="month" class="border rounded-xl px-3 py-2" onchange="renderMonthlyRanking();loadMonthlyRanking(true)"></div>
+      <div hidden><label class="block text-xs font-bold" for="rankingMonth">月份</label><input id="rankingMonth" type="month" class="border rounded-xl px-3 py-2" onchange="renderMonthlyRanking();loadMonthlyRanking(true)"></div>
       <div><label class="block text-xs font-bold" for="rankingSort">排名依據</label><select id="rankingSort" class="border rounded-xl px-3 py-2" onchange="renderMonthlyRanking()"><option value="eff">效率（含 H/C）</option><option value="containers">作業櫃數</option></select></div>
       <div><label class="block text-xs font-bold" for="rankingGroup">排班組別</label><select id="rankingGroup" class="border rounded-xl px-3 py-2" onchange="renderMonthlyRanking()"><option value="">全部組別</option></select></div>
       <div><label class="block text-xs font-bold" for="rankingName">姓名</label><input id="rankingName" type="search" class="border rounded-xl px-3 py-2" placeholder="搜尋姓名" oninput="renderMonthlyRanking()"></div>
       <button type="button" class="btn bg-sky-600 text-white" onclick="loadMonthlyRanking(true)">讀取整月雲端／歷史資料</button>
     </div><div id="rankingLoadState" class="text-sm mt-3" role="status"></div><div class="flex flex-wrap gap-2 items-center mt-2"><span id="rankingScheduleGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div></div>
   </div>
-  <div class="p79-section" data-section-key="ranking-results"><div><span>全員月度排名</span></div><div class="card p-4 overflow-auto"><div id="rankingCount" class="text-sm mb-3" role="status"></div><table class="tbl w-full min-w-[1300px] text-center"><thead><tr><th>名次</th><th>姓名</th><th>排班組別</th><th>作業船數</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th><th>資料狀態</th></tr></thead><tbody id="rankingBody"></tbody></table></div></div>
+  <div class="p79-section" data-section-key="ranking-results"><div><span>所選日期人員排名</span></div><div class="card p-4 overflow-auto"><div id="rankingCount" class="text-sm mb-3" role="status"></div><table class="tbl w-full min-w-[1300px] text-center"><thead><tr><th>名次</th><th>姓名</th><th>排班組別</th><th>作業船數</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th><th>資料狀態</th></tr></thead><tbody id="rankingBody"></tbody></table></div></div>
 </section>
 
 <dialog id="vesselMonthlyExportDialog" class="p-5">
@@ -4627,6 +4627,10 @@ function applyRecordDateRange(render=true,closePicker=false){
   if(closePicker)document.getElementById('recordDateRangePicker')?.removeAttribute('open');
   if(render)renderVesselDriverView();
 }
+function renderPersonnelAndRanking(){
+  renderWeeklyEfficiency();
+  if(typeof renderMonthlyRanking==='function')renderMonthlyRanking();
+}
 function applyWeeklyDateRange(render=true,closePicker=false){
   const startEl=document.getElementById('weeklyStart');
   const endEl=document.getElementById('weeklyEnd');
@@ -4635,7 +4639,7 @@ function applyWeeklyDateRange(render=true,closePicker=false){
   }
   updateWeeklyDateRangeSummary();
   if(closePicker)document.getElementById('weeklyDateRangePicker')?.removeAttribute('open');
-  if(render)renderWeeklyEfficiency();
+  if(render)renderPersonnelAndRanking();
 }
 
 function clearRecordDetailFilters(render=true){
@@ -7268,15 +7272,17 @@ function populatePersonStatPeople(){
   const sel=document.getElementById('personStatPerson');
   if(!sel)return;
   const prev=sel.value;
+  const prevLabel=sel.selectedOptions?.[0]?.textContent||'';
   const idx=buildWorkloadIndex();
   const {start,end}=workloadDateRange();
   const arr=idx.people.filter(p=>{
     if(!start&&!end)return true;
     return (idx.byPerson.get(p.key)||[]).some(r=>{const d=String(r?.workDate||'').slice(0,10);return d&&(!start||d>=start)&&(!end||d<=end)});
   });
-  sel.innerHTML='<option value="">全部人員</option>'+arr.map(p=>`<option value="${esc(p.key)}">${esc(p.name)}</option>`).join('');
-  if([...sel.options].some(o=>o.value===prev))sel.value=prev;
-  else sel.value='';
+  // Keep the selected person even when a newly picked day has no records.
+  const missing=prev&&!arr.some(p=>p.key===prev)?`<option value="${esc(prev)}">${esc(prevLabel||'所選人員')}（此日期無作業）</option>`:'';
+  sel.innerHTML='<option value="">全部人員</option>'+arr.map(p=>`<option value="${esc(p.key)}">${esc(p.name)}</option>`).join('')+missing;
+  sel.value=prev||'';
 }
 // 舊函式名稱保留相容，實際已不再使用船舶篩選。
 function populatePersonShipFilter(){populatePersonStatPeople();}
@@ -7517,33 +7523,49 @@ async function loadMonthlyRanking(force=false){
   if(activeEfficiencyTabName()==='weekly'){renderWeeklyEfficiency();renderMonthlyRanking();}
 }
 function renderMonthlyRanking(){
-  const input=document.getElementById('rankingMonth'),body=document.getElementById('rankingBody');if(!input||!body||!window.P79PersonnelRanking)return;
-  const year=getPort79Year();if(!input.value)input.value=(document.getElementById('filterMonth')?.value||'').startsWith(year+'-')?document.getElementById('filterMonth').value:year===isoTodayLocal().slice(0,4)?isoTodayLocal().slice(0,7):year+'-01';
-  const month=input.value,sourceRows=monthlyRankingRecords();
+  const input=document.getElementById('rankingMonth'),body=document.getElementById('rankingBody');
+  if(!input||!body||!window.P79PersonnelRanking)return;
+  const year=getPort79Year(),selectedMonth=document.getElementById('weeklyMonthFilter')?.value||'';
+  if(/^\d{4}-(0[1-9]|1[0-2])$/.test(selectedMonth)&&selectedMonth.startsWith(year+'-'))input.value=selectedMonth;
+  if(!input.value)input.value=(document.getElementById('filterMonth')?.value||'').startsWith(year+'-')?document.getElementById('filterMonth').value:year===isoTodayLocal().slice(0,4)?isoTodayLocal().slice(0,7):year+'-01';
+  const month=input.value;
+  // Use exactly the same source rows as the upper personnel statistics and Excel.
+  const sourceRows=weeklyFilteredRecords();
+  const period=typeof personnelStatisticsPeriod==='function'?personnelStatisticsPeriod():{month,start:month+'-01',end:month+'-31',custom:false};
+  const personKey=document.getElementById('personStatPerson')?.value||'',groupKey=document.getElementById('weeklyGroupFilter')?.value||'';
+  const dateNarrowed=!!(document.getElementById('weeklyStart')?.value||document.getElementById('weeklyEnd')?.value);
+  const narrowed=!!(personKey||groupKey||dateNarrowed);
   const store=currentOperationScheduleStore();
-  ensureOperationScheduleGroups(sourceRows.length?sourceRows:[{workDate:month+'-01'}]);
+  ensureOperationScheduleGroups(sourceRows.length?sourceRows:[{workDate:period.start||month+'-01'}]);
   if(typeof p79EnsureFreshOfficialAqcRoster==='function')p79EnsureFreshOfficialAqcRoster();
   const verified=p79AqcHeadcountVerified?p79VerifiedAqcReportView(sourceRows):p79ScheduledAqcReportView(sourceRows,month);
+  const rangeLabel=period.custom?(period.start===period.end?period.start:period.start+' ～ '+period.end):month+' 整月';
   if(!verified.verified){
-    body.innerHTML='<tr><td colspan="12" class="p-5 text-amber-700">正在讀取當月正式排班 AQC 編組；歷史 WORKING REPORT 不會自動新增現職員工。</td></tr>';
-    const count=document.getElementById('rankingCount');
-    if(count)count.textContent=month+'｜排班編組讀取中，作業資料仍保留。';
-    const group=document.getElementById('rankingGroup');
-    if(group)group.innerHTML='<option value="">全部組別</option>';
+    body.innerHTML='<tr><td colspan="12" class="p-5 text-amber-700">正在核對正式 AQC 名冊；不會顯示未經確認的全員名單。</td></tr>';
+    const count=document.getElementById('rankingCount');if(count)count.textContent=rangeLabel+'｜正式人員名冊待核對';
+    const group=document.getElementById('rankingGroup');if(group)group.innerHTML='<option value="">全部組別</option>';
     return;
   }
-  const rows=verified.rows;
-  // A monthly schedule roster may still contain departed employees. Only the
-  // verified, currently active HR roster may contribute a ranked person.
-  const roster=verified.source==='schedule'?verified.roster:people().map(p=>({empId:p.empId,name:p.name,group:operationGroupForRecord({empId:p.empId,name:p.name,workDate:month+'-01'})}));
-  const ranked=window.P79PersonnelRanking.rankMonth({month,records:rows,roster,metrics:workloadRecordMetrics,groupFor:r=>operationGroupForRecord(r.originalWorkDate?{...r,workDate:r.originalWorkDate}:r),normalize:normalizePersonName,sortBy:document.getElementById('rankingSort')?.value||'eff'});
+  const rows=verified.rows||[];
+  // RankMonth accepts one month; rewrite only transient rows, never source records.
+  const normalized=rows.map(r=>({...r,originalWorkDate:r.workDate,workDate:month+'-01'}));
+  // Only the unrestricted full-month view includes zero-work roster members.
+  const fullRoster=verified.source==='schedule'?verified.roster:people().map(p=>({empId:p.empId,name:p.name,group:operationGroupForRecord({empId:p.empId,name:p.name,workDate:month+'-01'})}));
+  const roster=narrowed?[]:fullRoster;
+  const ranked=window.P79PersonnelRanking.rankMonth({month,records:normalized,roster,metrics:workloadRecordMetrics,groupFor:r=>operationGroupForRecord(r.originalWorkDate?{...r,workDate:r.originalWorkDate}:r),normalize:normalizePersonName,sortBy:document.getElementById('rankingSort')?.value||'eff'});
   const group=document.getElementById('rankingGroup'),previous=group?.value||'',groups=[...new Set(ranked.flatMap(p=>p.groups))].sort(compareDriverNames);
-  if(group){group.innerHTML='<option value="">全部組別</option>'+groups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');group.value=groups.includes(previous)?previous:'';}
-  const name=normalizePersonName(document.getElementById('rankingName')?.value||''),shown=ranked.filter(p=>(!group?.value||p.groups.includes(group.value))&&(!name||normalizePersonName(p.name).includes(name)));
-  body.innerHTML=shown.map(p=>`<tr><td class="font-black">${p.rank??'—'}</td><td class="font-bold">${esc(displayPersonName(p.name))}</td><td>${esc(p.groups.join('、')||'未取得排班組別')}</td><td>${p.ships}</td><td>${p.count}</td><td>${p.hours.toFixed(2)}</td><td>${p.disc}</td><td>${p.load}</td><td>${p.hc}</td><td class="font-bold">${p.containers}</td><td>${p.eff===null?'—':p.eff.toFixed(2)}</td><td>${!p.count?'尚無作業資料':p.hours<=0?'缺少有效時數':'已有作業資料'}</td></tr>`).join('')||'<tr><td colspan="12" class="p-5 text-slate-400">此條件尚無人員資料</td></tr>';
-  const count=document.getElementById('rankingCount');if(count)count.textContent=`${month}｜顯示 ${shown.length}／${ranked.length} 人｜${rows.length} 筆作業紀錄。篩選保留全員原名次；效率以顯示的兩位小數判定同分。${store?.has(month)?'':'排班名冊尚未讀取，暫列現有人員及有作業紀錄的人員。'}`;
+  if(group){
+    group.innerHTML='<option value="">全部組別</option>'+groups.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('')+
+      (previous&&!groups.includes(previous)?`<option value="${esc(previous)}">${esc(previous)}（此日期無作業）</option>`:'');
+    group.value=previous||'';
+  }
+  const name=normalizePersonName(document.getElementById('rankingName')?.value||'');
+  const shown=ranked.filter(p=>(!groupKey||p.groups.includes(groupKey))&&(!group?.value||p.groups.includes(group.value))&&(!name||normalizePersonName(p.name).includes(name)));
+  body.innerHTML=shown.map(p=>`<tr><td class="font-black">${p.rank??'—'}</td><td class="font-bold">${esc(displayPersonName(p.name))}</td><td>${esc(p.groups.join('、')||'未取得排班組別')}</td><td>${p.ships}</td><td>${p.count}</td><td>${p.hours.toFixed(2)}</td><td>${p.disc}</td><td>${p.load}</td><td>${p.hc}</td><td class="font-bold">${p.containers}</td><td>${p.eff===null?'—':p.eff.toFixed(2)}</td><td>${!p.count?'尚無作業資料':p.hours<=0?'缺少有效時數':'已有作業資料'}</td></tr>`).join('')||'<tr><td colspan="12" class="p-5 text-slate-400">所選日期及人員沒有作業資料，不會改顯示全部人員。</td></tr>';
+  const count=document.getElementById('rankingCount');
+  if(count)count.textContent=`${rangeLabel}｜顯示 ${shown.length} 人｜符合條件的 WORKING REPORT ${rows.length} 筆。${narrowed?'已套用上方日期、組別或人員篩選；':''}效率以顯示的兩位小數判定同分。`;
   const key=String(gcToken||'')+'|'+month,state=monthlyRankingReads.get(key),load=document.getElementById('rankingLoadState');
-  if(load)load.textContent=state?.status==='loading'?'正在讀取整月雲端與歷史資料…':state?.status==='ready'?'整月雲端與歷史資料已讀取；排行依目前已匯入的作業資料計算。':state?.status==='partial'?'部分來源讀取失敗，以下為已取得資料的暫時排行，請重新讀取。':state?.status==='error'?'整月資料讀取失敗，以下僅以本機資料暫排，請重新讀取。':'尚未完成整月雲端讀取，以下為本機資料暫時排行。';
+  if(load)load.textContent=state?.status==='loading'?'正在讀取所選月份來源資料…':state?.status==='ready'?'所選月份雲端資料已讀取；排名依上方日期與人員篩選。':state?.status==='partial'?'部分來源讀取失敗，以下為已取得資料的暫時排行，請重新讀取。':state?.status==='error'?'整月資料讀取失敗，以下僅以本機資料暫排，請重新讀取。':'尚未完成雲端資料讀取，以下依目前已取得的紀錄統計。';
   if(!state&&String(gcToken||''))p79QueueVisibleMonthlyRanking(month);
 }
 
@@ -7562,7 +7584,7 @@ function applyPersonnelWeek(anchor,offset=0){
   const range=personnelWeekRange(anchor,offset);
   document.getElementById('weeklyStart').value=range.start;document.getElementById('weeklyEnd').value=range.end;
   updateWeeklyDateRangeSummary();globalThis.Port79CalendarRange?.syncAll();
-  renderWeeklyEfficiency();
+  renderPersonnelAndRanking();
 }
 function setCurrentWeek(){applyPersonnelWeek(isoTodayLocal());}
 function shiftPersonnelWeek(offset){applyPersonnelWeek(document.getElementById('weeklyStart')?.value||isoTodayLocal(),offset);}
@@ -7571,7 +7593,7 @@ function clearWeeklyRange(){
   document.getElementById('weeklyEnd').value='';
   updateWeeklyDateRangeSummary();globalThis.Port79CalendarRange?.syncAll();
   document.getElementById('weeklyDateRangePicker')?.removeAttribute('open');
-  renderWeeklyEfficiency();
+  renderPersonnelAndRanking();
 }
 function preparePersonnelFilters(){
   const start=document.getElementById('weeklyStart')?.value||'',end=document.getElementById('weeklyEnd')?.value||'';
@@ -7626,10 +7648,9 @@ function refreshWeeklyGroupFilter(sourceRows){
   const names=weeklyGroupNames(sourceRows);
 
   sel.innerHTML='<option value="">全部組別</option>'+
-    names.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');
-
-  if([...sel.options].some(o=>o.value===prev))sel.value=prev;
-  else sel.value='';
+    names.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('')+
+    (prev&&!names.includes(prev)?`<option value="${esc(prev)}">${esc(prev)}（此日期無作業）</option>`:'');
+  sel.value=prev||'';
 
   const current=sel.value||'';
   box.innerHTML=names.map(g=>`
@@ -7644,7 +7665,7 @@ function refreshWeeklyGroupFilter(sourceRows){
 function setWeeklyGroupFilter(groupNameValue){
   const sel=document.getElementById('weeklyGroupFilter');
   if(sel)sel.value=groupNameValue||'';
-  renderWeeklyEfficiency();
+  renderPersonnelAndRanking();
 }
 
 function personnelGroupCode(value){
@@ -7906,7 +7927,9 @@ async function exportPersonnelStatisticsExcel(){
   try{
     if(typeof window.p79EnsureXlsx==='function')await window.p79EnsureXlsx();
     if(typeof XLSX==='undefined'||!XLSX.utils?.book_new||!XLSX.writeFile)throw Error('Excel 匯出元件未載入');
-    const report=buildPersonnelStatisticsExcelData(),book=XLSX.utils.book_new();
+    const report=buildPersonnelStatisticsExcelData();
+    if(!report.rowsCount)throw Error('所選日期或人員沒有作業紀錄，未匯出全部人員');
+    const book=XLSX.utils.book_new();
     for(const [name,data,widths] of [
       ['統計摘要',report.summary,[31,49]],
       ['人員效率排行',report.ranking,[11,17,24,16,14,14,12,12,12,14,12]],
