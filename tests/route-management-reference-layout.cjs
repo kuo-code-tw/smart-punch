@@ -31,7 +31,7 @@ assert.match(css,/grid-template-columns:minmax\(0,2\.82fr\) minmax\(340px,1fr\)/
 assert.match(css,/p79-rm-chart-panel/);
 assert.match(css,/body:has\(#view-compare:not\(\.hidden\)\) #efficiencyHeader/,'screenshot nav replaces old header only on route view');
 assert(!css.includes('background-image:url('),'screen must be functional HTML, not a pasted screenshot');
-assert(html.includes('route-management-dashboard.css?v=20261110-reference-v1'));
+assert(html.includes('route-management-dashboard.css?v=20261111-compact-row-v3'));
 assert(html.includes('route-management-dashboard.js?v=20261118-autofill-v3'));
 assert(html.includes('WORKING NO.')&&html.includes('SERVICE'),'live working-sheet data still drives statistics');
 const node=()=>({dataset:{},innerHTML:'',textContent:'',hidden:false,style:{},options:[],value:'',
