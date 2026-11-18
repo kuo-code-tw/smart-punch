@@ -44,10 +44,10 @@ function permission(kind,c){
  if(!c)return false;
  if(c.role==='superadmin')return true;
  const s=c.actor;
- if(kind==='gate')return s.systemPermissions?.history!=='none'&&
+ if(kind==='gate')return String(s.systemPermissions?.history||'none')!=='none'&&
   s.finePermissions?.history?.['vessel.view']===true;
  if(kind==='yard')return ['view','edit','manage'].includes(String(s.systemPermissions?.efficiency||'').toLowerCase());
- return false; // Vessel Excel export is superadmin-only in the original system.
+ return c.role==='admin'&&String(s.systemPermissions?.efficiency||'').toLowerCase()==='manage'; // Original vessel export guard
 }
 function refresh(){
  const c=session();root.hidden=!c||!nodes.some(node=>permission(node.dataset.p79DropKind,c));
@@ -140,6 +140,12 @@ function yard(c){
   const values=yardKeys.map(k=>r[k]);
   if(values.some(v=>v===null||v===undefined||String(v).trim()===''||!Number.isFinite(Number(v))||Number(v)<0))
    throw Error('Yard 原始數值有缺漏，未產生不完整 Excel');
+  const near=(a,b)=>Math.abs(Number(a)-Number(b))<=0.065;
+  if(!near(r.heavyTotal,Number(r.impTeu)+Number(r.expTeu)+Number(r.transTeu)+Number(r.reeferTeu))||
+     !near(r.emptyTotal,Number(r.genEmptyTeu)+Number(r.reeferEmptyTeu))||
+     !near(r.longTotal,Number(r.longImpTeu)+Number(r.longExpTeu)+Number(r.longTransTeu))||
+     !near(r.specialHeavyCount,Number(r.specialHeavy20)+Number(r.specialHeavy40)))
+   throw Error(r.date+' Yard 分類小計與原始資料不符，已停止下載');
   return [r.date,...values.map(v=>Number(v))];
  }).sort((a,b)=>a[0].localeCompare(b[0]));
  assertSame(c);
