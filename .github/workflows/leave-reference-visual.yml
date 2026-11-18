@@ -7,11 +7,13 @@ on:
       - 'assets/port79-hidden-job-titles.js'
       - 'assets/port79-leave-reference-visual.js'
       - 'assets/port79-leave-exact-reference.css'
+      - 'assets/port79-leave-unified-sidebar.css'
       - 'assets/port79-leave-exact-reference.js'
       - 'tests/leave-original-style-restored.cjs'
       - 'tests/leave-hidden-job-titles.cjs'
       - 'tests/leave-reference-visual-only.cjs'
       - 'tests/leave-exact-reference-layout.cjs'
+      - 'tests/leave-sidebar-shared-parity.cjs'
       - '.github/workflows/leave-reference-visual.yml'
   push:
     branches: [main]
@@ -21,11 +23,13 @@ on:
       - 'assets/port79-hidden-job-titles.js'
       - 'assets/port79-leave-reference-visual.js'
       - 'assets/port79-leave-exact-reference.css'
+      - 'assets/port79-leave-unified-sidebar.css'
       - 'assets/port79-leave-exact-reference.js'
       - 'tests/leave-original-style-restored.cjs'
       - 'tests/leave-hidden-job-titles.cjs'
       - 'tests/leave-reference-visual-only.cjs'
       - 'tests/leave-exact-reference-layout.cjs'
+      - 'tests/leave-sidebar-shared-parity.cjs'
       - '.github/workflows/leave-reference-visual.yml'
 permissions:
   contents: read
@@ -41,5 +45,6 @@ jobs:
       - run: node tests/leave-reference-visual-only.cjs
       - run: node tests/leave-hidden-job-titles.cjs
       - run: node tests/leave-exact-reference-layout.cjs
+      - run: node tests/leave-sidebar-shared-parity.cjs
       - run: node tests/leave-admin-month-filter.cjs
       - run: node tests/leave-cover-short-form.cjs
