@@ -22,9 +22,10 @@
 <meta http-equiv="Expires" content="0">
 <title>79號碼頭雲端智慧系統｜八大系統入口</title>
 <link rel="stylesheet" href="assets/port79-all-backup.css?v=20261114-backup-above-vessel-v3">
-<link rel="stylesheet" href="assets/port79-home-drop-import.css?v=20261115-auto-dispatch-v1">
+<link rel="stylesheet" href="assets/port79-home-drop-import.css?v=20261118-download-bar-v1">
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script defer src="assets/port79-home-drop-import.js?v=20261116-auto-import-v2"></script>
+<script defer src="assets/port79-home-drop-import.js?v=20261116-auto-import-v2&mode=download-v1"></script>
+<script defer src="assets/port79-home-excel-download.js?v=20261118-read-only-v1"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script defer src="assets/port79-backup-excel.js?v=20261115-diagnostic-v124"></script>
 <script defer src="assets/port79-all-backup.js?v=20261116-receipt-recovery-v123"></script>
@@ -440,20 +441,20 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
         </div>
         <div class="p79-modern-home-ship" aria-hidden="true">🚢<small>人性化 · 科技化 · 更好操作</small></div>
       </section>
-      <section id="p79HomeDropImport" hidden aria-label="自動辨識 Excel 並使用原系統匯入">
-        <h2>Excel 自動匯入</h2>
+      <section id="p79HomeDropImport" data-p79-mode="download" hidden aria-label="Gate、Yard、船舶作業 Excel 資料下載">
+        <h2>Excel 資料下載</h2>
         <div id="p79HomeDropGrid">
-          <div class="p79-home-drop-zone" data-p79-drop-kind="gate" role="button" tabindex="0" aria-label="選取或拖入 Excel，自動辨識並匯入 Gate Yard 或船舶" title="拖入 Excel 自動辨識類型">
-            <span class="p79-drop-icon" aria-hidden="true">🚛</span><strong>Gate 進出站</strong>
-          </div>
-          <div class="p79-home-drop-zone" data-p79-drop-kind="yard" role="button" tabindex="0" aria-label="選取或拖入 Excel，自動辨識類型後匯入" title="拖入 Excel 自動辨識類型">
-            <span class="p79-drop-icon" aria-hidden="true">▥</span><strong>Yard 儲量</strong>
-          </div>
-          <div class="p79-home-drop-zone" data-p79-drop-kind="vessel" role="button" tabindex="0" aria-label="選取或拖入 Excel，自動辨識類型後匯入" title="拖入 Excel 自動辨識類型">
-            <span class="p79-drop-icon" aria-hidden="true">🚢</span><strong>船舶作業</strong>
-          </div>
+          <button type="button" class="p79-home-drop-zone" data-p79-drop-kind="gate" aria-label="下載本年度 Gate 進出站正式 Excel" title="下載本年度 Gate 正式進出站資料">
+            <span class="p79-drop-icon" aria-hidden="true">🚛</span><strong>Gate 進出站</strong><span class="p79-download-arrow" aria-hidden="true">↓</span>
+          </button>
+          <button type="button" class="p79-home-drop-zone" data-p79-drop-kind="yard" aria-label="下載此帳號在本機儲存的 Yard 儲量 Excel" title="下載目前電腦本機保存的 Yard 儲量資料">
+            <span class="p79-drop-icon" aria-hidden="true">▥</span><strong>Yard 儲量</strong><span class="p79-download-arrow" aria-hidden="true">↓</span>
+          </button>
+          <button type="button" class="p79-home-drop-zone" data-p79-drop-kind="vessel" aria-label="開啟船舶作業 Excel 匯出選項" title="前往原船舶系統選擇正式 Excel 匯出項目">
+            <span class="p79-drop-icon" aria-hidden="true">🚢</span><strong>船舶作業</strong><span class="p79-download-arrow" aria-hidden="true">↓</span>
+          </button>
         </div>
-        <input id="p79HomeImportInput" type="file" accept=".xlsx,.xls,.csv" multiple hidden aria-label="選擇自動辨識匯入的 Excel 檔案">
+        <input id="p79HomeImportInput" type="file" accept=".xlsx,.xls,.csv" multiple hidden disabled aria-label="舊版上傳控制，下載模式已停用">
       </section>
       <section id="p79AllBackupPanel" class="p79-all-backup" hidden aria-label="系統備份狀態">
         <div class="p79-all-backup-top"><strong>系統備份</strong><button type="button" id="p79AllBackupButton">備份資料庫</button></div>
