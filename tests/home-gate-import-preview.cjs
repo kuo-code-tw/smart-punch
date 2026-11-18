@@ -53,7 +53,7 @@ matrix[14][0]='本日進站卡車數';matrix[14][2]=263;matrix[14][3]=981;
 const book={SheetNames:['KHHGate'],Sheets:{KHHGate:{}}};
 const win={document:doc,XLSX:{read:()=>book,utils:{sheet_to_json:()=>matrix}},sessionStorage:{getItem:()=>null},setTimeout(){}};
 el('gateFile').files=[{name:'gate.xlsx',size:1200,arrayBuffer:async()=>Uint8Array.from([0x50,0x4b,0x03,0x04]).buffer}];
-vm.runInNewContext(importer,{window:win,URL});
+vm.runInNewContext(importer,{window:win,URL,URLSearchParams});
 (async()=>{
  await el('gateFile').listeners.change();
  el('gatePreview').listeners.click();
@@ -87,5 +87,42 @@ vm.runInNewContext(importer,{window:win,URL});
  assert.equal(el('gateSave').disabled,false,'deployed GAS enables upload');
  assert(el('gateMessage').textContent.includes('正式 Gate 雲端查詢服務已驗證'));
 
- console.log('PASS: Gate preview, missing backend blocks upload, authenticated backend enables upload');
+ // A known pre-write lock conflict must wait and retry, then complete exactly once.
+ let postCalls=0,waits=[];
+ win.setTimeout=(cb,ms)=>{if(ms===5000||ms===10000)waits.push(ms);queueMicrotask(cb);return 1};
+ win.fetch=async(_url,opts)=>{
+  if(opts?.method!=='POST')return {ok:true,json:async()=>({ok:true,source:'port79-gate-daily',year:'2026',rows:[]})};
+  postCalls++;
+  return {ok:true,json:async()=>postCalls<3?
+   {ok:false,error:'系統正在處理其他雲端寫入，本次 Gate 尚未開始匯入。請稍後重試。'}:
+   {ok:true,source:'port79-gate-daily',added:2,updated:0}};
+ };
+ await el('gateSave').listeners.click();
+ assert.equal(postCalls,3,'pre-write cloud contention gets at most two bounded retries');
+ assert.deepEqual(waits,[5000,10000],'retry uses bounded backoff rather than a hot loop');
+ assert.match(el('gateMessage').textContent,/已寫入正式資料庫/);
+ assert.equal(el('gateMessage').dataset.kind,'success');
+ assert.equal(el('gateSave').disabled,false,'save button restored after successful upload');
+ // Unknown or partial cloud commit state must not be retried automatically.
+ postCalls=0;
+ win.fetch=async(_url,opts)=>{
+  if(opts?.method==='POST')postCalls++;
+  return {ok:true,json:async()=>({ok:false,error:'無法確認雲端儲存結果'})};
+ };
+ await el('gateSave').listeners.click();
+ assert.equal(postCalls,1,'unknown completion result cannot be resubmitted');
+ assert.equal(el('gateMessage').dataset.kind,'error');
+ // A busy lock that stays busy must show the real no-write state, not say the
+ // server may have written a partial record, and never invent a success.
+ postCalls=0;
+ win.fetch=async(_url,opts)=>{
+  if(opts?.method==='POST')postCalls++;
+  return {ok:true,json:async()=>({ok:false,error:'其他管理員正在匯入，請稍後重試'})};
+ };
+ await el('gateSave').listeners.click();
+ assert.equal(postCalls,3,'permanent contention stops after the configured retry cap');
+ assert.match(el('gateMessage').textContent,/尚未開始匯入/);
+ assert.equal(el('gateMessage').dataset.kind,'error');
+
+ console.log('PASS: Gate preview, missing backend blocks upload, authenticated upload, safe busy retries, uncertain completion never resubmitted');
 })().catch(error=>{console.error(error);process.exitCode=1;});
