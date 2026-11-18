@@ -1690,6 +1690,7 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
                 </div>
               </div>
             </details>
+            <div class="flex items-center gap-1"><label for="weeklyMonthFilter" class="text-xs font-bold text-slate-600">月份</label><select id="weeklyMonthFilter" class="p79pr-select" aria-label="人員統計月份" title="選擇月份後自動更新統計" onchange="setPersonnelStatisticsMonth(this.value)"><option value="">選取月份</option></select></div>
             <select id="weeklyGroupFilter" class="p79pr-select" aria-label="組別" onchange="renderWeeklyEfficiency()"><option value="">全部組別</option></select>
             <select id="personStatPerson" class="p79pr-select" aria-label="姓名" onchange="renderWeeklyEfficiency()"><option value="">全部人員</option></select>
             <button type="button" class="p79pr-action" onclick="renderWeeklyEfficiency()">↻ 更新統計</button>
@@ -4537,6 +4538,77 @@ function updateRecordDateRangeSummary(){
   const el=document.getElementById('recordDateRangeSummary');
   if(el)el.textContent=from&&to?`${friendlyDateLabel(from)} ～ ${friendlyDateLabel(to)}`:(from?`${friendlyDateLabel(from)} 起`:(to?`至 ${friendlyDateLabel(to)}`:'全部日期'));
 }
+// 人員統計月份只控制本頁作業日期，不更動原始作業、人資或排班資料。
+function personnelStatisticsMonthRange(month){
+  const match=String(month||'').match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+  if(!match)return null;
+  const day=String(new Date(Number(match[1]),Number(match[2]),0).getDate()).padStart(2,'0');
+  return {start:month+'-01',end:month+'-'+day};
+}
+function syncPersonnelStatisticsMonthFilter(){
+  const select=document.getElementById('weeklyMonthFilter');
+  if(!select||select.tagName!=='SELECT')return;
+  const from=document.getElementById('weeklyStart'),to=document.getElementById('weeklyEnd');
+  if(!from||!to)return;
+  const year=getPort79Year();
+  const previousYear=String(select.dataset.p79Year||'');
+  const previousMonth=String(select.value||'');
+  if(previousYear!==year){
+    // The existing system-wide year selector also controls the personnel month.
+    if(previousYear){
+      const moved=personnelStatisticsMonthRange(previousMonth)
+        ?personnelStatisticsMonthRange(year+previousMonth.slice(4)):null;
+      from.value=moved?moved.start:'';
+      to.value=moved?moved.end:'';
+      globalThis.Port79CalendarRange?.syncAll();
+    }
+    select.innerHTML='<option value="">全部月份／自訂日期</option>'+
+      Array.from({length:12},(_,i)=>{
+        const month=year+'-'+String(i+1).padStart(2,'0');
+        return '<option value="'+month+'">'+year+'年'+(i+1)+'月</option>';
+      }).join('');
+    select.dataset.p79Year=year;
+  }
+  if(select.dataset.p79Initialized!=='1'){
+    select.dataset.p79Initialized='1';
+    if(!from.value&&!to.value){
+      const current=personnelStatisticsMonthRange(year+'-'+isoTodayLocal().slice(5,7));
+      from.value=current.start;to.value=current.end;
+      globalThis.Port79CalendarRange?.syncAll();
+    }
+  }
+  const range=personnelStatisticsMonthRange(String(from.value||'').slice(0,7));
+  const selected=range&&from.value===range.start&&to.value===range.end
+    &&range.start.startsWith(year+'-')?range.start.slice(0,7):'';
+  if(select.value!==selected)select.value=selected;
+}
+function setPersonnelStatisticsMonth(month){
+  const chosen=String(month||'').trim(),year=getPort79Year();
+  const range=personnelStatisticsMonthRange(chosen);
+  if(chosen&&(!range||!chosen.startsWith(year+'-')))return;
+  const from=document.getElementById('weeklyStart'),to=document.getElementById('weeklyEnd');
+  if(!from||!to)return;
+  const nextStart=range?range.start:'',nextEnd=range?range.end:'';
+  const changed=from.value!==nextStart||to.value!==nextEnd;
+  from.value=nextStart;to.value=nextEnd;
+  syncPersonnelStatisticsMonthFilter();
+  updateWeeklyDateRangeSummary();
+  globalThis.Port79CalendarRange?.syncAll();
+  document.getElementById('weeklyDateRangePicker')?.removeAttribute('open');
+  if(range){
+    const ranking=document.getElementById('rankingMonth');
+    if(ranking)ranking.value=chosen;
+  }
+  renderWeeklyEfficiency();
+  if(range&&typeof renderMonthlyRanking==='function')renderMonthlyRanking();
+  // Existing local data renders immediately; fetch selected official month/year
+  // in parallel so older months missing from local storage are not silently omitted.
+  if(changed&&String(gcToken||'')&&typeof loadEfficiencyCloudScope==='function'){
+    Promise.resolve(loadEfficiencyCloudScope(range?{month:chosen}:{year},false))
+      .catch(error=>console.warn('人員統計月份資料讀取失敗',error));
+  }
+}
+
 function updateWeeklyDateRangeSummary(){
   const from=document.getElementById('weeklyStart')?.value||'';
   const to=document.getElementById('weeklyEnd')?.value||'';
@@ -7756,6 +7828,7 @@ function p79EnsureFreshOfficialAqcRoster(){
 }
 
 function renderWeeklyEfficiency(){
+  syncPersonnelStatisticsMonthFilter();
   if(typeof p79EnsureFreshOfficialAqcRoster==='function')p79EnsureFreshOfficialAqcRoster();
   updateWeeklyDateRangeSummary();
   preparePersonnelFilters();
