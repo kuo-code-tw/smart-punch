@@ -1,5 +1,6 @@
 /* Port79 航線資料管理：依核准設計稿構成。僅在 #view-compare 顯示時啟用。 */
 body:has(#view-compare:not(.hidden)){background:#f8fbff!important}
+body:has(#view-compare:not(.hidden)) #efficiencyHeader{display:none!important}
 body:has(#view-compare:not(.hidden)) #efficiencyPageMain{max-width:none!important;width:100%!important;padding:12px 12px 24px!important;margin:0 auto!important}
 body:has(#view-compare:not(.hidden)) #view-compare{margin:0!important;padding:0!important;background:#f9fbff!important;color:#122b51;font-family:system-ui,"Microsoft JhengHei","Noto Sans TC",sans-serif}
 #view-compare .p79-rm-app{width:100%;min-height:100vh;background:linear-gradient(#fbfdff,#f8fbff);color:#11294d;--rm-blue:#1673e9;--rm-border:#d8e5f6;--rm-soft:#eff6ff}
