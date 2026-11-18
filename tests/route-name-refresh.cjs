@@ -4,7 +4,7 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
 const {discoverCodes,englishService,translateEnglish,refresh}=require('../scripts/refresh-route-service-names.cjs');
 assert.deepEqual(discoverCodes('航線代碼 : ABC(N)｜航線代碼：ZX3(S) 航線代碼：BADZZZZZ'),['ABC','ZX3']);
 const page='<html><head><title>WHLC ABC Service - JAPAN - VIETNAM SERVICE | Flexport</title></head><meta name="description" content="WHLC:ABC (Japan-vietnam Service) is Wan Hai"></html>';
-assert.equal(englishService(page,'ABC'),'JAPAN - VIETNAM SERVICE | Flexport');
+assert.equal(englishService(page,'ABC'),'JAPAN - VIETNAM SERVICE');
 assert.equal(englishService(page,'ZZZ'),'');
 assert.equal(translateEnglish('JAPAN - VIETNAM SERVICE'),'日本－越南航線');
 assert.equal(translateEnglish('NORTH CHINA-TAIWAN SERVICE'),'華北－台灣航線');

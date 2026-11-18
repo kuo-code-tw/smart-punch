@@ -33,7 +33,7 @@ function decodeHtml(value){return String(value||'').replace(/&amp;/gi,'&').repla
 function discoverCodes(text){
  const html=decodeHtml(text).replace(/<[^>]+>/g,' ');
  const results=new Set();
- const pattern=/航線代碼\s*[:：]\s*([A-Z0-9]{2,6})(?:\s*\([NS]\))?/gi;
+ const pattern=/航線代碼\s*[:：]\s*([A-Z0-9]{2,6})(?![A-Z0-9])(?:\s*\([NS]\))?/gi;
  for(const m of html.matchAll(pattern)){
   const code=normalizeCode(m[1]);if(code)results.add(code);
  }

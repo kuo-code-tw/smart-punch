@@ -1,5 +1,16 @@
 name: Refresh public AQC route name catalogue
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-route-name-autofill.js'
+      - 'aqc-efficiency/index.html'
+      - 'aqc-efficiency/route-management-dashboard.js'
+      - 'scripts/refresh-route-service-names.cjs'
+      - 'tests/route-name-*.cjs'
+      - 'tests/route-month-cards.cjs'
+      - 'tests/route-management-reference-layout.cjs'
+      - '.github/workflows/route-name-catalogue.yml'
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
@@ -27,8 +38,10 @@ jobs:
           node tests/route-month-cards.cjs
           node tests/route-management-reference-layout.cjs
       - name: Refresh public shipping service names
+        if: github.event_name != 'push'
         run: node scripts/refresh-route-service-names.cjs
       - name: Publish verified new service names to main
+        if: github.event_name != 'push'
         run: |
           if git diff --quiet -- data-sources/route-service-names.json; then
             echo 'No changes to the public source name catalogue'
