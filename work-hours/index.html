@@ -2722,7 +2722,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
         window.isTargetedManualPairRecord = window.isTargetedManualPairRecord || function(record) {
             return Boolean(window.getManualPairClockInId(record) || window.getManualPairClockOutId(record));
         };
-        const APP_VERSION='2026.11.18.119';
+        const APP_VERSION='2026.11.18.120';
 
         function readPort79SsoTokenFromHash() {
             try {
@@ -18007,7 +18007,7 @@ window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
 <script src="../assets/port79-management-workspace.js?v=20261115-shared-user-activity-v3"></script>
 <!-- User-approved work-hours dashboard: private to this page; original controller stays intact. -->
 <link rel="stylesheet" href="../assets/port79-workhours-reference-dashboard.css?v=20261117-approved-v2">
-<script defer src="../assets/port79-workhours-reference-dashboard.js?v=20261117-approved-v2&reuse=20261117-local-first-v3&refresh=20261118-stable-v1"></script>
+<script defer src="../assets/port79-workhours-reference-dashboard.js?v=20261117-approved-v2&reuse=20261117-local-first-v3&refresh=20261118-stable-v1&columns=20261118-no-id-v1"></script>
 <script>window.Port79OrgContext.configure({system:'workhours',container:()=>document.getElementById('viewAdmin'),people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
 <script>window.p79WorkhoursRosterForVisibility=()=>typeof employees==='undefined'||!Array.isArray(employees)?[]:employees;</script>
 </body>

@@ -298,10 +298,10 @@
   const pages=Math.max(1,Math.ceil(selected.length/5));state.page=Math.min(pages,Math.max(1,state.page));
   const shown=selected.slice((state.page-1)*5,state.page*5);
   const body=id('prTableBody');body.replaceChildren();
-  if(!shown.length){const r=body.insertRow(),c=r.insertCell();c.colSpan=12;c.textContent=state.current?.ok?'沒有符合條件的正式申報':'雲端資料尚未確認';}
+  if(!shown.length){const r=body.insertRow(),c=r.insertCell();c.colSpan=11;c.textContent=state.current?.ok?'沒有符合條件的正式申報':'雲端資料尚未確認';}
   for(const r of shown){
    const tr=body.insertRow();
-   const cells=['□',r.id,r.submitDate||em,r.name,r.unit||em,r.job,r.workDate,
+   const cells=['□',r.submitDate||em,r.name,r.unit||em,r.job,r.workDate,
     r.rawHours==null?em:format(r.rawHours)+' 小時',
     r.category==='延'?'平日加班':r.category==='休'?'休息日加班':r.category==='例'?'例假日加班':r.category==='國'?'國定假日加班':'其他加班',
     r.reason||em];
@@ -348,7 +348,7 @@
   const host=id('viewAdmin')?.querySelector('.admin-desktop-content');
   if(!host||id('p79WorkhoursReference'))return;
   let markup;
-  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1',{cache:'default'});
+  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1&columns=20261118-no-id-v1',{cache:'default'});
    if(!resp.ok)throw Error('HTTP '+resp.status);markup=await resp.text();
    if(!markup.includes('id="p79WorkhoursReference"')||!markup.includes('id="prTableBody"'))throw Error('版型檔格式錯誤');
   }catch(e){console.warn('工時版型尚未讀取完成，保留原本功能',e);return}

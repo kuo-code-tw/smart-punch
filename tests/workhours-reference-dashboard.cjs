@@ -10,6 +10,13 @@ assert(page.includes('port79-workhours-reference-dashboard.js?v=20261117-approve
 assert(ui.includes('port79-workhours-reference-dashboard.html?v=20261117-approved-v1'));
 assert(html.includes('id="p79WorkhoursReference"'));
 assert(html.includes('id="prForm"')&&html.includes('id="prTableBody"'));
+assert(!html.includes('<th>申請單號</th>'),'application number column must be removed from table heading');
+assert(html.includes('<th>□</th><th>申請日期</th>'),'application date follows original checkbox column');
+assert(ui.includes("const cells=['□',r.submitDate||em,r.name"),'rendered row must start with date, not application UUID');
+assert(!ui.includes("const cells=['□',r.id"),'never show application number as a table cell');
+assert(ui.includes('c.colSpan=11'),'empty state spans exact eleven visible columns');
+assert(ui.includes("idKey=String(report?.id||'')"),'keep official report IDs for internal reconciliation');
+assert(ui.includes('port79-workhours-reference-dashboard.html?v=20261117-approved-v1'),'browser can read the updated table template');
 const ids=['prUnit','prJob','prPerson','prStart','prEnd','prKpiWork','prKpiOvertime',
  'prKpiPeople','prKpiPending','prTrend','prDonut','prBreakdown','prTableBody',
  'prPersonalTitle','prPersonalActual','prPersonalOT','prPages'];
