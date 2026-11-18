@@ -16644,5 +16644,25 @@ window.addEventListener('load',function(){
 <link rel="stylesheet" href="./driver-workstation-dashboard.css?v=20261117-trend-v3">
 <script src="./driver-workstation-dashboard.js?v=20261117-trend-v3"></script>
 <script>window.Port79OrgContext.configure({system:'efficiency',people:()=>systemEmployees,render:()=>renderAll()});</script>
+<script id="p79-home-excel-download-export-entry">
+/* A homepage download action opens the existing authorized Excel selector.
+   Do not manufacture or export stale home-dashboard vessel data. */
+(function(){
+ 'use strict';
+ if(new URLSearchParams(location.search).get('homeDownload')!=='1')return;
+ let attempts=0;
+ function show(){
+  if(document.getElementById('exportDialog')?.open)return;
+  if(typeof requireSuperAdminAccess==='function'&&requireSuperAdminAccess()&&
+     typeof openExportDialog==='function'){
+   openExportDialog();
+   return;
+  }
+  if(++attempts<12)setTimeout(show,250);
+ }
+ if(document.readyState==='complete')setTimeout(show,0);
+ else window.addEventListener('load',()=>setTimeout(show,80),{once:true});
+})();
+</script>
 </body></html>
 
