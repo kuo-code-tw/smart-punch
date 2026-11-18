@@ -1,0 +1,43 @@
+name: Verify AQC personnel fast reads and official roster safety
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'aqc-efficiency/index.html'
+      - 'aqc-efficiency/personnel-reference-dashboard.js'
+      - 'tests/aqc-personnel-fast-read.cjs'
+      - 'tests/personnel-current-hr-verification.cjs'
+      - 'tests/aqc-schedule-read.cjs'
+      - 'tests/aqc-schedule-group-inheritance-integration.cjs'
+      - '.github/workflows/aqc-personnel-fast-read.yml'
+  pull_request:
+    paths:
+      - 'aqc-efficiency/index.html'
+      - 'tests/aqc-personnel-fast-read.cjs'
+      - '.github/workflows/aqc-personnel-fast-read.yml'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test shared personnel HR request and lazy monthly history
+        run: node tests/aqc-personnel-fast-read.cjs
+      - name: Check official personnel identity, departed employee exclusion and source stats
+        run: node tests/personnel-current-hr-verification.cjs
+      - name: Verify schedule-group request deduplication and verified group inheritance
+        run: |
+          node tests/aqc-schedule-read.cjs
+          node tests/aqc-schedule-group-inheritance-integration.cjs
+          node tests/aqc-schedule-roster-hr-outage.cjs
+          node tests/aqc-current-roster-ranking-groups.cjs
+      - name: Verify historical quantity counts and ranking logic
+        run: |
+          node tests/aqc-personnel-report-visibility.cjs
+          node tests/personnel-statistics.cjs
+          node tests/monthly-personnel-ranking.cjs
