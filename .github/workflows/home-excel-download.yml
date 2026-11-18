@@ -1,0 +1,45 @@
+name: Verify homepage Excel downloads are read-only
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'assets/port79-home-excel-download.js'
+      - 'assets/port79-home-drop-import.js'
+      - 'assets/port79-home-drop-import.css'
+      - 'aqc-efficiency/index.html'
+      - 'tests/home-excel-download.cjs'
+      - 'tests/home-drop-import.cjs'
+      - '.github/workflows/home-excel-download.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'assets/port79-home-excel-download.js'
+      - 'assets/port79-home-drop-import.js'
+      - 'assets/port79-home-drop-import.css'
+      - 'aqc-efficiency/index.html'
+      - 'tests/home-excel-download.cjs'
+      - 'tests/home-drop-import.cjs'
+      - '.github/workflows/home-excel-download.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify direct downloads, official sources, no uploads and account protection
+        run: node tests/home-excel-download.cjs
+      - name: Verify legacy importer remains isolated from download homepage
+        run: node tests/home-drop-import.cjs
+      - name: Verify Gate source/authorization safety
+        run: node tests/home-gate-import-preview.cjs
+      - name: Verify Yard account-scoped export model
+        run: node tests/yard-dashboard-module.cjs
+      - name: Verify vessel official monthly download integrity
+        run: node tests/vessel-completion-export-integrity.cjs
