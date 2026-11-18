@@ -6,10 +6,6 @@
 'use strict';
 const d=w.document,root=d.getElementById('p79HomeDropImport');
 if(!root)return;
-// The homepage has moved these three entry points to read-only downloads.
-// Keep the original import engine available only in legacy import mode; never
-// intercept click or drag/drop on the download toolbar.
-if(root.dataset?.p79Mode==='download')return;
 const $=id=>d.getElementById(id);
 const modal=$('p79HomeImportDialog'),frame=$('p79HomeImportFrame'),picker=$('p79HomeImportInput');
 const title=$('p79HomeImportTitle'),fileLabel=$('p79HomeImportFile');
