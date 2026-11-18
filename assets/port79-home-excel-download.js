@@ -89,6 +89,7 @@ function validDate(x){
 }
 async function gate(c){
  const raw=String(w.sessionStorage.getItem('port79_gas_url')||'').trim();
+ if(!raw)throw Error('尚未取得正式 Gate 雲端連線設定，不能下載未經核對的資料');
  const url=new URL(raw);
  if(url.origin!=='https://script.google.com'||!/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url.pathname))
   throw Error('正式 Gate 雲端網址尚未設定，不能提供不明來源的檔案');
