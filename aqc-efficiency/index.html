@@ -7858,8 +7858,8 @@ function p79EnsureFreshOfficialAqcRoster(){
 function buildPersonnelStatisticsExcelData(){
   const period=typeof personnelStatisticsPeriod==='function'?personnelStatisticsPeriod():{month:'',start:'',end:'',custom:false};
   const lowerGroup=document.getElementById('rankingGroup')?.value||'';
-  const lowerName=normalizePersonName(document.getElementById('rankingName')?.value||'');
-  const rows=weeklyFilteredRecords().filter(r=>(!lowerGroup||operationGroupForRecord(r)===lowerGroup)&&(!lowerName||normalizePersonName(displayPersonName(r.name)).includes(lowerName)));
+  const lowerName=String(document.getElementById('rankingName')?.value||'').trim();
+  const rows=weeklyFilteredRecords().filter(r=>(!lowerGroup||operationGroupForRecord(r)===lowerGroup)&&(!lowerName||normalizePersonName(displayPersonName(r.name)).includes(normalizePersonName(lowerName))));
   const verified=p79VerifiedAqcReportView(rows);
   const numSafe=value=>Number.isFinite(Number(value))?Number(value):0;
   const excelText=value=>{
