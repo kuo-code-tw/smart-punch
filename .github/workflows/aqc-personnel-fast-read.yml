@@ -7,6 +7,7 @@ on:
       - 'aqc-efficiency/personnel-reference-dashboard.js'
       - 'tests/aqc-personnel-fast-read.cjs'
       - 'tests/personnel-current-hr-verification.cjs'
+      - 'tests/personnel-statistics.cjs'
       - 'tests/aqc-schedule-read.cjs'
       - 'tests/aqc-schedule-group-inheritance-integration.cjs'
       - '.github/workflows/aqc-personnel-fast-read.yml'
