@@ -148,8 +148,9 @@
    if(ready()||attempts>=40){clearInterval(poll);poll=null}
    else void load();
   },1500);
-  root?.addEventListener?.('focus',()=>{void load(true)});
-  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void load(true)});
+  // Background visibility/focus checks must respect the 45-second read budget.
+  root?.addEventListener?.('focus',()=>{void load()});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void load()});
  }
  if(typeof document!=='undefined'){
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
