@@ -22,6 +22,9 @@ const start=dashboard.indexOf(' function verifiedAttendance(month){');
 const end=dashboard.indexOf('\n const job=',start);
 assert(start>=0&&end>start,'original authenticated attendance reader remains present');
 const fn=dashboard.slice(start,end);
+const fingerprintStart=dashboard.indexOf(' function recordFingerprint(rows){');
+assert(fingerprintStart>=0&&fingerprintStart<start,'dashboard fingerprint helper must be included in extracted reader');
+const fingerprintSource=dashboard.slice(fingerprintStart,start);
 let token='TOKEN',cloudCalls=0,cacheCalls=0,revision='v1';
 const states=new Map([['2026-11',{appliedCacheBundle:revision,revision,pending:false}]]);
 const ctx={
@@ -44,7 +47,7 @@ const ctx={
  }
 };
 vm.createContext(ctx);
-const read=vm.runInContext("const rawCloud={month:'',token:'',revision:'',rows:null,readAt:0,attemptAt:0,inflight:null,error:''};\n"+fn+"\nverifiedAttendance;",ctx);
+const read=vm.runInContext("const rawCloud={month:'',token:'',revision:'',rows:null,fingerprint:'',readAt:0,attemptAt:0,inflight:null,error:''};\n"+fingerprintSource+fn+"\nverifiedAttendance;",ctx);
 const first=read('2026-11');
 assert.deepEqual([...first].map(r=>r.id),['oct','nov','dec'],'dashboard uses previously verified official raw months');
 assert.equal(cloudCalls,0,'no duplicate GAS getAttendanceMonthRaw calls after main verified load');
