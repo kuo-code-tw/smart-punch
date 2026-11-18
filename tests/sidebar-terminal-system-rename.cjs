@@ -9,7 +9,11 @@ const nav=js.slice(js.indexOf('const NAV='),js.indexOf('const SYSTEMS=',js.index
 assert(nav.includes("['attendance','🕒','考勤管理','../attendance/']"));
 assert(nav.includes("['schedule','📅','排班管理','../schedule/']"));
 assert(nav.includes("['hr','👥','人資管理','../hr/']"));
-assert(nav.includes("['workhours','📊','工時與加班管理','../work-hours/']"));
+assert(nav.includes("['workhours','📊','加班管理','../work-hours/']"));
+assert(!nav.includes("['workhours','📊','工時與加班管理','../work-hours/']"),'old work-hours label must not appear in shared navigation');
+const workspace=fs.readFileSync('assets/port79-management-workspace.js','utf8');
+assert(workspace.includes("workhours:['加班管理','查詢出勤統計"),'unified home and seven-system sidebar must use 加班管理');
+assert(!workspace.includes("workhours:['工時與加班管理'"),'old sidebar label must not remain in workspace');
 assert(nav.includes("['leave','📝','請假管理','../leave/']"));
 assert(nav.includes("['history','🗄️','歷史資料庫','../history-data/']"));
 for(const path of ['attendance','schedule','aqc-efficiency','hr','work-hours','leave','history-data']){
