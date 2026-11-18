@@ -8,6 +8,7 @@ on:
       - 'tests/aqc-personnel-fast-read.cjs'
       - 'tests/personnel-current-hr-verification.cjs'
       - 'tests/personnel-statistics.cjs'
+      - 'tests/monthly-personnel-ranking.cjs'
       - 'tests/aqc-schedule-read.cjs'
       - 'tests/aqc-schedule-group-inheritance-integration.cjs'
       - '.github/workflows/aqc-personnel-fast-read.yml'
