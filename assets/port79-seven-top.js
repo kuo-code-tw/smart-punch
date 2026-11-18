@@ -167,7 +167,7 @@ const NAV=[
  ['schedule','📅','排班管理','../schedule/'],
  ['efficiency','🚢','碼頭系統管理','../aqc-efficiency/'],
  ['hr','👥','人資管理','../hr/'],
- ['workhours','📊','工時與加班管理','../work-hours/'],
+ ['workhours','📊','加班管理','../work-hours/'],
  ['leave','📝','請假管理','../leave/'],
  ['history','🗄️','歷史資料庫','../history-data/']
 ];
