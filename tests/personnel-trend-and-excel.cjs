@@ -2,7 +2,7 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
 const html=fs.readFileSync(path.join(__dirname,'../aqc-efficiency/index.html'),'utf8');
 const source=fs.readFileSync(path.join(__dirname,'../aqc-efficiency/personnel-reference-dashboard.js'),'utf8');
-function fn(s,name){const i=s.indexOf('function '+name+'(');assert(i>=0,'missing '+name);const e=s.indexOf('\n}',i);assert(e>i);return s.slice(i,e+2);}
+function fn(s,name){const asyncStart=s.indexOf('async function '+name+'('),i=asyncStart>=0?asyncStart:s.indexOf('function '+name+'(');assert(i>=0,'missing '+name);const e=s.indexOf('\n}',i);assert(e>i);return s.slice(i,e+2);}
 const rows=[
  {workDate:'2026-11-01',name:'甲',empId:'1',group:'A組',source:'working-report',disc:4,load:3,hatches:1,hours:2,workingNo:'NO1',number:'A1',startTime:'07:00',endTime:'09:00'},
  {workDate:'2026-11-30',name:'甲',empId:'1',group:'A組',source:'working-report',disc:6,load:1,hatches:0,hours:2,workingNo:'NO2',number:'A1',startTime:'07:00',endTime:'09:00'},
