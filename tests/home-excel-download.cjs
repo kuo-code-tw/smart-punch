@@ -11,6 +11,7 @@ assert(homepage.includes('Excel 資料下載'));
 assert(homepage.includes('port79-home-excel-download.js?v=20261118-read-only-v1'));
 assert(legacy.includes("if(root.dataset?.p79Mode==='download')return;"),'old import event handlers must not run');
 assert(vessel.includes('p79-home-excel-download-export-entry')&&vessel.includes("new URLSearchParams(location.search).get('homeDownload')!=='1'"));
+assert(homepage.includes('function buildSsoHref(')&&homepage.includes('window.p79NavigateWhileBackingUp=p79NavigateWhileBackingUp'),'home vessel export must use original signed SSO and backup-aware navigation');
 assert(!/gateStatsImport|P79GateImport.*chooseFile|P79YardDashboard.*importFile|P79VesselHomeImport.*importFiles|method:['"]POST/.test(download),
  'homepage data downloads must be read-only');
 const year=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Taipei',year:'numeric'}).format(new Date());
@@ -45,7 +46,9 @@ let response={ok:true,source:'port79-gate-daily',year,rows:[{
 const window={
  document:doc,sessionStorage:{getItem:key=>session.get(key)||null},
  localStorage:{getItem:key=>storage.get(key)||null},
- location:{assign:url=>nav.push(url)},
+ location:{assign:()=>assert.fail('vessel download must use the signed management SSO path')},
+ buildSsoHref:path=>path+'#port79sso=TOKEN',
+ p79NavigateWhileBackingUp:path=>nav.push(path),
  fetch:async(url,opts)=>{requests.push({url,opts});return {ok:true,json:async()=>response};},
  XLSX:{utils:{
   book_new:()=>({sheets:[]}),
@@ -71,7 +74,7 @@ vm.runInNewContext(download,{window,URL,Intl,Date,JSON,Map,Set,AbortController,s
  assert.equal(files[1].book.sheets[0].sheet.values[0].length,fields.length+1);
  assert.equal(requests.length,1,'Yard reads current account local data without extra cloud write');
  assert.equal(await api.start('vessel'),true);
- assert.deepEqual(nav,['./aqc-efficiency/?homeDownload=1']);
+ assert.deepEqual(nav,['./aqc-efficiency/?homeDownload=1#port79sso=TOKEN']);
  response={ok:false,error:'正式 Gate 讀取服務尚未部署'};
  assert.equal(await api.start('gate'),false);
  assert.equal(files.length,2,'failed official cloud read must not generate fake Excel');
