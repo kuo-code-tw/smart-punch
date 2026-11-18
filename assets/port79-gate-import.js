@@ -302,6 +302,14 @@ function auth(){
   throw Error('找不到正式 Google Apps Script 資料服務網址');
  return {base,token};
 }
+// Only a definitive server response stating Gate did not start writing can
+// be retried safely. Never retry unknown HTTP failures, timeouts or partial writes.
+function gateNotStartedBusy(result){
+ if(result?.ok!==false)return false;
+ var reason=String(result.error||'');
+ return (/本次\s*Gate\s*尚未開始匯入/i.test(reason)&&/其他雲端寫入|正在處理/.test(reason))||
+  /其他管理員正在匯入，請稍後重試/.test(reason);
+}
 async function save(){
  if(!days.length||!sourceFile||!serviceReady||saving)return;
  var key;
@@ -316,13 +324,32 @@ async function save(){
   body.set('token',key.token);body.set('gcToken',key.token);
   body.set('fileName',sourceFile.name);
   body.set('rows',JSON.stringify(days));
-  var response=await g.fetch(key.base,{method:'POST',
-   headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
-   body:body.toString(),redirect:'follow',credentials:'omit'});
-  if(!response.ok)throw Error('HTTP '+response.status);
-  var result=await response.json();
-  if(result?.ok!==true||result?.source!=='port79-gate-daily')
-   throw Error(result?.error||'正式 GAS Gate 匯入接口尚未部署');
+  var currentSelection=selectionId,currentFile=sourceFile;
+  var result=null,attempt=0,delays=[5000,10000];
+  while(true){
+   // Never resubmit a previous session's data or another file.
+   var live=auth();
+   if(live.token!==key.token||live.base!==key.base||
+      currentSelection!==selectionId||currentFile!==sourceFile)
+    throw Error('帳號或 Gate 檔案已變更，已停止重送；請重新選檔');
+   var response=await g.fetch(key.base,{method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},
+    body:body.toString(),redirect:'follow',credentials:'omit'});
+   if(!response.ok)throw Error('HTTP '+response.status);
+   result=await response.json();
+   if(result?.ok===true&&result.source==='port79-gate-daily')break;
+   if(!gateNotStartedBusy(result))
+    throw Error(result?.error||'正式 GAS Gate 匯入接口尚未部署');
+   if(attempt===delays.length){
+    message('Gate 雲端持續有其他寫入，已等待並重試 '+attempt+
+     ' 次；伺服器確認本次 Gate 尚未開始匯入，原 Excel 與預覽保留。請稍後再操作。','error');
+    return;
+   }
+   var delay=delays[attempt++];
+   message('Gate 雲端正在處理其他資料，伺服器確認本次尚未開始寫入。'+
+    '將於 '+delay/1000+' 秒後安全重試（'+attempt+'/'+delays.length+'），請勿關閉視窗。','info');
+   await new Promise(resolve=>g.setTimeout(resolve,delay));
+  }
   message('已寫入正式資料庫：新增 '+result.added+' 天、更新 '+result.updated+
    ' 天。日、週、月、年統計將自動重新加總。','success');
   // Only a confirmed backend success refreshes the official read-only view.
