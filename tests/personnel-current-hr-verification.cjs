@@ -62,7 +62,7 @@ assert.match(el('p79prFreshness').textContent,/人資在職 AQC 3 人/);
 assert.match(el('p79prFreshness').textContent,/已排除 6 筆/);
 assert.match(html,/personnel-reference-dashboard\.js\?v=20261117-schedule-roster-v3/,'new script version invalidates previous cached personnel dashboard');
 assert.match(html,/const hrView=p79VerifiedAqcReportView\(rs\)/);
-assert.match(html,/apiGet\('gcGetEmployees'\)/,'current HR roster must be read through dedicated endpoint');
+assert.match(html,/apiGetQuick\('gcGetEmployees',\{\},20000\)/,'current HR roster uses one bounded authenticated dedicated endpoint request');
 for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){
  if(/\bsrc=|application\/ld\+json/i.test(m[1])||!m[2].trim())continue;
  new vm.Script(m[2]);
