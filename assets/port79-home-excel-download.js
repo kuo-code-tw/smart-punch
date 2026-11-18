@@ -159,9 +159,14 @@ async function start(kind){
  if(!permission(kind,c)){message('目前帳號沒有 '+kind+' 下載權限，資料不會提供下載','error');return false;}
  if(busy)return false;
  if(kind==='vessel'){
-  // Original module owns the Excel selection, complete cloud scope and the
-  // audit of cross-month vessel records. Never export a guessed home snapshot.
-  w.location.assign('./aqc-efficiency/?homeDownload=1');
+  // Use the exact same SSO and active-backup navigation as the original
+  // management card. A naked location.assign loses its signed session hash.
+  if(typeof w.buildSsoHref!=='function'||typeof w.p79NavigateWhileBackingUp!=='function'){
+   message('管理員單一登入尚未準備完成，請重新進入首頁後再下載','error');
+   return false;
+  }
+  const target=w.buildSsoHref('./aqc-efficiency/?homeDownload=1');
+  w.p79NavigateWhileBackingUp(target);
   return true;
  }
  busy=true;refresh();message('正在核對 '+(kind==='gate'?'Gate 正式雲端':'Yard 本機')+'資料並產生 Excel…');
