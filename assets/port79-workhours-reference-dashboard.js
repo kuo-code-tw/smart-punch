@@ -140,6 +140,13 @@
   if(/待審|待核准|審核中|pending/i.test(raw))return'review';
   return'applied'; // Official report ID does NOT imply approval.
  }
+ // Operational KPIs only use official, already de-duplicated, permission-scoped
+ // applications from compute(). No punch statistics or planned overtime.
+ function applicationMetrics(reports){
+  const completed=reports.filter(r=>r.status==='approved'||r.status==='rejected').length;
+  const restApplicants=new Set(reports.filter(r=>r.category==='休').map(r=>r.empId).filter(Boolean)).size;
+  return{applications:reports.length,reviewRate:reports.length?round(completed/reports.length*100):null,restApplicants};
+ }
  function compute(){
   if(typeof hasValidHomepageAdminSession!=='function'||!hasValidHomepageAdminSession()||
      typeof p79WorkhoursEligibleEmployees!=='function')
@@ -237,13 +244,14 @@
   const ok=data.ok,attendance=ok&&data.attendanceAvailable;
   say('prDataStatus',ok?(data.attendanceAvailable?'資料來源：正式原始打卡月份已核對，正式加班申報已核對；打卡區間時數不等於薪資結算工時。':data.attendanceError?'正式加班已核對；原始打卡讀取失敗：'+data.attendanceError:'正式加班已核對；原始打卡月份仍在讀取，不顯示推估工時。'):'資料狀態：'+data.reason);
   id('prDataStatus').dataset.error=ok&&data.attendanceAvailable?'false':'true';
-  say('prKpiWork',attendance?format(data.rawHours):em);
-  say('prKpiOvertime',ok&&!data.invalid?format(round(data.overtime)):em);
-  say('prKpiPeople',attendance?format(data.attenders):em);
+  const metrics=ok?applicationMetrics(data.reports):null;
+  say('prKpiApplications',ok?format(metrics.applications):em);
+  say('prKpiReviewRate',ok&&metrics.reviewRate!==null?format(metrics.reviewRate):em);
+  say('prKpiRestApplicants',ok?format(metrics.restApplicants):em);
   say('prKpiPending',ok?data.pending:em);
-  say('prKpiWorkNote',attendance?'已完成簽退的打卡區間時數':'打卡資料待核對');
-  say('prKpiOtNote',ok&&!data.invalid?'正式申報，未核實預排不計入':'有申報時數待核對');
-  say('prKpiPeopleNote',attendance?'區間內有完整打卡的人數':'完整打卡待核對');
+  say('prKpiApplicationsNote',ok?'依所選日期及人員，僅計正式申請':'正式申請尚未核對');
+  say('prKpiReviewRateNote',ok?(metrics.applications?'核准及駁回件數 ÷ 正式申請':'本期間尚無正式申請'):'審核狀態尚未核對');
+  say('prKpiRestApplicantsNote',ok?'正式休息日加班申請，依人員去重':'休息日申請尚未核對');
   say('prKpiPendingNote',ok?'正式申報狀態（非預估）':'申報狀態待核對');
   id('prTrend').innerHTML=attendance?trendSvg(data.trend):'<div class="pr-message">正式資料尚未讀齊</div>';
   // A report can be credited to a different month than the physical punch.
@@ -348,7 +356,7 @@
   const host=id('viewAdmin')?.querySelector('.admin-desktop-content');
   if(!host||id('p79WorkhoursReference'))return;
   let markup;
-  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1&columns=20261118-no-id-v1',{cache:'default'});
+  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1',{cache:'default'});
    if(!resp.ok)throw Error('HTTP '+resp.status);markup=await resp.text();
    if(!markup.includes('id="p79WorkhoursReference"')||!markup.includes('id="prTableBody"'))throw Error('版型檔格式錯誤');
   }catch(e){console.warn('工時版型尚未讀取完成，保留原本功能',e);return}

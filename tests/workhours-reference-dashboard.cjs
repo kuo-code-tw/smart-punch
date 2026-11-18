@@ -17,10 +17,15 @@ assert(!ui.includes("const cells=['□',r.id"),'never show application number as
 assert(ui.includes('c.colSpan=11'),'empty state spans exact eleven visible columns');
 assert(ui.includes("idKey=String(report?.id||'')"),'keep official report IDs for internal reconciliation');
 assert(ui.includes('port79-workhours-reference-dashboard.html?v=20261117-approved-v1'),'browser can read the updated table template');
-const ids=['prUnit','prJob','prPerson','prStart','prEnd','prKpiWork','prKpiOvertime',
- 'prKpiPeople','prKpiPending','prTrend','prDonut','prBreakdown','prTableBody',
+const ids=['prUnit','prJob','prPerson','prStart','prEnd','prKpiApplications','prKpiReviewRate',
+ 'prKpiRestApplicants','prKpiPending','prTrend','prDonut','prBreakdown','prTableBody',
  'prPersonalTitle','prPersonalActual','prPersonalOT','prPages'];
 for(const k of ids)assert(html.includes('id="'+k+'"'),'screenshot dashboard missing '+k);
+assert(!/本月總工時|本月加班時數|<div class="pr-kpi-label">出勤人數<\/div>/.test(html),
+ 'the top-level dashboard must not repeat the other modules\' time/headcount cards');
+assert(html.includes('查詢期間加班申請')&&html.includes('已完成審核比例')&&html.includes('休息日加班申請人數'),
+ 'the three replacement metrics must focus on overtime application operations');
+assert(ui.includes('applicationMetrics(data.reports)'),'KPIs must use the same official scoped reports as the application list');
 assert(!/143,628|1,428\.5|682 人|已核准\s*3/.test(html+ui+css),
  'approved screenshot is NOT a source of sample KPI figures');
 assert(ui.includes('hasValidHomepageAdminSession'),'fail closed without logged-in workhours session');
