@@ -8,6 +8,7 @@ on:
       - 'tests/aqc-personnel-fast-read.cjs'
       - 'tests/personnel-current-hr-verification.cjs'
       - 'tests/personnel-statistics.cjs'
+      - 'tests/personnel-month-selection.cjs'
       - 'tests/monthly-personnel-ranking.cjs'
       - 'tests/aqc-schedule-read.cjs'
       - 'tests/aqc-schedule-group-inheritance-integration.cjs'
@@ -42,4 +43,5 @@ jobs:
         run: |
           node tests/aqc-personnel-report-visibility.cjs
           node tests/personnel-statistics.cjs
+          node tests/personnel-month-selection.cjs
           node tests/monthly-personnel-ranking.cjs

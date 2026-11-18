@@ -7828,7 +7828,7 @@ function p79EnsureFreshOfficialAqcRoster(){
 }
 
 function renderWeeklyEfficiency(){
-  syncPersonnelStatisticsMonthFilter();
+  if(typeof syncPersonnelStatisticsMonthFilter==='function')syncPersonnelStatisticsMonthFilter();
   if(typeof p79EnsureFreshOfficialAqcRoster==='function')p79EnsureFreshOfficialAqcRoster();
   updateWeeklyDateRangeSummary();
   preparePersonnelFilters();
