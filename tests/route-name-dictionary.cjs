@@ -17,5 +17,5 @@ for(const [code,name] of Object.entries({"JSH":"日本－華南－越南航線",
  assert.equal(c.p79RouteChineseName(' '+code.toLowerCase()+' '),name);
 }
 assert.equal(c.p79RouteChineseName('XYY'),'航線 XYY（中文名稱查詢中）');
-assert(html.includes('port79-route-name-autofill.js?v=20261118-v1'));
+assert(html.includes('port79-route-name-autofill.js?v=20261118-v2'));
 console.log('PASS screenshot route names, normalized codes, no placeholder, consistent fallback');
