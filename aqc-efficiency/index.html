@@ -1694,7 +1694,7 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
             <select id="weeklyGroupFilter" class="p79pr-select" aria-label="組別" onchange="renderPersonnelAndRanking()"><option value="">全部組別</option></select>
             <select id="personStatPerson" class="p79pr-select" aria-label="姓名" onchange="renderPersonnelAndRanking()"><option value="">全部人員</option></select>
             <button type="button" class="p79pr-action" onclick="renderPersonnelAndRanking()">↻ 更新統計</button>
-            <button type="button" id="p79prExportExcel" class="p79pr-action" onclick="exportPersonnelStatisticsExcel()">⬇ 匯出 Excel</button>
+            <button type="button" id="p79prExportExcel" class="p79pr-action" onclick="exportPersonnelStatisticsExcel()">⬇ 匯出目前篩選 Excel</button>
           </div>
         </div>
         <div class="p79pr-filter-status"><span id="weeklyScheduleGroupState" role="status"></span><span id="p79prFreshness" role="status" aria-live="polite"></span><button type="button" class="text-sky-700 underline" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
@@ -1918,7 +1918,7 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
       <button type="button" class="btn bg-sky-600 text-white" onclick="loadMonthlyRanking(true)">讀取整月雲端／歷史資料</button>
     </div><div id="rankingLoadState" class="text-sm mt-3" role="status"></div><div class="flex flex-wrap gap-2 items-center mt-2"><span id="rankingScheduleGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div></div>
   </div>
-  <div class="p79-section" data-section-key="ranking-results"><div><span>所選日期人員排名</span></div><div class="card p-4 overflow-auto"><div id="rankingCount" class="text-sm mb-3" role="status"></div><table class="tbl w-full min-w-[1300px] text-center"><thead><tr><th>名次</th><th>姓名</th><th>排班組別</th><th>作業船數</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th><th>資料狀態</th></tr></thead><tbody id="rankingBody"></tbody></table></div></div>
+  <div class="p79-section" data-section-key="ranking-results"><div><span>所選日期人員排名</span><button type="button" id="p79prRankingExportExcel" class="btn bg-emerald-600 text-white text-xs" onclick="exportPersonnelStatisticsExcel()">⬇ 匯出目前篩選 Excel</button></div><div class="card p-4 overflow-auto"><div id="rankingCount" class="text-sm mb-3" role="status"></div><table class="tbl w-full min-w-[1300px] text-center"><thead><tr><th>名次</th><th>姓名</th><th>排班組別</th><th>作業船數</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th><th>資料狀態</th></tr></thead><tbody id="rankingBody"></tbody></table></div></div>
 </section>
 
 <dialog id="vesselMonthlyExportDialog" class="p-5">
@@ -7857,7 +7857,9 @@ function p79EnsureFreshOfficialAqcRoster(){
 // Export exactly the rows and verified names used by the visible personnel dashboard.
 function buildPersonnelStatisticsExcelData(){
   const period=typeof personnelStatisticsPeriod==='function'?personnelStatisticsPeriod():{month:'',start:'',end:'',custom:false};
-  const rows=weeklyFilteredRecords();
+  const lowerGroup=document.getElementById('rankingGroup')?.value||'';
+  const lowerName=normalizePersonName(document.getElementById('rankingName')?.value||'');
+  const rows=weeklyFilteredRecords().filter(r=>(!lowerGroup||operationGroupForRecord(r)===lowerGroup)&&(!lowerName||normalizePersonName(displayPersonName(r.name)).includes(lowerName)));
   const verified=p79VerifiedAqcReportView(rows);
   const numSafe=value=>Number.isFinite(Number(value))?Number(value):0;
   const excelText=value=>{
@@ -7883,6 +7885,7 @@ function buildPersonnelStatisticsExcelData(){
     ['人員統計 Excel 報表',''],['選取月份',period.month],
     ['資料日期',period.start+' ～ '+period.end],['查詢方式',period.custom?'指定日期／區間':'整月（未選日期）'],
     ['組別',excelText(selectedGroup||'全部組別')],['人員',excelText(personLabel)],
+    ['排行組別',excelText(lowerGroup||'全部組別')],['排行姓名搜尋',excelText(lowerName||'無')],
     ['來源','WORKING REPORT（目前畫面已載入資料）'],
     ['正式名冊',verified.verified?'已核對':'待核對（不匯出未確認的人員排行）'],
     [],['統計指標','數值'],
@@ -7921,9 +7924,9 @@ function buildPersonnelStatisticsExcelData(){
 }
 async function exportPersonnelStatisticsExcel(){
   if(typeof requireEfficiencyAccess==='function'&&!requireEfficiencyAccess())return;
-  const button=document.getElementById('p79prExportExcel');
-  if(button?.disabled)return;
-  if(button){button.disabled=true;button.textContent='匯出中…';}
+  const buttons=['p79prExportExcel','p79prRankingExportExcel'].map(id=>document.getElementById(id)).filter(Boolean);
+  if(buttons.some(button=>button.disabled))return;
+  buttons.forEach(button=>{button.disabled=true;button.textContent='匯出中…';});
   try{
     if(typeof window.p79EnsureXlsx==='function')await window.p79EnsureXlsx();
     if(typeof XLSX==='undefined'||!XLSX.utils?.book_new||!XLSX.writeFile)throw Error('Excel 匯出元件未載入');
@@ -7948,7 +7951,7 @@ async function exportPersonnelStatisticsExcel(){
     console.error('人員統計 Excel 匯出失敗',error);
     if(typeof toast==='function')toast(error?.message||'人員統計 Excel 匯出失敗');
   }finally{
-    if(button){button.disabled=false;button.textContent='⬇ 匯出 Excel';}
+    buttons.forEach(button=>{button.disabled=false;button.textContent=button.id==='p79prRankingExportExcel'?'⬇ 匯出目前篩選 Excel':'⬇ 匯出目前篩選 Excel';});
   }
 }
 
