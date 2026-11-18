@@ -10,6 +10,7 @@ on:
       - 'tests/workhours-local-first-speed.cjs'
       - 'tests/workhours-verified-cache.cjs'
       - 'tests/workhours-reference-dashboard.cjs'
+      - 'tests/workhours-application-ops-kpis.cjs'
       - 'tests/workhours-no-spurious-refresh.cjs'
       - 'tests/overtime-load-speed.cjs'
       - '.github/workflows/workhours-local-first-speed.yml'
@@ -21,6 +22,7 @@ on:
       - 'tests/workhours-local-first-speed.cjs'
       - 'tests/workhours-verified-cache.cjs'
       - 'tests/workhours-reference-dashboard.cjs'
+      - 'tests/workhours-application-ops-kpis.cjs'
       - 'tests/workhours-no-spurious-refresh.cjs'
       - 'tests/overtime-load-speed.cjs'
       - '.github/workflows/workhours-local-first-speed.yml'
@@ -43,6 +45,8 @@ jobs:
         run: node tests/overtime-load-speed.cjs
       - name: Verify original screenshot and permission guard
         run: node tests/workhours-reference-dashboard.cjs
+      - name: Verify scoped official application operational KPIs
+        run: node tests/workhours-application-ops-kpis.cjs
       - name: Verify no flicker without real HR or attendance changes
         run: node tests/workhours-no-spurious-refresh.cjs
       - name: Verify editing and read pressure guards
