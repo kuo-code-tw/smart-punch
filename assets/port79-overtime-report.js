@@ -281,24 +281,61 @@
   const token=global.p79OvertimeContext?.token?.()||sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_gc_token')||'';
   const url=global.p79OvertimeContext?.gasUrl?.();if(!url||!token)throw Error('請先登入管理員');return {url,token};
  }
- async function rpc(action,payload){
-  const {url,token}=auth(),ctl=new AbortController(),timeoutMs=payload?45000:12000;let timer;
-  const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>{ctl.abort();reject(Error(payload?'雲端儲存逾時，尚未確認成功；請保留修改':'雲端讀取超過12秒，請按「重新讀取雲端」再試'));},timeoutMs)});
-  try{return await Promise.race([(async()=>{
-   const endpoint=payload?url:url+'?action='+encodeURIComponent(action)+'&token='+encodeURIComponent(token)+'&gcToken='+encodeURIComponent(token)+'&t='+Date.now();
-   const options=payload?{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...payload,action,token,gcToken:token,userToken:token})}:{cache:'no-store'};
-   const res=await fetch(endpoint,{...options,signal:ctl.signal});if(!res.ok)throw Error('雲端HTTP '+res.status);
-   const d=await res.json();if(d?.ok!==true)throw Error(d?.error||'雲端未確認成功');return d;
-  })(),deadline]);}finally{clearTimeout(timer)}
+ // Read-only cloud queries can safely retry a transient busy response.
+ // Never apply this helper to a POST: unknown write results must not replay.
+ function retryableCloudRead(error){
+  return error?.retryable===true||
+   /雲端目前正在處理其他資料|正在處理其他資料|雲端忙碌|稍後自動重試|班表正在編輯|HTTP 429|HTTP 5\d\d|Failed to fetch|NetworkError|Load failed|AbortError|逾時|timeout|timed out|網路連線失敗/i.test(String(error?.message||error||''));
+ }
+ function cloudError(data,fallback){
+  const error=Error(String(data?.error||fallback));
+  error.retryable=data?.retryable===true;
+  error.retryAfterMs=Number(data?.retryAfterMs)||0;
+  error.rejectedBeforeWrite=data?.rejectedBeforeWrite===true;
+  return error;
+ }
+ async function retryCloudRead(task,onRetry){
+  for(let attempt=0;attempt<5;attempt++){
+   try{return await task();}
+   catch(error){
+    const transient=retryableCloudRead(error),busy=/雲端目前正在處理其他資料|正在處理其他資料|雲端忙碌|班表正在編輯|稍後自動重試/i.test(String(error?.message||''));
+    const maxAttempts=busy?5:3;
+    if(!transient||attempt+1>=maxAttempts)throw error;
+    const delay=Math.min(5500,Math.max(900,Number(error.retryAfterMs)||900)*Math.pow(1.6,attempt));
+    try{onRetry?.(attempt+1,maxAttempts-1,Math.ceil(delay/1000));}catch(ignore){}
+    await new Promise(resolve=>setTimeout(resolve,delay));
+   }
+  }
+ }
+ async function rpc(action,payload,onRetry){
+  const {url,token}=auth();
+  const execute=async()=>{
+   const ctl=new AbortController(),timeoutMs=payload?45000:12000;let timer;
+   const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>{
+    ctl.abort();reject(Error(payload?'雲端儲存逾時，尚未確認成功；請保留修改':'雲端讀取逾時，將在安全範圍內自動重試'));
+   },timeoutMs);});
+   try{return await Promise.race([(async()=>{
+    const endpoint=payload?url:url+'?action='+encodeURIComponent(action)+'&token='+encodeURIComponent(token)+'&gcToken='+encodeURIComponent(token)+'&t='+Date.now();
+    const options=payload?{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+     body:JSON.stringify({...payload,action,token,gcToken:token,userToken:token})}:{cache:'no-store'};
+    const res=await fetch(endpoint,{...options,signal:ctl.signal});
+    if(!res.ok)throw Error('雲端HTTP '+res.status);
+    const data=await res.json();
+    if(data?.ok!==true)throw cloudError(data,'雲端未確認成功');
+    return data;
+   })(),deadline]);}finally{clearTimeout(timer);}
+  };
+  return payload?execute():retryCloudRead(execute,onRetry);
  }
  // A preflight belongs to one button press, never to persisted browser drafts.
  const saveValidationContexts=new WeakMap();
- async function prepareSaveValidation(request,checkRules=true){
+ async function prepareSaveValidation(request,checkRules=true,onRetry){
   const credentials=auth(),{url,token}=credentials;
   const scope={empId:String(request.empId).trim().toUpperCase(),date:request.date,
-   overtimeDate:String(request.overtimeDate||request.date),coverDate:String(request.coverDate||request.date),leaveHandoffId:String(request.leaveHandoffId||'')};
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),45000);
-  const read=(async()=>{
+   overtimeDate:String(request.overtimeDate||request.date),coverDate:String(request.coverDate||request.date),
+   leaveHandoffId:String(request.leaveHandoffId||'')};
+  const read=()=>retryCloudRead(async()=>{
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
    try{
     const query='?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+
      '&empId='+encodeURIComponent(scope.empId)+'&date='+encodeURIComponent(scope.date)+
@@ -306,13 +343,17 @@
      '&overtimeDate='+encodeURIComponent(scope.overtimeDate)+'&_='+Date.now();
     const response=await fetch(url+query,{cache:'no-store',signal:controller.signal});
     const cloud=await response.json();
-    if(!response.ok||cloud?.ok!==true)throw Error(cloud?.error||'出勤與班表核對失敗');
+    if(!response.ok||cloud?.ok!==true)throw cloudError(cloud,'出勤與班表核對失敗');
     if(cloud.revision==null||!Array.isArray(cloud.records)||!Array.isArray(cloud.schedules)||
-       !cloud.schedules.some(row=>String(row.empId).trim().toUpperCase()===scope.empId))throw Error('雲端出勤或正式班表資料不完整，尚未送出申報');
+       !cloud.schedules.some(row=>String(row.empId).trim().toUpperCase()===scope.empId))
+     throw Error('雲端出勤或正式班表資料不完整，尚未送出申報');
     return {cloud,checkedAt:Date.now()};
-   }finally{clearTimeout(timer)}
-  })();
-  const [rules,context]=await Promise.all([checkRules?loadRules():null,read]);
+   }finally{clearTimeout(timer);}
+  },onRetry);
+  // Two simultaneous GETs can compete with the GAS data lock. Sequence
+  // them so one filing does not generate its own cloud contention.
+  const rules=checkRules?await loadRules(onRetry):null;
+  const context=await read();
   const current=auth();
   if(current.url!==url||current.token!==token)throw Error('登入或資料來源已變更，請重新核對申報');
   saveValidationContexts.set(request,{...context,...credentials,...scope});
@@ -470,7 +511,7 @@
     roleDefaults:normalizeRoleTypeDefaults(snapshot)};
   }catch(error){return null;}
  }
- async function loadRules(){const d=await rpc('getOvertimeConfig');if(!d.config||typeof d.config!=='object')throw Error('雲端設定不完整，未使用預設值覆蓋');const rows=validate(normalizeStored(d.config[CONFIG]));rememberOvertimeOptions(d.config,'getOvertimeConfig');return {config:d.config,rows};}
+ async function loadRules(onRetry){const d=await rpc('getOvertimeConfig',null,onRetry);if(!d.config||typeof d.config!=='object')throw Error('雲端設定不完整，未使用預設值覆蓋');const rows=validate(normalizeStored(d.config[CONFIG]));rememberOvertimeOptions(d.config,'getOvertimeConfig');return {config:d.config,rows};}
  // Replace ONLY the cloud-owned overtime fields. Shallow Object.assign leaves
  // old archive flags behind when the authoritative cloud no longer has them.
  // Other context settings, such as permissions or local page data, stay intact.
@@ -1940,7 +1981,11 @@
      // Always read the current official rule table during preflight, including
      // original planned-review edits. Reuse this already verified snapshot
      // instead of performing a second GET after the Save spinner appears.
-     const validation=await prepareSaveValidation(validationRequest,true);
+     const validation=await prepareSaveValidation(validationRequest,true,(attempt,total,seconds)=>{
+      if(!el.isConnected||selectionKey()!==selection)
+       throw Error('申報視窗已關閉或內容已變更，取消重新核對。');
+      el.querySelector('#p79OtStatus').textContent='雲端正在處理其他資料，未寫入加班；自動重試核對 '+attempt+'/'+total+'（約 '+seconds+' 秒後）…';
+     });
      // Older GAS stores only the punch/work date. Never silently credit 04-08 to 11/08.
      if(prefill.sameDayCover&&validation.cloud?.capabilities?.sameDayCoverFourHourV1!==true)
       throw Error('正式 GAS 尚未部署同日兩位各 4 小時代班申報驗證；保留申報資料，禁止寫入錯誤日期或時段。');
@@ -2006,18 +2051,23 @@
        // Retry only an authoritative, no-write edit-lock refusal. Never
        // replay a timeout or unknown POST result; preserve the original ID.
        let result;
-       for(let attempt=0;attempt<3;attempt++){
+       for(let attempt=0;attempt<5;attempt++){
         try{
          result=await awaitOvertimeSaveConfirmation(global.p79OvertimeContext.saveReport(draft));
          break;
         }catch(error){
          const message=String(error?.message||'');
-         if(message!=='班表正在編輯，請待儲存完成後再申報')throw error;
-         if(attempt===2)throw Error('排班編輯鎖仍被占用，尚未寫入加班；原申報內容已保留。排班完成後可繼續申報，不必重新填寫。');
+         const rosterRefused=message==='班表正在編輯，請待儲存完成後再申報';
+         const serverRefused=error?.retryable===true&&error?.rejectedBeforeWrite===true;
+         // Only an explicit rejection BEFORE writing is safe to resend.
+         // A timeout, transport error, or unverified POST is NOT retried.
+         if(!rosterRefused&&!serverRefused)throw error;
+         if(attempt===4)throw Error('雲端仍忙碌，本次尚未寫入加班；已保留原申報資料與 ID，請稍後核對再申報。');
          if(!el.isConnected||selectionKey()!==selection)
           throw Error('申報視窗已關閉或內容已更動，停止自動重試；原申報內容已保留。');
-         el.querySelector('#p79OtStatus').textContent='排班正在編輯，未寫入加班；已保留原申報並自動重新核對 '+(attempt+1)+'/2…';
-         await new Promise(resolve=>setTimeout(resolve,1400*(attempt+1)));
+         const waitMs=Math.min(6500,Math.max(1000,Number(error.retryAfterMs)||1200)*(attempt+1));
+         el.querySelector('#p79OtStatus').textContent='雲端正在處理其他資料（明確未寫入），自動重試 '+(attempt+1)+'/4…';
+         await new Promise(resolve=>setTimeout(resolve,waitMs));
         }
        }
        verifySavedReport(draft,result);
