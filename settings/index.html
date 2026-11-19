@@ -119,7 +119,7 @@ async function reload(){if(busy||!verifiedSuperadmin)return;busy=true;q('reloadC
  var d=await cloudGet('hrGetOrgOptions');if(!d.config||typeof d.config!=='object')throw Error('雲端設定資料不完整');
  cloud=d.config;apply(safeSettings(cloud));status('✅ 已從雲端讀取正式設定','ok');
 }catch(e){setError(e);}finally{busy=false;q('reloadCloud').disabled=false;}}
-async function save(){if(!verifiedSuperadmin){status('沒有通過超級管理員雲端驗證，禁止寫入','error');return;}if(busy)return;var draft=readDraft();if(draft.notice.enabled&&!draft.notice.text){status('請先輸入要公告的內容','error');q('noticeText').focus();return;}
+async function save(){if(!verifiedSuperadmin){status('沒有通過超級管理員雲端驗證，禁止寫入','error');return false;}if(busy)return false;var draft=readDraft();if(draft.notice.enabled&&!draft.notice.text){status('請先輸入要公告的內容','error');q('noticeText').focus();return false;}
 busy=true;q('save').disabled=true;q('restore').disabled=true;status('正在讀取最新雲端設定並保存…');
 try{
  var latest=await cloudGet('hrGetOrgOptions');if(!latest.config||typeof latest.config!=='object')throw Error('無法確認雲端原始設定，已取消儲存');
@@ -131,7 +131,8 @@ try{
  if(JSON.stringify(actual)!==JSON.stringify(draft))throw Error('雲端讀回與本次設定不一致；請重新載入後核對');
  cloud=check.config;previous=actual;status('✅ 全域公告已儲存到正式雲端，並讀回確認。畫面設定已同步本機。','ok');
  localStorage.setItem('p79_settings_notice_cache_v1',JSON.stringify({at:Date.now(),notice:actual.notice}));
-}catch(e){setError(e);}finally{busy=false;q('save').disabled=false;q('restore').disabled=false;}}
+ return true;
+}catch(e){setError(e);return false;}finally{busy=false;q('save').disabled=false;q('restore').disabled=false;}}
 async function ping(){q('cloudPing').disabled=true;q('cloudState').textContent='正在向正式雲端查詢…';
  try{var d=await timeoutFetch(url()+'?action=ping&t='+Date.now(),null,9000);
  q('cloudState').textContent=d.ok===true?'✅ 雲端已回覆，連線正常':'⚠️ 雲端回覆格式未符合預期';}
@@ -145,9 +146,11 @@ async function init(){
  setLocalAppearance();q('yearMode').addEventListener('change',function(){saveLocal('port79_year_mode',this.value);status('✅ 年份顯示方式已儲存到本瀏覽器','ok');});
  q('themeMode').addEventListener('change',function(){saveLocal('port79_theme',this.value);D.documentElement.setAttribute('data-theme',this.value);status('✅ 主題已套用到本瀏覽器','ok');});
  q('cloudPing').addEventListener('click',ping);q('reloadCloud').addEventListener('click',function(){if(JSON.stringify(readDraft())!==JSON.stringify(previous)&&!confirm('重新讀取會捨棄尚未儲存的公告文字。確定繼續？'))return;reload();});
- q('save').addEventListener('click',save);q('restore').addEventListener('click',async function(){if(!confirm('恢復年份、主題與首頁公告預設？全域公告也會在確認後儲存到雲端。'))return;
+ q('save').addEventListener('click',save);q('restore').addEventListener('click',async function(){if(!verifiedSuperadmin||busy)return;if(!confirm('恢復年份、主題與首頁公告預設？全域公告會先在雲端確認成功才修改本機畫面設定。'))return;
+ var prior=readDraft();q('noticeEnabled').checked=false;q('noticeText').value='';
+ var confirmed=await save();if(!confirmed){q('noticeEnabled').checked=prior.notice.enabled;q('noticeText').value=prior.notice.text;return;}
  q('yearMode').value='gregorian';q('themeMode').value='light';saveLocal('port79_year_mode','gregorian');saveLocal('port79_theme','light');D.documentElement.setAttribute('data-theme','light');
- q('noticeEnabled').checked=false;q('noticeText').value='';await save();});
+ status('✅ 已讀回確認全域公告恢復預設，並更新本機主題與年份設定。','ok');});
  token=getToken();if(!token){q('gateText').textContent='沒有正式登入憑證，請返回首頁以超級管理員身分登入。';return;}
  try{auth=await cloudGet('getSessionMeta');var role=String(auth.adminRole||auth.actualAdminRole||auth.role||auth.session&&auth.session.adminRole||'').toLowerCase();
  var active=readSessionRole();if(role!=='superadmin'||active&&String(active.adminRole||active.role||'').toLowerCase()==='employee')throw Error('此頁只允許超級管理員修改；管理員請返回原工作模組');
