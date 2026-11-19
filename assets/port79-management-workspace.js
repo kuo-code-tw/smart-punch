@@ -13,10 +13,10 @@
 (function(){
 'use strict';
 const d=document,home=!d.body.dataset.p79System;
-const paths={attendance:'attendance/',schedule:'schedule/',leave:'leave/',hr:'hr/',workhours:'work-hours/',efficiency:'aqc-efficiency/',history:'history-data/'};
-const meta={home:['首頁','整合人力、考勤、排班與船舶作業，讓每一天的管理更順暢。'],attendance:['考勤管理','查詢出勤紀錄、核對異常與補卡，掌握每日出勤狀況。'],schedule:['排班管理','依月份、單位與組別查看班表，安排班別與人力。'],leave:['請假管理','請假申請、審核與可休天數，集中管理。'],hr:['人資管理','維護員工主檔、組織資料與系統權限。'],workhours:['加班管理','查詢出勤統計、核對申報加班與月結工時。'],efficiency:['碼頭系統管理','船舶作業明細、人員效率與月報輸出，集中查詢。'],history:['歷史資料庫','依月份查詢考勤、排班與船舶歷史資料。']};
-const order=['attendance','schedule','efficiency','hr','workhours','leave','history'];
-const icons={home:'<path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/>',attendance:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/>',schedule:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-14 4h2m3 0h2m3 0h1m-11 4h2m3 0h2"/>',leave:'<path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8m-8 4h5"/>',hr:'<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m1-15a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5"/>',workhours:'<path d="M4 20V11h3v9m4 0V5h3v15m4 0V2h3v18"/>',efficiency:'<path d="m3 13 9-3 9 3-3 6H6zm4-2V6h10v5M10 6V3h4v3M2 22q3-3 5 0 3-3 5 0 3-3 5 0 3-3 5 0"/>',history:'<path d="M3 5h18v5H3zm2 5v11h14V10m-10 4h6"/>',search:'<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>',menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 22a8 8 0 0 1 16 0"/>',arrow:'<path d="m9 5 7 7-7 7"/>'};
+const paths={attendance:'attendance/',schedule:'schedule/',leave:'leave/',hr:'hr/',workhours:'work-hours/',efficiency:'aqc-efficiency/',history:'history-data/',settings:'settings/'};
+const meta={home:['首頁','整合人力、考勤、排班與船舶作業，讓每一天的管理更順暢。'],attendance:['考勤管理','查詢出勤紀錄、核對異常與補卡，掌握每日出勤狀況。'],schedule:['排班管理','依月份、單位與組別查看班表，安排班別與人力。'],leave:['請假管理','請假申請、審核與可休天數，集中管理。'],hr:['人資管理','維護員工主檔、組織資料與系統權限。'],workhours:['加班管理','查詢出勤統計、核對申報加班與月結工時。'],efficiency:['碼頭系統管理','船舶作業明細、人員效率與月報輸出，集中查詢。'],history:['歷史資料庫','依月份查詢考勤、排班與船舶歷史資料。'],settings:['系統設置','集中管理實際可用的全域設定、備份與系統管理入口。']};
+const order=['attendance','schedule','efficiency','hr','workhours','leave','history','settings'];
+const icons={home:'<path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/>',attendance:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/>',schedule:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-14 4h2m3 0h2m3 0h1m-11 4h2m3 0h2"/>',leave:'<path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8m-8 4h5"/>',hr:'<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m1-15a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5"/>',workhours:'<path d="M4 20V11h3v9m4 0V5h3v15m4 0V2h3v18"/>',efficiency:'<path d="m3 13 9-3 9 3-3 6H6zm4-2V6h10v5M10 6V3h4v3M2 22q3-3 5 0 3-3 5 0 3-3 5 0 3-3 5 0"/>',history:'<path d="M3 5h18v5H3zm2 5v11h14V10m-10 4h6"/>',settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2.2 2.2m9.6 9.6L19 19M19 5l-2.2 2.2M5 19l2.2-2.2"/>',search:'<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>',menu:'<path d="M4 6h16M4 12h16M4 18h16"/>',user:'<circle cx="12" cy="8" r="4"/><path d="M4 22a8 8 0 0 1 16 0"/>',arrow:'<path d="m9 5 7 7-7 7"/>'};
 const icon=k=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(icons[k]||icons.leave)+'</svg>';
 const logo='<svg class="p79-port-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="27" r="24" fill="#dcefff"/><path d="M8 31 32 21l24 10-10 14H18z" fill="#1689ef"/><path d="M24 23V12h16v11M30 12V5" fill="none" stroke="#fff" stroke-width="5"/><path d="M2 49q12-9 28 0t32-2M5 57q12-7 27 0t27-2" fill="none" stroke="#197be1" stroke-width="4"/></svg>';
 let shell,bar,frame=0,navObserver,homePermissionSignature="";
@@ -43,6 +43,9 @@ function homeTarget(){return home?'./':'../';}
 // label and icon source. Aliases must not masquerade as separate systems.
 function decorateNav(){
  const nav=shell?.querySelector('#p79SevenNav');if(!nav)return;
+ if(!home&&String(account()?.adminRole||account()?.role||'').toLowerCase()==='superadmin'&&!nav.querySelector('[data-p79-settings-link]')){
+  const a=d.createElement('a');a.href='../settings/';a.dataset.p79SettingsLink='1';a.textContent='系統設置';nav.append(a);
+ }
  if(!nav.querySelector('[data-p79-workspace-home]')){
   const a=d.createElement('a');a.href=homeTarget();a.dataset.p79WorkspaceHome='1';
   if(home)a.className='active';
@@ -66,6 +69,7 @@ function decorateNav(){
 }
 function homeNavAllowed(key,source){
  const s=account(),role=String(s.adminRole||s.role||'employee').toLowerCase();
+ if(key==='settings')return role==='superadmin'&&!s.punchOnly;
  if(key==='history')return !!source&&!source.hidden&&!source.disabled&&source.style.display!=='none';
  if(role==='superadmin'&&!s.punchOnly)return true;
  if(role==='employee'||s.punchOnly)return false;
@@ -83,6 +87,7 @@ function buildHomeNav(){
   a.addEventListener('click',e=>{
    e.preventDefault();
    if(!homeNavAllowed(key,source))return;
+   if(key==='settings'){const target='./settings/';if(typeof window.p79NavigateWhileBackingUp==='function')window.p79NavigateWhileBackingUp(target);else location.href=target;return;}
    if(key==='history'){source.click();return;}
    if(typeof window.launchSystem==='function')window.launchSystem(key);
   });
