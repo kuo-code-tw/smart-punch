@@ -244,6 +244,8 @@ window.openAdminCreateLeave=async function(...args){
  $id('adminCreateLeaveDaily').checked=true;
  redraw();
 };
+// Consecutive days for one applicant are ONE leave record. Each day's cover
+// stays separate inside dailyAssignments. Different applicants form distinct runs.
 async function saveDaily(){
  if(adminCreateLeaveBusy)return;
  if(!adminSession||leaveAccess!=='manage'){alert('沒有新增請假管理權限');return;}
@@ -259,55 +261,102 @@ async function saveDaily(){
    const ids=[row.first,row.second].filter(Boolean);
    if(!ids.length||new Set(ids.map(String)).size!==ids.length)throw Error(date+' 請選擇一至兩位不同代班人員');
    if(window.P79SmartCoverPicker&&ids.length!==(row.secondVisible?2:1))throw Error(date+' 請按代班模式完整勾選人員');
-   if(window.P79SmartCoverPicker){const opts=window.P79SmartCoverPicker.candidates(smartOptions(date,row,employee,people));if(ids.some(id=>!opts.some(x=>x.id===id&&!x.disabled)))throw Error(date+' 已核准請假或重複代班人員不得儲存');}
+   if(window.P79SmartCoverPicker){
+    const opts=window.P79SmartCoverPicker.candidates(smartOptions(date,row,employee,people));
+    if(ids.some(id=>!opts.some(x=>x.id===id&&!x.disabled)))throw Error(date+' 已核准請假或重複代班人員不得儲存');
+   }
    if(!String(employee.dept||'').trim())throw Error(date+' 請假人員未設定部門');
    for(const id of ids){
     const worker=people.find(p=>String(p.empId)===String(id));
-    if(!worker||String(worker.empId)===String(employee.empId)||String(worker.dept||'').trim()!==String(employee.dept||'').trim())throw Error(date+' 代班人員必須是同部門在職的其他人員');
+    if(!worker||String(worker.empId)===String(employee.empId)||String(worker.dept||'').trim()!==String(employee.dept||'').trim())
+     throw Error(date+' 代班人員必須是同部門在職的其他人員');
    }
-   plans.push({date,id:row.id,employee,ids,mode:ids.length===2?'two':'one',overtimeTypeByWorker:{[String(row.first)]:row.firstOvertimeType||'',...(row.second?{[String(row.second)]:row.secondOvertimeType||''}:{})}});
+   plans.push({date,id:row.id,employee,ids,mode:ids.length===2?'two':'one',
+    overtimeTypeByWorker:{[String(row.first)]:row.firstOvertimeType||'',...(row.second?{[String(row.second)]:row.secondOvertimeType||''}:{})}});
   }
  }catch(e){notice.textContent=e.message;return;}
+ // Create one approved leave per uninterrupted run of dates for the same employee.
+ // A deliberately changed applicant starts a separate application.
+ const groups=[];
+ for(const p of plans){
+  const last=groups[groups.length-1];
+  const contiguous=last&&Date.parse(p.date+'T00:00:00Z')-Date.parse(last.endDate+'T00:00:00Z')===86400000;
+  if(last&&contiguous&&String(last.employee.empId)===String(p.employee.empId)){
+   last.endDate=p.date;last.days++;last.plans.push(p);
+  }else groups.push({id:p.id,employee:p.employee,startDate:p.date,endDate:p.date,days:1,plans:[p]});
+ }
+ for(const group of groups)group.dailyAssignments=group.plans.map(p=>({date:p.date,mode:p.mode,workerIds:p.ids}));
  const button=$id('adminCreateLeaveSave'),done=[],entries=[];
- adminCreateLeaveBusy=true;button.disabled=true;button.textContent='逐日儲存中…';
+ adminCreateLeaveBusy=true;button.disabled=true;button.textContent='請假及代班儲存中…';
  try{
   const fresh=await p79ReadCurrentLeaveCoverState();
-  if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))throw Error(fresh?.error||'無法核對雲端資料');
-  for(const p of plans){
-   notice.textContent='正在儲存 '+p.date+'｜'+p.employee.name;
-   const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{id:p.id,empId:p.employee.empId,leaveType:type,startDate:p.date,endDate:p.date,mode:p.mode,workerIds:p.ids});
-   const localPlan=rows.get(p.date);if(localPlan)localPlan.id=plan.leaveId; // preserve confirmed identity for partial retry
+  if(!fresh?.ok||!Array.isArray(fresh.leaveRecords)||!Array.isArray(fresh.leaveCoverAssignments))
+   throw Error(fresh?.error||'無法核對雲端資料');
+  for(const group of groups){
+   const employee=group.employee,span=group.startDate===group.endDate?group.startDate:group.startDate+' ～ '+group.endDate;
+   notice.textContent='正在儲存 '+span+'｜'+employee.name+'（'+group.days+' 天合併一筆）';
+   // Never create an overlapping multi-day request over older one-day records.
+   // Those require a deliberate migration including their cover/overtime links.
+   const overlapping=fresh.leaveRecords.filter(l=>
+    String(l.empId)===String(employee.empId)&&String(l.leaveType)===String(type)&&
+    String(l.status)==='已核准'&&
+    normalizeLeaveFilterDate(l.startTime||l.startDate)<=group.endDate&&
+    normalizeLeaveFilterDate(l.endTime||l.endDate||l.startTime||l.startDate)>=group.startDate);
+   if(overlapping.some(l=>normalizeLeaveFilterDate(l.startTime||l.startDate)!==group.startDate||
+    normalizeLeaveFilterDate(l.endTime||l.endDate||l.startTime||l.startDate)!==group.endDate))
+    throw Error(span+' 已有部分重疊的請假紀錄（可能是舊版逐日單），為避免重複扣假與代班，請先整併既有資料');
+   const assignment=group.dailyAssignments[0];
+   const plan=p79PlanLeaveCoverRequest(fresh.leaveRecords,fresh.leaveCoverAssignments,{
+    id:group.id,empId:employee.empId,leaveType:type,startDate:group.startDate,endDate:group.endDate,
+    mode:assignment.mode,workerIds:assignment.workerIds,dailyAssignments:group.dailyAssignments
+   });
+   group.id=plan.leaveId;
+   // Retain the same application ID across all dates on retry.
+   group.plans.forEach(p=>{const row=rows.get(p.date);if(row)row.id=plan.leaveId;});
    if(!plan.existing){
-    await postCloud({action:'addLeaveRecord',leave:{id:plan.leaveId,empId:p.employee.empId,attNo:p.employee.attNo||'',name:p.employee.name||'',dept:p.employee.dept||'',leaveType:type,startDate:p.date,endDate:p.date,days:1,reason:$id('adminCreateLeaveReason').value.trim(),status:'已核准',source:'manual-admin'}});
-    fresh.leaveRecords.push({id:plan.leaveId,empId:p.employee.empId,leaveType:type,startDate:p.date,endDate:p.date,status:'已核准'});
+    await postCloud({action:'addLeaveRecord',leave:{
+     id:plan.leaveId,empId:employee.empId,attNo:employee.attNo||'',name:employee.name||'',dept:employee.dept||'',
+     leaveType:type,startDate:group.startDate,endDate:group.endDate,days:group.days,
+     reason:$id('adminCreateLeaveReason').value.trim(),status:'已核准',source:'manual-admin'
+    }});
+    fresh.leaveRecords.push({id:plan.leaveId,empId:employee.empId,leaveType:type,startDate:group.startDate,endDate:group.endDate,status:'已核准'});
    }
    if(!plan.covered){
-    const result=await postCloud({action:'saveLeaveCoverAssignment',leaveId:plan.leaveId,mode:p.mode,workerIds:p.ids});
-    if(!result?.ok)throw Error('代班儲存未獲雲端確認');
-    fresh.leaveCoverAssignments.push({leaveEmpId:p.employee.empId,leaveId:plan.leaveId,startDate:p.date,endDate:p.date,mode:p.mode,workerIds:p.ids});
+    notice.textContent='請假已儲存，正在同步 '+span+' 的 '+group.days+' 天代班明細…';
+    const result=await postCloud({action:'saveLeaveCoverAssignment',leaveId:plan.leaveId,
+     mode:assignment.mode,workerIds:assignment.workerIds,dailyAssignments:group.dailyAssignments});
+    if(!result?.ok||result.dailyAssignmentsSaved!==true)
+     throw Error(span+' 每日代班未獲雲端完整確認；請核對後再試，不會重複新增請假');
+    for(const daily of group.dailyAssignments)
+     fresh.leaveCoverAssignments.push({leaveEmpId:employee.empId,leaveId:plan.leaveId,
+      startDate:daily.date,endDate:daily.date,mode:daily.mode,workerIds:daily.workerIds});
     const confirmedEntries=[];
-    for(const id of p.ids){const worker=people.find(e=>String(e.empId)===String(id));confirmedEntries.push({leaveId:plan.leaveId,empId:String(id),name:worker?.name||'',date:p.date,forEmpId:String(p.employee.empId),preferredType:p.overtimeTypeByWorker[String(id)]||''});}
-    // Preserve each confirmed day immediately, including when a later day fails.
+    for(const p of group.plans)for(const id of p.ids){
+     const worker=people.find(e=>String(e.empId)===String(id));
+     confirmedEntries.push({leaveId:plan.leaveId,empId:String(id),name:worker?.name||'',
+      date:p.date,forEmpId:String(employee.empId),preferredType:p.overtimeTypeByWorker[String(id)]||''});
+    }
+    // Save pending overtime handoffs even when a later group cannot be confirmed.
     p79AppendLeaveHandoffEntries(confirmedEntries);entries.push(...confirmedEntries);
    }
-   done.push(p.date+' '+p.employee.name);
+   done.push(span+' '+employee.name);
   }
+  // Close immediately when ALL leave and cover saves are confirmed.
   $id('adminCreateLeaveDialog').close();
-  setStatus('✅ 已儲存 '+done.length+' 筆請假及代班；正在開啟第一位代班人員加班申報核對視窗','success');
+  setStatus('✅ 已儲存 '+groups.length+' 筆請假（共 '+plans.length+' 天），每日代班已同步','success');
   if(entries.length){
-   p79AppendLeaveHandoffEntries(entries);
-   // Open only after ALL selected dates have confirmed cloud saves.
-   // Keep other employees/days pending; this never files overtime automatically.
-   p79ActivateLeaveHandoff();
-   p79UpdateLeaveHandoffBanner();
-   if(typeof window.p79LaunchLeaveOvertimeAfterSave==='function')
-    window.p79LaunchLeaveOvertimeAfterSave();
+   try{
+    p79ActivateLeaveHandoff();p79UpdateLeaveHandoffBanner();
+    if(typeof window.p79LaunchLeaveOvertimeAfterSave==='function')window.p79LaunchLeaveOvertimeAfterSave();
+   }catch(error){setStatus('✅ 請假與代班已儲存，但加班申報視窗未成功開啟：'+String(error?.message||error),'warn');}
   }
   void loadCloud(false,true);
  }catch(error){
-  notice.textContent='已完成 '+done.length+' 天：'+done.join('、')+'。剩餘未確認：'+String(error?.message||error)+'。請先核對雲端避免重複新增。';
+  notice.textContent='已確認 '+done.length+' 筆連續假期：'+done.join('、')+'。未完成：'+String(error?.message||error)+'。視窗與資料已保留，請先核對雲端避免重複新增。';
   void loadCloud(false,true);
- }finally{adminCreateLeaveBusy=false;button.disabled=false;button.textContent='儲存請假並安排代班';}
+ }finally{
+  adminCreateLeaveBusy=false;button.disabled=false;button.textContent='儲存請假並安排代班';
+ }
 }
 window.saveAdminCreateLeave=function(){
  if($id('adminCreateLeaveDaily')?.checked&&!$id('adminCreateLeaveNoCover')?.checked)return saveDaily();
