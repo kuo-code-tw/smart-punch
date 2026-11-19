@@ -8,6 +8,13 @@ on:
       - 'tests/vessel-corrected-working-no-alias.cjs'
       - 'tests/vessel-correction-source-cleanup.cjs'
       - '.github/workflows/vessel-corrected-working-no.yml'
+  pull_request:
+    paths:
+      - 'aqc-efficiency/index.html'
+      - 'assets/port79-vessel-versions.js'
+      - 'tests/vessel-corrected-working-no-alias.cjs'
+      - 'tests/vessel-correction-source-cleanup.cjs'
+      - '.github/workflows/vessel-corrected-working-no.yml'
   workflow_dispatch:
 permissions:
   contents: read
