@@ -9498,6 +9498,9 @@ function mergeEfficiencyCloudData(d){
   }
   if(Array.isArray(d?.records)&&d.records.length){
     records=mergeCloudRecordsWithLocal(d.records,records);
+    // Month-scoped refresh must not restore a superseded numbered edition.
+    if(typeof p79PruneVerifiedCorrectedVesselRecords==='function')
+      records=p79PruneVerifiedCorrectedVesselRecords(shipMasters,records).records;
   }
 
   if(Array.isArray(d?.availableMonths)){
