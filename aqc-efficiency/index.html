@@ -10378,6 +10378,12 @@ function parseBundleRemark(text){
     .toUpperCase()
     .replace(/[’′]/g,"'")
     .replace(/\u00A0/g,' ')
+    // Recognize the same explicit BN/FR or BN/FL pair across supplier
+    // formats (fullwidth slash, ×, equals, commas and colon).
+    .replace(/[／∕⁄]/g,'/')
+    .replace(/[×＊]/g,'*')
+    .replace(/[：=,，＋+]/g,'/')
+    .replace(/\b(BN|FR|FL)\s*\/\s*(?=\d)/g,'$1')
     .replace(/[ \t]+/g,' ')
     .trim();
 
@@ -10413,14 +10419,14 @@ function parseBundleRemark(text){
   };
 
   // 格式 1：2BN/7FR、5BN/20FL（舊有格式）
-  const normal=/(?:^|[^0-9])(?:(20|40|45)\s*'?\s*\*?\s*)?(\d+(?:\.\d+)?)\s*BN\s*\/\s*(\d+(?:\.\d+)?)\s*(FR|FL)/gi;
+  const normal=/(?:^|[^0-9])(?:(20|40|45)\s*'?\s*\*?\s*)?(\d+(?:\.\d+)?)\s*BN\s*(?:\/|\s+)\s*(\d+(?:\.\d+)?)\s*(FR|FL)/gi;
   let m;
   while((m=normal.exec(s))){
     pushItem(m[1],m[2],m[3],m[4],m[0],`N:${m.index}:${m[0]}`);
   }
 
   // 格式 2：7FR/2BN、20FL/5BN（WAN HAI 272 N229 實際使用格式）
-  const reverse=/(?:^|[^0-9])(?:(20|40|45)\s*'?\s*\*?\s*)?(\d+(?:\.\d+)?)\s*(FR|FL)\s*\/\s*(\d+(?:\.\d+)?)\s*BN/gi;
+  const reverse=/(?:^|[^0-9])(?:(20|40|45)\s*'?\s*\*?\s*)?(\d+(?:\.\d+)?)\s*(FR|FL)\s*(?:\/|\s+)\s*(\d+(?:\.\d+)?)\s*BN/gi;
   while((m=reverse.exec(s))){
     pushItem(m[1],m[4],m[2],m[3],m[0],`R:${m.index}:${m[0]}`);
   }
@@ -10447,6 +10453,22 @@ function parseBundleRemark(text){
   while((m=labelFirstReverse.exec(s))){
     pushItem('',m[3],m[2],m[1],m[0],`LFR:${m.index}:${m[0]}`);
   }
+
+  // Mix of value-first and label-first notation: BN2/7FR, 2BN/FL7,
+  // FR7/2BN and 7FR/BN2. Both group and container evidence are mandatory.
+  const mixed=[
+    {re:/\bBN\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(FR|FL)/gi,read:m=>[m[1],m[2],m[3]]},
+    {re:/(?:^|[^0-9])(\d+(?:\.\d+)?)\s*BN\s*\/\s*(FR|FL)\s*(\d+(?:\.\d+)?)/gi,read:m=>[m[1],m[3],m[2]]},
+    {re:/\b(FR|FL)\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*BN/gi,read:m=>[m[3],m[2],m[1]]},
+    {re:/(?:^|[^0-9])(\d+(?:\.\d+)?)\s*(FR|FL)\s*\/\s*BN\s*(\d+(?:\.\d+)?)/gi,read:m=>[m[3],m[1],m[2]]}
+  ];
+  mixed.forEach(({re,read},i)=>{
+    let found;
+    while((found=re.exec(s))){
+      const [bn,fl,unit]=read(found);
+      pushItem('',bn,fl,unit,found[0],'M'+i+':'+found.index+':'+found[0]);
+    }
+  });
 
   const deduct=items.reduce((a,x)=>a+num(x.deduct),0);
   const fl=items.reduce((a,x)=>a+num(x.fl),0);
@@ -11982,6 +12004,7 @@ function isWorkingReportOperationRow(row,colMap){
 function workingReportContinuationInfo(rows,rowIndex,colMap){
   const col=colMap||{stopItem:17,stopTime:18,remark:19,name:4,start:1,end:3};
   const remarks=[];
+  const sourceOccurrences=new Set();
   let stopMinutes=0;
 
   for(let r=rowIndex;r<rows.length;r++){
@@ -11995,7 +12018,13 @@ function workingReportContinuationInfo(rows,rowIndex,colMap){
 
     [col.stopItem,col.remark].forEach(c=>{
       const s=String(row[c]||'').trim();
-      if(s && !remarks.includes(s))remarks.push(s);
+      if(!s)return;
+      // Distinct physical worksheet rows with the same remark are distinct
+      // Bundle events; do not collapse a second 1BN/4FR into the first.
+      const occurrence=r+'|'+s.toUpperCase().replace(/\s+/g,' ');
+      if(sourceOccurrences.has(occurrence))return;
+      sourceOccurrences.add(occurrence);
+      remarks.push(s);
     });
 
     const stopItem=String(row[col.stopItem]||'').trim();
