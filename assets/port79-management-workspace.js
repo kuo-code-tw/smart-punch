@@ -43,7 +43,7 @@ function homeTarget(){return home?'./':'../';}
 // label and icon source. Aliases must not masquerade as separate systems.
 function decorateNav(){
  const nav=shell?.querySelector('#p79SevenNav');if(!nav)return;
- if(!home&&String(account()?.adminRole||account()?.role||'').toLowerCase()==='superadmin'&&!nav.querySelector('[data-p79-settings-link]')){
+ if(!home&&['admin','superadmin'].includes(String(account()?.adminRole||account()?.role||'').toLowerCase())&&!nav.querySelector('[data-p79-settings-link]')){
   const a=d.createElement('a');a.href='../settings/';a.dataset.p79SettingsLink='1';a.textContent='系統設置';nav.append(a);
  }
  if(!nav.querySelector('[data-p79-workspace-home]')){
@@ -69,7 +69,7 @@ function decorateNav(){
 }
 function homeNavAllowed(key,source){
  const s=account(),role=String(s.adminRole||s.role||'employee').toLowerCase();
- if(key==='settings')return role==='superadmin'&&!s.punchOnly;
+ if(key==='settings')return ['admin','superadmin'].includes(role)&&!s.punchOnly;
  if(key==='history')return !!source&&!source.hidden&&!source.disabled&&source.style.display!=='none';
  if(role==='superadmin'&&!s.punchOnly)return true;
  if(role==='employee'||s.punchOnly)return false;
