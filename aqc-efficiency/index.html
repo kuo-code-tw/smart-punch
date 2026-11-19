@@ -2724,11 +2724,13 @@ function summaryRows(){
   // edit copies excluded from the vessel leaderboard. Keep records in storage.
   const versioned=typeof window!=='undefined'?window.P79VesselVersionView:null;
   const superseded=new Set(versioned?.collapse?.(shipMasters||[])?.excludedWorkingNos||[]);
-  const verifiedAliases=p79VerifiedCorrectedVesselAliases(shipMasters,records);
+  const verifiedAliases=typeof p79VerifiedCorrectedVesselAliases==='function'
+    ?p79VerifiedCorrectedVesselAliases(shipMasters,records):new Map();
   const base=canonicalOperationalRecords((records||[]).filter(r=>
     recordMatches(r)&&recordIsCurrentShipDetail(r,completionIndex)&&
     !superseded.has(String(r?.workingNo||'').trim().toUpperCase())&&
-    !p79IsSupersededCorrectedVesselRow(r,verifiedAliases)));
+    !(typeof p79IsSupersededCorrectedVesselRow==='function'&&p79IsSupersededCorrectedVesselRow(r,verifiedAliases))&&
+    !(typeof p79IsSupersededOrphanWorkingReportRow==='function'&&p79IsSupersededOrphanWorkingReportRow(r,shipMasters))));
   const byId=new Map(),byName=new Map(),personRows=ps.map(()=>[]),historicalRows=new Map();
   ps.forEach((p,i)=>{
     for(const [index,key] of [[byId,p.empId],[byName,normalizePersonName(p.name)]]){
@@ -3037,7 +3039,8 @@ function vesselJobRows(monthOverride=''){
   const completionIndex=shipCompletionIndex(shipMasters||[]);
   records.filter(r=>String(r.source||'')==='working-report').forEach(r=>{
     if(!recordIsCurrentShipDetail(r,completionIndex)||
-       p79IsSupersededCorrectedVesselRow(r,verifiedAliases))return;
+       p79IsSupersededCorrectedVesselRow(r,verifiedAliases)||
+       (typeof p79IsSupersededOrphanWorkingReportRow==='function'&&p79IsSupersededOrphanWorkingReportRow(r,shipMasters)))return;
     if(rangeActive){
       if(!dateWithinDashboardRange(r.workDate))return;
     }else{
@@ -9500,6 +9503,53 @@ function p79IsSupersededCorrectedVesselRow(row,aliases){
   });
 }
 
+// A source-only WORKING REPORT row has no ship master to open after its
+// original WORKING NO was replaced. The verified-manifest filter above can
+// be unavailable during partial cloud reads, so use the corrected master
+// lineage to keep this orphan OUT of active UI/accounting, without deleting
+// or rewriting the historical cloud record. A separate call or later import
+// is not a duplicate.
+function p79IsSupersededOrphanWorkingReportRow(row,masters){
+  if(String(row?.source||'')!=='working-report')return false;
+  if(row?.manualEditedAt||row?.editedAt)return false;
+  const overrides=row?.manualOverrides;
+  if(overrides&&typeof overrides==='object'&&
+     Object.keys(overrides).some(key=>!key.startsWith('_')&&overrides[key]!==undefined))return false;
+  const original=String(row?.workingNo||'').trim();
+  if(!/^\d{7,}$/.test(original))return false;
+  const source=String(row?.sourceWorkingNo||'').trim();
+  if(source&&source!==original)return false;
+  const list=Array.isArray(masters)?masters:[];
+  const oldWharf=normalizeShipText(row?.wharf);
+  const oldShip=normalizeShipText(row?.shipName||row?.vessel);
+  const oldVoyage=normalizeShipText(row?.voyageI||row?.voyageE||row?.voyage);
+  const date=String(row?.workDate||'').slice(0,10);
+  if(!oldShip||!oldWharf||!oldVoyage||!/^20\d{2}-\d{2}-\d{2}$/.test(date))return false;
+  // Only an orphan: a real independently retained master is authoritative.
+  if(list.some(m=>String(m?.workingNo||'').trim()===original&&
+    normalizeShipText(m?.wharf)===oldWharf))return false;
+  const rowStamp=Date.parse(String(row?.workingSheetImportedAt||''))||0;
+  return list.some(m=>{
+    const current=String(m?.workingNo||'').trim();
+    const from=String(m?.sourceWorkingNo||m?.workingSheetSource?.sourceWorkingNo||'').trim();
+    if(!/^\d{7,}$/.test(current)||current===original||from!==original||
+       vesselImportCallNumber(m)!==vesselImportCallNumber(row))return false;
+    if(normalizeShipText(m?.vessel)!==oldShip||
+       normalizeShipText(m?.wharf)!==oldWharf||
+       normalizeShipText(m?.voyageI||m?.voyageE)!==oldVoyage)return false;
+    const first=String(m?.firstDate||m?.compareDate||'').slice(0,10);
+    const last=String(m?.lastDate||m?.compareDate||first).slice(0,10);
+    if(!/^20\d{2}-\d{2}-\d{2}$/.test(first)||
+       !/^20\d{2}-\d{2}-\d{2}$/.test(last)||date<first||date>last)return false;
+    const currentStamp=Date.parse(String(m?.workingSheetImportedAt||m?.workingSheetSource?.importedAt||''))||0;
+    if(!currentStamp||(rowStamp&&rowStamp>currentStamp))return false;
+    // Require an actual WORKING SHEET snapshot for the corrected master,
+    // not just a manually typed number alias.
+    const ws=m?.workingSheetSource;
+    const moves=Number(ws?.totalMoves??m?.totalMoves);
+    return !!ws&&Number.isFinite(moves)&&moves>0;
+  });
+}
 function shipMasterToSummary(s){
   if(!s)return null;
   return {
@@ -14182,7 +14232,8 @@ function vesselJobRowsForMonth(month){
     (records||[])
       .filter(r=>String(r.source||'')==='working-report')
       .forEach(r=>{
-        if(p79IsSupersededCorrectedVesselRow(r,verifiedAliases))return;
+        if(p79IsSupersededCorrectedVesselRow(r,verifiedAliases)||
+           (typeof p79IsSupersededOrphanWorkingReportRow==='function'&&p79IsSupersededOrphanWorkingReportRow(r,shipMasters)))return;
         if(target&&!String(r.workDate||'').startsWith(target))return;
         const no=String(r.workingNo||'').trim();
         let vessel=String(r.shipName||r.vessel||'').trim();

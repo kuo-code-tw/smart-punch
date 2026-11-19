@@ -30,6 +30,8 @@ jobs:
       - name: Verify explicit cross-number correction and existing reimports
         run: |
           node tests/vessel-corrected-working-no-alias.cjs
+          node tests/vessel-dashboard-month-scope-20261102.cjs
+          node tests/dashboard-historical-workers.cjs
           node tests/vessel-correction-source-cleanup.cjs
           node tests/original-vessel-reimport.cjs
           node tests/working-report-reimport-replacement.cjs
