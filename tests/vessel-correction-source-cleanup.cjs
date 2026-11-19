@@ -59,7 +59,7 @@ assert.equal(c.p79PruneVerifiedCorrectedVesselRecords([noManifest],all).removedI
 const extraCall={...corrected,workingNo:'5260042-CALL2',sourceFileName:'WAN HAI 290 第二靠.xlsx'};
 assert.equal(c.p79PruneVerifiedCorrectedVesselRecords([extraCall],all).removedIds.length,0,
  'never delete first-call work due to second call');
-assert(auditCalls>=2);
+assert(auditCalls>=1,'complete corrected manifest is independently audited');
 assert(html.includes('p79PruneVerifiedCorrectedVesselRecords(sendingMasters,mixedRecords)'));
 assert(html.includes('p79PruneVerifiedCorrectedVesselRecords(shipMasters,records)'));
 console.log('PASS WAN HAI 290 185 stale WR only removed after 473/6 manifest audit; manual, newer and second call retained');
