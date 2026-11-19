@@ -1,0 +1,30 @@
+name: Verify working report bundle source reconciliation
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'aqc-efficiency/index.html'
+      - 'tests/wanhai-278-bundle-reconciliation.cjs'
+      - '.github/workflows/bundle-reconcile.yml'
+  pull_request:
+    paths:
+      - 'aqc-efficiency/index.html'
+      - 'tests/wanhai-278-bundle-reconciliation.cjs'
+      - '.github/workflows/bundle-reconcile.yml'
+permissions:
+  contents: read
+jobs:
+  bundle-reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reproduce and reconcile original workbook gross vs bundle
+        run: |
+          node tests/wanhai-278-bundle-reconciliation.cjs
+          node tests/working-sheet-bundle-source-occurrences.cjs
+          node tests/working-sheet-bundle-pending-import.cjs
+          node tests/dashboard-working-report-audit.cjs
