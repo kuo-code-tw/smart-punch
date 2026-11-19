@@ -22,6 +22,8 @@ const doc={filterMonth:{value:'2026-10'},rankingMonth:{value:'2026-10'}},ctx={
  getPort79Year:()=> '2026',dashboardDateRange:()=>({active:false}),dateWithinDashboardRange:()=>true,
  applyShipManualOverrides:x=>x,people:()=>[],normalizePersonName:v=>String(v||''),
  canonicalOperationalRecords:x=>x,personGroupId:()=>'',effectiveHours:r=>r.timeHours,
+ p79VerifiedCorrectedVesselAliases:()=>new Map(),
+ p79IsSupersededCorrectedVesselRow:()=>false,
  recordMoveValues:r=>({disc:r.disc,load:r.load}),num:v=>Number(v)||0,
  round:(v,p=2)=>Number(Number(v).toFixed(p))
 };vm.createContext(ctx);
