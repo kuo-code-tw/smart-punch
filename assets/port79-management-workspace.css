@@ -232,12 +232,12 @@ html body.p79-workspace[data-p79-system="workhours"] :is(.p79-stats-table-wrap,.
   touch-action:manipulation!important
  }
 }
-/* On desktop keep the content and topbar anchored while hiding only the sidebar.
-   This prevents the three-line menu from shifting the page. */
+/* Desktop hamburger must release its reserved width so content fills the screen.
+   Body padding and topbar left offset already use --p79-w-width. */
 @media screen and (min-width:901px) {
- html body.p79-workspace.p79-nav-collapsed{--p79-w-width:230px!important}
+ html body.p79-workspace.p79-nav-collapsed{--p79-w-width:0px!important}
  html body.p79-workspace.p79-nav-collapsed :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{
-  display:flex!important;transform:translateX(-100%)!important;
+  display:none!important;transform:translateX(-100%)!important;
   visibility:hidden!important;pointer-events:none!important
  }
  html body.p79-workspace:not(.p79-nav-collapsed) :is(#p79SevenTop,#p79WorkspaceSidebar).p79-workspace-sidebar{
