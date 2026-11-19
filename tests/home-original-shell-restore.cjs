@@ -16,7 +16,7 @@ assert.match(js,/item\.classList\.toggle\('is-available',permitted\)/,'permissio
 assert.match(js,/className='p79-status-light'/,'status light element is required');
 assert(!js.includes("a.style.opacity='0.55'"),'do not fade disabled menu links to unreadable opacity');
 assert(!js.includes("available.textContent=permitted?'可使用':'不可使用'"),'homepage must not replace live activity with fixed green availability');
-assert(/port79-home-cloud-status\\.js\\?v=[^"'\\s<>]+/.test(html),'live home cloud poller must be loaded, regardless of cache revision');
+assert(html.includes('port79-home-cloud-status.js?v='),'live home cloud poller must be loaded, regardless of cache revision');
 assert(!js.includes("intro.innerHTML="),'homepage script must not overwrite native title');
 assert(!js.includes("card.querySelector('.name').textContent="),'native system names stay unchanged');
 assert(!js.includes("card.querySelector('.icon').innerHTML="),'native system icons stay unchanged');
