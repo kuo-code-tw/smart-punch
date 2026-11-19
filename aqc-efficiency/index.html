@@ -10382,7 +10382,7 @@ function parseBundleRemark(text){
     // formats (fullwidth slash, ×, equals, commas and colon).
     .replace(/[／∕⁄]/g,'/')
     .replace(/[×＊]/g,'*')
-    .replace(/[：=,，＋+]/g,'/')
+    .replace(/[：:=,，＋+]/g,'/')
     .replace(/\b(BN|FR|FL)\s*\/\s*(?=\d)/g,'$1')
     .replace(/[ \t]+/g,' ')
     .trim();
