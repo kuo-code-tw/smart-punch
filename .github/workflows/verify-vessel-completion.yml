@@ -7,6 +7,7 @@ on:
       - 'tests/vessel-completion-export-integrity.cjs'
       - 'tests/vessel-monthly-export.cjs'
       - 'tests/dashboard-monthly-quantity-reconciliation.cjs'
+      - 'tests/working-sheet-bundle-source-occurrences.cjs'
       - '.github/workflows/verify-vessel-completion.yml'
   push:
     branches: [main]
@@ -15,10 +16,20 @@ on:
       - 'tests/vessel-completion-export-integrity.cjs'
       - 'tests/vessel-monthly-export.cjs'
       - 'tests/dashboard-monthly-quantity-reconciliation.cjs'
+      - 'tests/working-sheet-bundle-source-occurrences.cjs'
       - '.github/workflows/verify-vessel-completion.yml'
 permissions:
   contents: read
 jobs:
+  bundle-source-auto-recognition:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Bundle automatic source recognition independently
+        run: node tests/working-sheet-bundle-source-occurrences.cjs
   vessel-completion-exports:
     runs-on: ubuntu-latest
     steps:
@@ -34,6 +45,7 @@ jobs:
           node tests/efficiency-sync-light.cjs
           node tests/vessel-berth-job-isolation.cjs
           node tests/dashboard-working-report-audit.cjs
+          node tests/working-sheet-bundle-source-occurrences.cjs
           node tests/vessel-driver-history.cjs
           node tests/vessel-all-month-name-directory.cjs
           node tests/vessel-completion-export-integrity.cjs
