@@ -3,6 +3,13 @@ on:
   pull_request:
     paths:
       - 'assets/port79-seven-top.js'
+      - 'assets/port79-management-workspace.css'
+      - 'assets/port79-home-original-shell.css'
+      - 'assets/port79-leave-unified-sidebar.css'
+      - 'assets/port79-schedule-reference-design.css'
+      - 'tests/workspace-sidebar-fullwidth-toggle.cjs'
+      - 'tests/home-original-shell-restore.cjs'
+      - 'tests/leave-sidebar-shared-parity.cjs'
       - 'tests/sidebar-terminal-system-rename.cjs'
       - '.github/workflows/sidebar-terminal-system-rename.yml'
       - 'attendance/index.html'
@@ -16,6 +23,13 @@ on:
     branches: [main]
     paths:
       - 'assets/port79-seven-top.js'
+      - 'assets/port79-management-workspace.css'
+      - 'assets/port79-home-original-shell.css'
+      - 'assets/port79-leave-unified-sidebar.css'
+      - 'assets/port79-schedule-reference-design.css'
+      - 'tests/workspace-sidebar-fullwidth-toggle.cjs'
+      - 'tests/home-original-shell-restore.cjs'
+      - 'tests/leave-sidebar-shared-parity.cjs'
       - 'tests/sidebar-terminal-system-rename.cjs'
       - '.github/workflows/sidebar-terminal-system-rename.yml'
       - 'attendance/index.html'
@@ -39,3 +53,6 @@ jobs:
       - run: |
           node tests/sidebar-terminal-system-rename.cjs
           node tests/seven-top-status-icons.cjs
+          node tests/workspace-sidebar-fullwidth-toggle.cjs
+          node tests/home-original-shell-restore.cjs
+          node tests/leave-sidebar-shared-parity.cjs

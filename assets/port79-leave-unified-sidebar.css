@@ -125,10 +125,10 @@
 }
 @media screen and (min-width:901px) {
  :is(html.p79-leave-reference-admin.p79-leave-pixel-admin,html.p79-leave-reference-admin) body.p79-workspace[data-p79-system="leave"].p79-nav-collapsed{
-  --p79-w-width:230px!important;padding-left:230px!important;
+  --p79-w-width:0px!important;padding-left:0!important;
  }
  :is(html.p79-leave-reference-admin.p79-leave-pixel-admin,html.p79-leave-reference-admin) body.p79-workspace[data-p79-system="leave"].p79-nav-collapsed #p79SevenTop.p79-workspace-sidebar{
-  display:flex!important;transform:translateX(-100%)!important;
+  display:none!important;transform:translateX(-100%)!important;
   visibility:hidden!important;pointer-events:none!important;
  }
 }

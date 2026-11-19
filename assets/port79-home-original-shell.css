@@ -89,6 +89,11 @@ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus .
 @media screen and (max-width:1100px){
  html body.p79-workspace:has(#systems.show) #p79WorkspaceTopbar .p79-toolbar-user-caption{display:none!important}
 }
+/* Homepage default sidebar width is more specific than the shared rule.
+   Remove its reserved 230px too when the desktop drawer is collapsed. */
+@media screen and (min-width:901px){
+  html body.p79-workspace:has(#systems.show).p79-nav-collapsed{--p79-w-width:0px!important}
+}
 @media screen and (max-width:900px){
  html body.p79-workspace:has(#systems.show){--p79-w-width:0px!important}
  html body.p79-workspace:has(#systems.show) #p79WorkspaceSidebar.p79-workspace-sidebar{width:min(230px,84vw)!important}
