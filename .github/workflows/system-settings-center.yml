@@ -1,0 +1,63 @@
+name: Verify system settings center
+on:
+  pull_request:
+    paths:
+      - 'settings/**'
+      - 'assets/port79-management-workspace.js'
+      - 'assets/port79-system-notice.js'
+      - 'index.html'
+      - 'tests/system-settings-center.cjs'
+      - '.github/workflows/system-settings-center.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'settings/**'
+      - 'assets/port79-management-workspace.js'
+      - 'assets/port79-system-notice.js'
+      - 'index.html'
+      - 'tests/system-settings-center.cjs'
+      - '.github/workflows/system-settings-center.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/system-settings-center.cjs
+
+  public-readonly-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check deployed system entrypoints (GET only; production main)
+        env:
+          BASE_URL: https://kuo-code-tw.github.io/smart-punch
+        shell: bash
+        run: |
+          set -uo pipefail
+          failed=0
+          for route in "" "attendance/" "leave/" "schedule/" "work-hours/" "aqc-efficiency/" "hr/" "history-data/" "gate-dashboard/" "gate-import/"; do
+            file="$(mktemp)"
+            code="$(curl --silent --show-error --location --max-time 25 --output "$file" --write-out '%{http_code}' "$BASE_URL/$route")" || code="network-error"
+            if [ "$code" = "200" ] && grep -Eiq '<!doctype html|<html' "$file"; then
+              echo "PASS route: /$route (200)"
+            else
+              echo "::error::GET route /$route failed or did not contain HTML (HTTP $code)"
+              failed=1
+            fi
+            rm -f "$file"
+          done
+          exit "$failed"
+      - name: Read-only official Google Apps Script health
+        env:
+          GAS_URL: https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="$(curl --silent --show-error --location --retry 1 --max-time 35 "$GAS_URL?action=deploymentCheck")"
+          BODY="$result" node -e 'const x=JSON.parse(process.env.BODY); if(x.ok!==true||x.action!=="deploymentCheck"){process.exit(1)} console.log("PASS: authenticated writes were not attempted; deployment health JSON is valid")'

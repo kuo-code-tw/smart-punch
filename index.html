@@ -2276,5 +2276,22 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 </style>
 <!-- Home-only restoration: original title/cards, dark slim sidebar and usable top-right system menu. -->
 <link rel="stylesheet" href="./assets/port79-home-original-shell.css?v=20261117-home-original-ui-v1&harbor=20261117-restored-v1&brand=20261117-restore-v2&ui=20261117-home-live-status-v2&theme=20261117-dark-sidebar-coherent-v1">
+<script defer src="./assets/port79-system-notice.js?v=20261119-verified-v1"></script>
+<script id="p79-settings-backup-entry">
+(function(){
+ if(new URLSearchParams(location.search).get('openBackup')!=='1')return;
+ var shown=false;function open(){
+  if(shown||!document.getElementById('systems')?.classList.contains('show'))return;
+  var session;try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')}catch(e){}
+  if(!['admin','superadmin'].includes(String(session?.adminRole||session?.role||'').toLowerCase()))return;
+  if(typeof window.Port79AllBackup?.show!=='function')return;
+  shown=true;window.Port79AllBackup.show();
+  try{var u=new URL(location.href);u.searchParams.delete('openBackup');history.replaceState(null,'',u.pathname+u.search+u.hash)}catch(e){}
+ }
+ var root=document.getElementById('systems');
+ if(root)new MutationObserver(open).observe(root,{attributes:true,attributeFilter:['class']});
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',open);else open();
+})();
+</script>
 </body>
 </html>
