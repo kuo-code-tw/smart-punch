@@ -302,7 +302,7 @@
     const maxAttempts=busy?5:3;
     if(!transient||attempt+1>=maxAttempts)throw error;
     const delay=Math.min(5500,Math.max(900,Number(error.retryAfterMs)||900)*Math.pow(1.6,attempt));
-    try{onRetry?.(attempt+1,maxAttempts-1,Math.ceil(delay/1000));}catch(ignore){}
+    onRetry?.(attempt+1,maxAttempts-1,Math.ceil(delay/1000));
     await new Promise(resolve=>setTimeout(resolve,delay));
    }
   }
