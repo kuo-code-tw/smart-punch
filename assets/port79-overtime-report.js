@@ -1228,14 +1228,14 @@
    // stays stored and cannot be marked completed by unrelated overtime.
    handoff.entries.push({...entry,deferredAfterOwnOvertime:true});
    handoff.entries=[
-    ...handoff.entries.filter(e=>e.deferredAfterOwnOvertime!==true),
-    ...handoff.entries.filter(e=>e.deferredAfterOwnOvertime===true)
+    ...handoff.entries.filter(e=>e.deferredAfterOwnOvertime!==true&&e.deferredAfterCloudBusy!==true),
+    ...handoff.entries.filter(e=>e.deferredAfterOwnOvertime===true||e.deferredAfterCloudBusy===true)
    ];
   }
   if(handoff.entries.length)sessionStorage.setItem(key,JSON.stringify(handoff));
   else sessionStorage.removeItem(key);
   return {remaining:handoff.entries.length,
-   nextAuto:handoff.entries.some(e=>e.deferredAfterOwnOvertime!==true),
+   nextAuto:handoff.entries.some(e=>e.deferredAfterOwnOvertime!==true&&e.deferredAfterCloudBusy!==true),
    independent};
  }
  // Match the currently selected overtime TYPE to complete official punches.
@@ -1945,6 +1945,30 @@
      throw Error('原預排時段與實際打卡不符，不能確認正式申報；請選擇符合 08-16、16-24 等實際上下班的時段。');
    }
    let submissionBusy=false;
+   // A temporarily blocked worker should not prevent filing for everyone else.
+   // This only rearranges the pending handoff queue; NO overtime is saved,
+   // approved, or marked completed by the skip action.
+   if(prefill.leaveHandoffId&&typeof global.p79OvertimeContext?.deferReport==='function'&&
+      typeof global.p79OpenLeaveOvertimeHandoff==='function'){
+    const saveButton=el.querySelector('#p79OtStage');
+    saveButton.insertAdjacentHTML('afterend',
+     ' <button id="p79OtDefer" type="button" style="margin-left:8px;padding:9px 12px;border:1px solid #64748b;background:#f1f5f9;color:#334155;border-radius:8px">暫存此筆，處理下一位</button>');
+    const skip=el.querySelector('#p79OtDefer');
+    skip.onclick=async()=>{
+     if(submissionBusy){el.querySelector('#p79OtStatus').textContent='申報正在核對或寫入，請在本次結果確認後再切換，避免遺失回覆。';return;}
+     skip.disabled=true;
+     try{
+      const outcome=global.p79OvertimeContext.deferReport({
+       leaveId:prefill.leaveHandoffId,empId:prefill.empId,date:prefill.date,forEmpId:prefill.forEmpId
+      });
+      if(!outcome?.moved){el.querySelector('#p79OtStatus').textContent=outcome?.reason||'本筆已保留，沒有下一位待申報人員';return;}
+      closeConfirmedReportDialog(el);
+      try{await global.p79OpenLeaveOvertimeHandoff(true);}
+      catch(error){console.warn('已暫存待申報；下一位開啟失敗',error);
+       global.alert?.('本筆仍在待申報清單；下一位視窗未成功開啟，可按「集中核對加班」接續。');}
+     }finally{skip.disabled=false;}
+    };
+   }
    el.querySelector('#p79OtStage').onclick=async()=>{
     if(prefill.readonlyWrongDate===true)return;
     if(submissionBusy)return;
@@ -2039,8 +2063,18 @@
       ?{forEmpId:String(prefill.forEmpId||''),forName:''}
       :reportPair(prefill.leaveHandoffId?'代':selectedCategory,empId,prefill.leaveHandoffId?prefill.forEmpId:forSelect.value,people);
      const draft=Object.assign(validationRequest,{id:editingExisting?String(prefill.reportId):crypto.randomUUID(),manualPlan:prefill.manualPlan===true,preventReplace:editingExisting,plannedReview:editingExisting&&prefill.plannedReview===true,expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||''):'',expectedOriginalCategory:editingOriginal?String(prefill.originalReportCategory||''):'',expectedPunchStart:editingOriginal?Number(prefill.attendance?.start):null,expectedPunchEnd:editingOriginal?Number(prefill.attendance?.end):null,empId,date,rule:report(chosen),...pair,note:el.querySelector('#p79OtNote').value||(independentFiling&&prefill.leaveHandoffId?'本人加班（非代班）':''),createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:validationRequest.leaveHandoffId});
-     try{const pending=editingExisting?null:JSON.parse(sessionStorage.getItem(KEY)||'null');
-      if(pending&&pending.gasUrl===draft.gasUrl&&pending.empId===draft.empId&&pending.date===draft.date&&pending.forEmpId===draft.forEmpId&&pending.note===draft.note&&pending.leaveHandoffId===draft.leaveHandoffId&&JSON.stringify(pending.rule)===JSON.stringify(draft.rule)){draft.id=pending.id;draft.createdAt=pending.createdAt;}
+     try{
+      const pending=editingExisting?null:JSON.parse(sessionStorage.getItem(KEY)||'null');
+      const matches=prior=>prior&&(!prior.gasUrl||prior.gasUrl===draft.gasUrl)&&
+       String(prior.empId)===String(draft.empId)&&String(prior.date)===String(draft.date)&&
+       String(prior.forEmpId||'')===String(draft.forEmpId||'')&&
+       String(prior.note||'')===String(draft.note||'')&&
+       String(prior.leaveHandoffId||'')===String(draft.leaveHandoffId||'')&&
+       JSON.stringify(prior.rule)===JSON.stringify(draft.rule);
+      // A deferred worker keeps their original ID even after subsequent
+      // workers have used the single-form draft storage slot.
+      const saved=matches(pending)?pending:matches(prefill.pendingDraft)?prefill.pendingDraft:null;
+      if(saved?.id){draft.id=saved.id;draft.createdAt=saved.createdAt;}
      }catch(ignore){}
      sessionStorage.setItem(KEY,JSON.stringify(draft));
      if(typeof global.p79OvertimeContext?.saveReport==='function'){
