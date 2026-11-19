@@ -10743,6 +10743,39 @@ function effectiveBundleRecord(r){
     && Math.abs(currentDeduct-existingDeduct)<=0.01
     && (existingInfo.length>0 || existingBn>0 || existingFl>0);
 
+  // Legacy cloud rows sometimes persisted BN as bundleDeduct instead of FR-BN.
+  // An existing partial deduction is not proof of correctness if original
+  // structured Bundle evidence says to deduct more (e.g. 13BN/51FR => 38).
+  const structuredTotals=existingInfo.reduce((sum,item)=>{
+    const bn=num(item?.bn),fl=num(item?.fl);
+    return bn>=0&&fl>=bn&&fl>0?sum+fl-bn:sum;
+  },0);
+  const scalarDeduct=existingBn>0&&existingFl>=existingBn
+    ?existingFl-existingBn:0;
+  const evidencedDeduct=Math.max(structuredTotals,scalarDeduct);
+  const originalGrossIsProven=hasRawDisc&&hasRawLoad&&
+    rawSum>=currentSum&&rawSum>=evidencedDeduct&&
+    (Math.abs(currentDeduct-existingDeduct)<=0.01 ||
+      Math.abs(currentDeduct-evidencedDeduct)<=0.01);
+  if(!parsed.items.length && evidencedDeduct>existingDeduct+0.01 &&
+      originalGrossIsProven && (existingInfo.length>0||existingBn>0)){
+    const proofRemark=canonicalBundleRemark(existingInfo)||
+      (existingFl>0?String(existingBn)+'BN/'+String(existingFl)+'FR':'');
+    if(proofRemark){
+      const repaired=applyBundleDeductionToWorkingReport(rawDisc,rawLoad,proofRemark);
+      // No invented distribution: the known gross must cover the exact deduction.
+      if(Math.abs(rawSum-num(repaired.disc)-num(repaired.load)-evidencedDeduct)<=0.01){
+        return {
+          detected:true,remark:proofRemark,rawDisc,rawLoad,
+          disc:num(repaired.disc),load:num(repaired.load),
+          bundleDeduct:evidencedDeduct,
+          bundleBn:existingBn||num(repaired.bundleInfo?.bn),
+          bundleFl:existingFl||num(repaired.bundleInfo?.fl),
+          bundleInfo:existingInfo.length?existingInfo:(repaired.bundleInfo?.items||[])
+        };
+      }
+    }
+  }
   if(structuralBundleIsStronger){
     return {
       detected:true,
@@ -10871,6 +10904,8 @@ function repairBundleRecordsFromRemarks(){
   });
 
   if(changed){
+    // Cached metrics must not retain legacy +25 bundle quantities.
+    if(typeof invalidateWorkloadIndex==='function')invalidateWorkloadIndex();
     saveLocal();
   }
   return changed;
