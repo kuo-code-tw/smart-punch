@@ -38,7 +38,7 @@ const c={
 vm.createContext(c);
 for(const name of ['parseBundleRemark','scanWorkbookBundleEvidence','buildBundleImportAudit',
  'workingSheetBundleInfo','applyBundleDeductionToWorkingReport','bundleRemarkTextFromRecord',
- 'canonicalBundleRemark','effectiveBundleRecord','repairBundleRecordsFromRemarks'])
+ 'canonicalBundleRemark','effectiveBundleRecord','repairBundleRecordsFromRemarks','vesselQuantityAudit'])
  vm.runInContext(fn(name),c);
 const gross=source.reduce((n,r)=>n+r[1]+r[2],0);
 const hc=source.reduce((n,r)=>n+r[3],0);
@@ -82,4 +82,52 @@ assert.equal(c.records.reduce((sum,r)=>sum+r.containers,0)+otherGross,526);
 assert.equal(saves,1);assert.equal(invalidations,1);
 assert.equal(c.repairBundleRecordsFromRemarks(),0,'subsequent renders do not double-deduct');
 assert.equal(saves,1,'stable records do not keep changing');
-console.log('PASS WAN HAI 278 original 24 rows: 564 gross, 13BN/51FR=>38, 551 legacy=>526 correct, 8 H/C, safe idempotent local repair');
+
+// Regression for screenshot: intervals merged by AQC/person after import.
+// 11BN/44FR belongs to DISC source rows. Aggregated LOAD=8 must not absorb
+// a 33-move deduction: that made 100 instead of 75 on AQC 7903.
+const mergedLegacy={
+ source:'working-report',name:'AQC 7903',rawDisc:100,rawLoad:8,
+ disc:100,load:0,bundleDeduct:33,bundleBn:11,bundleFl:44,
+ bundleRemark:'11BN/44FR',bundleInfo:[],hatches:1
+};
+const mixedCorrected=c.applyBundleDeductionToWorkingReport(100,8,'11BN/44FR');
+assert.equal(mixedCorrected.disc,67);
+assert.equal(mixedCorrected.load,8);
+assert.equal(mixedCorrected.disc+mixedCorrected.load,75);
+const projected=c.effectiveBundleRecord(mergedLegacy);
+assert.equal(projected.disc,67);
+assert.equal(projected.load,8);
+assert.equal(projected.bundleDeduct,33);
+
+// Protect records whose source row already assigned Bundle on LOAD; never
+// move that deduction onto DISC simply because merged DISC is numerically
+// closer to the BN/FR quantity.
+const correctLoadSplit={
+ source:'working-report',name:'AQC 7905',rawDisc:41,rawLoad:65,
+ disc:41,load:63,bundleDeduct:2,bundleBn:1,bundleFl:3,
+ bundleRemark:'1BN/3FR',bundleInfo:[],hatches:2
+};
+const protectedSplit=c.effectiveBundleRecord(correctLoadSplit);
+assert.equal(protectedSplit.disc,41);
+assert.equal(protectedSplit.load,63);
+
+// Green audit must check measured person DISC/LOAD, not a tautological
+// calculated total (the screenshot showed green 526 while red said 551).
+c.recordRawMoveSplit=r=>({disc:c.effectiveBundleRecord(r).rawDisc,load:c.effectiveBundleRecord(r).rawLoad});
+c.recoveredMoveSplit=r=>({disc:r.disc,load:r.load});
+const job={bundleDeduct:33,totalContainers:75,shiftMoves:0,totalMoves:75,hatches:1};
+const badAudit=c.vesselQuantityAudit(job,[mergedLegacy]);
+assert.equal(badAudit.measuredAdjustedMoves,100);
+assert.equal(badAudit.calculatedAdjusted,75);
+assert.equal(badAudit.recordBundleMathOk,false);
+assert.equal(badAudit.ok,false);
+c.records=[mergedLegacy,correctLoadSplit];
+assert.equal(c.repairBundleRecordsFromRemarks(),1,'only stale merged person is changed');
+assert.equal(c.records[0].disc,67);
+assert.equal(c.records[0].load,8);
+assert.equal(c.records[1].disc,41);
+assert.equal(c.records[1].load,63);
+assert.equal(c.vesselQuantityAudit(job,[mergedLegacy]).ok,true);
+assert.equal(c.repairBundleRecordsFromRemarks(),0,'merged record repair is idempotent');
+console.log('PASS WAN HAI 278: 564 gross - 38 Bundle = 526; merged AQC 7903 100/8 with 11BN/44FR becomes 67/8 (75), green audit measures actual personnel totals');
