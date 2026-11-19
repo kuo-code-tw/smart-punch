@@ -2003,7 +2003,7 @@ async function saveAdminCreateLeave(){
 </script>
 
 <script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261116-sameday-4h-v1"></script>
+<script src="../assets/port79-overtime-report.js?v=20261119-bounded-busy-retry-v1"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
@@ -2016,15 +2016,36 @@ async function p79SaveWorkOvertimeDraft(draft){
  const token=leaveRequestToken();if(!token||!p79CanReportOvertime())throw Error('沒有申報權限');
  const month=draft.date.slice(0,7),url=GAS_URL;
  const read=async (action,label)=>{
-  for(let attempt=1;attempt<=2;attempt++){
-   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
+  for(let attempt=1;attempt<=5;attempt++){
+   const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),25000);
    try{
-    const response=await fetch(url+'?action='+action+'&month='+month+'&empId='+encodeURIComponent(draft.empId)+'&date='+encodeURIComponent(draft.date)+'&leaveHandoffId='+encodeURIComponent(draft.leaveHandoffId||'')+'&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+'&_='+Date.now(),{cache:'no-store',signal:ctl.signal});
-    const data=await response.json();if(!response.ok||data.ok!==true)throw Error(label+'：'+(data.error||'雲端回應失敗'));return data;
+    const response=await fetch(url+'?action='+action+'&month='+month+
+     '&empId='+encodeURIComponent(draft.empId)+'&date='+encodeURIComponent(draft.date)+
+     '&leaveHandoffId='+encodeURIComponent(draft.leaveHandoffId||'')+
+     '&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+'&_='+Date.now(),
+     {cache:'no-store',signal:ctl.signal});
+    const data=await response.json();
+    if(!response.ok||data.ok!==true){
+     const error=Error(label+'：'+(data.error||'雲端回應失敗'));
+     error.retryable=data?.retryable===true;
+     error.retryAfterMs=Number(data?.retryAfterMs)||0;
+     throw error;
+    }
+    return data;
    }catch(error){
-    const transport=error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||'');
-    if(!transport)throw error;
-    if(attempt===2)throw Error(label+'連線失敗或逾時，尚未送出加班；已保留內容，請再次按儲存。');
+    const message=String(error?.message||'');
+    const busy=/正在處理其他資料|雲端忙碌|稍後自動重試|排班正在編輯/i.test(message);
+    const transport=error?.name==='AbortError'||error instanceof TypeError||
+     /Failed to fetch|NetworkError|網路連線失敗|HTTP 5\d\d/i.test(message);
+    if(!busy&&!transport&&error.retryable!==true)throw error;
+    if(attempt>=(busy?5:3)){
+     const issue=Error(label+'目前雲端忙碌，尚未送出加班；已保留內容與原申報 ID。'+message);
+     // This call has only attempted GET. Safe to retry from the UI.
+     issue.retryable=true;issue.rejectedBeforeWrite=true;issue.retryAfterMs=Number(error.retryAfterMs)||1200;
+     throw issue;
+    }
+    const delay=Math.min(5500,Math.max(900,Number(error.retryAfterMs)||900)*Math.pow(1.6,attempt-1));
+    await new Promise(resolve=>setTimeout(resolve,delay));
    }finally{clearTimeout(timer)}
   }
  };
@@ -2062,8 +2083,19 @@ async function p79SaveWorkOvertimeDraft(draft){
   attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
  try{
-  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();
-  if(!response.ok||result.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error(result.error||'加班寫入尚未確認');
+  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+   body:JSON.stringify(body),signal:ctl.signal});
+  const result=await response.json();
+  if(!response.ok||result.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id){
+   const issue=Error(result?.error||'加班寫入尚未確認');
+   // GAS must explicitly confirm a rejected request was never written.
+   // Never retry based on error text or a missing HTTP acknowledgment alone.
+   if(result?.retryable===true&&result?.rejectedBeforeWrite===true){
+    issue.retryable=true;issue.rejectedBeforeWrite=true;
+    issue.retryAfterMs=Number(result.retryAfterMs)||1200;
+   }
+   throw issue;
+  }
   if(overtimeDate!==String(draft.date)&&String(result.report?.overtimeDate||'')!==overtimeDate)
    throw Error('正式 GAS 未確認加班歸屬日；請核對原申報 ID，不可重複新增。');
   return result;
@@ -2334,7 +2366,13 @@ window.p79OvertimeContext={
  saveReport:p79SaveWorkOvertimeDraft,refreshAccess:async()=>{await restoreAdmin();if(adminSession&&!employees.length)await loadCloud(false,true);return !!adminSession;},
  canEditRules:()=>adminSession?.adminRole==='superadmin',persistConfig:()=>{}
 };
-window.addEventListener('p79-overtime-report-saved',()=>{p79LeaveHandoffContext=null;setTimeout(()=>{p79UpdateLeaveHandoffBanner();void p79ReconcileLeaveHandoff().catch(console.warn);},0);});
+window.addEventListener('p79-overtime-report-saved',()=>{
+ // The next handoff opens with its own authoritative reconciliation.
+ // Do not issue an extra background cloud read at the same instant:
+ // it contends with the new filing's reads and may lock the GAS worker.
+ p79LeaveHandoffContext=null;
+ p79UpdateLeaveHandoffBanner();
+});
 window.addEventListener('load',()=>{p79UpdateLeaveHandoffBanner();void p79ReconcileLeaveHandoff().catch(console.warn);});
 
 </script>
