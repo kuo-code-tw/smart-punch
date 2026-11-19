@@ -2613,6 +2613,37 @@ html.p79-leave-reference-admin body[data-p79-system="leave"] > main > #p79LeaveV
 <script src="../assets/port79-leave-exact-reference.js?v=20261116-reference-match-v3&field=20261117-number-hidden-v1&compat=20261117-production-reference-repaired-v1&compact=20261117-clean-header-v1&picker=20261117-hidden-job-v4"></script>
 <!-- Match the common seven-system sidebar; loaded after both leave-only screenshot skins. -->
 <link rel="stylesheet" href="../assets/port79-leave-unified-sidebar.css?v=20261118-common-sidebar-v1">
+
+<style id="p79-leave-admin-list-large-person-name-20261119">
+/* Real admin leave-record list. Override the pixel-reference skin's
+   table button {font-size:10px!important} without resizing other actions. */
+html.p79-leave-pixel-admin body[data-p79-system="leave"] #adminMode table.leave-admin-table tbody td:first-child button.p79-leave-person-name,
+body[data-p79-system="leave"] #adminMode table.leave-admin-table tbody td:first-child button.p79-leave-person-name {
+ font-size:20px!important;
+ font-weight:900!important;
+ line-height:1.3!important;
+ letter-spacing:.2px!important;
+ color:#183456!important;
+ background:transparent!important;
+ border:0!important;
+ padding:0!important;
+ min-height:27px!important;
+ text-align:left!important;
+ white-space:nowrap!important;
+}
+body[data-p79-system="leave"] #adminMode .leave-admin-table tbody td:first-child .p79-leave-person {
+ align-items:center!important;
+ gap:10px!important;
+}
+body[data-p79-system="leave"] #adminMode .leave-admin-table tbody td:first-child .p79-leave-person small {
+ font-size:11px!important;
+ font-weight:500!important;
+ line-height:1.35!important;
+}
+html.p79-leave-pixel-admin body[data-p79-system="leave"] #adminMode table.leave-admin-table tbody td:first-child {
+ height:66px!important;
+}
+</style>
 </body>
 </html>
 
