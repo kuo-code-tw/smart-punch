@@ -41,9 +41,29 @@
   return JSON.stringify([rootNo(workingNo),callNumber(r),date,vessel,voyage,txt(r?.wharf),
     ...(revision?['import-revision']:[q.containers,q.moves,q.hatches,q.shifts])]);
  }
+ function correctionLink(a,b){
+  const an=no(a?.workingNo),bn=no(b?.workingNo);
+  if(!/^\d{7,}(?:-(?:CALL)?\d+)?$/.test(an)||!/^\d{7,}(?:-(?:CALL)?\d+)?$/.test(bn)||an===bn)return false;
+  const as=no(a?.sourceWorkingNo||a?.workingSheetSource?.sourceWorkingNo||an);
+  const bs=no(b?.sourceWorkingNo||b?.workingSheetSource?.sourceWorkingNo||bn);
+  const link=(as!==an&&rootNo(as)===rootNo(bn))||(bs!==bn&&rootNo(bs)===rootNo(an))||
+    (as===bs&&(as!==an||bs!==bn));
+  if(!link||callNumber(a)!==callNumber(b))return false;
+  if(!txt(a?.vessel)||txt(a?.vessel)!==txt(b?.vessel)||!txt(a?.wharf)||txt(a?.wharf)!==txt(b?.wharf))return false;
+  const av=txt(a?.voyageI||a?.voyageE||a?.voyage),bv=txt(b?.voyageI||b?.voyageE||b?.voyage);
+  if(!av||av!==bv||!/^20\d{2}-\d{2}-\d{2}$/.test(dateOf(a))||dateOf(a)!==dateOf(b))return false;
+  const aq=quantity(a),bq=quantity(b);
+  return Object.keys(aq).every(k=>aq[k]!==null&&aq[k]===bq[k])||!!(importedAt(a)&&importedAt(b));
+ }
  function choose(a,b){
   const at=importedAt(a),bt=importedAt(b);
   if(at!==bt&&at&&bt)return at>bt?a:b;
+  if(correctionLink(a,b)){
+    const as=no(a.sourceWorkingNo||a.workingSheetSource?.sourceWorkingNo||a.workingNo);
+    const bs=no(b.sourceWorkingNo||b.workingSheetSource?.sourceWorkingNo||b.workingNo);
+    const ac=as!==no(a.workingNo),bc=bs!==no(b.workingNo);
+    if(ac!==bc)return ac?a:b;
+  }
   const ac=a?.workingSheetSource?.reportRecordIds?.length||0;
   const bc=b?.workingSheetSource?.reportRecordIds?.length||0;
   if(ac!==bc)return ac>bc?a:b;
@@ -59,6 +79,14 @@
   const kept=[],byIdentity=new Map(),excluded=[];
   for(const r of rows||[]){
    const key=identity(r);
+   const correctedIdx=kept.findIndex(prior=>correctionLink(prior,r));
+   if(correctedIdx>=0){
+     const prior=kept[correctedIdx],winner=choose(prior,r);
+     kept[correctedIdx]=winner;
+     excluded.push(no(winner===prior?r.workingNo:prior.workingNo));
+     if(key)byIdentity.set(key,correctedIdx);
+     continue;
+   }
    if(!key||!byIdentity.has(key)){
     kept.push(r);
     if(key)byIdentity.set(key,kept.length-1);
@@ -77,5 +105,5 @@
   }
   return {rows:kept,excludedWorkingNos:[...new Set(excluded)]};
  }
- return {collapse,identity,rootNo,callNumber};
+ return {collapse,identity,rootNo,callNumber,correctionLink};
 });

@@ -3001,6 +3001,8 @@ function vesselJobRows(monthOverride=''){
     totalContainers:num(s.totalContainers),
     hatches:num(s.hatches),
     totalMoves:num(s.totalMoves),
+    sourceWorkingNo:String(s.sourceWorkingNo||s.workingSheetSource?.sourceWorkingNo||s.workingNo||''),
+    sourceFileName:String(s.sourceFileName||s.workingSheetSource?.sourceFileName||''),
     bundleDeduct:num(s.bundleDeduct ?? s.workingSheetSource?.bundleDeduct),
     bundlePresent:!!(s.bundlePresent ?? s.workingSheetSource?.bundlePresent ?? num(s.bundleDeduct ?? s.workingSheetSource?.bundleDeduct)>0),
     bundleInfo:Array.isArray(s.bundleInfo)
@@ -9207,7 +9209,31 @@ function sameShipMasterJob(a,b){
 
 // v8.9：只要兩筆都有明確 WORKING NO.，不同月報子序號就不能只因同船同日被視為同一筆。
 // 允許 0149 <-> 5260149 這種等價表示，但禁止 0149-1 <-> 0149-2。
+// Different numeric WORKING numbers may be editions of the SAME visit only
+// when sourceWorkingNo explicitly records the correction.
+function sameVerifiedCorrectedShipJob(a,b){
+  if(!a||!b)return false;
+  const an=String(a.workingNo||'').trim(),bn=String(b.workingNo||'').trim();
+  if(!/^\d{7,}(?:-(?:CALL)?\d+)?$/i.test(an)||!/^\d{7,}(?:-(?:CALL)?\d+)?$/i.test(bn)||an===bn)return false;
+  const as=String(a.sourceWorkingNo||a.workingSheetSource?.sourceWorkingNo||an).trim();
+  const bs=String(b.sourceWorkingNo||b.workingSheetSource?.sourceWorkingNo||bn).trim();
+  const link=(as!==an&&originalNumericWorkingNo(as)===originalNumericWorkingNo(bn))||
+    (bs!==bn&&originalNumericWorkingNo(bs)===originalNumericWorkingNo(an))||
+    (as===bs&&(as!==an||bs!==bn));
+  if(!link||vesselImportCallNumber(a)!==vesselImportCallNumber(b))return false;
+  const ship=normalizeShipText(a.vessel),wharf=normalizeShipText(a.wharf);
+  const voyage=normalizeShipText(a.voyageI||a.voyageE);
+  if(!ship||ship!==normalizeShipText(b.vessel)||!wharf||wharf!==normalizeShipText(b.wharf)||
+     !voyage||voyage!==normalizeShipText(b.voyageI||b.voyageE))return false;
+  const af=String(a.firstDate||a.compareDate||'').slice(0,10),bf=String(b.firstDate||b.compareDate||'').slice(0,10);
+  const al=String(a.lastDate||a.compareDate||af).slice(0,10),bl=String(b.lastDate||b.compareDate||bf).slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(af)||!/^\d{4}-\d{2}-\d{2}$/.test(bf)||
+    af>bl||bf>al)return false;
+  return sameShipMasterJob(a,b);
+}
+
 function sameShipMasterJobWithSerialGuard(a,b){
+  if(sameVerifiedCorrectedShipJob(a,b))return true;
   if(!sameShipMasterJob(a,b))return false;
   if(typeof vesselImportCallNumber==='function'&&vesselImportCallNumber(a)!==vesselImportCallNumber(b))return false;
   const aNo=String(a?.workingNo||'').trim();
@@ -9265,6 +9291,12 @@ function chooseLatestShipMaster(a,b){
   const at=Date.parse(String(a?.workingSheetImportedAt||a?.workingSheetSource?.importedAt||''))||0;
   const bt=Date.parse(String(b?.workingSheetImportedAt||b?.workingSheetSource?.importedAt||''))||0;
   if(at!==bt && (at||bt))return at>bt?a:b;
+  if(sameVerifiedCorrectedShipJob(a,b)){
+    const as=String(a.sourceWorkingNo||a.workingSheetSource?.sourceWorkingNo||a.workingNo);
+    const bs=String(b.sourceWorkingNo||b.workingSheetSource?.sourceWorkingNo||b.workingNo);
+    if((as!==String(a.workingNo))!==(bs!==String(b.workingNo)))
+      return as!==String(a.workingNo)?a:b;
+  }
 
   const ap=workingNoSortParts(a?.workingNo),bp=workingNoSortParts(b?.workingNo);
   if(ap.base!==bp.base)return ap.base>bp.base?a:b;
@@ -9286,6 +9318,10 @@ function dedupeShipMasters(list){
     // 合併完整欄位，但 workingNo 一定保留較新的那一筆。
     const merged=mergeShipMasterOne(other,keep);
     merged.workingNo=keep.workingNo;
+    if(sameVerifiedCorrectedShipJob(out[idx],s)){
+      merged.sourceWorkingNo=String(keep.sourceWorkingNo||keep.workingSheetSource?.sourceWorkingNo||keep.workingNo);
+      merged.sourceFileName=String(keep.sourceFileName||keep.workingSheetSource?.sourceFileName||'');
+    }
     out[idx]=merged;
   }
   return out;
@@ -9306,7 +9342,9 @@ function mergeShipMastersPreferComplete(localList,cloudList){
 
     if(idx<0){
       idx=cloud.findIndex((c,i)=>{
-        if(used.has(i)||!sameShipMasterJob(l,c))return false;
+        if(used.has(i))return false;
+        if(sameVerifiedCorrectedShipJob(l,c))return true;
+        if(!sameShipMasterJob(l,c))return false;
         const lNo=String(l?.workingNo||'').trim();
         const cNo=String(c?.workingNo||'').trim();
         if(!lNo||!cNo)return true;
@@ -9337,7 +9375,7 @@ function mergeShipMastersPreferComplete(localList,cloudList){
 function shipMasterToSummary(s){
   if(!s)return null;
   return {
-    workingNo:s.workingNo||'',vessel:s.vessel||'',vesselChineseName:p79VesselChineseDisplay(s),voyageI:s.voyageI||'',voyageE:s.voyageE||'',
+    workingNo:s.workingNo||'',sourceWorkingNo:s.sourceWorkingNo||s.workingSheetSource?.sourceWorkingNo||s.workingNo||'',vessel:s.vessel||'',vesselChineseName:p79VesselChineseDisplay(s),voyageI:s.voyageI||'',voyageE:s.voyageE||'',
     wharf:s.wharf||'',totalContainers:num(s.totalContainers),hatches:num(s.hatches),
     totalMoves:num(s.totalMoves),bundleDeduct:num(s.bundleDeduct),bundlePresent:!!s.bundlePresent,
     shiftMoves:num(s.shiftMoves),aqcs:s.aqcs||[],
