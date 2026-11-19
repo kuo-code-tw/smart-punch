@@ -1,0 +1,27 @@
+name: Verify corrected WORKING NO replaces prior vessel
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'aqc-efficiency/index.html'
+      - 'assets/port79-vessel-versions.js'
+      - 'tests/vessel-corrected-working-no-alias.cjs'
+      - '.github/workflows/vessel-corrected-working-no.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify explicit cross-number correction and existing reimports
+        run: |
+          node tests/vessel-corrected-working-no-alias.cjs
+          node tests/original-vessel-reimport.cjs
+          node tests/working-report-reimport-replacement.cjs
+          node tests/vessel-monthly-export.cjs
