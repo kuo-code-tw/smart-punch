@@ -1712,7 +1712,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  <div class="p79-create-body">
   <div class="p79-workflow-steps" aria-label="請假代班加班三階段">
    <div class="p79-workflow-step p79-workflow-leave"><strong>① 申請資料</strong><small>選擇請假人員與日期</small></div>
-   <div class="p79-workflow-step p79-workflow-check"><strong>② 代班安排</strong><small>原系統逐日代班核對</small></div>
+   <div class="p79-workflow-step p79-workflow-check"><strong>② 代班安排</strong><small>連續請假合併一筆，逐日安排代班</small></div>
    <div class="p79-workflow-step p79-workflow-overtime"><strong>③ 確認送出</strong><small>儲存並核對雲端資料</small></div>
   </div>
   <div class="p79-create-two">
@@ -1729,7 +1729,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
    <div class="field"><label for="adminCreateLeaveDays">請假天數</label><input id="adminCreateLeaveDays" readonly></div>
   </div>
   <div class="p79-create-mode-row">
-   <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79SetDailyCreateMode()">每天分別指派（可更換本日請假人員）</label>
+   <label id="adminCreateLeaveDailyToggle" class="p79-create-daily-toggle" for="adminCreateLeaveDaily"><input id="adminCreateLeaveDaily" type="checkbox" onchange="p79SetDailyCreateMode()">逐日安排代班（連續請假合併一筆）</label>
    <label class="p79-create-daily-toggle" for="adminCreateLeaveNoCover"><input id="adminCreateLeaveNoCover" type="checkbox" onchange="p79ToggleCreateNoCover()">只補登請假／無須新增代班（保留既有排班與加班）</label>
   </div>
   <div id="adminCreateLeaveWorkers" class="p79-create-two">
@@ -2488,7 +2488,7 @@ html.p79-leave-simple #p79LeaveHandoffBanner:not([hidden]){display:flex!importan
 @media(max-width:420px){.p79-smart-cover-slot-fields{grid-template-columns:minmax(0,1fr)}}
 </style>
 
-<script src="../assets/port79-leave-daily-simple.js?v=20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1"></script>
+<script src="../assets/port79-leave-daily-simple.js?v=20261119-group-consecutive-leave-close-v1"></script>
 <script>window.Port79OrgContext.configure({system:'leave',people:()=>employees,render:()=>{populateDepartments();renderAll();}});</script>
 <link rel="stylesheet" href="../assets/port79-leave-ui-v115.css?v=20261117-production-v115d-table-center">
 <link rel="stylesheet" href="../assets/port79-leave-reference-visual.css?v=20261116-reference-tab-stroke-v2&compat=20261117-production-reference-repaired-v1">
