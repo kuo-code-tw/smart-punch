@@ -639,6 +639,16 @@
    #p79OvertimeDialog #p79OtForEmp{background:#fff1f2!important;color:#9f1239!important}
    #p79OvertimeDialog #p79OtEmp{background:#ecfeff!important;color:#155e75!important}
    #p79OvertimeDialog #p79OtDate{background:#f0fdf4!important;color:#166534!important}
+   #p79OvertimeDialog #p79OtForEmp,#p79OvertimeDialog #p79OtEmp{
+    font-size:19px!important;font-weight:850!important;letter-spacing:.2px;
+    min-height:47px!important;padding:9px 10px!important
+   }
+   #p79OvertimeDialog #p79OtDate:not([readonly]):not(:disabled){
+    cursor:pointer!important;min-height:44px!important
+   }
+   #p79OvertimeDialog input[type="date"]::-webkit-calendar-picker-indicator{
+    cursor:pointer!important;opacity:1!important;min-width:19px;min-height:19px
+   }
    .p79-ot-dialog-header{position:relative;display:flex;align-items:center;justify-content:center;min-height:36px;padding:0 90px}
    .p79-ot-dialog-header h2{margin:0;font-size:20px;font-weight:900}
    .p79-ot-dialog-header button{position:absolute;right:0;top:50%;transform:translateY(-50%)}
@@ -1324,6 +1334,22 @@
     if(prefill.manualPlan===true&&prefill.pickDateExplicitly===true)el.querySelector('#p79OtDate').value='';
    const forSelect=el.querySelector('#p79OtForEmp'),empSelect=el.querySelector('#p79OtEmp');
    const dateInput=el.querySelector('#p79OtDate'),leaveDateSelect=el.querySelector('#p79OtLeaveDates'),leaveDateWrap=el.querySelector('#p79OtLeaveDatesWrap');
+   // All authorized admins get the same native calendar picker for editable
+   // dates. A linked approved-cover date remains intentionally locked for
+   // both admin roles; changing it would misfile an overtime declaration.
+   dateInput.addEventListener('click',()=>{
+    if(dateInput.readOnly||dateInput.disabled)return;
+    if(typeof dateInput.showPicker==='function'){
+     try{dateInput.showPicker();}catch(ignore){}
+    }
+   });
+   dateInput.addEventListener('keydown',event=>{
+    if(dateInput.readOnly||dateInput.disabled)return;
+    if((event.key==='Enter'||event.key===' ')&&typeof dateInput.showPicker==='function'){
+     event.preventDefault();try{dateInput.showPicker();}catch(ignore){}
+    }
+   });
+
    // Leave day is the accounting date. The actual workDate is independently
    // fixed for official roster and IN/OUT verification; no wrong-day filing.
    if(prefill.independentOvertime===true){
