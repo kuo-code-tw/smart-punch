@@ -10,6 +10,7 @@ on:
       - 'assets/port79-home-dashboard.js'
       - 'tests/home-drop-import.cjs'
       - 'tests/home-vessel-confirmed-close.cjs'
+      - 'tests/working-sheet-bundle-pending-import.cjs'
       - '.github/workflows/home-import-auto-close.yml'
   push:
     branches: [main]
@@ -45,3 +46,5 @@ jobs:
           node tests/gate-drag-drop-import.cjs
           node tests/yard-dashboard-module.cjs
           node tests/vessel-save-queue.cjs
+          node tests/working-sheet-bundle-source-occurrences.cjs
+          node tests/working-sheet-bundle-pending-import.cjs
