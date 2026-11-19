@@ -17,6 +17,10 @@ assert.match(home,/port79-system-notice\.js/);
 assert.ok(home.includes("get('openBackup')!=='1'"));
 assert.match(home,/Port79AllBackup\.show\(\)/);
 assert.match(shell,/const order=.*'settings'/);
+assert.deepEqual([...html.matchAll(/data-nav="([^"]+)"/g)].map(m=>m[1]),
+ ['home','attendance','schedule','efficiency','hr','workhours','leave','history','settings'],
+ 'Settings sidebar module order must match real homepage navigation');
+
 assert.match(shell,/role==='superadmin'/);
 assert.match(shell,/\.\/settings\//);
 assert.match(html,/hrGetOrgOptions/);
