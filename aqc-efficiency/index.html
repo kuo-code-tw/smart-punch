@@ -10771,7 +10771,13 @@ function applyBundleDeductionToWorkingReport(discValue,loadValue,remarkText){
     // 因此扣在與 FL 最接近的一側，避免任意拆分。
     const dDiff=Math.abs(rawDisc-info.fl);
     const lDiff=Math.abs(rawLoad-info.fl);
-    if(dDiff<=lDiff)disc=Math.max(0,rawDisc-deduction);
+    // Merged personnel intervals can have all Bundle remarks on DISC while
+    // LOAD is a small unrelated interval (WAN HAI 278: DISC 100, LOAD 8,
+    // 11BN/44FR => deduct 33). Never pick a side that cannot cover the
+    // deduction if the other side can.
+    if(rawDisc>=deduction && rawLoad<deduction)disc=rawDisc-deduction;
+    else if(rawLoad>=deduction && rawDisc<deduction)load=rawLoad-deduction;
+    else if(dDiff<=lDiff)disc=Math.max(0,rawDisc-deduction);
     else load=Math.max(0,rawLoad-deduction);
   }
 
@@ -10865,6 +10871,22 @@ function effectiveBundleRecord(r){
   const scalarDeduct=existingBn>0&&existingFl>=existingBn
     ?existingFl-existingBn:0;
   const evidencedDeduct=Math.max(structuredTotals,scalarDeduct);
+  // If original source rows already produced a correct DISC/LOAD split,
+  // preserve it. Re-selecting a side from merged BN/FR remarks can move a
+  // valid LOAD deduction to DISC and silently corrupt per-person metrics.
+  const fullDeduct=Math.max(existingDeduct,evidencedDeduct,num(parsed.deduct));
+  if(hasRawDisc&&hasRawLoad&&fullDeduct>0 &&
+      currentDisc<=rawDisc&&currentLoad<=rawLoad &&
+      Math.abs(currentDeduct-fullDeduct)<=0.01){
+    return {
+      detected:true,remark:remark||canonicalBundleRemark(existingInfo),
+      rawDisc,rawLoad,disc:currentDisc,load:currentLoad,
+      bundleDeduct:fullDeduct,
+      bundleBn:existingBn||num(parsed.bn),
+      bundleFl:existingFl||num(parsed.fl),
+      bundleInfo:existingInfo.length?existingInfo:(parsed.items||[])
+    };
+  }
   const originalGrossIsProven=hasRawDisc&&hasRawLoad&&
     rawSum>=currentSum&&rawSum>=evidencedDeduct&&
     (Math.abs(currentDeduct-existingDeduct)<=0.01 ||
@@ -15144,7 +15166,11 @@ function vesselQuantityAudit(job, detailRows){
   const shiftEmbedded=(shipBundleDeduct>0 && Math.abs(summaryMoves-summaryBill)<=0.01);
   const calculatedShift=shiftEmbedded ? summaryShift : (authoritativeAdjusted-summaryBill);
 
-  const recordBundleMathOk=Math.abs(calculatedAdjusted-authoritativeAdjusted)<=0.01;
+  // Compare against actual per-person DISC/LOAD, not authoritativeAdjusted:
+  // the latter equals calculatedAdjusted by construction whenever Bundle>0.
+  // Otherwise 551 visible personnel moves can incorrectly receive a green
+  // check against 526 expected moves.
+  const recordBundleMathOk=Math.abs(calculatedAdjusted-detailAdjustedMoves)<=0.01;
   const bundleAssignedOk=Math.abs(detailBundleDeduct-shipBundleDeduct)<=0.01;
   const movesOk=Math.abs(authoritativeAdjusted-summaryMoves)<=0.01;
   const shiftOk=shiftEmbedded ? true : Math.abs(calculatedShift-summaryShift)<=0.01;
