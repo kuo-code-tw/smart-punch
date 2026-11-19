@@ -30,7 +30,9 @@ assert.match(sharedCss,/color:#203d61!important/,'menu labels must be dark and r
 assert.match(sharedCss,/background:#d8ebff!important/,'selected home menu must be pale blue');
 assert.match(sharedCss,/p79-status-light/,'system status lights require an explicit visual style');
 assert.match(sharedCss,/port79-harbor-banner\.webp/,'the original harbor photo must be kept');
-assert.match(sharedCss,/p79-nav-collapsed\{--p79-w-width:230px!important\}/,'desktop main content width must not change when closing sidebar');
+assert.match(sharedCss,/p79-nav-collapsed\\{--p79-w-width:0px!important\\}/,'desktop hamburger removes sidebar gutter so content expands');
+assert.match(css,/body\\.p79-workspace:has\\(#systems\\.show\\)\\.p79-nav-collapsed\\{--p79-w-width:0px!important\\}/,
+ 'homepage-specific width must also reset to zero in collapsed mode');
 assert(!css.includes('#193964'),'dark theme must never be forced on the left sidebar');
 
 assert.match(sharedCss,/P79 DARK SIDEBAR UNIFIED/,'shared sidebar must define coherent dark-mode theme');
