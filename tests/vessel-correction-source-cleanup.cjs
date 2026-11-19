@@ -27,6 +27,9 @@ const newRows=[base('new1','5260042',newStamp,200,3),base('new2','5260042',newSt
 const oldRows=[base('old1','5290042',firstStamp,100,0),base('old2','5290042',firstStamp,85,0)];
 const keepRows=[
  base('oldmanual','5290042','',22,0,{source:'manual-entry'}),
+ base('oldEdited','5290042',firstStamp,7,0,{manualEditedAt:'2026-11-19T04:30:00Z'}),
+ base('oldDifferentSource','5290042',firstStamp,9,0,{sourceWorkingNo:'5299999'}),
+ base('oldSecondCall','5290042',firstStamp,21,0,{sourceFileName:'WAN HAI 290 第二靠.xlsx'}),
  base('later','5290042','2026-11-19T05:40:00Z',11,0),
  base('differentShip','5290042',firstStamp,20,0,{shipName:'WAN HAI 291'}),
  base('differentWharf','5290042',firstStamp,30,0,{wharf:'80R'}),
