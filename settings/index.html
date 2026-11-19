@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>系統設置｜79號碼頭雲端智慧系統</title>
+<style>
+:root{font-family:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;color:#122443;background:#f3f7fc;font-synthesis:none}
+*{box-sizing:border-box}body{margin:0}button,select,textarea,input{font:inherit}button,a,select{touch-action:manipulation}
+button:focus-visible,a:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
+#loginGate{position:fixed;inset:0;z-index:100;background:#f3f7fc;display:grid;place-items:center;padding:24px}
+#loginGate[hidden]{display:none}.gate-card{max-width:500px;padding:30px;border-radius:15px;background:white;box-shadow:0 12px 35px #20395b1c;text-align:center}
+.gate-card h2{margin:0 0 14px}.gate-card p{line-height:1.7;color:#53637c}
+.shell{display:flex;min-height:100vh}.sidebar{width:225px;flex:0 0 225px;background:linear-gradient(#092f61,#09264c);color:white;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+.brand{height:61px;padding:18px 14px;font-size:16px;font-weight:900;white-space:nowrap;border-bottom:1px solid #ffffff24}
+.main-nav{padding:13px 9px;overflow:auto;display:flex;flex-direction:column;gap:5px;flex:1}
+.main-nav a{display:flex;gap:10px;padding:11px 12px;align-items:center;color:#e8f1ff;font-weight:750;text-decoration:none;border-radius:8px;font-size:14px}
+.main-nav a:hover,.main-nav a:focus{background:#164c91}.main-nav a.active{background:#1768e5;color:#fff}
+.main-nav a:last-child{margin-top:auto;border-top:1px solid #ffffff33;border-radius:0;padding-top:15px}
+.main-nav .sym{width:23px;text-align:center;font-size:18px}.view{min-width:0;flex:1}
+.topbar{height:61px;display:flex;align-items:center;justify-content:space-between;padding:10px 22px;background:#fff;border-bottom:1px solid #dbe4f0;gap:12px}
+.topbar h1{font-size:21px;margin:0;font-weight:900}.operator{font-weight:750;color:#324a6c;font-size:12px;text-align:right}
+.page{padding:15px;max-width:1600px;margin:auto}.layout{display:grid;grid-template-columns:206px minmax(0,1fr);gap:14px}
+.subnav,.content{background:#fff;border:1px solid #dce5f0;border-radius:14px;box-shadow:0 3px 10px #142b5112}
+.subnav{padding:10px;align-self:start;position:sticky;top:75px}.subnav h2{font-size:17px;margin:8px 10px 14px}.subnav a{display:flex;align-items:center;gap:8px;padding:11px 10px;color:#19345b;text-decoration:none;font-size:12px;font-weight:800;border-bottom:1px solid #e4eaf2;border-radius:5px}
+.subnav a:hover,.subnav a.active{background:#dcecff;color:#075bc3}.content{padding:16px}
+.intro{display:flex;justify-content:space-between;gap:10px;align-items:center}.intro h2{margin:0 0 12px;font-size:22px}.tip{background:#eaf3ff;padding:11px 13px;border-radius:9px;color:#174b88;font-size:12px;line-height:1.6;margin-bottom:12px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.panel{border:1px solid #d8e5f3;border-radius:12px;min-width:0;overflow:hidden;background:#fff;scroll-margin-top:82px}
+.panel h3{font-size:16px;margin:0;padding:12px 14px;background:linear-gradient(90deg,#e6f0ff,#f4f8fc);color:#103865}
+.panel p{font-size:12px;color:#526784;line-height:1.65;margin:11px 13px}
+.panel .field{padding:10px 14px;border-top:1px solid #eff3f8;display:flex;align-items:center;gap:12px;justify-content:space-between;font-size:13px}
+.panel .field label{font-weight:800}.panel .field select,.panel .field textarea{border:1px solid #c8d5e6;border-radius:7px;padding:7px;color:#17385e;background:white;max-width:60%}
+.panel .field select{width:210px}.panel .field textarea{width:100%;max-width:100%;height:73px;resize:vertical}
+.panel .field.col{display:block}.panel .field.col label{display:block;margin-bottom:8px}
+.switch{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-weight:700}.switch input{width:18px;height:18px;accent-color:#0667de}
+.inline-actions{padding:8px 13px 13px;display:flex;flex-wrap:wrap;gap:8px}
+button,.btn{border:1px solid #c0d3ea;background:#edf5ff;color:#134e94;padding:8px 13px;border-radius:7px;font-size:12px;font-weight:850;cursor:pointer;text-decoration:none}
+button:hover,.btn:hover{background:#daeaff}button.primary,.btn.primary{background:#0967e5;border-color:#0967e5;color:white}button.primary:hover,.btn.primary:hover{background:#0355c7}
+button:disabled{opacity:.55;cursor:not-allowed}
+.tag{font-size:11px;background:#e9f5ed;color:#187441;padding:4px 8px;border-radius:100px;font-weight:800}
+.note{font-size:11px;color:#65778f;padding:0 13px 12px;line-height:1.5}.wide{grid-column:1/-1}
+.bar{margin-top:14px;display:flex;align-items:center;justify-content:flex-end;gap:10px}
+#status{margin-right:auto;font-size:12px;line-height:1.5;color:#385779;font-weight:700}
+#status[data-kind="error"]{color:#ae2929}#status[data-kind="ok"]{color:#127044}
+html[data-theme="dark"]{color-scheme:dark;background:#121d31;color:#e8eef9}html[data-theme="dark"] body{background:#121d31}
+html[data-theme="dark"] .topbar,html[data-theme="dark"] .subnav,html[data-theme="dark"] .content,html[data-theme="dark"] .panel{background:#1d2d44;color:#edf3ff;border-color:#385272}
+html[data-theme="dark"] .panel h3{background:#26415e;color:#e6f2ff}
+html[data-theme="dark"] .panel p,html[data-theme="dark"] .note,html[data-theme="dark"] .operator{color:#c2d1e5}
+html[data-theme="dark"] .panel .field{border-color:#385272}html[data-theme="dark"] .panel .field select,html[data-theme="dark"] .panel textarea{background:#162944;color:#e8eef9}
+@media(max-width:1020px){.grid{grid-template-columns:1fr}.layout{grid-template-columns:180px 1fr}.sidebar{width:175px;flex-basis:175px}}
+@media(max-width:740px){.sidebar{width:66px;flex-basis:66px}.brand{font-size:0}.brand:first-letter{font-size:20px}.main-nav a{font-size:0;justify-content:center}.main-nav .sym{font-size:22px}.layout{grid-template-columns:1fr}.subnav{position:static}.subnav h2{margin:4px}.subnav a{display:inline-flex;border:0;padding:7px}.page{padding:8px}.content{padding:10px}.topbar h1{font-size:18px}}
+</style>
+</head>
+<body>
+<div id="loginGate"><div class="gate-card"><h2>🔒 正在確認系統設置權限</h2><p id="gateText">系統設置只能由已通過雲端驗證的超級管理員修改。</p><a class="btn primary" href="../">返回首頁登入</a></div></div>
+<div class="shell">
+<aside class="sidebar"><div class="brand">▣ 79號碼頭 雲端智慧系統</div><nav class="main-nav" aria-label="首頁系統選單">
+<a href="../" data-nav="home"><span class="sym">⌂</span>首頁儀表板</a>
+<a href="../hr/" data-nav="hr"><span class="sym">♙</span>人員管理</a>
+<a href="../schedule/" data-nav="schedule"><span class="sym">▦</span>排班管理</a>
+<a href="../attendance/" data-nav="attendance"><span class="sym">☑</span>考勤管理</a>
+<a href="../leave/" data-nav="leave"><span class="sym">▤</span>請假管理</a>
+<a href="../work-hours/" data-nav="workhours"><span class="sym">▥</span>工時及統計報表</a>
+<a href="../aqc-efficiency/" data-nav="efficiency"><span class="sym">⚓</span>船舶與 Bundle 管理</a>
+<a href="../history-data/" data-nav="history"><span class="sym">☁</span>歷史資料及雲端紀錄</a>
+<a class="active" href="./" aria-current="page"><span class="sym">⚙</span>系統設置</a>
+</nav></aside>
+<div class="view"><header class="topbar"><h1>☰　系統設置</h1><div class="operator" id="operator">驗證管理員身分中…</div></header>
+<main class="page"><div class="layout"><nav class="subnav" aria-label="系統設定分類">
+<h2>⚙ 系統設置中心</h2>
+<a href="#basic">⚙　基本系統設定</a><a href="#org">▣　公司／單位／組別</a><a href="#roles">♙　角色與權限設定</a>
+<a href="#attendance">▦　考勤與排班規則</a><a href="#leave">▤　請假規則設定</a><a href="#shift">◷　班別與工時設定</a>
+<a href="#reports">▥　統計與報表設定</a><a href="#vessel">⚓　船舶與 Bundle</a><a href="#cloud">☁　雲端同步與處理</a>
+<a href="#notice">♧　通知與提醒設定</a><a href="#maintenance">▤　資料維護與備份</a><a href="#logs">▧　系統日誌</a>
+</nav><div class="content">
+<div class="intro"><h2>⚙ 系統設置</h2><button id="restore" type="button">↻ 恢復預設</button></div>
+<div class="tip"><strong>這裡只提供已接上真實功能的操作。</strong> 原系統的考勤計算、核准及排班規則不得只靠畫面開關更改；尚未完成後端支援的項目，直接進入原本可用的設定功能，不提供假按鈕。全域公告儲存後會重新讀回雲端確認。</div>
+<div class="grid">
+<section class="panel" id="basic"><h3>⚙ 基本系統設定</h3><div class="field"><label for="yearMode">年份顯示</label><select id="yearMode"><option value="gregorian">西元年</option><option value="roc">民國年</option></select></div><div class="field"><label for="themeMode">畫面主題</label><select id="themeMode"><option value="light">亮色模式</option><option value="dark">暗色模式</option></select></div><div class="note">年份與主題會立即寫入本瀏覽器原系統使用的設定鍵，重新整理仍保留。</div></section>
+<section class="panel" id="attendance"><h3>▦ 考勤與排班規則</h3><p>正式考勤、休假日出勤、打卡待核與班表異動，目前依既有正式驗證及防誤改規則處理，不提供無法生效的假開關。</p><div class="field"><strong>既有考勤校驗</strong><span class="tag">保持原規則</span></div><div class="inline-actions"><a class="btn" data-route="schedule" href="../schedule/">查看正式排班與考勤狀態</a></div></section>
+<section class="panel" id="org"><h3>▣ 公司／單位／組別設定</h3><p>維護人資唯一主檔的總公司、事業部、單位、職稱；沿用原本具有雲端讀回核對的操作。</p><div class="inline-actions"><a class="btn" data-route="hr" href="../hr/">開啟正式組織設定</a></div></section>
+<section class="panel" id="roles"><h3>♙ 角色與權限設定</h3><p>超級管理員與一般管理員的系統權限、資料範圍、員工權限皆由原人資主檔管理，不另建兩套權限表。</p><div class="inline-actions"><a class="btn" data-route="hr" href="../hr/">開啟正式權限管理</a></div></section>
+<section class="panel" id="leave"><h3>▤ 請假規則</h3><p>請假類型、申請、審核與代班作業保留原系統實際驗證與儲存流程。</p><div class="inline-actions"><a class="btn" data-route="leave" href="../leave/">開啟正式請假管理</a></div></section>
+<section class="panel" id="shift"><h3>◷ 班別與工時</h3><p>班別配置、排班、加班與工時計算依正式資料，不擅自更改現有薪資計算倍率。</p><div class="inline-actions"><a class="btn" data-route="schedule" href="../schedule/">管理排班</a><a class="btn" data-route="workhours" href="../work-hours/">管理工時及加班</a></div></section>
+<section class="panel" id="reports"><h3>▥ 統計與報表</h3><p>出勤天數、加班時數、船舶效率等統計維持原來源與權限。</p><div class="inline-actions"><a class="btn" data-route="workhours" href="../work-hours/">開啟工時報表</a><a class="btn" data-route="efficiency" href="../aqc-efficiency/">開啟船舶效率報表</a></div></section>
+<section class="panel" id="vessel"><h3>⚓ 船舶與 Bundle 設定</h3><p>船舶主檔、航次、船舶效率與 Bundle 的正式資料處理仍由原管理模組執行。</p><div class="inline-actions"><a class="btn" data-route="efficiency" href="../aqc-efficiency/">開啟船舶管理</a></div></section>
+<section class="panel" id="cloud"><h3>☁ 雲端同步與處理</h3><p>顯示實際雲端檢查結果，不以本機快取冒充雲端正常。</p><div class="inline-actions"><button type="button" id="cloudPing">測試雲端連線</button><button type="button" id="reloadCloud">重新讀取雲端設定</button></div><div class="note" id="cloudState" aria-live="polite">尚未測試連線</div></section>
+<section class="panel" id="notice"><h3>♧ 系統通知與全域公告</h3><div class="field"><label for="noticeEnabled">首頁公告</label><label class="switch"><input type="checkbox" id="noticeEnabled"> 啟用</label></div><div class="field col"><label for="noticeText">公告內容（最多 180 字，顯示在管理員首頁）</label><textarea id="noticeText" maxlength="180" placeholder="輸入需要通知所有管理員的公告；不會發送電子郵件或簡訊"></textarea></div><div class="note">全域公告經雲端正式儲存後，各管理員重新進入首頁即可看見；本設定不偽稱有 Email 或簡訊發送功能。</div></section>
+<section class="panel" id="maintenance"><h3>▤ 資料維護與備份</h3><p>沿用原系統「全部系統備份」流程及伺服器收據核對，不新增會誤刪正式資料的清理按鈕。</p><div class="inline-actions"><a class="btn" data-route="home" href="../?openBackup=1">開啟正式備份管理</a></div></section>
+<section class="panel wide" id="logs"><h3>▧ 系統日誌</h3><p>人員及權限異動稽核沿用人資系統的正式稽核；歷史考勤與排班檔案沿用既有歷史資料庫，不在此建立假紀錄。</p><div class="inline-actions"><a class="btn" data-route="hr" href="../hr/">查閱人資系統稽核紀錄</a><a class="btn" data-route="history" href="../history-data/">查閱歷史資料</a></div></section>
+</div>
+<div class="bar"><div id="status" role="status" aria-live="polite">正在讀取雲端系統設定…</div><button type="button" id="save" class="primary">▣ 儲存設定</button></div>
+</div></div></main></div></div>
+<script>
+(function(){
+'use strict';
+var DEFAULT_GAS='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
+var KEY='p79SystemSettingsV1',D=document,q=function(id){return D.getElementById(id)},busy=false,auth=null,cloud=null,previous=null,token='';
+var defaults={notice:{enabled:false,text:''}};
+function status(text,kind){q('status').textContent=text;q('status').dataset.kind=kind||'';}
+function url(){var value=String(sessionStorage.getItem('port79_gas_url')||DEFAULT_GAS).trim();return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(value)?value:DEFAULT_GAS;}
+function getToken(){var hash=new URLSearchParams(location.hash.replace(/^#/,''));var t=hash.get('port79sso');if(t)sessionStorage.setItem('port79_admin_token',t);return String(t||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_gc_token')||'').trim();}
+function setError(e){status('❌ '+String(e&&e.message||e),'error');}
+function timeoutFetch(target,options,ms){var controller=new AbortController(),timeout=setTimeout(function(){controller.abort();},ms);return fetch(target,Object.assign({cache:'no-store',redirect:'follow',signal:controller.signal},options||{})).then(async function(res){if(!res.ok)throw Error('HTTP '+res.status);var payload=await res.json();if(!payload||payload.ok===false)throw Error(payload&&payload.error||'雲端要求失敗');return payload;}).finally(function(){clearTimeout(timeout);});}
+function cloudGet(action){return timeoutFetch(url()+'?action='+encodeURIComponent(action)+'&token='+encodeURIComponent(token)+'&t='+Date.now(),null,16000);}
+function cloudPost(payload){return timeoutFetch(url(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({token:token,userToken:token,gcToken:token},payload))},35000);}
+function safeSettings(config){var saved=config&&config[KEY];return saved&&typeof saved==='object'&&!Array.isArray(saved)?saved:defaults;}
+function normalized(value){var src=value&&value.notice||{};return {notice:{enabled:src.enabled===true,text:String(src.text||'').slice(0,180)}};}
+function apply(v){var x=normalized(v);q('noticeEnabled').checked=x.notice.enabled;q('noticeText').value=x.notice.text;previous=x;}
+function readDraft(){return normalized({notice:{enabled:q('noticeEnabled').checked,text:q('noticeText').value.trim()}});}
+function saveLocal(key,value){localStorage.setItem(key,value);window.dispatchEvent(new Event('storage'));}
+function setLocalAppearance(){
+ q('yearMode').value=localStorage.getItem('port79_year_mode')==='roc'?'roc':'gregorian';
+ q('themeMode').value=localStorage.getItem('port79_theme')==='dark'?'dark':'light';
+ D.documentElement.setAttribute('data-theme',q('themeMode').value);
+}
+async function reload(){if(busy)return;busy=true;q('reloadCloud').disabled=true;try{
+ var d=await cloudGet('hrGetOrgOptions');if(!d.config||typeof d.config!=='object')throw Error('雲端設定資料不完整');
+ cloud=d.config;apply(safeSettings(cloud));status('✅ 已從雲端讀取正式設定','ok');
+}catch(e){setError(e);}finally{busy=false;q('reloadCloud').disabled=false;}}
+async function save(){if(busy)return;var draft=readDraft();if(draft.notice.enabled&&!draft.notice.text){status('請先輸入要公告的內容','error');q('noticeText').focus();return;}
+busy=true;q('save').disabled=true;q('restore').disabled=true;status('正在讀取最新雲端設定並保存…');
+try{
+ var latest=await cloudGet('hrGetOrgOptions');if(!latest.config||typeof latest.config!=='object')throw Error('無法確認雲端原始設定，已取消儲存');
+ var config=Object.assign({},latest.config);config[KEY]=draft;
+ if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw Error('雲端原有設定容量不足，未覆寫正式資料');
+ var reply=await cloudPost({action:'saveConfig',config:config});
+ var check=await cloudGet('hrGetOrgOptions');if(!check.config||typeof check.config!=='object')throw Error('寫入請求已發送，但無法讀回確認；請勿重複送出，先重新載入雲端設定');
+ var actual=normalized(safeSettings(check.config));
+ if(JSON.stringify(actual)!==JSON.stringify(draft))throw Error('雲端讀回與本次設定不一致；請重新載入後核對');
+ cloud=check.config;previous=actual;status('✅ 全域公告已儲存到正式雲端，並讀回確認。畫面設定已同步本機。','ok');
+ localStorage.setItem('p79_settings_notice_cache_v1',JSON.stringify({at:Date.now(),notice:actual.notice}));
+}catch(e){setError(e);}finally{busy=false;q('save').disabled=false;q('restore').disabled=false;}}
+async function ping(){q('cloudPing').disabled=true;q('cloudState').textContent='正在向正式雲端查詢…';
+ try{var d=await timeoutFetch(url()+'?action=ping&t='+Date.now(),null,9000);
+ q('cloudState').textContent=d.ok===true?'✅ 雲端已回覆，連線正常':'⚠️ 雲端回覆格式未符合預期';}
+ catch(e){q('cloudState').textContent='❌ 連線測試失敗：'+String(e.message||e);}
+ finally{q('cloudPing').disabled=false;}}
+function authorizeLinks(){var t=encodeURIComponent(token),g=encodeURIComponent(url());
+ D.querySelectorAll('[data-route]').forEach(function(a){var href=a.getAttribute('href'),route=a.dataset.route;
+ if(route==='home')return;var root=href.split('#')[0];a.href=root+'#port79sso='+t+'&gasurl='+g;});}
+function readSessionRole(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||'null');}catch(e){return null;}}
+async function init(){
+ setLocalAppearance();q('yearMode').addEventListener('change',function(){saveLocal('port79_year_mode',this.value);status('✅ 年份顯示方式已儲存到本瀏覽器','ok');});
+ q('themeMode').addEventListener('change',function(){saveLocal('port79_theme',this.value);D.documentElement.setAttribute('data-theme',this.value);status('✅ 主題已套用到本瀏覽器','ok');});
+ q('cloudPing').addEventListener('click',ping);q('reloadCloud').addEventListener('click',function(){if(JSON.stringify(readDraft())!==JSON.stringify(previous)&&!confirm('重新讀取會捨棄尚未儲存的公告文字。確定繼續？'))return;reload();});
+ q('save').addEventListener('click',save);q('restore').addEventListener('click',async function(){if(!confirm('恢復年份、主題與首頁公告預設？全域公告也會在確認後儲存到雲端。'))return;
+ q('yearMode').value='gregorian';q('themeMode').value='light';saveLocal('port79_year_mode','gregorian');saveLocal('port79_theme','light');D.documentElement.setAttribute('data-theme','light');
+ q('noticeEnabled').checked=false;q('noticeText').value='';await save();});
+ token=getToken();if(!token){q('gateText').textContent='沒有正式登入憑證，請返回首頁以超級管理員身分登入。';return;}
+ try{auth=await cloudGet('getSessionMeta');var role=String(auth.adminRole||auth.actualAdminRole||auth.role||auth.session&&auth.session.adminRole||'').toLowerCase();
+ var active=readSessionRole();if(role!=='superadmin'||active&&String(active.adminRole||active.role||'').toLowerCase()==='employee')throw Error('此頁只允許超級管理員修改；管理員請返回原工作模組');
+ q('operator').textContent=String(auth.name||auth.empId||'超級管理員')+'｜超級管理員';
+ authorizeLinks();q('loginGate').hidden=true;await reload();
+ }catch(e){q('gateText').textContent='系統拒絕開啟設定中心：'+String(e.message||e);}}
+D.addEventListener('DOMContentLoaded',init);
+})();
+</script>
+</body>
+</html>
