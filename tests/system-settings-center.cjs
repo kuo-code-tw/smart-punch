@@ -22,6 +22,8 @@ assert.deepEqual([...html.matchAll(/data-nav="([^"]+)"/g)].map(m=>m[1]),
  'Settings sidebar module order must match real homepage navigation');
 
 assert.match(shell,/role==='superadmin'/);
+assert.match(shell,/if\(key==='settings'\)return \['admin','superadmin'\]\.includes\(role\)/,
+ 'Both manager roles see the settings sidebar link; server still blocks unauthorized writes');
 assert.match(shell,/\.\/settings\//);
 assert.match(html,/hrGetOrgOptions/);
 assert.match(html,/saveConfig/);
