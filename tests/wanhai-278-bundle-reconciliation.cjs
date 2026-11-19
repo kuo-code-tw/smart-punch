@@ -91,10 +91,10 @@ const mergedLegacy={
  disc:100,load:0,bundleDeduct:33,bundleBn:11,bundleFl:44,
  bundleRemark:'11BN/44FR',bundleInfo:[],hatches:1
 };
-const corrected=c.applyBundleDeductionToWorkingReport(100,8,'11BN/44FR');
-assert.equal(corrected.disc,67);
-assert.equal(corrected.load,8);
-assert.equal(corrected.disc+corrected.load,75);
+const mixedCorrected=c.applyBundleDeductionToWorkingReport(100,8,'11BN/44FR');
+assert.equal(mixedCorrected.disc,67);
+assert.equal(mixedCorrected.load,8);
+assert.equal(mixedCorrected.disc+mixedCorrected.load,75);
 const projected=c.effectiveBundleRecord(mergedLegacy);
 assert.equal(projected.disc,67);
 assert.equal(projected.load,8);
