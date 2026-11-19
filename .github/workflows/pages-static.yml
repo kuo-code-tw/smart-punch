@@ -19,6 +19,7 @@ on:
       - 'aqc-efficiency/**'
       - 'data-sources/route-service-names.json'
       - 'hr/**'
+      - 'settings/**'
       - 'history-data/**'
       - 'data-cache/**'
       # Keep the deployment gate verifiable when a regression harness is repaired.
