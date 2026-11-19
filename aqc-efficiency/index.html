@@ -9511,7 +9511,10 @@ function p79IsSupersededCorrectedVesselRow(row,aliases){
 // is not a duplicate.
 function p79IsSupersededOrphanWorkingReportRow(row,masters){
   if(String(row?.source||'')!=='working-report')return false;
-  if(row?.manualEditedAt||row?.editedAt||row?.manualOverrides)return false;
+  if(row?.manualEditedAt||row?.editedAt)return false;
+  const overrides=row?.manualOverrides;
+  if(overrides&&typeof overrides==='object'&&
+     Object.keys(overrides).some(key=>!key.startsWith('_')&&overrides[key]!==undefined))return false;
   const original=String(row?.workingNo||'').trim();
   if(!/^\d{7,}$/.test(original))return false;
   const source=String(row?.sourceWorkingNo||'').trim();
