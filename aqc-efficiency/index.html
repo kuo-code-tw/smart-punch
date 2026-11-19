@@ -9402,7 +9402,12 @@ function p79PruneVerifiedCorrectedVesselRecords(masters,rows){
     let pruned=0;
     source.forEach((r,i)=>{
       if(String(r?.workingNo||'').trim()!==original||
-         String(r?.source||'')!=='working-report')return;
+         String(r?.source||'')!=='working-report'||
+         vesselImportCallNumber(r)!==vesselImportCallNumber(master)||
+         r.manualEditedAt||r.editedAt||r.manualOverrides)return;
+      // An old row with a different explicit source key belongs to another job.
+      const rowSource=String(r.sourceWorkingNo||original).trim();
+      if(rowSource!==original)return;
       const stamp=Date.parse(String(r?.workingSheetImportedAt||''))||0;
       if(!stamp||stamp>newStamp)return;
       const oldShip=normalizeShipText(r.shipName||r.vessel);
