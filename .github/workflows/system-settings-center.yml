@@ -41,7 +41,7 @@ jobs:
         run: |
           set -uo pipefail
           failed=0
-          for route in "" "attendance/" "leave/" "schedule/" "work-hours/" "aqc-efficiency/" "hr/" "history-data/" "gate-dashboard/" "gate-import/"; do
+          for route in "" "settings/" "attendance/" "leave/" "schedule/" "work-hours/" "aqc-efficiency/" "hr/" "history-data/" "gate-dashboard/" "gate-import/"; do
             file="$(mktemp)"
             code="$(curl --silent --show-error --location --max-time 25 --output "$file" --write-out '%{http_code}' "$BASE_URL/$route")" || code="network-error"
             if [ "$code" = "200" ] && grep -Eiq '<!doctype html|<html' "$file"; then
@@ -53,6 +53,18 @@ jobs:
             rm -f "$file"
           done
           exit "$failed"
+      - name: Verify production homepage loads new Settings navigation script
+        env:
+          NAV_URL: https://kuo-code-tw.github.io/smart-punch/assets/port79-management-workspace.js
+          HOME_URL: https://kuo-code-tw.github.io/smart-punch/
+        shell: bash
+        run: |
+          set -euo pipefail
+          nav="$(curl --silent --show-error --location --max-time 30 --fail "$NAV_URL?verify=$GITHUB_SHA")"
+          homepage="$(curl --silent --show-error --location --max-time 30 --fail "$HOME_URL?verify=$GITHUB_SHA")"
+          grep -Fq "settings:'settings/'" <<<"$nav"
+          grep -Fq "sidebar=20261120-settings-menu-visible-v1" <<<"$homepage"
+          echo "PASS: homepage references refreshed sidebar and production navigation includes system settings"
       - name: Read-only official Google Apps Script health
         env:
           GAS_URL: https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec
