@@ -50,12 +50,31 @@ html[data-theme="dark"] .panel p,html[data-theme="dark"] .note,html[data-theme="
 html[data-theme="dark"] .panel .field{border-color:#385272}html[data-theme="dark"] .panel .field select,html[data-theme="dark"] .panel textarea{background:#162944;color:#e8eef9}
 @media(max-width:1020px){.grid{grid-template-columns:1fr}.layout{grid-template-columns:180px 1fr}.sidebar{width:175px;flex-basis:175px}}
 @media(max-width:740px){.sidebar{width:66px;flex-basis:66px}.brand{font-size:0}.brand:first-letter{font-size:20px}.main-nav a{font-size:0;justify-content:center}.main-nav .sym{font-size:22px}.layout{grid-template-columns:1fr}.subnav{position:static}.subnav h2{margin:4px}.subnav a{display:inline-flex;border:0;padding:7px}.page{padding:8px}.content{padding:10px}.topbar h1{font-size:18px}}
+/* PORT79 SETTINGS SIDEBAR PARITY: reuse the established homepage light-blue navigation. */
+.sidebar{width:230px;flex:0 0 230px;background:#f1f8ff;color:#203d61;border-right:1px solid #dceaf8;position:sticky;top:0;height:100vh;box-shadow:none;overflow:hidden}
+.brand{height:72px;min-height:72px;display:flex;align-items:center;gap:7px;padding:10px 17px;border:0;white-space:nowrap;font-weight:inherit}
+.port-logo{width:42px;height:47px;flex:none}
+.brand-text strong{display:block;font-size:19px;font-weight:900;line-height:1.2;color:#16385f}
+.brand-text small{display:block;font-size:11px;letter-spacing:1px;font-weight:650;color:#31587d;line-height:1.4}
+.main-nav{padding:12px 12px 0;gap:5px;flex:0 1 auto;overflow-y:auto;min-height:0}
+.main-nav a{min-height:46px;gap:13px;padding:10px 13px;color:#203d61;border-radius:10px;font-size:14px;font-weight:750;white-space:nowrap}
+.main-nav .sym{width:23px;font-size:19px;color:#284e76}
+.main-nav a:hover,.main-nav a:focus,.main-nav a.active{background:#d8ebff;color:#0667b3;box-shadow:0 2px 8px #bdddf247}
+.main-nav a:last-child{margin-top:0;border:0;border-radius:10px;padding:10px 13px}
+.harbor-footer{margin-top:auto;flex:none;position:relative;height:120px;overflow:hidden}
+.harbor-image{position:absolute;inset:0;background:linear-gradient(to top,transparent,#f1f8ff 88%),url("../assets/port79-harbor-banner.webp") center bottom/cover no-repeat;opacity:.55}
+html[data-theme="dark"] .sidebar{background:#14253c;color:#d8e8ff;border-color:#29466b}
+html[data-theme="dark"] .brand-text strong,html[data-theme="dark"] .brand-text small,html[data-theme="dark"] .main-nav a,html[data-theme="dark"] .main-nav .sym{color:#d8e8ff}
+html[data-theme="dark"] .main-nav a.active,html[data-theme="dark"] .main-nav a:hover{background:#234365;color:#fff}
+html[data-theme="dark"] .harbor-image{opacity:.13}
+@media(max-width:1020px){.sidebar{width:208px;flex-basis:208px}.brand{padding:10px 9px}.main-nav{padding:10px 7px}.main-nav a{gap:10px;padding:9px 9px}}
+@media(max-width:740px){.sidebar{width:65px;flex-basis:65px}.brand{padding:10px}.brand-text{display:none}.port-logo{width:42px}.main-nav{padding:10px 5px}.main-nav a{font-size:0;justify-content:center;gap:0}.main-nav .sym{font-size:22px}.harbor-footer{height:70px}}
 </style>
 </head>
 <body>
 <div id="loginGate"><div class="gate-card"><h2>🔒 正在確認系統設置權限</h2><p id="gateText">系統設置只能由已通過雲端驗證的超級管理員修改。</p><a class="btn primary" href="../">返回首頁登入</a></div></div>
 <div class="shell">
-<aside class="sidebar"><div class="brand">▣ 79號碼頭 雲端智慧系統</div><nav class="main-nav" aria-label="首頁系統選單">
+<aside class="sidebar"><div class="brand"><svg class="port-logo" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="27" r="24" fill="#dcefff"/><path d="M8 31 32 21l24 10-10 14H18z" fill="#1689ef"/><path d="M24 23V12h16v11M30 12V5" fill="none" stroke="#fff" stroke-width="5"/><path d="M2 49q12-9 28 0t32-2M5 57q12-7 27 0t27-2" fill="none" stroke="#197be1" stroke-width="4"/></svg><div class="brand-text"><strong>79號碼頭</strong><small>雲端智慧系統</small></div></div><nav class="main-nav" aria-label="首頁系統選單">
 <a href="../" data-nav="home"><span class="sym">⌂</span>首頁</a>
 <a href="../attendance/" data-nav="attendance"><span class="sym">◷</span>考勤管理</a>
 <a href="../schedule/" data-nav="schedule"><span class="sym">▦</span>排班管理</a>
@@ -65,7 +84,7 @@ html[data-theme="dark"] .panel .field{border-color:#385272}html[data-theme="dark
 <a href="../leave/" data-nav="leave"><span class="sym">▤</span>請假管理</a>
 <a href="../history-data/" data-nav="history"><span class="sym">☁</span>歷史資料庫</a>
 <a class="active" href="./" data-nav="settings" aria-current="page"><span class="sym">⚙</span>系統設置</a>
-</nav></aside>
+</nav><div class="harbor-footer" aria-hidden="true"><div class="harbor-image"></div></div></aside>
 <div class="view"><header class="topbar"><h1>☰　系統設置</h1><div class="operator" id="operator">驗證管理員身分中…</div></header>
 <main class="page"><div class="layout"><nav class="subnav" aria-label="系統設定分類">
 <h2>⚙ 系統設置中心</h2>
