@@ -40,7 +40,7 @@ async function simulate(adminRole){
  const doc={readyState:'loading',documentElement:{setAttribute(){}},getElementById:field,
   querySelectorAll(){return[]},addEventListener(name,fn){events[name]=fn}};
  const ctx={
-  document:doc,window:{dispatchEvent(){}},location:{hash:'',href:'https://example.test/settings/'},URL,URLSearchParams,TextEncoder,Event:class{},
+  document:doc,window:{dispatchEvent(){}},location:{hash:'',href:'https://example.test/settings/'},URL,URLSearchParams,TextEncoder,AbortController,Event:class{},
   sessionStorage:{getItem:k=>stored.get(k)||null,setItem:(k,v)=>stored.set(k,v)},
   localStorage:{getItem:k=>local.get(k)||null,setItem:(k,v)=>local.set(k,v)},
   setTimeout,clearTimeout,confirm:()=>true,console,
