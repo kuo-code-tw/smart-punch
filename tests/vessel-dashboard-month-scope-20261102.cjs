@@ -20,6 +20,9 @@ const c={
   document:{getElementById:id=>doc[id]||null},
   shipMasters:source,window:{P79VesselVersionView:versionView},getPort79Year:()=> '2026',
   canonicalShipMasters:x=>x,applyShipManualOverrides:x=>x,
+  // Verified replacement filtering has its own source-backed regression test.
+  p79VerifiedCorrectedVesselAliases:()=>new Map(),
+  p79IsSupersededCorrectedVesselRow:()=>false,
   dashboardDateRange:()=>({active:false}),
   shipMasterMatchesDashboardRange:()=>true,dateWithinDashboardRange:()=>true,
   num:v=>Number(v)||0,compareWorkingNoDesc:(a,b)=>String(b.workingNo).localeCompare(String(a.workingNo)),

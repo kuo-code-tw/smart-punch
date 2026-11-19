@@ -2724,9 +2724,11 @@ function summaryRows(){
   // edit copies excluded from the vessel leaderboard. Keep records in storage.
   const versioned=typeof window!=='undefined'?window.P79VesselVersionView:null;
   const superseded=new Set(versioned?.collapse?.(shipMasters||[])?.excludedWorkingNos||[]);
+  const verifiedAliases=p79VerifiedCorrectedVesselAliases(shipMasters,records);
   const base=canonicalOperationalRecords((records||[]).filter(r=>
     recordMatches(r)&&recordIsCurrentShipDetail(r,completionIndex)&&
-    !superseded.has(String(r?.workingNo||'').trim().toUpperCase())));
+    !superseded.has(String(r?.workingNo||'').trim().toUpperCase())&&
+    !p79IsSupersededCorrectedVesselRow(r,verifiedAliases)));
   const byId=new Map(),byName=new Map(),personRows=ps.map(()=>[]),historicalRows=new Map();
   ps.forEach((p,i)=>{
     for(const [index,key] of [[byId,p.empId],[byName,normalizePersonName(p.name)]]){
@@ -2988,9 +2990,12 @@ function vesselJobRows(monthOverride=''){
   const month=requestedMonth||document.getElementById('filterMonth')?.value||'';
   const rangeActive=!requestedMonth&&dashboardDateRange().active;
 
-  // 新版以獨立船舶主檔為準；日期區間啟用時優先依 firstDate / lastDate 篩選。
+  // Corrected imports may coexist in cloud with historical source masters.
+  // Only a complete verified manifest may replace its older source on screen.
+  const verifiedAliases=p79VerifiedCorrectedVesselAliases(shipMasters,records);
   const selectedYear=requestedMonth?requestedMonth.slice(0,4):getPort79Year();
   let masters=(shipMasters||[])
+    .filter(s=>!p79IsSupersededCorrectedVesselRow(s,verifiedAliases))
     .filter(s=>rangeActive?shipMasterMatchesDashboardRange(s):(month?shipMasterDateMatchesMonth(s,month):shipMasterDateMatchesYear(s,selectedYear)))
     .map(s=>applyShipManualOverrides(s)).map(s=>({
     workingNo:String(s.workingNo||'—'),
@@ -3031,7 +3036,8 @@ function vesselJobRows(monthOverride=''){
   const recordMap=new Map();
   const completionIndex=shipCompletionIndex(shipMasters||[]);
   records.filter(r=>String(r.source||'')==='working-report').forEach(r=>{
-    if(!recordIsCurrentShipDetail(r,completionIndex))return;
+    if(!recordIsCurrentShipDetail(r,completionIndex)||
+       p79IsSupersededCorrectedVesselRow(r,verifiedAliases))return;
     if(rangeActive){
       if(!dateWithinDashboardRange(r.workDate))return;
     }else{
@@ -9425,6 +9431,75 @@ function p79PruneVerifiedCorrectedVesselRecords(masters,rows){
     removedIds:[...drop].map(i=>String(source[i]?.id||'')),auditLog};
 }
 
+// Display-only replacement lineage: a corrected WORKING NO must have a
+// complete, independently verified WORKING REPORT manifest before old source
+// rows can be excluded from the ship/month dashboard. Never delete data here.
+function p79VerifiedCorrectedVesselAliases(masters,sourceRows){
+  const aliases=new Map();
+  if(typeof workloadSheetAudit!=='function')return aliases;
+  const all=Array.isArray(sourceRows)?sourceRows:[];
+  for(const master of (masters||[])){
+    const current=String(master?.workingNo||'').trim();
+    const original=String(master?.sourceWorkingNo||master?.workingSheetSource?.sourceWorkingNo||'').trim();
+    if(!/^\d{7,}$/.test(current)||!/^\d{7,}$/.test(original)||
+       current===original||vesselImportCallNumber(master)!==1)continue;
+    const manifest=master?.workingSheetSource?.reportRecordIds;
+    const ids=new Set(Array.isArray(manifest)?manifest.map(String).filter(Boolean):[]);
+    const stamp=Date.parse(String(master?.workingSheetImportedAt||master?.workingSheetSource?.importedAt||''))||0;
+    if(!stamp||!ids.size||ids.size!==manifest.length)continue;
+    const fresh=all.filter(r=>String(r?.workingNo||'').trim()===current&&
+      String(r?.source||'')==='working-report'&&ids.has(String(r?.id||'')));
+    if(fresh.length!==ids.size||new Set(fresh.map(r=>String(r.id))).size!==ids.size||
+       fresh.some(r=>(Date.parse(String(r?.workingSheetImportedAt||''))||0)!==stamp))continue;
+    if(workloadSheetAudit(master,fresh).status!=='match')continue;
+    const vessel=normalizeShipText(master.vessel),
+      wharf=normalizeShipText(master.wharf),
+      voyage=normalizeShipText(master.voyageI||master.voyageE);
+    const start=String(master.firstDate||master.compareDate||'').slice(0,10);
+    const end=String(master.lastDate||master.compareDate||start).slice(0,10);
+    if(!vessel||!wharf||!voyage||!/^20\d{2}-\d{2}-\d{2}$/.test(start)||
+       !/^20\d{2}-\d{2}-\d{2}$/.test(end)||start>end)continue;
+    const link={original,current,vessel,wharf,voyage,start,end,stamp,master};
+    if(!aliases.has(original))aliases.set(original,[]);
+    aliases.get(original).push(link);
+  }
+  return aliases;
+}
+function p79IsSupersededCorrectedVesselRow(row,aliases){
+  const no=String(row?.workingNo||'').trim();
+  const links=aliases?.get(no)||[];
+  if(!links.length||row?.manualEditedAt||row?.editedAt)return false;
+  const source=String(row?.source||'');
+  const overrides=row?.manualOverrides;
+  const hasManualChange=overrides&&typeof overrides==='object'&&
+    Object.keys(overrides).some(key=>!key.startsWith('_')&&overrides[key]!==undefined);
+  if(hasManualChange)return false;
+  if(source&&source!=='working-report')return false;
+  const explicitSource=String(row?.sourceWorkingNo||row?.workingSheetSource?.sourceWorkingNo||'').trim();
+  if(explicitSource&&explicitSource!==no)return false;
+  const vessel=normalizeShipText(row?.shipName||row?.vessel);
+  const wharf=normalizeShipText(row?.wharf);
+  const voyage=normalizeShipText(row?.voyageI||row?.voyageE||row?.voyage);
+  if(!vessel||!wharf||!voyage)return false;
+  const stamped=Date.parse(String(row?.workingSheetImportedAt||row?.workingSheetSource?.importedAt||''))||0;
+  const starts=[row?.firstDate,row?.workDate,row?.compareDate,row?.sheetCompareDate,row?.completionDate,
+    row?.lastDate,row?.sheetLastDate].map(v=>String(v||'').slice(0,10))
+    .filter(v=>/^20\d{2}-\d{2}-\d{2}$/.test(v));
+  return links.some(link=>{
+    if(vessel!==link.vessel||wharf!==link.wharf||voyage!==link.voyage||
+       vesselImportCallNumber(row)!==vesselImportCallNumber(link.master)||
+       (stamped&&stamped>link.stamp))return false;
+    if(starts.some(date=>date>=link.start&&date<=link.end))return true;
+    // Undated legacy ship masters only: full identical quantities are needed
+    // in addition to explicit source-number lineage and ship identity.
+    return !source&&!starts.length &&
+      num(row?.totalContainers)===num(link.master.totalContainers)&&
+      num(row?.totalMoves)===num(link.master.totalMoves)&&
+      num(row?.hatches)===num(link.master.hatches)&&
+      num(row?.shiftMoves)===num(link.master.shiftMoves);
+  });
+}
+
 function shipMasterToSummary(s){
   if(!s)return null;
   return {
@@ -14069,8 +14144,10 @@ function monthlyMonthFromDate(value,sheetName=''){
 function vesselJobRowsForMonth(month){
   const target=String(month||'').trim();
   shipMasters=canonicalShipMasters(shipMasters||[]);
+  const verifiedAliases=p79VerifiedCorrectedVesselAliases(shipMasters,records);
 
   let masters=(shipMasters||[])
+    .filter(s=>!p79IsSupersededCorrectedVesselRow(s,verifiedAliases))
     .filter(s=>!target||shipMasterDateMatchesMonth(s,target))
     .map(s=>applyShipManualOverrides(s))
     .map(s=>({
@@ -14105,6 +14182,7 @@ function vesselJobRowsForMonth(month){
     (records||[])
       .filter(r=>String(r.source||'')==='working-report')
       .forEach(r=>{
+        if(p79IsSupersededCorrectedVesselRow(r,verifiedAliases))return;
         if(target&&!String(r.workDate||'').startsWith(target))return;
         const no=String(r.workingNo||'').trim();
         let vessel=String(r.shipName||r.vessel||'').trim();
