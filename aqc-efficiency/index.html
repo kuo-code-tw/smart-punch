@@ -10556,6 +10556,26 @@ function buildBundleImportAudit(book,summary,imported){
   };
 }
 
+// Preserve original source totals and the unassigned difference. A source gap
+// is not evidence that an arbitrary driver handled those extra containers.
+function buildBundleImportAuditMetadata(audit){
+  const sheetDeduct=num(audit?.sheetDeduct),detailDeduct=num(audit?.detailDeduct);
+  const difference=Math.round((sheetDeduct-detailDeduct)*100)/100;
+  return {
+    checkedAt:new Date().toISOString(),
+    ok:!!audit?.ok,
+    status:audit?.ok?'verified':'pending-review',
+    workingSheetDeduct:sheetDeduct,
+    workingReportDeduct:num(audit?.scan?.reportDeduct),
+    personDetailDeduct:detailDeduct,
+    difference,
+    unassignedDeduct:Math.max(0,difference),
+    excessDeduct:Math.max(0,-difference),
+    hitCount:Array.isArray(audit?.scan?.hits)?audit.scan.hits.length:0,
+    errors:Array.isArray(audit?.errors)?audit.errors.slice(0,30):[]
+  };
+}
+
 function workingSheetBundleInfo(ws){
   if(!ws)return {items:[],deduct:0,fl:0,bn:0};
 
@@ -12479,7 +12499,7 @@ async function importExcelFiles(fileList){
            });
           }
           excelQueueStats.success++;
-          updateExcelImportLiveStatus({stage:`✅ 此檔完成${lastExcelImportResult?.workingNo?`｜NO. ${lastExcelImportResult.workingNo}`:''}`,pct:100,state:'done',waiting:excelImportQueue.length});
+          updateExcelImportLiveStatus({stage:`${lastExcelImportResult?.bundleReviewPending?'⚠️ 已匯入，Bundle 待核對':'✅ 此檔完成'}${lastExcelImportResult?.workingNo?`｜NO. ${lastExcelImportResult.workingNo}`:''}`,pct:100,state:'done',waiting:excelImportQueue.length});
         }else{
           excelQueueStats.failed++;
           const reason=lastExcelImportResult?.reason||'未寫入人員作業明細';
@@ -12813,16 +12833,12 @@ async function importExcel(file) {
 
     setExcelImportStage('核對 Bundle / Moves / SHIFT',55);
     const bundleAudit=buildBundleImportAudit(book,summary,imported);
+    const bundleAuditMetadata=buildBundleImportAuditMetadata(bundleAudit);
     if(!bundleAudit.ok){
-      console.error('Bundle 完整性檢查失敗',bundleAudit);
-      const reason='Bundle 核對不一致：'+bundleAudit.errors.join('；');
-      lastExcelImportResult={ok:false,file:String(file?.name||''),reason,records:imported.length,workingNo:String(summary?.workingNo||'')};
-      p79HomeExcelImportWarning(
-        '匯入停止：Bundle 核對不一致\n\n'+
-        bundleAudit.errors.join('\n')+
-        '\n\n系統沒有寫入這份錯誤資料。'
-      );
-      return;
+      // Import the actual personnel records and the independent ship totals,
+      // without fabricating a driver assignment to make the counts match.
+      console.warn('Bundle 來源差額已保留為待核對，不阻擋有效作業資料匯入',bundleAudit);
+      setExcelImportStage('Bundle 差額已自動登記，繼續匯入原始資料',55);
     }
 
     const audit=summary.importAudit||{};
@@ -12843,7 +12859,7 @@ async function importExcel(file) {
       `翻艙合計：${num(audit.inHatch)} + (${num(audit.shiftRaw)} × 2) = ${summary.shiftMoves}\n`+
       `WORKING SHEET TTL Ctnr：${num(audit.sheetTtlCtnr)||'—'}\n`+
       `Bundle：${num(audit.bundleDeduct)}（FR/FL - BN）\n`+
-      `Bundle完整性：✅ WORKING REPORT ${bundleAudit.scan.reportDeduct}｜人員明細 ${bundleAudit.detailDeduct}｜WORKING SHEET ${bundleAudit.sheetDeduct}\n`+
+      `Bundle核對：${bundleAudit.ok?'✅ 已一致':'⚠️ 待核對（不阻擋匯入）'}｜WORKING REPORT ${bundleAudit.scan.reportDeduct}｜人員明細 ${bundleAudit.detailDeduct}｜WORKING SHEET ${bundleAudit.sheetDeduct}${bundleAudit.ok?'':`｜未對應 ${bundleAuditMetadata.unassignedDeduct}`}\n`+
       `實際櫃數：${summary.totalContainers}${num(audit.sheetTtlCtnr)>0?` = ${num(audit.sheetTtlCtnr)} - ${num(audit.bundleDeduct)}`:''}\n`+
       `WORKING SHEET TTL Moves：${num(audit.sheetTtlMoves)||'—'}\n`+
       `H/C：${summary.hatches}\n`+
@@ -12916,7 +12932,7 @@ async function importExcel(file) {
       });
     }
     records.push(...imported);
-    lastExcelImportResult={ok:true,file:String(file?.name||''),reason:'船舶主檔與人員明細已解析',records:imported.length,recordIds:imported.map(r=>String(r?.id||'').trim()),workingNo:String(summary?.workingNo||'')};
+    lastExcelImportResult={ok:true,file:String(file?.name||''),reason:bundleAudit.ok?'船舶主檔與人員明細已解析':'原始資料已匯入；Bundle 差額保留待核對',records:imported.length,recordIds:imported.map(r=>String(r?.id||'').trim()),workingNo:String(summary?.workingNo||''),bundleReviewPending:!bundleAudit.ok,bundleUnassignedDeduct:bundleAuditMetadata.unassignedDeduct};
 
     // 船舶摘要獨立保存，避免 GAS 後端只保留舊欄位時 NO./GPH/VPH 被同步掉。
     const master={
@@ -12937,13 +12953,7 @@ async function importExcel(file) {
       bundleInfo:Array.isArray(summary.bundleInfo)?summary.bundleInfo:[],
       bundleBn:(summary.bundleInfo||[]).reduce((sum,item)=>sum+num(item?.bn),0),
       bundleFl:(summary.bundleInfo||[]).reduce((sum,item)=>sum+num(item?.fl),0),
-      bundleAudit:{
-        checkedAt:new Date().toISOString(),ok:true,
-        workingSheetDeduct:bundleAudit.sheetDeduct,
-        workingReportDeduct:bundleAudit.scan.reportDeduct,
-        personDetailDeduct:bundleAudit.detailDeduct,
-        hitCount:bundleAudit.scan.hits.length
-      },
+      bundleAudit:{...bundleAuditMetadata},
       shiftMoves:num(summary.shiftMoves),
       aqcCount:(summary.aqcs||[]).length,
       aqcs:summary.aqcs||[],
@@ -12978,13 +12988,7 @@ async function importExcel(file) {
         bundleInfo:Array.isArray(summary.bundleInfo)?summary.bundleInfo:[],
         bundleBn:(summary.bundleInfo||[]).reduce((sum,item)=>sum+num(item?.bn),0),
         bundleFl:(summary.bundleInfo||[]).reduce((sum,item)=>sum+num(item?.fl),0),
-        bundleAudit:{
-          checkedAt:new Date().toISOString(),ok:true,
-          workingSheetDeduct:bundleAudit.sheetDeduct,
-          workingReportDeduct:bundleAudit.scan.reportDeduct,
-          personDetailDeduct:bundleAudit.detailDeduct,
-          hitCount:bundleAudit.scan.hits.length
-        },
+        bundleAudit:{...bundleAuditMetadata},
         shiftMoves:num(summary.shiftMoves),
         totalMoves:num(summary.totalMoves),
         unlashingDateTime:String(summary.unlashingDateTime||''),
@@ -13029,7 +13033,9 @@ async function importExcel(file) {
     }));
     // 批次匯入期間先不重算整份月報，全部檔案完成後統一重算一次。
     renderVesselSummary(lastVesselSummary);
-    toast(`已匯入 ${summary.vessel||'船舶'}：${imported.length} 筆 AQC 作業明細`);
+    toast(bundleAudit.ok
+      ? `已匯入 ${summary.vessel||'船舶'}：${imported.length} 筆 AQC 作業明細`
+      : `⚠️ 已匯入 ${summary.vessel||'船舶'}：${imported.length} 筆明細｜Bundle 待核對 ${bundleAuditMetadata.unassignedDeduct}（未分派給人員）`);
     // 匯入佇列中還有檔案時，只先寫本機，不要每一份都重送整包雲端資料。
     // 最後由 importExcelFiles() 統一同步一次，速度會快很多。
     const hasMoreQueuedFiles = excelBatchImporting && excelImportQueue.length > 0;
