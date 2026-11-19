@@ -8,7 +8,11 @@ const css=fs.readFileSync('assets/port79-home-drop-import.css','utf8');
 new vm.Script(js);
 const importerSection=html.slice(html.indexOf('id="p79HomeDropImport"'),html.indexOf('id="p79AllBackupPanel"'));
 assert.equal((importerSection.match(/data-p79-drop-kind=/g)||[]).length,3);
-assert.match(importerSection,/Excel 自動匯入/);
+assert.doesNotMatch(importerSection,/<h2>Excel 自動匯入<\/h2>/,'unneeded import strip heading must not render');
+assert(!importerSection.includes('Excel 自動匯入'),'import strip must have no visible Excel title');
+assert(importerSection.includes('id="p79HomeDropGrid"'),'existing drop grid remains');
+for(const kind of ['gate','yard','vessel'])
+ assert(importerSection.includes('data-p79-drop-kind="'+kind+'"'),'all import targets remain functional: '+kind);
 assert.match(html,/id="p79HomeImportDialog"/);
 assert.match(html,/id="p79HomeImportProgressBar"/);
 assert.match(html,/id="p79HomeImportReviewYes"/);
