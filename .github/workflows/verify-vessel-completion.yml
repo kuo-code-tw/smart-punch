@@ -21,6 +21,15 @@ on:
 permissions:
   contents: read
 jobs:
+  bundle-source-auto-recognition:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Bundle automatic source recognition independently
+        run: node tests/working-sheet-bundle-source-occurrences.cjs
   vessel-completion-exports:
     runs-on: ubuntu-latest
     steps:
