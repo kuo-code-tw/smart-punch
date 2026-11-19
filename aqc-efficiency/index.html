@@ -10048,6 +10048,10 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
 
     shipMasters=canonicalShipMasters(shipMasters||[]);
     if(!requireCloudSuccess)await p79ReadCompleteWorkingReportOnMismatch();
+    // Fresh cloud data can still carry the old BN-only deduction. Recheck after
+    // merging the source records, not only during the initial local-cache load.
+    const repairedBundleRows=repairBundleRecordsFromRemarks();
+    if(repairedBundleRows)console.info('[WORKING REPORT bundle auto-repair]',repairedBundleRows);
     saveLocal();
 
     // 2026-09-24 顯示修正：雲端明明有船舶資料，但舊月份／日期篩選可能把全部資料擋掉。
