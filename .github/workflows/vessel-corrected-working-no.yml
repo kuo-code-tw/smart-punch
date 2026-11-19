@@ -6,6 +6,7 @@ on:
       - 'aqc-efficiency/index.html'
       - 'assets/port79-vessel-versions.js'
       - 'tests/vessel-corrected-working-no-alias.cjs'
+      - 'tests/vessel-correction-source-cleanup.cjs'
       - '.github/workflows/vessel-corrected-working-no.yml'
   workflow_dispatch:
 permissions:
@@ -22,6 +23,7 @@ jobs:
       - name: Verify explicit cross-number correction and existing reimports
         run: |
           node tests/vessel-corrected-working-no-alias.cjs
+          node tests/vessel-correction-source-cleanup.cjs
           node tests/original-vessel-reimport.cjs
           node tests/working-report-reimport-replacement.cjs
           node tests/vessel-monthly-export.cjs
