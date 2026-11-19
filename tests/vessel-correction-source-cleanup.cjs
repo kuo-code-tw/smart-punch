@@ -40,7 +40,7 @@ const all=[...oldRows,...newRows,...keepRows];
 let auditCalls=0;
 const c={Array,String,Date,Map,Set,Number,console,
  normalizeShipText:s=>String(s||'').trim().toUpperCase(),
- vesselImportCallNumber:r=>/\b第二靠/.test(String(r.sourceFileName||''))||/-CALL2/.test(String(r.workingNo||''))?2:1,
+ vesselImportCallNumber:r=>/第二靠/.test(String(r.sourceFileName||''))||/-CALL2/.test(String(r.workingNo||''))?2:1,
  workloadSheetAudit:(m,rows)=>{auditCalls++;
  const total=rows.reduce((x,r)=>x+Number(r.disc||0)+Number(r.load||0),0);
  const hc=rows.reduce((x,r)=>x+Number(r.hatches||0),0);
