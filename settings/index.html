@@ -96,7 +96,7 @@ html[data-theme="dark"] .panel .field{border-color:#385272}html[data-theme="dark
 (function(){
 'use strict';
 var DEFAULT_GAS='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
-var KEY='p79SystemSettingsV1',D=document,q=function(id){return D.getElementById(id)},busy=false,auth=null,cloud=null,previous=null,token='';
+var KEY='p79SystemSettingsV1',D=document,q=function(id){return D.getElementById(id)},busy=false,auth=null,cloud=null,previous=null,token='',verifiedSuperadmin=false;
 var defaults={notice:{enabled:false,text:''}};
 function status(text,kind){q('status').textContent=text;q('status').dataset.kind=kind||'';}
 function url(){var value=String(sessionStorage.getItem('port79_gas_url')||DEFAULT_GAS).trim();return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(value)?value:DEFAULT_GAS;}
@@ -115,11 +115,11 @@ function setLocalAppearance(){
  q('themeMode').value=localStorage.getItem('port79_theme')==='dark'?'dark':'light';
  D.documentElement.setAttribute('data-theme',q('themeMode').value);
 }
-async function reload(){if(busy)return;busy=true;q('reloadCloud').disabled=true;try{
+async function reload(){if(busy||!verifiedSuperadmin)return;busy=true;q('reloadCloud').disabled=true;try{
  var d=await cloudGet('hrGetOrgOptions');if(!d.config||typeof d.config!=='object')throw Error('雲端設定資料不完整');
  cloud=d.config;apply(safeSettings(cloud));status('✅ 已從雲端讀取正式設定','ok');
 }catch(e){setError(e);}finally{busy=false;q('reloadCloud').disabled=false;}}
-async function save(){if(busy)return;var draft=readDraft();if(draft.notice.enabled&&!draft.notice.text){status('請先輸入要公告的內容','error');q('noticeText').focus();return;}
+async function save(){if(!verifiedSuperadmin){status('沒有通過超級管理員雲端驗證，禁止寫入','error');return;}if(busy)return;var draft=readDraft();if(draft.notice.enabled&&!draft.notice.text){status('請先輸入要公告的內容','error');q('noticeText').focus();return;}
 busy=true;q('save').disabled=true;q('restore').disabled=true;status('正在讀取最新雲端設定並保存…');
 try{
  var latest=await cloudGet('hrGetOrgOptions');if(!latest.config||typeof latest.config!=='object')throw Error('無法確認雲端原始設定，已取消儲存');
@@ -152,7 +152,7 @@ async function init(){
  try{auth=await cloudGet('getSessionMeta');var role=String(auth.adminRole||auth.actualAdminRole||auth.role||auth.session&&auth.session.adminRole||'').toLowerCase();
  var active=readSessionRole();if(role!=='superadmin'||active&&String(active.adminRole||active.role||'').toLowerCase()==='employee')throw Error('此頁只允許超級管理員修改；管理員請返回原工作模組');
  q('operator').textContent=String(auth.name||auth.empId||'超級管理員')+'｜超級管理員';
- authorizeLinks();q('loginGate').hidden=true;await reload();
+ verifiedSuperadmin=true;authorizeLinks();q('loginGate').hidden=true;await reload();
  }catch(e){q('gateText').textContent='系統拒絕開啟設定中心：'+String(e.message||e);}}
 D.addEventListener('DOMContentLoaded',init);
 })();
