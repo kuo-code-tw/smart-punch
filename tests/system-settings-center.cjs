@@ -14,7 +14,7 @@ new vm.Script(scripts[0]);
 new vm.Script(notice);
 new vm.Script(shell);
 assert.match(home,/port79-system-notice\.js/);
-assert.match(home,/openBackup=1/);
+assert.match(home,/searchParams\.get\('openBackup'\)\s*!==\s*'1'/);
 assert.match(home,/Port79AllBackup\.show\(\)/);
 assert.match(shell,/const order=.*'settings'/);
 assert.match(shell,/role==='superadmin'/);
