@@ -9646,7 +9646,9 @@ async function buildSafeGcSyncPayload(payload={}){
       Array.isArray(localPayload.records)?localPayload.records:(records||[]),
       sendingMasters
     );
-    const correctionCleanup=p79PruneVerifiedCorrectedVesselRecords(sendingMasters,mixedRecords);
+    const correctionCleanup=typeof p79PruneVerifiedCorrectedVesselRecords==='function'
+      ?p79PruneVerifiedCorrectedVesselRecords(sendingMasters,mixedRecords)
+      :{records:mixedRecords,auditLog:[]};
     const sendingRecords=correctionCleanup.records;
     if(correctionCleanup.auditLog.length)
       console.info('[Vessel corrected import verified cleanup]',correctionCleanup.auditLog);
@@ -10139,7 +10141,9 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
     shipMasters=canonicalShipMasters(shipMasters||[]);
     if(!requireCloudSuccess)await p79ReadCompleteWorkingReportOnMismatch();
     // Hide only verified imported edit copies; never delete arbitrary manual rows.
-    const correctionCleanup=p79PruneVerifiedCorrectedVesselRecords(shipMasters,records);
+    const correctionCleanup=typeof p79PruneVerifiedCorrectedVesselRecords==='function'
+      ?p79PruneVerifiedCorrectedVesselRecords(shipMasters,records)
+      :{records,auditLog:[]};
     if(correctionCleanup.auditLog.length){
       records=correctionCleanup.records;
       console.info('[Vessel corrected import source rows]',correctionCleanup.auditLog);
