@@ -36,7 +36,7 @@ async function simulate(adminRole){
   listeners:{},addEventListener(name,fn){this.listeners[name]=fn},focus(){this.focused=true},setAttribute(){}});return fields.get(id);}
  const stored=new Map([['port79_admin_token','real-test-token'],['port79_user_session',JSON.stringify({adminRole})]]);
  const local=new Map();
- let persisted={unrelatedOrganizationKey:{keep:true}},writes=0;
+ let persisted={unrelatedOrganizationKey:{keep:true}},writes=0,failNextWrite=false;
  const doc={readyState:'loading',documentElement:{setAttribute(){}},getElementById:field,
   querySelectorAll(){return[]},addEventListener(name,fn){events[name]=fn}};
  const ctx={
@@ -49,7 +49,10 @@ async function simulate(adminRole){
    let data={ok:true};
    if(action==='getSessionMeta')data={ok:true,adminRole};
    if(action==='hrGetOrgOptions')data={ok:true,config:JSON.parse(JSON.stringify(persisted))};
-   if(action==='saveConfig'){writes++;persisted=JSON.parse(options.body).config;}
+   if(action==='saveConfig'){
+    if(failNextWrite){failNextWrite=false;data={ok:false,error:'測試雲端寫入失敗'};}
+    else{writes++;persisted=JSON.parse(options.body).config;}
+   }
    if(action==='ping')data={ok:true};
    return {ok:true,json:async()=>data};
   }
@@ -75,8 +78,33 @@ async function simulate(adminRole){
  assert.equal(local.get('port79_theme'),'dark');
  field('yearMode').value='roc';field('yearMode').listeners.change.call(field('yearMode'));
  assert.equal(local.get('port79_year_mode'),'roc');
+ // Every command button is wired and has an observable effect.
+ await field('cloudPing').listeners.click();
+ assert.match(field('cloudState').textContent,/雲端已回覆/);
+ assert.equal(field('cloudPing').disabled,false);
+ field('noticeText').value='尚未儲存';
+ await field('reloadCloud').listeners.click();
+ await new Promise(resolve=>setTimeout(resolve,10));
+ assert.equal(field('noticeText').value,'測試公告','Reload discards unsaved local draft and reads canonical cloud data');
+ // Restore must not silently change local appearance if cloud write fails.
+ failNextWrite=true;
+ await field('restore').listeners.click();
+ assert.equal(local.get('port79_theme'),'dark','Failed cloud restore must preserve local theme');
+ assert.equal(local.get('port79_year_mode'),'roc','Failed cloud restore must preserve local calendar mode');
+ assert.equal(field('noticeEnabled').checked,true,'Failed cloud restore must preserve draft');
+ assert.equal(writes,1,'Failed cloud write must not be counted as successful');
+ assert.match(field('status').textContent,/測試雲端寫入失敗/);
+ // Successful restore must update cloud config AND local preferences exactly once.
+ await field('restore').listeners.click();
+ assert.equal(writes,2);
+ assert.equal(persisted.p79SystemSettingsV1.notice.enabled,false);
+ assert.equal(persisted.p79SystemSettingsV1.notice.text,'');
+ assert.equal(local.get('port79_theme'),'light');
+ assert.equal(local.get('port79_year_mode'),'gregorian');
+ assert.match(field('status').textContent,/讀回確認/);
 }
+
 (async function(){
  await simulate('superadmin');await simulate('admin');
- console.log('PASS settings: JS syntax, navigation, official backup flow, verified cloud save/readback, existing-config preservation, local preferences, role denial');
+ console.log('PASS settings: all controls, real module destinations, cloud health, update, reload, restore success/failure, original config retained, local preferences, superadmin access gate, normal-admin denial');
 })().catch(e=>{console.error(e);process.exitCode=1});
