@@ -2,7 +2,6 @@
 /* Compact single-row import strip at the top of the authenticated homepage. */
 #p79HomeDropImport{display:flex;align-items:center;gap:12px;min-height:66px;margin:0 0 12px;padding:9px 13px;border:1px solid #dce8f5;border-radius:12px;background:var(--panel,#fff);box-shadow:none}
 #p79HomeDropImport[hidden]{display:none!important}
-#p79HomeDropImport>h2{flex:none;white-space:nowrap;font-size:13px;font-weight:800;margin:0;color:var(--text,#173c65)}
 #p79HomeDropGrid{display:grid;flex:1 1 auto;min-width:0;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .p79-home-drop-zone{position:relative;display:flex;flex-direction:row;justify-content:center;align-items:center;gap:8px;min-height:46px;padding:7px 10px;border:1.5px dashed #98bcdf;border-radius:9px;background:#f2f8ff;text-align:center;cursor:pointer;outline:0;transition:background .15s,border-color .15s}
 .p79-home-drop-zone[data-p79-drop-kind=yard]{background:#effaf5;border-color:#8ccfb2}
@@ -19,14 +18,12 @@
 #p79HomeDropImport .p79-home-drop-zone:hover{border-color:#126db8;background:#e1f1ff}
 @media(max-width:700px){
  #p79HomeDropImport{flex-wrap:wrap;gap:6px;padding:8px 10px}
- #p79HomeDropImport>h2{flex:1 1 100%;font-size:12px}
  #p79HomeDropGrid{flex:1 1 100%;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
  .p79-home-drop-zone{min-height:42px;padding:6px 4px;gap:4px}
  .p79-home-drop-zone strong{font-size:11px}
  .p79-home-drop-zone .p79-drop-icon{font-size:15px}
 }
 html[data-theme=dark] #p79HomeDropImport{background:#182f49;border-color:#456385}
-html[data-theme=dark] #p79HomeDropImport>h2{color:#f1f7ff}
 
 /* Auto-routing dialog: short and readable. Native importers run inside the
    invisible same-origin iframe; the iframe never stretches this dialog. */
