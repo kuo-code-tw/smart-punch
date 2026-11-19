@@ -28,6 +28,8 @@ assert(fix.includes('width:230px!important')&&fix.includes('padding-left:230px!i
  'leave admin must align with the 230px shared desktop sidebar');
 assert(shared.includes('--p79-w-width:230px!important'),
  'the unified sidebar must match the shared workspace width');
+assert(fix.includes('--p79-w-width:0px!important;padding-left:0!important;'),
+ 'leave page must remove the reserved desktop gutter on hamburger collapse');
 assert(shared.includes('background:#d8ebff!important;color:#0667b3!important'),
  'the shared light active state must exist');
 assert(shared.includes('background:#26496e!important;color:#ffffff!important'),
