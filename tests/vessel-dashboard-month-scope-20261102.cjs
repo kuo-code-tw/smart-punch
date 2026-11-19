@@ -24,7 +24,6 @@ const c={
   p79VerifiedCorrectedVesselAliases:()=>new Map(),
   p79IsSupersededCorrectedVesselRow:()=>false,
   normalizeShipText:v=>String(v||'').trim().replace(/\s+/g,' ').toUpperCase(),
-  vesselImportCallNumber:()=>1,
   dashboardDateRange:()=>({active:false}),
   shipMasterMatchesDashboardRange:()=>true,dateWithinDashboardRange:()=>true,
   num:v=>Number(v)||0,compareWorkingNoDesc:(a,b)=>String(b.workingNo).localeCompare(String(a.workingNo)),
@@ -34,7 +33,7 @@ vm.createContext(c);
 for(const name of [
   'shipMasterKey','shipCompletionMonth','shipCompletionIndex','recordCompletionMonth','recordIsCurrentShipDetail',
   'shipMasterDateMatchesMonth','shipMasterDateMatchesYear','vesselJobRows',
-  'p79IsSupersededOrphanWorkingReportRow',
+  'vesselImportCallNumber','p79IsSupersededOrphanWorkingReportRow',
   'normalizeIsoDateOnly','dashboardJobDateValue','updateDashboardTableFilterState'
 ])vm.runInContext(fn(name),c);
 
