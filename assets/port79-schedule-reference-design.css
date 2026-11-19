@@ -422,6 +422,13 @@ html[data-p79-schedule-page="month"] body.p79-workspace[data-p79-system="schedul
  html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleQuickBar .p79-quick-actions{grid-row:2!important;justify-content:flex-start!important;flex-wrap:wrap!important}
  html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleQuickBar #p79ScheduleDataSource{grid-row:3!important}
 }
+/* The reference schedule layout sets a fixed desktop sidebar width;
+   collapsed mode must release it and let the main content expand. */
+@media screen and (min-width:901px){
+ html body.p79-workspace[data-p79-system="schedule"].p79-nav-collapsed{
+  --p79-w-width:0px!important;
+ }
+}
 @media(max-width:900px){
  html body.p79-workspace[data-p79-system="schedule"]{--p79-w-width:0px!important;padding-top:66px!important}
  html body.p79-workspace[data-p79-system="schedule"] #p79ScheduleRefHero{padding:10px 12px 0}
