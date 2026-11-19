@@ -9468,8 +9468,12 @@ function p79VerifiedCorrectedVesselAliases(masters,sourceRows){
 function p79IsSupersededCorrectedVesselRow(row,aliases){
   const no=String(row?.workingNo||'').trim();
   const links=aliases?.get(no)||[];
-  if(!links.length||row?.manualEditedAt||row?.editedAt||row?.manualOverrides)return false;
+  if(!links.length||row?.manualEditedAt||row?.editedAt)return false;
   const source=String(row?.source||'');
+  const overrides=row?.manualOverrides;
+  const hasManualChange=overrides&&typeof overrides==='object'&&
+    Object.keys(overrides).some(key=>!key.startsWith('_')&&overrides[key]!==undefined);
+  if(hasManualChange)return false;
   if(source&&source!=='working-report')return false;
   const explicitSource=String(row?.sourceWorkingNo||row?.workingSheetSource?.sourceWorkingNo||'').trim();
   if(explicitSource&&explicitSource!==no)return false;
