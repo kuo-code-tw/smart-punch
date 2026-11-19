@@ -7,6 +7,7 @@ on:
       - 'tests/vessel-completion-export-integrity.cjs'
       - 'tests/vessel-monthly-export.cjs'
       - 'tests/dashboard-monthly-quantity-reconciliation.cjs'
+      - 'tests/working-sheet-bundle-source-occurrences.cjs'
       - '.github/workflows/verify-vessel-completion.yml'
   push:
     branches: [main]
@@ -15,6 +16,7 @@ on:
       - 'tests/vessel-completion-export-integrity.cjs'
       - 'tests/vessel-monthly-export.cjs'
       - 'tests/dashboard-monthly-quantity-reconciliation.cjs'
+      - 'tests/working-sheet-bundle-source-occurrences.cjs'
       - '.github/workflows/verify-vessel-completion.yml'
 permissions:
   contents: read
@@ -34,6 +36,7 @@ jobs:
           node tests/efficiency-sync-light.cjs
           node tests/vessel-berth-job-isolation.cjs
           node tests/dashboard-working-report-audit.cjs
+          node tests/working-sheet-bundle-source-occurrences.cjs
           node tests/vessel-driver-history.cjs
           node tests/vessel-all-month-name-directory.cjs
           node tests/vessel-completion-export-integrity.cjs
