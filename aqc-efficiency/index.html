@@ -9372,6 +9372,54 @@ function mergeShipMastersPreferComplete(localList,cloudList){
   return dedupeShipMasters(result);
 }
 
+// Prune old imported WORKING REPORT rows only after an explicitly corrected
+// WORKING NO has a COMPLETE independently reconciled source manifest.
+// Manual edits, unknown records, later imports and separate calls survive.
+function p79PruneVerifiedCorrectedVesselRecords(masters,rows){
+  const source=Array.isArray(rows)?rows:[];
+  const drop=new Set(),auditLog=[];
+  if(typeof workloadSheetAudit!=='function')return {records:source,removedIds:[],auditLog};
+  for(const master of (masters||[])){
+    const current=String(master?.workingNo||'').trim();
+    const original=String(master?.sourceWorkingNo||master?.workingSheetSource?.sourceWorkingNo||'').trim();
+    if(!/^\d{7,}$/.test(current)||!/^\d{7,}$/.test(original)||
+       current===original||vesselImportCallNumber(master)!==1)continue;
+    const manifest=master?.workingSheetSource?.reportRecordIds;
+    const ids=new Set(Array.isArray(manifest)?manifest.map(String).filter(Boolean):[]);
+    if(!ids.size||ids.size!==manifest.length)continue;
+    const newStamp=Date.parse(String(master?.workingSheetImportedAt||master?.workingSheetSource?.importedAt||''))||0;
+    if(!newStamp)continue;
+    const fresh=source.filter(r=>String(r?.workingNo||'').trim()===current&&
+       String(r?.source||'')==='working-report'&&ids.has(String(r?.id||'')));
+    if(fresh.length!==ids.size||new Set(fresh.map(r=>String(r?.id||''))).size!==ids.size)continue;
+    if(fresh.some(r=>(Date.parse(String(r?.workingSheetImportedAt||''))||0)!==newStamp))continue;
+    if(workloadSheetAudit(master,fresh).status!=='match')continue;
+    const ship=normalizeShipText(master.vessel),wharf=normalizeShipText(master.wharf),
+      voyage=normalizeShipText(master.voyageI||master.voyageE);
+    const first=String(master.firstDate||master.compareDate||'').slice(0,10);
+    const last=String(master.lastDate||master.compareDate||first).slice(0,10);
+    if(!ship||!wharf||!voyage||!/^\d{4}-\d{2}-\d{2}$/.test(first))continue;
+    let pruned=0;
+    source.forEach((r,i)=>{
+      if(String(r?.workingNo||'').trim()!==original||
+         String(r?.source||'')!=='working-report')return;
+      const stamp=Date.parse(String(r?.workingSheetImportedAt||''))||0;
+      if(!stamp||stamp>newStamp)return;
+      const oldShip=normalizeShipText(r.shipName||r.vessel);
+      const oldWharf=normalizeShipText(r.wharf);
+      const oldVoyage=normalizeShipText(r.voyageI||r.voyageE);
+      const date=String(r.workDate||'').slice(0,10);
+      if(!oldShip||oldShip!==ship||!oldWharf||oldWharf!==wharf||
+         !oldVoyage||oldVoyage!==voyage||!date||date<first||date>last)return;
+      drop.add(i);pruned++;
+    });
+    if(pruned)auditLog.push({original,current,removed:pruned});
+  }
+  if(!drop.size)return {records:source,removedIds:[],auditLog};
+  return {records:source.filter((_,i)=>!drop.has(i)),
+    removedIds:[...drop].map(i=>String(source[i]?.id||'')),auditLog};
+}
+
 function shipMasterToSummary(s){
   if(!s)return null;
   return {
@@ -9593,11 +9641,15 @@ async function buildSafeGcSyncPayload(payload={}){
     const sendingMasters=canonicalShipMasters(mergedMasters);
 
     // 作業明細：雲端先作基底，再套用本機較完整的新資料，且保留雙方不存在的紀錄。
-    const sendingRecords=mergeCloudRecordsWithLocal(
+    const mixedRecords=mergeCloudRecordsWithLocal(
       remoteRecords,
       Array.isArray(localPayload.records)?localPayload.records:(records||[]),
       sendingMasters
     );
+    const correctionCleanup=p79PruneVerifiedCorrectedVesselRecords(sendingMasters,mixedRecords);
+    const sendingRecords=correctionCleanup.records;
+    if(correctionCleanup.auditLog.length)
+      console.info('[Vessel corrected import verified cleanup]',correctionCleanup.auditLog);
 
     // 人員分組不允許雲端空 groupId 洗掉本機已分組資料。
     const sendingAssignments=mergeAssignmentsKeepLocal(
@@ -10086,6 +10138,12 @@ async function restoreVesselDataFromCloud(showMessage=true,requireCloudSuccess=f
 
     shipMasters=canonicalShipMasters(shipMasters||[]);
     if(!requireCloudSuccess)await p79ReadCompleteWorkingReportOnMismatch();
+    // Hide only verified imported edit copies; never delete arbitrary manual rows.
+    const correctionCleanup=p79PruneVerifiedCorrectedVesselRecords(shipMasters,records);
+    if(correctionCleanup.auditLog.length){
+      records=correctionCleanup.records;
+      console.info('[Vessel corrected import source rows]',correctionCleanup.auditLog);
+    }
     // Fresh cloud data can still carry the old BN-only deduction. Recheck after
     // merging the source records, not only during the initial local-cache load.
     const repairedBundleRows=repairBundleRecordsFromRemarks();
