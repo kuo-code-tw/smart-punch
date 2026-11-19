@@ -2138,18 +2138,31 @@ function p79AppendLeaveHandoffEntries(entries){
 // Move the still-PENDING item to the tail; never mark it reported or delete it.
 function p79DeferLeaveOvertimeHandoff(entry){
  const h=p79GetLeaveHandoff(),items=h?.entries||[];
- if(items.length<2)return {moved:false,reason:'沒有下一位待申報人員；本筆仍保留在待申報清單。'};
+ const active=e=>e.deferredAfterOwnOvertime!==true&&e.deferredAfterCloudBusy!==true;
+ if(items.length<2||!items.slice(1).some(active))
+  return {moved:false,reason:'目前沒有其他可接續的待申報人員；本筆仍保留在清單中。'};
  const top=items[0],norm=v=>String(v||'').trim().toUpperCase();
  if(String(top.leaveId||h.id)!==String(entry?.leaveId||'')||
     norm(top.empId)!==norm(entry?.empId)||
     String(top.date||'')!==String(entry?.date||'')||
     norm(top.forEmpId)!==norm(entry?.forEmpId))
   return {moved:false,reason:'待申報順序已變更，請回到集中核對清單確認。'};
- const reordered={...h,entries:[...items.slice(1),top],updatedAt:Date.now()};
+ let pendingDraft=null;
+ try{
+  const draft=JSON.parse(sessionStorage.getItem('port79_overtime_report_draft_v1')||'null');
+  if(draft&&norm(draft.empId)===norm(top.empId)&&String(draft.date)===String(top.date))
+   pendingDraft={id:String(draft.id||''),createdAt:draft.createdAt,empId:draft.empId,date:draft.date,
+    forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',rule:draft.rule,note:draft.note||''};
+ }catch(ignore){}
+ // Preserve the original report ID even when its POST outcome is unknown.
+ // Retrying a deferred worker must not create another ID for that request.
+ const held={...top,deferredAfterCloudBusy:true,...(pendingDraft?.id?{pendingDraft}:{})};
+ const entries=[...items.slice(1).filter(active),...items.slice(1).filter(e=>!active(e)),held];
+ const reordered={...h,entries,updatedAt:Date.now()};
  sessionStorage.setItem(P79_HANDOFF_KEY,JSON.stringify(reordered));
  p79LeaveHandoffContext=null;
  p79UpdateLeaveHandoffBanner();
- return {moved:true,remaining:reordered.entries.length};
+ return {moved:true,remaining:entries.length};
 }
 function p79ActivateLeaveHandoff(){
  const h=p79GetLeaveHandoff();
@@ -2297,7 +2310,12 @@ function p79UpdateLeaveHandoffBanner(){
  const banner=$('p79LeaveHandoffBanner');if(!banner)return;
  const h=p79GetLeaveHandoff(),count=h?.entries?.length||0;
  banner.hidden=!adminSession||!p79CanReportOvertime()||!count;
- if(!banner.hidden)$('p79LeaveHandoffStatus').textContent='尚有 '+count+' 筆代班加班待核對｜請先核對出勤時段，再逐筆完成申報。';
+ if(!banner.hidden){
+  const deferred=(h?.entries||[]).filter(e=>e.deferredAfterCloudBusy===true).length;
+  $('p79LeaveHandoffStatus').textContent='尚有 '+count+' 筆代班加班待核對'+
+   (deferred?'（其中 '+deferred+' 筆因雲端忙碌暫緩，未當作已完成）':'')+
+   '｜請先核對出勤時段，再逐筆完成申報。';
+ }
 }
 // After cloud-confirmed cover save, open the first pending overtime filing.
 // Filing is never submitted automatically; subsequent workers stay in the handoff queue.
@@ -2320,15 +2338,15 @@ async function p79OpenLeaveOvertimeHandoff(autoContinue=false){
  if(p79LeaveHandoffBusy)return;
  const queued=p79GetLeaveHandoff();
  if(autoContinue===true){
-  // A standalone filing is not proof that its planned leave cover was done.
-  // Skip deferred workers only during automatic sequential filing.
-  if(!queued?.entries?.some(e=>e.deferredAfterOwnOvertime!==true)){
+  // Busy/independent filings may be deferred for this automatic round.
+  // They remain pending and are offered again during manual review.
+  if(!queued?.entries?.some(e=>e.deferredAfterOwnOvertime!==true&&e.deferredAfterCloudBusy!==true)){
    p79UpdateLeaveHandoffBanner();return;
   }
- }else if(queued?.entries?.some(e=>e.deferredAfterOwnOvertime===true)){
-  // Manual "集中核對加班" revisits any still-unfulfilled original cover.
+ }else if(queued?.entries?.some(e=>e.deferredAfterOwnOvertime===true||e.deferredAfterCloudBusy===true)){
+  // Explicit manual review reactivates previously deferred filings.
   sessionStorage.setItem(P79_HANDOFF_KEY,JSON.stringify({...queued,
-   entries:queued.entries.map(({deferredAfterOwnOvertime,...e})=>e)}));
+   entries:queued.entries.map(({deferredAfterOwnOvertime,deferredAfterCloudBusy,...e})=>e)}));
  }
  p79LeaveHandoffBusy=true;
  const loading=P79Overtime.showReportLoading();
@@ -2337,7 +2355,7 @@ async function p79OpenLeaveOvertimeHandoff(autoContinue=false){
   const h=await p79ReconcileLeaveHandoff();
   if(!loading.isConnected)return;
   if(!h?.entries?.length){loading.close();setStatus('✅ 已安排或已申報的代班資料已核對，不再重複提醒','success');return;}
-  if(autoContinue===true&&h.entries[0]?.deferredAfterOwnOvertime===true){
+  if(autoContinue===true&&(h.entries[0]?.deferredAfterOwnOvertime===true||h.entries[0]?.deferredAfterCloudBusy===true)){
    loading.close();p79UpdateLeaveHandoffBanner();return;
   }
   const e=h.entries[0],token=leaveRequestToken(),cached=p79LeaveHandoffContext;
