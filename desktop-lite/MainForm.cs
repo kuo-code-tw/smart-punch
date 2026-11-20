@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Diagnostics;
 using System.Drawing;
+using System.Web.Script.Serialization;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.WinForms;
@@ -16,6 +17,11 @@ namespace Port79Lite {
   private readonly NotifyIcon tray;
   private readonly WebView2 web;
   private readonly ToolStripMenuItem checkUpdatesMenu;
+  private readonly ToolStripMenuItem cacheStatusMenu;
+  private readonly Label cacheTitle;
+  private readonly Label cacheDetail;
+  private readonly Label cacheCount;
+  private readonly ProgressBar cacheBar;
   private bool exit=false;
   private bool updateBusy=false;
   private bool initiated=false;
@@ -28,9 +34,26 @@ namespace Port79Lite {
    Icon=SystemIcons.Application;
    web=new WebView2{Dock=DockStyle.Fill};
    Controls.Add(web);
+   // Persistent native status stays visible even when the webpage scrolls,
+   // changes modules, or the HTML progress popover is hidden.
+   var panel=new Panel{Dock=DockStyle.Bottom,Height=74,BackColor=Color.FromArgb(239,248,255),Padding=new Padding(12,7,12,7)};
+   var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=2,Margin=Padding.Empty};
+   layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,79));
+   layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,21));
+   layout.RowStyles.Add(new RowStyle(SizeType.Absolute,29));
+   layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+   cacheTitle=new Label{Dock=DockStyle.Fill,Text="☁ 本機資料：等待管理員登入",AutoEllipsis=true,Font=new Font("Microsoft JhengHei",10,FontStyle.Bold),ForeColor=Color.FromArgb(19,65,113),TextAlign=ContentAlignment.MiddleLeft};
+   cacheCount=new Label{Dock=DockStyle.Fill,Text="0 / 7 個系統",TextAlign=ContentAlignment.MiddleRight,Font=new Font("Microsoft JhengHei",9,FontStyle.Bold),ForeColor=Color.FromArgb(23,101,169)};
+   cacheDetail=new Label{Dock=DockStyle.Fill,Text="登入後才開始下載；首次開啟不會預先下載私人資料。",AutoEllipsis=true,Font=new Font("Microsoft JhengHei",9),ForeColor=Color.FromArgb(61,97,130),TextAlign=ContentAlignment.MiddleLeft};
+   cacheBar=new ProgressBar{Dock=DockStyle.Fill,Minimum=0,Maximum=7,Value=0,Style=ProgressBarStyle.Continuous,Margin=new Padding(12,5,0,4)};
+   layout.Controls.Add(cacheTitle,0,0);layout.Controls.Add(cacheCount,1,0);
+   layout.Controls.Add(cacheDetail,0,1);layout.Controls.Add(cacheBar,1,1);
+   panel.Controls.Add(layout);Controls.Add(panel);panel.BringToFront();
    tray=new NotifyIcon{Icon=SystemIcons.Application,Visible=true,Text="79號碼頭雲端智慧系統"};
    var menu=new ContextMenuStrip();
    menu.Items.Add("開啟系統",null,(s,e)=>ShowWindow());
+   cacheStatusMenu=new ToolStripMenuItem("資料狀態：尚未登入"){Enabled=false};
+   menu.Items.Add(cacheStatusMenu);
    menu.Items.Add("縮小到系統匣",null,(s,e)=>Hide());
    menu.Items.Add(new ToolStripSeparator());
    menu.Items.Add("管理員登入後重新下載資料",null,async(s,e)=>await ForceDownload());
@@ -67,7 +90,8 @@ namespace Port79Lite {
     var env=await CoreWebView2Environment.CreateAsync(null,Path.Combine(DataRoot,"BrowserProfile"));
     await web.EnsureCoreWebView2Async(env);
     web.CoreWebView2.SetVirtualHostNameToFolderMapping(Host,Path.Combine(root,"site"),CoreWebView2HostResourceAccessKind.DenyCors);
-    web.CoreWebView2.Settings.IsWebMessageEnabled=false;
+    web.CoreWebView2.Settings.IsWebMessageEnabled=true;
+    web.CoreWebView2.WebMessageReceived+=OnCacheMessage;
     web.CoreWebView2.Settings.AreDevToolsEnabled=false;
     web.CoreWebView2.NewWindowRequested+=(s,e)=>{
      e.Handled=true;
@@ -110,6 +134,46 @@ namespace Port79Lite {
     MessageBox.Show("無法開啟本機系統。Windows 需要 WebView2 Runtime，並且整個程式資料夾必須完整。\n"+ex.Message,
       "79號碼頭 Windows 版",MessageBoxButtons.OK,MessageBoxIcon.Error);
    }
+  }
+  // Ignore any progress message not sent by our original locally hosted webpage.
+  // It carries status text/counters only; never accepts tokens, credentials, URLs or commands.
+  private void OnCacheMessage(object sender,CoreWebView2WebMessageReceivedEventArgs args){
+   try {
+    if(!Uri.TryCreate(args.Source,UriKind.Absolute,out var source)||
+      !source.Host.Equals(Host,StringComparison.OrdinalIgnoreCase)||
+      !source.AbsolutePath.StartsWith("/smart-punch/",StringComparison.OrdinalIgnoreCase))return;
+    var raw=args.TryGetWebMessageAsString();
+    if(raw==null||raw.Length>1600)return;
+    var payload=new JavaScriptSerializer().Deserialize<CacheStatusPayload>(raw);
+    if(payload==null||payload.kind!="port79-cache-status-v1")return;
+    UpdateCacheStatus(payload);
+   }catch(Exception error){Log("native cache status rejected: "+error.Message);}
+  }
+  private sealed class CacheStatusPayload{
+   public string kind {get;set;}
+   public string phase {get;set;}
+   public string title {get;set;}
+   public string detail {get;set;}
+   public int completed {get;set;}
+   public int total {get;set;}
+  }
+  private static string SafeStatus(string value,int limit=120){
+   var text=String.IsNullOrEmpty(value)?"":value.Replace("\r"," ").Replace("\n"," ").Replace("\t"," ");
+   return text.Length>limit?text.Substring(0,limit):text;
+  }
+  private void UpdateCacheStatus(CacheStatusPayload value){
+   var phase=value.phase??"";
+   if(phase!="idle"&&phase!="waiting"&&phase!="downloading"&&phase!="complete"&&phase!="partial"&&phase!="failed"&&phase!="cached")return;
+   int total=phase=="idle"?7:Math.Max(1,Math.Min(7,value.total));
+   int completed=Math.Max(0,Math.Min(total,value.completed));
+   cacheTitle.Text="☁ "+SafeStatus(value.title,90);
+   cacheDetail.Text=SafeStatus(value.detail,180);
+   cacheCount.Text=completed+" / "+total+" 個系統";
+   cacheBar.Maximum=total;cacheBar.Value=completed;
+   cacheStatusMenu.Text=SafeStatus("資料狀態："+value.title,55);
+   // Windows notify icons have a limited tooltip length.
+   tray.Text=SafeStatus("79號碼頭｜"+completed+"/"+total+"｜"+value.title,60);
+   if(phase=="complete"||phase=="partial"||phase=="failed")Log("download "+phase+" "+completed+"/"+total+" "+SafeStatus(value.detail,120));
   }
   private static void OpenSafeExternal(string address){
    if(!Uri.TryCreate(address,UriKind.Absolute,out var u)||u.Scheme!="https")return;
