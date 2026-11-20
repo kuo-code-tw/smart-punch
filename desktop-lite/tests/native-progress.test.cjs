@@ -190,8 +190,13 @@ test('one Update System menu handles both website and native shell without separ
 test('system file restart and verified Windows updater reopen the app automatically',()=>{
  const updater=fs.readFileSync(path.join(__dirname,'../app/upgrade-windows.ps1'),'utf8');
  assert.match(nativeSource,/exit=true;Application\.Restart\(\);Close\(\);/,'Site-file update restarts the Windows app');
+ assert.match(nativeSource,/Shown\+=async\(s,e\)=>\{[\s\S]*?ShowWindow\(\);/,'Reopened app must show its main window');
  assert.match(nativeSource,/ReleaseUpdater\.Launch\(shell,root,Process\.GetCurrentProcess\(\)\.Id\)/,'Native update launches helper before shutdown');
  assert.match(updater,/AUTO_RESTART_SUCCESS pid=/,'Updater logs verified automatic reopening');
+ assert.match(updater,/WINDOW_VISIBLE_CONFIRMED pid=/,'Update success requires visible native main window');
+ assert.match(updater,/Port79NativeWindow/,'Updater checks Windows native window visibility');
+ assert.match(updater,/ERROR_NO_VISIBLE_WINDOW/,'Missing window is an explicit error, not a success');
+ assert.match(updater,/STOPPED_FAILED_NEW_PROCESS/,'Failed invisible new app must stop before rollback');
  assert.match(updater,/Start-Process -FilePath \$exe -WorkingDirectory \$root -PassThru/,'New Windows executable starts by itself');
  assert.match(updater,/if\(\$child.HasExited\)/,'A failed immediate restart must not be called successful');
  assert.match(updater,/ROLLBACK_RESTART_ATTEMPTED/,'Failed update attempts to reopen the old program');
