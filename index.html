@@ -398,7 +398,10 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
 
     <div id="sessionBar" class="session">
       <div><strong id="sessionTitle"></strong><small id="sessionMeta"></small></div>
-      <button id="logoutBtn" class="logout" type="button">登出</button>
+      <div class="p79-windows-download-slot">
+        <a id="p79WindowsDownloadLink" class="p79-windows-download-link" href="https://github.com/kuo-code-tw/smart-punch/releases/download/port79-windows-lite-20261120/Port79-Windows-Lite.zip" target="_blank" rel="noopener noreferrer" hidden aria-label="下載 Windows 電腦版，輕量資料夾 ZIP，約 2.8 MB">⬇ 下載 Windows 電腦版 <small>ZIP 約 2.8 MB</small></a>
+        <button id="logoutBtn" class="logout" type="button">登出</button>
+      </div>
     </div>
 
     <div id="loginBox" class="login-box">
@@ -2293,5 +2296,14 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',open);else open();
 })();
 </script>
+<style id="p79-win-download-style">
+.p79-windows-download-slot{display:flex;gap:9px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.p79-windows-download-link{display:inline-flex;align-items:center;gap:8px;background:#0d81ce;color:#fff!important;text-decoration:none;padding:9px 13px;border-radius:10px;font-size:13px;font-weight:900;white-space:nowrap;box-shadow:0 5px 16px rgba(0,114,197,.16);line-height:1.25}
+.p79-windows-download-link:hover,.p79-windows-download-link:focus-visible{background:#096bad;color:#fff!important;outline-offset:3px}
+.p79-windows-download-link small{color:#dceeff;font-size:10px;margin:0;font-weight:700}
+.p79-windows-download-link[hidden]{display:none!important}
+@media(max-width:650px){.p79-windows-download-slot{width:100%;display:grid;grid-template-columns:1fr;gap:8px}.p79-windows-download-link{justify-content:center}.p79-windows-download-slot .logout{width:100%}}
+</style>
+<script defer src="./assets/port79-windows-download.js?v=20261120-manager-release-v1"></script>
 </body>
 </html>
