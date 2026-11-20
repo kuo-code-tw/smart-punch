@@ -26,9 +26,12 @@ try{
  $lines=Get-Content -LiteralPath $upgradeLog
  $launch=@($lines | Where-Object {$_ -match 'AUTO_RESTART_SUCCESS pid=([0-9]+)'})[-1]
  if(!$launch){throw 'Update completed without automatically reopening Windows app'}
+ if(!($lines -match 'WINDOW_VISIBLE_CONFIRMED pid=')){throw 'Native process started but visible desktop window was not confirmed'}
  $match=[regex]::Match([string]$launch,'AUTO_RESTART_SUCCESS pid=([0-9]+)')
  $childPid=[int]$match.Groups[1].Value
  if(!(Get-Process -Id $childPid -ErrorAction SilentlyContinue)){throw 'Relaunched Windows app not running'}
+ $shown=(Get-Process -Id $childPid -ErrorAction SilentlyContinue).MainWindowHandle
+ if($shown -eq [IntPtr]::Zero){throw 'Relaunched native app has no main window handle'}
  if([IO.File]::ReadAllText($keep) -ne 'SAVED PRIVATE DATA'){throw 'Auto update damaged BrowserProfile'}
  if([IO.File]::ReadAllText($site) -eq 'OLD WEBSITE CONTENT'){throw 'Update did not apply newer system code'}
  $appLog=Join-Path $root 'local-data/logs/windows-lite.log'
