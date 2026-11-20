@@ -75,7 +75,15 @@ namespace Port79Lite {
      OpenSafeExternal(e.Uri);
     };
     web.CoreWebView2.NavigationStarting+=(s,e)=>{
-     if(e.Uri.StartsWith(LocalRoot,StringComparison.OrdinalIgnoreCase))return;
+     if(e.Uri.StartsWith(LocalRoot,StringComparison.OrdinalIgnoreCase)){
+      var current=new Uri(e.Uri);
+      if(current.AbsolutePath.EndsWith("/")){
+       e.Cancel=true;
+       var target=new UriBuilder(current){Path=current.AbsolutePath+"index.html"};
+       web.CoreWebView2.Navigate(target.Uri.AbsoluteUri);
+      }
+      return;
+     }
      e.Cancel=true;
      if(e.Uri.StartsWith(OfficialRoot,StringComparison.OrdinalIgnoreCase)){
       web.CoreWebView2.Navigate(LocalRoot+e.Uri.Substring(OfficialRoot.Length));return;
@@ -92,7 +100,7 @@ namespace Port79Lite {
       }catch(Exception x){Log("progress overlay: "+x.Message);}
      }
     };
-    web.CoreWebView2.Navigate(LocalRoot);
+    web.CoreWebView2.Navigate(LocalRoot+"index.html");
     // Software files only: does not download any private database or employee records.
     var tick=new Timer{Interval=600000};
     tick.Tick+=async(s,e)=>await CheckUpdates();
