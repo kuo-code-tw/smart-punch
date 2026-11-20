@@ -218,6 +218,8 @@ namespace Port79Lite {
    public string detail {get;set;}
    public int completed {get;set;}
    public int total {get;set;}
+   public int monthCompleted {get;set;}
+   public int monthTotal {get;set;}
   }
   private static string SafeStatus(string value,int limit=120){
    var text=String.IsNullOrEmpty(value)?"":value.Replace("\r"," ").Replace("\n"," ").Replace("\t"," ");
@@ -230,16 +232,24 @@ namespace Port79Lite {
    int completed=Math.Max(0,Math.Min(total,value.completed));
    cacheTitle.Text="☁ "+SafeStatus(value.title,90);
    cacheDetail.Text=SafeStatus(value.detail,180);
-   cacheCount.Text=completed+" / "+total+" 個系統";
    cacheInProgress=phase=="downloading"||phase=="stalled";
-   // Moving marquee means the current month is still being processed, NOT complete.
-   cacheBar.Style=cacheInProgress?ProgressBarStyle.Marquee:ProgressBarStyle.Continuous;
-   cacheBar.Maximum=total;
-   if(!cacheInProgress)cacheBar.Value=completed;
-   cacheBar.MarqueeAnimationSpeed=cacheInProgress?25:0;
+   int monthTotal=Math.Max(0,Math.Min(240,value.monthTotal));
+   int monthCompleted=Math.Max(0,Math.Min(monthTotal,value.monthCompleted));
+   bool showMonths=cacheInProgress&&monthTotal>0;
+   cacheCount.Text=showMonths?monthCompleted+" / "+monthTotal+" 月｜系統 "+completed+"/"+total:completed+" / "+total+" 個系統";
+   // Numeric month bar is real completed months, not an estimate. For a long
+   // waiting request with no completion progress, revert to animated waiting.
+   bool animate=cacheInProgress&&(!showMonths||phase=="stalled");
+   cacheBar.Style=animate?ProgressBarStyle.Marquee:ProgressBarStyle.Continuous;
+   cacheBar.Maximum=showMonths?monthTotal:total;
+   if(!animate){
+    if(showMonths)cacheBar.Value=monthCompleted;
+    else cacheBar.Value=completed;
+   }
+   cacheBar.MarqueeAnimationSpeed=animate?25:0;
    cacheStatusMenu.Text=SafeStatus("資料狀態："+value.title,55);
    // Windows notify icons have a limited tooltip length.
-   tray.Text=SafeStatus("79號碼頭｜"+completed+"/"+total+"｜"+value.title,60);
+   tray.Text=SafeStatus("79號碼頭｜"+(showMonths?monthCompleted+"/"+monthTotal+"月":"系統"+completed+"/"+total)+"｜"+value.title,60);
    if(phase=="complete"||phase=="partial"||phase=="failed"||phase=="interrupted")Log("download "+phase+" "+completed+"/"+total+" "+SafeStatus(value.detail,120));
   }
   private static void OpenSafeExternal(string address){
