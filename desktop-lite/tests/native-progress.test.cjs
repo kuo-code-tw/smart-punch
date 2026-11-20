@@ -168,3 +168,19 @@ test('native WinForms integration shows status permanently and in tray without a
  assert.match(nativeSource,/private void UpdateCacheStatus/);
  assert(!nativeSource.includes('ExecuteScriptAsync("window.Port79DataCache.downloadAll()'));
 });
+
+test('one Update System menu handles both website and native shell without separate ZIP action',()=>{
+ const releaseSource=fs.readFileSync(path.join(__dirname,'../ReleaseUpdater.cs'),'utf8');
+ assert.match(nativeSource,/ToolStripMenuItem\("更新系統（保留本機資料）"/);
+ assert.doesNotMatch(nativeSource,/ToolStripMenuItem\("更新 Windows 主程式/,'No separate manual shell update menu');
+ assert.match(nativeSource,/await Updater\.StageFromOfficialAsync/,'Updates only changed public site files');
+ assert.match(nativeSource,/await ReleaseUpdater\.PrepareAsync/,'Checks native shell in same action');
+ assert.match(nativeSource,/ReleaseUpdater\.Launch\(shell,root,Process\.GetCurrentProcess\(\)\.Id\)/);
+ assert.match(nativeSource,/Application\.Restart\(\)/,'Site-only update can apply without downloading another ZIP');
+ assert.match(nativeSource,/exit=true;Application\.Restart\(\);Close\(\);/,'Restart must bypass normal hide-to-tray close guard');
+ assert.match(nativeSource,/Interval=300000/,'Automatic checks stay enabled');
+ assert.match(releaseSource,/沿用已驗證的 Windows 更新檔，沒有再次下載/,'Verified staged release is reused');
+ assert.match(releaseSource,/if\(foundShell&&identical\)/,'Newly unpacked identical shell is not reinstalled');
+ assert.match(releaseSource,/installed-shell-sha256\.txt/,'Installed version is preserved');
+ assert.match(releaseSource,/relative\.StartsWith\("local-data\//,'User data is excluded from release');
+});
