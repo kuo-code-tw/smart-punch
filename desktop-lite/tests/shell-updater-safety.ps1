@@ -21,6 +21,9 @@ if((Get-Content (Join-Path $root 'Port79WindowsLite.exe') -Raw).Trim() -ne 'new'
 if((Get-Content (Join-Path $root 'site/smart-punch/index.html') -Raw).Trim() -ne 'new site'){throw 'Original site not updated'}
 if((Get-Content (Join-Path $root 'local-data/BrowserProfile/keep.dat') -Raw).Trim() -ne 'MY PRIVATE DATA'){throw 'User data was changed'}
 if((Get-Content (Join-Path $root 'local-data/updates/installed-shell-sha256.txt') -Raw).Trim() -ne $digest){throw 'Installed SHA version not saved'}
+$exeHash=(Get-Content (Join-Path $root 'local-data/updates/installed-shell-exe-sha256.txt') -Raw).Trim()
+$actualExeHash=(Get-FileHash -LiteralPath (Join-Path $root 'Port79WindowsLite.exe') -Algorithm SHA256).Hash.ToLowerInvariant()
+if($exeHash -ne $actualExeHash){throw 'Installed EXE fingerprint missing or stale'}
 $old=(Get-Content (Join-Path $root 'Port79WindowsLite.exe') -Raw)
 $rejected=$false
 try{
