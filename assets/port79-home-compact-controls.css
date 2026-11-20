@@ -1,0 +1,112 @@
+/* 79 Port | 2026-11-21 | Homepage compact controls only.
+   Presentation only: existing status, account permissions, links and handlers remain unchanged. */
+@media screen {
+ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  gap:8px!important;min-height:48px!important;margin:3px 16px 8px!important;
+  padding:3px 8px!important;box-sizing:border-box!important;
+  border:1px solid #dfecfa!important;border-radius:12px!important;
+  background:linear-gradient(100deg,#edf7ff,#e8f3ff)!important;
+ }
+ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus{
+  display:flex!important;align-items:center!important;flex:1 1 auto!important;
+  flex-wrap:nowrap!important;gap:4px!important;min-width:0!important;
+  padding:3px 0!important;overflow-x:auto!important;overflow-y:hidden!important;
+  scrollbar-width:thin;scrollbar-color:#cbdff3 transparent;
+ }
+ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus .cloud-title{
+  flex:0 0 auto!important;white-space:nowrap!important;font-size:10px!important;
+ }
+ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus .sys{
+  flex:0 0 auto!important;display:inline-flex!important;align-items:center!important;
+  gap:3px!important;min-height:27px!important;padding:3px 6px!important;
+  border:1px solid #dbe8f5!important;border-radius:8px!important;
+  background:#fff!important;white-space:nowrap!important;
+  font-size:10px!important;line-height:1.2!important;
+ }
+ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus .sys .p79-sys-icon{
+  font-size:12px!important;line-height:1!important;
+ }
+ html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus .sys .p79-sys-state{
+  max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+ }
+ html body.p79-workspace:has(#systems.show) #p79HomeCompactActions{
+  display:flex!important;align-items:center!important;justify-content:flex-end!important;
+  flex:0 0 auto!important;gap:6px!important;min-width:0;
+ }
+ html body.p79-workspace:has(#systems.show) #p79HomeCompactActions>*{
+  box-sizing:border-box;
+ }
+ html body.p79-workspace:has(#systems.show) #p79HomeDownloadProgress{
+  display:flex;flex-direction:column;justify-content:center;gap:3px;
+  flex:0 0 126px;min-width:126px;height:35px;padding:4px 9px;
+  border-radius:11px;border:1px solid #d6e5f5;background:#fff;
+  color:#1c4776;font-size:11px;font-weight:750;line-height:1.15;
+ }
+ html body.p79-workspace:has(#systems.show) #p79HomeDownloadProgress[hidden]{display:none!important}
+ #p79HomeDownloadProgress .p79-compact-progress-line{
+  display:flex;align-items:center;gap:5px;justify-content:space-between;white-space:nowrap;
+ }
+ #p79HomeDownloadProgress .p79-compact-progress-label{overflow:hidden;text-overflow:ellipsis}
+ #p79HomeDownloadProgress .p79-compact-progress-count{font-variant-numeric:tabular-nums;flex:0 0 auto}
+ #p79HomeDownloadProgress .p79-compact-progress-track{
+  width:100%;height:4px;border-radius:99px;background:#d9e5f3;overflow:hidden
+ }
+ #p79HomeDownloadProgress .p79-compact-progress-fill{
+  height:100%;width:0%;border-radius:99px;background:#20b966;transition:width .25s ease
+ }
+ html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79WindowsDownloadLink:not([hidden]){
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  min-height:35px!important;height:35px!important;flex:0 0 auto!important;
+  margin:0!important;padding:7px 11px!important;max-width:none!important;
+  border-radius:10px!important;background:#087fda!important;border:1px solid #0872c9!important;
+  color:#fff!important;box-shadow:0 2px 8px #0f76c226!important;
+  font-size:12px!important;font-weight:800!important;line-height:1!important;
+  text-decoration:none!important;white-space:nowrap!important;
+ }
+ html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79WindowsDownloadLink:hover{
+  background:#0769bb!important;
+ }
+ html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79HomeFunctionMenu{
+  flex:0 0 auto!important;margin:0!important;min-width:0!important;
+ }
+ html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79HomeFunctionMenu>summary{
+  display:flex!important;align-items:center!important;justify-content:center!important;
+  min-height:35px!important;height:35px!important;margin:0!important;
+  padding:6px 9px!important;border:1px solid #d2e3f4!important;
+  border-radius:9px!important;background:#fff!important;color:#254d78!important;
+  box-shadow:none!important;font-size:11px!important;white-space:nowrap!important;
+ }
+ html body.p79-workspace:has(#systems.show) #p79HomeCompactActions .p79-toolbar-theme{
+  flex:0 0 35px!important;min-width:35px!important;width:35px!important;
+  height:35px!important;min-height:35px!important;margin:0!important;padding:0!important;
+  background:#fff!important;border:1px solid #d2e3f4!important;border-radius:9px!important;
+  color:#193f6e!important;font-size:15px!important;line-height:1!important;
+ }
+ html body.p79-workspace:has(#systems.show) #p79HomeCompactActions :is(a,button,summary):focus-visible{
+  outline:2px solid #2e8de4!important;outline-offset:2px!important;
+ }
+ html:is(.dark,[data-theme="dark"]) body.p79-workspace:has(#systems.show) #p79WorkspaceStatus{
+  background:#142b44!important;border-color:#31465e!important;
+ }
+ html:is(.dark,[data-theme="dark"]) body.p79-workspace:has(#systems.show) #p79HomeDownloadProgress,
+ html:is(.dark,[data-theme="dark"]) body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79HomeFunctionMenu>summary,
+ html:is(.dark,[data-theme="dark"]) body.p79-workspace:has(#systems.show) #p79HomeCompactActions .p79-toolbar-theme{
+  background:#1e3650!important;color:#e2efff!important;border-color:#38516d!important;
+ }
+ @media(max-width:1320px){
+  html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus{flex-wrap:wrap!important}
+  html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus #p79SevenStatus{
+   flex:1 1 100%!important;min-width:0!important;
+  }
+  html body.p79-workspace:has(#systems.show) #p79HomeCompactActions{
+   margin-left:auto!important;flex-wrap:wrap!important;
+  }
+ }
+ @media(max-width:650px){
+  html body.p79-workspace:has(#systems.show) #p79WorkspaceStatus{margin:4px 10px 8px!important}
+  html body.p79-workspace:has(#systems.show) #p79HomeCompactActions{width:100%;justify-content:flex-end!important;gap:5px!important}
+  html body.p79-workspace:has(#systems.show) #p79HomeDownloadProgress{flex-basis:112px;min-width:112px}
+  html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79WindowsDownloadLink:not([hidden]){padding:6px 8px!important;font-size:11px!important}
+ }
+}
