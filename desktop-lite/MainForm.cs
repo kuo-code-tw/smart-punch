@@ -24,6 +24,8 @@ namespace Port79Lite {
   private readonly Label cacheDetail;
   private readonly Label cacheCount;
   private readonly ProgressBar cacheBar;
+  private readonly Panel cachePanel;
+  private readonly System.Windows.Forms.Timer cacheDismissTimer;
   private bool exit=false;
   private bool updateBusy=false;
   private bool initiated=false;
@@ -38,21 +40,46 @@ namespace Port79Lite {
    Icon=SystemIcons.Application;
    web=new WebView2{Dock=DockStyle.Fill};
    Controls.Add(web);
-   // Persistent native status stays visible even when the webpage scrolls,
-   // changes modules, or the HTML progress popover is hidden.
-   var panel=new Panel{Dock=DockStyle.Bottom,Height=74,BackColor=Color.FromArgb(239,248,255),Padding=new Padding(12,7,12,7)};
-   var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=2,Margin=Padding.Empty};
-   layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,79));
-   layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,21));
-   layout.RowStyles.Add(new RowStyle(SizeType.Absolute,29));
+   // Compact, floating native progress at the top-right; never reserve a
+   // full-width row below the webpage and never duplicate the HTML toast.
+   cachePanel=new Panel {
+    Width=326,Height=96,BackColor=Color.FromArgb(246,251,255),
+    Padding=new Padding(9,7,9,7),BorderStyle=BorderStyle.FixedSingle,
+    Anchor=AnchorStyles.Top|AnchorStyles.Right,Visible=false
+   };
+   var layout=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=3,RowCount=3,Margin=Padding.Empty };
+   layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,67));
+   layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,24));
+   layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,9));
+   layout.RowStyles.Add(new RowStyle(SizeType.Absolute,26));
+   layout.RowStyles.Add(new RowStyle(SizeType.Absolute,25));
    layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-   cacheTitle=new Label{Dock=DockStyle.Fill,Text="☁ 本機資料：等待管理員登入",AutoEllipsis=true,Font=new Font("Microsoft JhengHei",10,FontStyle.Bold),ForeColor=Color.FromArgb(19,65,113),TextAlign=ContentAlignment.MiddleLeft};
-   cacheCount=new Label{Dock=DockStyle.Fill,Text="0 / 7 個系統",TextAlign=ContentAlignment.MiddleRight,Font=new Font("Microsoft JhengHei",9,FontStyle.Bold),ForeColor=Color.FromArgb(23,101,169)};
-   cacheDetail=new Label{Dock=DockStyle.Fill,Text="登入後才開始下載；首次開啟不會預先下載私人資料。",AutoEllipsis=true,Font=new Font("Microsoft JhengHei",9),ForeColor=Color.FromArgb(61,97,130),TextAlign=ContentAlignment.MiddleLeft};
-   cacheBar=new ProgressBar{Dock=DockStyle.Fill,Minimum=0,Maximum=7,Value=0,Style=ProgressBarStyle.Continuous,Margin=new Padding(12,5,0,4)};
-   layout.Controls.Add(cacheTitle,0,0);layout.Controls.Add(cacheCount,1,0);
-   layout.Controls.Add(cacheDetail,0,1);layout.Controls.Add(cacheBar,1,1);
-   panel.Controls.Add(layout);Controls.Add(panel);panel.BringToFront();
+   cacheTitle=new Label { Dock=DockStyle.Fill,Text="☁ 正在下載",AutoEllipsis=true,
+    Font=new Font("Microsoft JhengHei",9,FontStyle.Bold),ForeColor=Color.FromArgb(19,65,113),
+    TextAlign=ContentAlignment.MiddleLeft };
+   cacheCount=new Label { Dock=DockStyle.Fill,Text="0/7",AutoEllipsis=true,
+    TextAlign=ContentAlignment.MiddleRight,Font=new Font("Microsoft JhengHei",8,FontStyle.Bold),
+    ForeColor=Color.FromArgb(23,101,169) };
+   cacheDetail=new Label { Dock=DockStyle.Fill,AutoEllipsis=true,
+    Text="資料下載進度",Font=new Font("Microsoft JhengHei",8),ForeColor=Color.FromArgb(61,97,130),
+    TextAlign=ContentAlignment.MiddleLeft };
+   cacheBar=new ProgressBar { Dock=DockStyle.Fill,Minimum=0,Maximum=7,Value=0,
+    Style=ProgressBarStyle.Continuous,Margin=new Padding(2,4,2,5) };
+   var dismiss=new Button { Text="×",Dock=DockStyle.Fill,FlatStyle=FlatStyle.Flat,
+    TabStop=false,Margin=Padding.Empty,Font=new Font("Microsoft JhengHei",9),AccessibleName="隱藏下載進度" };
+   dismiss.FlatAppearance.BorderSize=0;
+   dismiss.Click+=(s,e)=>{cachePanel.Visible=false;cacheDismissTimer.Stop();};
+   layout.Controls.Add(cacheTitle,0,0);
+   layout.Controls.Add(cacheCount,1,0);
+   layout.Controls.Add(dismiss,2,0);
+   layout.Controls.Add(cacheDetail,0,1);layout.SetColumnSpan(cacheDetail,3);
+   layout.Controls.Add(cacheBar,0,2);layout.SetColumnSpan(cacheBar,3);
+   cachePanel.Controls.Add(layout);Controls.Add(cachePanel);
+   cachePanel.BringToFront();
+   cacheDismissTimer=new System.Windows.Forms.Timer { Interval=6000 };
+   cacheDismissTimer.Tick+=(s,e)=>{cacheDismissTimer.Stop();cachePanel.Visible=false;};
+   SizeChanged+=(s,e)=>PositionCachePanel();
+   PositionCachePanel();
    tray=new NotifyIcon{Icon=SystemIcons.Application,Visible=true,Text="79號碼頭雲端智慧系統"};
    var menu=new ContextMenuStrip();
    menu.Items.Add("開啟系統",null,(s,e)=>ShowWindow());
@@ -73,8 +100,11 @@ namespace Port79Lite {
    tray.ContextMenuStrip=menu;
    tray.DoubleClick+=(s,e)=>ShowWindow();
    FormClosing+=(s,e)=>{if(!exit){e.Cancel=true;Hide();}};
-   FormClosed+=(s,e)=>{tray.Visible=false;tray.Dispose();web.Dispose();};
+   FormClosed+=(s,e)=>{cacheDismissTimer.Dispose();tray.Visible=false;tray.Dispose();web.Dispose();};
    Shown+=async(s,e)=>await Initialize();
+  }
+  private void PositionCachePanel(){
+   cachePanel.Location=new Point(Math.Max(8,ClientSize.Width-cachePanel.Width-16),12);
   }
   private void ShowWindow(){Show();WindowState=FormWindowState.Maximized;Activate();}
   private void ExitApp(){exit=true;tray.Visible=false;Close();}
@@ -119,6 +149,8 @@ namespace Port79Lite {
       cacheTitle.Text="⏸ 本機資料下載已中斷";
       cacheDetail.Text="頁面已切換；已下載的資料仍保留。回到首頁可重新下載。";
       cacheBar.Style=ProgressBarStyle.Continuous;
+      cachePanel.Visible=true;
+      cacheDismissTimer.Stop();
       cacheStatusMenu.Text="資料狀態：已切換頁面，下載中斷";
      }
      if(e.Uri.StartsWith(LocalRoot,StringComparison.OrdinalIgnoreCase)){
@@ -247,6 +279,10 @@ namespace Port79Lite {
    cacheTitle.Text="☁ "+SafeStatus(value.title,90);
    cacheDetail.Text=SafeStatus(value.detail,180);
    cacheInProgress=phase=="downloading"||phase=="stalled";
+   cacheDismissTimer.Stop();
+   cachePanel.Visible=phase=="downloading"||phase=="stalled"||phase=="complete"||
+                      phase=="partial"||phase=="failed"||phase=="interrupted";
+   if(phase=="complete")cacheDismissTimer.Start();
    int monthTotal=Math.Max(0,Math.Min(240,value.monthTotal));
    int monthCompleted=Math.Max(0,Math.Min(monthTotal,value.monthCompleted));
    bool showMonths=cacheInProgress&&monthTotal>0;
