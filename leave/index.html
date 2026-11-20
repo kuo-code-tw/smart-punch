@@ -559,6 +559,7 @@ async function loadCloud(show=false,requireFresh=false,identityReady=null,entryR
   }
   if(!d?.ok){const message=d?.error||'雲端讀取失敗';if(!adminSession&&p79LeaveAuthError(message)){p79EmployeeLeaveReauth();return false;}throw new Error(message);}
   cloudFinished=true;p79LeaveCloudDataReady=true;
+  p79LeaveOvertimeVerified.clear();p79LeaveListAudit=null;
   employees=Array.isArray(d.employees)?d.employees:[];
   leaveRecords=adminSession&&Array.isArray(d.leaveRecords)?d.leaveRecords:[];
   window.p79LeaveCoverAssignments=Array.isArray(d.leaveCoverAssignments)?d.leaveCoverAssignments:[];
@@ -913,6 +914,39 @@ function p79OvertimeComplete(leave,coverage,cloudMonths){
  });
 }
 
+
+function p79AuditVisibleLeaveOvertime(visible){
+ // Read-only, sequential, at most two filtered months. Never POST or guess green.
+ if(!p79LeaveCloudDataReady||!adminSession||!visible.length||document.visibilityState==='hidden')return;
+ const records=visible.map(leave=>({leave,coverage:p79LeaveCoverage(leave)}))
+  .filter(x=>x.coverage.complete&&x.coverage.units.length);
+ if(!records.length)return;
+ const months=[...new Set(records.flatMap(x=>x.coverage.units.map(u=>u.date.slice(0,7))))].sort();
+ if(months.length<1||months.length>2)return;
+ const token=leaveRequestToken();if(!token)return;
+ const key=JSON.stringify([token,months,records.map(x=>[x.leave.id,x.coverage.signature])]);
+ if(p79LeaveListAudit?.key===key&&Date.now()-p79LeaveListAudit.at<90000)return;
+ const request={key,at:Date.now()};p79LeaveListAudit=request;
+ void (async()=>{
+  await new Promise(resolve=>setTimeout(resolve,700));
+  if(p79LeaveListAudit!==request||leaveRequestToken()!==token)return;
+  const cloud=new Map();
+  for(const month of months){
+   const result=await jsonFetch(GAS_URL+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+
+    '&month='+encodeURIComponent(month)+'&_='+Date.now(),{cache:'no-store',redirect:'follow'},22000);
+   if(!result?.ok||!Array.isArray(result.schedules)||result.month&&String(result.month)!==month)
+    throw Error('正式雲端加班資料尚未核對');
+   cloud.set(month,result);
+  }
+  if(p79LeaveListAudit!==request||leaveRequestToken()!==token)return;
+  for(const {leave,coverage} of records){
+   const done=p79OvertimeComplete(leave,coverage,cloud);
+   p79LeaveOvertimeVerified.set(String(leave.id),{signature:coverage.signature,complete:done,at:Date.now()});
+   p79ApplyCompletion(leave.id,true,done);
+  }
+ })().catch(error=>console.warn('[PORT79] 加班核對未完成，維持灰色狀態',error));
+}
+
 function renderAdmin(){
  if($('p79CleanupDeletedLeaveButton'))$('p79CleanupDeletedLeaveButton').hidden=leaveAccess!=='manage';
  if(!adminSession)return;
@@ -968,6 +1002,7 @@ function renderAdmin(){
      <td><span class="leave-remain ${remainClass}">${remainText}</span>${emp&&remain!=null?`<div class="note" style="font-size:11px">${esc(leaveBalanceExplanation(emp,info))}</div>`:''}</td>
    </tr>`;
  }).join(''):'<tr><td colspan="9">'+(leaveRecords.length?(month?'所選月份沒有符合資料。':'目前篩選條件沒有符合資料，請調整單位、職稱或狀態。'):(month?'所選月份沒有請假紀錄':'目前沒有請假紀錄'))+'</td></tr>';
+ if(currentMode==='admin')p79AuditVisibleLeaveOvertime(rows.filter(l=>String(l.status)==='已核准'));
 }
 function renderAdminBalances(){
  if(currentMode!=='balance'||!adminSession)return;
@@ -2518,6 +2553,8 @@ window.addEventListener('p79-overtime-report-saved',()=>{
  // Do not issue an extra background cloud read at the same instant:
  // it contends with the new filing's reads and may lock the GAS worker.
  p79LeaveHandoffContext=null;
+ p79LeaveOvertimeVerified.clear();p79LeaveListAudit=null;
+ if(currentMode==='admin')renderAdmin();
  p79UpdateLeaveHandoffBanner();
 });
 window.addEventListener('load',()=>{p79UpdateLeaveHandoffBanner();void p79ReconcileLeaveHandoff().catch(console.warn);});
