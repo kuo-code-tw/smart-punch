@@ -213,3 +213,17 @@ test('Windows app has one unmistakable update entry and a dedicated 79 icon',()=
  assert.match(build,/generate-icon\.ps1/);
  assert.match(generator,/DrawString\('79'/);
 });
+
+test('a stale version marker must never hide an old bottom-bar executable',()=>{
+ const updater=fs.readFileSync(path.join(__dirname,'../ReleaseUpdater.cs'),'utf8');
+ const script=fs.readFileSync(path.join(__dirname,'../app/upgrade-windows.ps1'),'utf8');
+ assert.match(updater,/installed-shell-exe-sha256\.txt/);
+ assert.match(updater,/markerMatches&&HashValid\(exeHash\)&&File.Exists\(exeFile\)/);
+ assert.match(updater,/Sha256\(File.ReadAllBytes\(exeFile\)\)/);
+ assert.match(updater,/版本紀錄存在但 EXE 尚未核對/);
+ assert.match(script,/AUTO_RESTART_SUCCESS pid=/);
+ assert.match(script,/Get-FileHash -LiteralPath \$exe -Algorithm SHA256/);
+ assert.match(script,/WriteAllText\(\$version,\$ExpectedDigest\)/);
+ const restartPos=script.indexOf('if($child.HasExited)'),markerPos=script.indexOf('WriteAllText($version,$ExpectedDigest)');
+ assert(restartPos>=0&&markerPos>restartPos,'Only mark successful release after new executable was launched');
+});
