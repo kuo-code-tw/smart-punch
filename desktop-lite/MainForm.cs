@@ -18,6 +18,7 @@ namespace Port79Lite {
   private readonly WebView2 web;
   private readonly ToolStripMenuItem checkUpdatesMenu;
   private readonly ToolStripMenuItem cacheStatusMenu;
+  private readonly ToolStripMenuItem updateWindowsMenu;
   private readonly Label cacheTitle;
   private readonly Label cacheDetail;
   private readonly Label cacheCount;
@@ -60,6 +61,8 @@ namespace Port79Lite {
    menu.Items.Add("管理員登入後重新下載資料",null,async(s,e)=>await ForceDownload());
    checkUpdatesMenu=new ToolStripMenuItem("檢查原系統程式更新",null,async(s,e)=>await CheckUpdates());
    menu.Items.Add(checkUpdatesMenu);
+   updateWindowsMenu=new ToolStripMenuItem("一鍵更新 Windows 程式（保留本機資料）",null,async(s,e)=>await UpgradeWindowsShell());
+   menu.Items.Add(updateWindowsMenu);
    menu.Items.Add("開啟電腦資料夾",null,(s,e)=>OpenLocalData());
    menu.Items.Add(new ToolStripSeparator());
    menu.Items.Add("真正結束程式",null,(s,e)=>ExitApp());
@@ -197,6 +200,36 @@ namespace Port79Lite {
    if(web.CoreWebView2==null)return;
    // The script rechecks the server-issued manager session before doing any download.
    await web.CoreWebView2.ExecuteScriptAsync("window.dispatchEvent(new Event('port79-desktop-force-sync'))");
+  }
+  private async Task UpgradeWindowsShell(){
+   if(updateBusy)return;
+   var answer=MessageBox.Show(
+    "將從 79號碼頭官方 GitHub Release 驗證下載新版 Windows 程式，保留 local-data、所有已下載快取與備份。\n\n請先確認沒有正在進行 Excel 匯入、考勤儲存或任何未完成的雲端寫入。\n\n驗證成功後，程式將自動關閉、更新並重新啟動。現在繼續嗎？",
+    "一鍵更新 Windows 程式",MessageBoxButtons.YesNo,MessageBoxIcon.Question);
+   if(answer!=DialogResult.Yes)return;
+   updateBusy=true;updateWindowsMenu.Enabled=false;checkUpdatesMenu.Enabled=false;
+   try{
+    cacheTitle.Text="正在檢查 Windows 程式版本";
+    cacheDetail.Text="從正式發布檢查檔案 SHA-256；不會下載或覆蓋考勤資料庫。";
+    var ready=await ReleaseUpdater.PrepareAsync(root,DataRoot,Log);
+    if(ready==null){
+     cacheTitle.Text="Windows 主程式已是最新版";
+     cacheDetail.Text="已核對目前安裝的版本，無需再次下載。";
+     MessageBox.Show("Windows 主程式已是最新發布版本。","79號碼頭 Windows 更新",MessageBoxButtons.OK,MessageBoxIcon.Information);
+     return;
+    }
+    ReleaseUpdater.Launch(ready,root,Process.GetCurrentProcess().Id);
+    Log("已驗證最新版程式檔；已啟動安全更新工具。系統進入重新啟動流程");
+    ExitApp();
+   }catch(Exception error){
+    Log("Windows 版本更新失敗："+error.Message);
+    cacheTitle.Text="Windows 更新未完成";
+    cacheDetail.Text=error.Message;
+    MessageBox.Show("程式尚未更新，原有資料與 Windows 程式均保留：\n"+error.Message,
+     "79號碼頭 Windows 更新",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+   }finally{
+    updateBusy=false;updateWindowsMenu.Enabled=true;checkUpdatesMenu.Enabled=true;
+   }
   }
   private async Task CheckUpdates(){
    if(updateBusy)return;updateBusy=true;checkUpdatesMenu.Enabled=false;
