@@ -22,7 +22,7 @@ jobs:
           dotnet-version: 8.0.x
       - name: Test zero cloud database downloads before verified administrator login
         shell: pwsh
-        run: node --test desktop-lite/tests/login-after-admin.test.cjs
+        run: node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs
       - name: Restore WebView2 WinForms dependencies
         shell: pwsh
         run: dotnet restore desktop-lite/Port79Lite.csproj /p:Platform=x64
