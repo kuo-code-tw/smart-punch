@@ -20,6 +20,16 @@ const scriptUrl=document.currentScript?.src || new URL('assets/port79-session-ti
 const HOME=new URL('../',scriptUrl).href;
 const isHome=(new URL(HOME).pathname.replace(/\/+$/,'/')===location.pathname.replace(/\/+$/,'/')) || location.pathname.endsWith('/index.html')&&!location.pathname.includes('/hr/')&&location.pathname===new URL('index.html',HOME).pathname;
 const isHr=/\/hr\/(?:index\.html)?$/i.test(location.pathname);
+// Only the packaged Windows WebView2 application uses this private virtual
+// host. A normal desktop browser, even on Windows, retains the cloud HR idle
+// policy. Never use a persistent localStorage flag as desktop proof.
+function isNativeWindowsDesktop(){
+ try{
+  return location.origin==='https://port79assets.example'&&
+   location.pathname.startsWith('/smart-punch/')&&
+   typeof window.chrome?.webview?.postMessage==='function';
+ }catch(_){return false;}
+}
 const AUTH_KEYS=[
  'port79_user_session','port79_user_token','port79_admin_token','port79_gc_token','port79_gc_superadmin_token',
  'admin_session','aqc_admin_logged_in','aqc_admin_id','aqc_admin_role','aqc_admin_name','aqc_admin_active_tab',
@@ -134,12 +144,14 @@ function clearIdentity(){
  try{sessionStorage.removeItem(ACTIVITY_KEY);sessionStorage.removeItem(FINGERPRINT_KEY);sessionStorage.setItem('port79_idle_expired_notice','1');}catch(e){}
 }
 function expire(){
- if(expiring||!fingerprint())return;
+ // Never expire the native Windows app merely for inactivity; an explicit
+ // logout and any server-side credential rejection still operate normally.
+ if(isNativeWindowsDesktop()||expiring||!fingerprint())return;
  expiring=true;clearIdentity();
  location.replace(HOME+'?logout=1&idle=1&t='+Date.now());
 }
 function tick(){
- if(!observeLogin())return;
+ if(isNativeWindowsDesktop()||!observeLogin())return;
  const last=timestamp();
  if(last&&Date.now()-last>=minutes*60000)expire();
 }
@@ -170,7 +182,9 @@ function refreshPreview(){
  const select=document.getElementById('p79IdleMinutes'),preview=document.getElementById('p79IdlePreview');
  if(!select||!preview)return;
  const custom=document.getElementById('p79IdleCustomRow');custom.hidden=select.value!=='custom';
- const n=chosen();preview.textContent=n===null?'請輸入 1～120 的整數分鐘數。':'全部公司、全部單位、全部人員：連續 '+n+' 分鐘未操作，自動登出並返回首頁。';
+ const n=chosen();
+ preview.textContent=n===null?'請輸入 1～120 的整數分鐘數。':
+  '全部公司、全部單位、全部人員使用一般網頁版：連續 '+n+' 分鐘未操作將自動登出。Windows 電腦版不受此閒置時間限制。';
 }
 function setStatus(message,error){const el=document.getElementById('p79IdleStatus');if(el){el.textContent=message;el.style.color=error?'#dc2626':'#047857';}}
 async function saveUI(){
@@ -221,9 +235,17 @@ function idleNotice(){
   if(status){status.textContent='因連續 '+minutes+' 分鐘沒有操作，系統已自動登出。請重新登入。';status.classList.add('warning');}
  }catch(e){}
 }
-window.Port79IdleLogout={currentMinutes:()=>minutes,sync:()=>syncCloud(true),openSettings:()=>{if(!isHr)return;makeUI();return window.Port79IdleLogout.openSettings();}};
+window.Port79IdleLogout={currentMinutes:()=>minutes,desktopExempt:isNativeWindowsDesktop,
+ sync:()=>syncCloud(true),openSettings:()=>{if(!isHr)return;makeUI();return window.Port79IdleLogout.openSettings();}};
 function start(){
- readCache();idleNotice();makeUI();
+ readCache();makeUI();
+ if(isNativeWindowsDesktop()){
+  // No inactivity clock, activity recording or recurring settings fetch is
+  // needed in the Windows app. Management can still open the global WEB
+  // timeout settings when explicitly requested; stored policy is untouched.
+  return;
+ }
+ idleNotice();
  ['pointerdown','keydown','wheel','touchstart','scroll','input'].forEach(type=>window.addEventListener(type,activity,{passive:true,capture:true}));
  window.addEventListener('focus',()=>{tick();void syncCloud();});
  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){tick();void syncCloud();}});
