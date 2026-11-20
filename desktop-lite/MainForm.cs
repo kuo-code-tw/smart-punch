@@ -37,7 +37,7 @@ namespace Port79Lite {
    WindowState=FormWindowState.Maximized;
    MinimumSize=new Size(980,640);
    StartPosition=FormStartPosition.CenterScreen;
-   Icon=SystemIcons.Application;
+   Icon=System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
    web=new WebView2{Dock=DockStyle.Fill};
    Controls.Add(web);
    // Tiny icon and slim progress at the upper-right; no full-width strip.
@@ -78,7 +78,7 @@ namespace Port79Lite {
    cacheDismissTimer.Tick+=(s,e)=>{cacheDismissTimer.Stop();cachePanel.Visible=false;};
    SizeChanged+=(s,e)=>PositionCachePanel();
    PositionCachePanel();
-   tray=new NotifyIcon{Icon=SystemIcons.Application,Visible=true,Text="79號碼頭雲端智慧系統"};
+   tray=new NotifyIcon{Icon=Icon ?? SystemIcons.Application,Visible=true,Text="79號碼頭雲端智慧系統"};
    var menu=new ContextMenuStrip();
    menu.Items.Add("開啟系統",null,(s,e)=>ShowWindow());
    menu.Items.Add("縮小到系統匣",null,(s,e)=>Hide());
