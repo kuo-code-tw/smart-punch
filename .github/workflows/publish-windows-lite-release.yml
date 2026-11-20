@@ -39,7 +39,6 @@ jobs:
         shell: pwsh
         run: |
           & ./desktop-lite/tests/shell-updater-safety.ps1
-          if ($LASTEXITCODE -ne 0) { throw 'Windows updater safety test failed' }
       - name: Restore native Windows dependencies
         shell: pwsh
         run: dotnet restore desktop-lite/Port79Lite.csproj /p:Platform=x64
