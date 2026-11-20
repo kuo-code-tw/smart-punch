@@ -973,8 +973,9 @@ function renderAdmin(){
    const leaveType=/特休|年假/.test(String(l.leaveType||''))?'年假':String(l.leaveType||'');
    const cover=coverIndex.get(String(l.id));
    const coverage=p79LeaveCoverage(l);
+   const coverComplete=coverage.complete&&p79LeaveCloudDataReady===true;
    const verified=p79LeaveOvertimeVerified.get(String(l.id));
-   const overtimeComplete=coverage.complete&&verified?.signature===coverage.signature&&verified.complete===true&&Date.now()-verified.at<90000;
+   const overtimeComplete=coverComplete&&verified?.signature===coverage.signature&&verified.complete===true&&Date.now()-verified.at<90000;
    const workerIds=Array.isArray(cover?.workerIds)?cover.workerIds.filter(Boolean):[];
    const workerNames=workerIds.map(id=>{
      const e=peopleIndex.get(String(id).trim().toUpperCase());
@@ -985,7 +986,7 @@ function renderAdmin(){
      ? (cover?.mode==='rest'?'排休代班：':'加班代班：')+workerNames.join('、')
      : l.source==='manual-admin-no-cover'?'無須代班人員':'尚未安排代班');
    const coverButton=String(l.status)==='已核准'&&leaveAccess==='manage'
-     ? `<button type="button" class="p79-cover-again p79-leave-step-button ${coverage.complete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-button="cover" data-p79-leave-id="${esc(l.id)}" onclick="p79OpenLeaveCover('${esc(l.id)}')">安排代班</button><button type="button" class="p79-cover-again p79-leave-step-button ${overtimeComplete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-button="overtime" data-p79-leave-id="${esc(l.id)}" onclick="p79ReportSavedLeaveCover('${esc(l.id)}')">申報加班</button>`
+     ? `<button type="button" class="p79-cover-again p79-leave-step-button ${coverComplete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-button="cover" data-p79-leave-id="${esc(l.id)}" onclick="p79OpenLeaveCover('${esc(l.id)}')">安排代班</button><button type="button" class="p79-cover-again p79-leave-step-button ${overtimeComplete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-button="overtime" data-p79-leave-id="${esc(l.id)}" onclick="p79ReportSavedLeaveCover('${esc(l.id)}')">申報加班</button>`
      : '';
    const coverDisplay=String(l.status)==='已核准'
      ? `<span class="p79-leave-cover-inline">${coverButton}<span class="p79-leave-cover-names" title="${esc(coverText)}">${esc(coverText)}</span></span>`
@@ -997,7 +998,7 @@ function renderAdmin(){
      <td class="p79-leave-date-inline">${esc(l.startTime||l.startDate||'')} ～ ${esc(l.endTime||l.endDate||l.startTime||l.startDate||'')}</td>
      <td>${esc(l.days??l.hours??'')}</td>
      <td><div class="p79-leave-reason">${l.reason?'<div class="p79-leave-reason-text">'+esc(l.reason)+'</div>':''}${coverDisplay}</div></td>
-     <td><div class="p79-leave-status-inline">${badge(l.status)}<span class="p79-leave-completion-state ${coverage.complete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-status="cover" data-p79-leave-id="${esc(l.id)}">代班：${coverage.complete?'已安排完成':'未申報完成'}</span><span class="p79-leave-completion-state ${overtimeComplete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-status="overtime" data-p79-leave-id="${esc(l.id)}">加班：${overtimeComplete?'已申報完成':'未申報完成'}</span></div></td>
+     <td><div class="p79-leave-status-inline">${badge(l.status)}<span class="p79-leave-completion-state ${coverComplete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-status="cover" data-p79-leave-id="${esc(l.id)}">代班：${coverComplete?'已安排完成':'未申報完成'}</span><span class="p79-leave-completion-state ${overtimeComplete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-status="overtime" data-p79-leave-id="${esc(l.id)}">加班：${overtimeComplete?'已申報完成':'未申報完成'}</span></div></td>
      <td>${leaveAccess==='manage'?`<div class="actions"><button style="background:#dcfce7;color:#166534" onclick="setLeaveStatus('${esc(l.id)}','已核准')">核准</button><button style="background:#ffe4e6;color:#9f1239" onclick="setLeaveStatus('${esc(l.id)}','已駁回')">駁回</button><button style="background:#e2e8f0;color:#334155" onclick="deleteLeave('${esc(l.id)}')">刪除</button></div>`:'只能查看'}</td>
      <td><span class="leave-remain ${remainClass}">${remainText}</span>${emp&&remain!=null?`<div class="note" style="font-size:11px">${esc(leaveBalanceExplanation(emp,info))}</div>`:''}</td>
    </tr>`;
@@ -1087,7 +1088,14 @@ async function p79ReportSavedLeaveCover(id){
    for(const cover of covers){
     const start=normalizeLeaveFilterDate(cover.startDate),end=normalizeLeaveFilterDate(cover.endDate);
     if(!start||!end||start>end)throw Error('代班日期無效，請核對雲端安排');
-    const assignments=[];for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1))
+    const assignments=[];
+    if(Array.isArray(cover.dailyAssignments)&&cover.dailyAssignments.length){
+     for(const item of cover.dailyAssignments){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(String(item.date||''))||item.date<start||item.date>end)
+       throw Error('逐日代班日期超出核准請假區間，保留待核對狀態');
+      assignments.push({date:item.date,mode:item.mode||cover.mode||'one',workerIds:item.workerIds||[]});
+     }
+    }else for(let day=new Date(start+'T12:00:00Z'),last=new Date(end+'T12:00:00Z');day<=last;day.setUTCDate(day.getUTCDate()+1))
      assignments.push({date:day.toISOString().slice(0,10),mode:cover.mode||'one',workerIds:cover.workerIds||[]});
     const mapped=await p79BuildLeaveCoverWorkdayEntries(String(id),String(leave.empId),assignments);
     for(const entry of mapped){
