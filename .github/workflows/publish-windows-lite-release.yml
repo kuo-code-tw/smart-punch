@@ -47,6 +47,37 @@ jobs:
         run: |
           & ./desktop-lite/build-portable.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+      - name: Native WebView2 verifies all Gate Yard Vessel importer frames are same-origin
+        shell: pwsh
+        run: |
+          $root=(Resolve-Path 'desktop-lite/dist/79號碼頭_Windows輕量版').Path
+          $exe=Join-Path $root 'Port79WindowsLite.exe'
+          $p=Start-Process -FilePath $exe -ArgumentList '--port79-verify-import-frames' -WorkingDirectory $root -PassThru
+          try {
+            $log=Join-Path $root 'local-data/logs/windows-lite.log'
+            $success=$false
+            for($i=0;$i -lt 135;$i++){
+              Start-Sleep -Seconds 1
+              if(Test-Path $log) {
+                $lines=Get-Content $log -ErrorAction SilentlyContinue
+                if($lines -match 'IMPORT FRAME CHECK: .*FAIL'){Get-Content $log -Tail 12;throw 'One or more import frames loaded cross-origin'}
+                if($lines -match 'IMPORT FRAME CHECK: .*PASS imported frames gate, yard, vessel are same-origin'){$success=$true;break}
+              }
+              if($p.HasExited){throw 'Native importer test exited before completion'}
+            }
+            if(!$success){if(Test-Path $log){Get-Content $log -Tail 15};throw 'Importer frames did not prove same-origin'}
+            Write-Host 'PASS native Gate / Yard / Vessel same-origin iframe navigation without any file upload'
+          } finally {
+            Get-Process Port79WindowsLite -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          }
+          # Never distribute Windows CI browser cookies or profile state.
+          $profile=Join-Path $root 'local-data/BrowserProfile'
+          for($i=0;$i -lt 12;$i++){
+            try {if(Test-Path $profile){Remove-Item $profile -Force -Recurse -ErrorAction Stop};break}catch{Start-Sleep -Seconds 2}
+          }
+          New-Item -ItemType Directory -Force $profile | Out-Null
+          $logs=Join-Path $root 'local-data/logs'
+          if(Test-Path $logs){Get-ChildItem $logs -File | Remove-Item -Force}
       - name: Verify small, clean ZIP and unchanged production site files
         shell: pwsh
         run: |
