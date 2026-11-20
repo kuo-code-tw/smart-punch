@@ -18,7 +18,9 @@ assert.match(html,/id="p79HomeImportProgressBar"/);
 assert.match(html,/id="p79HomeImportReviewYes"/);
 assert.match(html,/id="p79HomeImportInput"/);
 assert.match(css,/#p79HomeImportProgressBar/);
-assert.match(html,/port79-home-drop-import.js\?v=20261116-auto-import-v2/);
+assert.match(html,/port79-home-drop-import.js\?v=20261120-webview2-explicit-iframe-v1/);
+for(const route of ['gate-import','yard-dashboard','aqc-efficiency'])
+ assert(js.includes("./"+route+"/index.html"),"Native Windows iframe needs explicit index.html: "+route);
 assert(!js.includes('launchSystem('),'no homepage redirect');
 assert(!js.includes('gcSyncAll'),'cloud storage remains with the original importers');
 assert(!js.includes('gateStatsImport'),'no second Gate import implementation');
