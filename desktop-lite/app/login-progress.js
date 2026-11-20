@@ -3,7 +3,7 @@
  if(window.__port79FolderProgress)return;window.__port79FolderProgress=true;
  const SYSTEMS=['attendance','workhours','leave','schedule','efficiency','hr','history'];
  const names={attendance:'考勤',workhours:'工時',leave:'請假',schedule:'排班',efficiency:'碼頭與船舶',hr:'人資',history:'歷史資料'};
- let running=false,sessionKey='',processed=0,successes=0,errors=0,completedInMemoryKey='',completedInMemoryAt=0,lastFailureKey='',lastNativeMessage='';
+ let running=false,sessionKey='',processed=0,successes=0,errors=0,completedInMemoryKey='',completedInMemoryAt=0,lastFailureKey='',lastNativeMessage='',lastActivityAt=0,lastHeartbeatAt=0,activeSystem='',activeDetail='',leftPage=false;
  const STORE='p79-windows-last-download-v1',TWO_HOURS=2*60*60*1000,ATTEMPT_GRACE=20*60*1000;
  function session(){
   try{
@@ -62,11 +62,12 @@
    if(lastFailureKey!==key)nativeProgress('waiting','上次下載尚未全部確認','為避免重複雲端請求暫停自動重試；可從系統匣手動重新下載。',0);
    return;
   }
-  running=true;processed=0;successes=0;errors=0;sessionKey=key;lastFailureKey='';save(key,{attempt:now});
+  running=true;leftPage=false;processed=0;successes=0;errors=0;sessionKey=key;lastFailureKey='';lastActivityAt=now;lastHeartbeatAt=now;activeSystem='考勤';activeDetail='正在核對雲端資料';save(key,{attempt:now});
   view('正在下載本機資料','已處理 0／7 個系統；下載不會阻止你使用首頁。',0);
   try{
    const results=await api.downloadAll((sys,index,total,state,error,detail)=>{
     if(!session()||sessionKey!==key)return;
+    lastActivityAt=Date.now();lastHeartbeatAt=lastActivityAt;activeSystem=names[sys]||sys;activeDetail=detail||((state==='loading'?'開始下載：':'正在處理：')+activeSystem);
     if(state==='done'||state==='error'){processed=Math.max(processed,index+1);if(state==='done')successes++;else errors++;}
     const msg=(detail||names[sys]||sys)+(state==='error'?'（失敗）':'')+'｜已處理 '+processed+'／'+total+'；成功 '+successes+' 項';
     view('正在下載 '+(names[sys]||sys),msg,processed);
@@ -86,9 +87,22 @@
    lastFailureKey=key;view('❌ 下載中斷，原快取保留',String(error&&error.message||error),processed,'failed');
   }finally{running=false;}
  }
+ // These seven downloads are sequential. The first (attendance) can contain
+ // dozens of months; a completed-system counter can remain at 0 for minutes.
+ // A heartbeat indicates an active wait WITHOUT inventing success or bytes.
+ function heartbeat(){
+  if(!running||leftPage||!session())return;
+  const now=Date.now(),waitSeconds=Math.floor((now-lastActivityAt)/1000);
+  if(waitSeconds<12||now-lastHeartbeatAt<12000)return;
+  lastHeartbeatAt=now;
+  const explanation=waitSeconds>=70?'雲端讀取較慢，正在等待原系統逾時／重試結果':'請求仍在處理；系統進度只在實際完成後增加';
+  const detail=activeDetail+'｜已等待 '+waitSeconds+' 秒｜'+explanation+'｜已處理 '+processed+'／7 系統';
+  nativeProgress(waitSeconds>=70?'stalled':'downloading','正在等待 '+activeSystem+' 雲端資料',detail,processed);
+ }
  window.addEventListener('port79-desktop-force-sync',()=>void start(true));
  let priorSessionKey='';
  function poll(){
+  if(running){heartbeat();return;}
   const id=session();
   if(!id){
    if(priorSessionKey){priorSessionKey='';nativeProgress('idle','等待管理員登入','登入後才下載私人資料庫；目前尚未開始下載。',0);}
@@ -98,8 +112,16 @@
   if(key!==priorSessionKey){priorSessionKey=key;nativeProgress('waiting','管理員已登入，準備下載','登入驗證完成後，開始依序下載七大系統。',0);}
   if(!running)void start(false);
  }
- nativeProgress('idle','等待管理員登入','登入後才下載私人資料庫；目前尚未開始下載。',0);
+ const homePage=!!document.getElementById('systems');
+ nativeProgress(homePage?'idle':'waiting',homePage?'等待管理員登入':'請回首頁查看下載狀態',homePage?'登入後才下載私人資料庫；目前尚未開始下載。':'本機資料仍保留；切換系統頁面會中斷首頁的下載工作，請回首頁重新下載。',0);
  const interval=setInterval(()=>{if(document.body)poll()},1200);
- window.addEventListener('pagehide',()=>clearInterval(interval));
+ window.addEventListener('pagehide',()=>{
+  leftPage=true;clearInterval(interval);
+  if(running){
+   // Do not block returning to the homepage for 20 minutes after a real page switch.
+   save(sessionKey,{attempt:0});
+   nativeProgress('interrupted','下載已中斷：切換頁面','已處理 '+processed+'／7 系統；本機原有快取保留。返回首頁可以重新下載。',processed);
+  }
+ });
  setTimeout(poll,1000);
 })();
