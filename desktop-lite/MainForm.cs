@@ -183,11 +183,15 @@ namespace Port79Lite {
      if(!result.startsWith('OK '))return 'FAIL '+result;
     }
     return 'PASS imported frames gate, yard, vessel are same-origin';
-   })()";
+   })().then(result=>window.chrome.webview.postMessage(JSON.stringify({
+     kind:'port79-import-probe-v1',title:result
+    }))).catch(error=>window.chrome.webview.postMessage(JSON.stringify({
+     kind:'port79-import-probe-v1',title:'FAIL '+String(error&&error.message||error)
+    })))";
    try{
-    var result=await web.CoreWebView2.ExecuteScriptAsync(code);
-    Log("IMPORT FRAME CHECK: "+result);
-   }catch(Exception ex){Log("IMPORT FRAME CHECK: ERROR "+ex.Message);}
+    await web.CoreWebView2.ExecuteScriptAsync(code);
+    Log("IMPORT FRAME CHECK: asynchronous probe started");
+   }catch(Exception ex){Log("IMPORT FRAME CHECK: FAIL "+ex.Message);}
   }
   // Ignore any progress message not sent by our original locally hosted webpage.
   // It carries status text/counters only; never accepts tokens, credentials, URLs or commands.
@@ -199,7 +203,11 @@ namespace Port79Lite {
     var raw=args.TryGetWebMessageAsString();
     if(raw==null||raw.Length>1600)return;
     var payload=new JavaScriptSerializer().Deserialize<CacheStatusPayload>(raw);
-    if(payload==null||payload.kind!="port79-cache-status-v1")return;
+    if(payload==null)return;
+    if(payload.kind=="port79-import-probe-v1"){
+     Log("IMPORT FRAME CHECK: "+SafeStatus(payload.title,320));return;
+    }
+    if(payload.kind!="port79-cache-status-v1")return;
     UpdateCacheStatus(payload);
    }catch(Exception error){Log("native cache status rejected: "+error.Message);}
   }
