@@ -1,0 +1,113 @@
+name: Build and test 79 Port Windows folder application
+on:
+  push:
+    branches:
+      - feature/windows-folder-local-first-20261120
+    paths:
+      - 'desktop-folder/**'
+      - '.github/workflows/windows-folder-app.yml'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'desktop-folder/**'
+      - '.github/workflows/windows-folder-app.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install exactly scoped Electron desktop build tools
+        working-directory: desktop-folder
+        run: npm install --no-audit --no-fund
+      - name: Verify static asset routing, cloud update integrity, rollback and local-data isolation
+        working-directory: desktop-folder
+        run: npm test
+      - name: Verify Node syntax for all application modules
+        shell: pwsh
+        run: |
+          foreach ($f in @('app/main.cjs','app/progress.js','app/site-server.cjs','app/update-site.cjs','app/icon.cjs','build.cjs')) {
+            node --check "desktop-folder/$f"
+            if ($LASTEXITCODE -ne 0) { throw "Syntax verification failed: $f" }
+          }
+      - name: Package native Windows x64 app plus original application directory layout
+        working-directory: desktop-folder
+        run: npm run package
+      - name: Verify official site byte-for-byte, folders, BrowserProfile isolation and executable
+        shell: pwsh
+        run: |
+          $folder = Get-ChildItem desktop-folder/dist -Directory | Select-Object -First 1
+          if (!$folder) { throw 'Application directory missing' }
+          $exe = Join-Path $folder.FullName 'Port79Windows.exe'
+          if (!(Test-Path $exe)) { throw 'Windows executable missing' }
+          foreach ($p in @('index.html','port79-attendance-core.js','assets','attendance','schedule','leave','hr','work-hours','aqc-efficiency','history-data','settings','gate-dashboard','gate-import','yard-dashboard','data-cache','data-sources','local-data','resources')) {
+            if (!(Test-Path (Join-Path $folder.FullName $p))) { throw "Missing original system path: $p" }
+          }
+          foreach ($p in @('index.html','port79-attendance-core.js','attendance/index.html','schedule/index.html','leave/index.html','hr/index.html','settings/index.html','assets/port79-data-cache.js')) {
+            $from=(Get-FileHash $p -Algorithm SHA256).Hash
+            $to=(Get-FileHash (Join-Path $folder.FullName $p) -Algorithm SHA256).Hash
+            if ($from -ne $to) { throw "Original file changed: $p" }
+          }
+          if (!(Test-Path (Join-Path $folder.FullName 'resources/app/app/main.cjs'))) { throw 'Packaged Electron application missing' }
+          Write-Host 'PASS Windows executable, 1:1 module folders, byte-identical website, separate local-data'
+      - name: Read-only runtime smoke on Windows
+        shell: pwsh
+        run: |
+          $folder = Get-ChildItem desktop-folder/dist -Directory | Select-Object -First 1
+          $exe = Join-Path $folder.FullName 'Port79Windows.exe'
+          $p = Start-Process -FilePath $exe -WorkingDirectory $folder.FullName -PassThru
+          try {
+            $success=$false
+            for ($i=0;$i -lt 20;$i++){
+              Start-Sleep -Seconds 1
+              try{
+                $r=Invoke-WebRequest 'http://127.0.0.1:18779/smart-punch/' -UseBasicParsing -TimeoutSec 3
+                if ($r.StatusCode -eq 200 -and $r.Content -match '79號碼頭'){$success=$true;break}
+              }catch{}
+            }
+            if (!$success) {
+              Write-Host 'App log if present:'
+              $log = Join-Path $folder.FullName 'local-data/logs/desktop.log'
+              if (Test-Path $log) { Get-Content $log -Tail 15 }
+              throw 'Windows runtime local-page smoke failed'
+            }
+            $s=Invoke-WebRequest 'http://127.0.0.1:18779/smart-punch/settings/' -UseBasicParsing -TimeoutSec 5
+            if ($s.StatusCode -ne 200) { throw 'Settings page is not accessible' }
+            try {
+              Invoke-WebRequest 'http://127.0.0.1:18779/smart-punch/local-data/README.txt' -UseBasicParsing -ErrorAction Stop | Out-Null
+              throw 'Private data folder must not be HTTP visible'
+            }catch [System.Net.WebException]{
+              if ($_.Exception.Response.StatusCode.value__ -ne 404) { throw }
+            }
+            Write-Host 'PASS: original system website and settings respond from local folder; private local-data is not public'
+          }finally{
+            Get-Process Port79Windows -ErrorAction SilentlyContinue | Stop-Process -Force
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          }
+      - name: Produce portable system-folder ZIP and SHA-256 checksums
+        shell: pwsh
+        run: |
+          $folder = Get-ChildItem desktop-folder/dist -Directory | Select-Object -First 1
+          $dest = Join-Path (Resolve-Path 'desktop-folder/dist').Path '79號碼頭_Windows系統資料夾'
+          if ($folder.FullName -ne $dest) { Rename-Item -Path $folder.FullName -NewName '79號碼頭_Windows系統資料夾' }
+          $dir = (Resolve-Path $dest).Path
+          $zip = Join-Path (Resolve-Path 'desktop-folder/dist').Path '79號碼頭_Windows系統資料夾版.zip'
+          Compress-Archive -Path $dir -DestinationPath $zip -CompressionLevel Optimal -Force
+          $exe = Join-Path $dir 'Port79Windows.exe'
+          $h1=Get-FileHash $exe -Algorithm SHA256
+          $h2=Get-FileHash $zip -Algorithm SHA256
+          @("Windows EXE: $($h1.Hash)  $($h1.Path)", "Portable folder ZIP: $($h2.Hash)  $($h2.Path)") | Set-Content -Encoding utf8 (Join-Path (Resolve-Path 'desktop-folder/dist').Path 'SHA256.txt')
+          Write-Host "ZIP bytes: $((Get-Item $zip).Length)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Port79-Windows-Folder-Portable-Test
+          path: |
+            desktop-folder/dist/79號碼頭_Windows系統資料夾版.zip
+            desktop-folder/dist/SHA256.txt
+          if-no-files-found: error
+          retention-days: 30
