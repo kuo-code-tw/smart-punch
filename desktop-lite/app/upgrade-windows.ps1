@@ -1,4 +1,4 @@
-param(
+﻿param(
  [Parameter(Mandatory=$true)][string]$Archive,
  [Parameter(Mandatory=$true)][string]$InstallRoot,
  [Parameter(Mandatory=$true)][int]$ParentPid,
@@ -65,11 +65,11 @@ try{
   $target=Join-Path $root $rel
   $back=Join-Path $rollback $rel
   $before=Test-Path $target -PathType Leaf
-  $touched.Add([PSCustomObject]@{Target=$target;Back=$back;Existed=$before})
   if($before){
    New-Item -ItemType Directory -Force ([IO.Path]::GetDirectoryName($back)) | Out-Null
    Copy-Item -LiteralPath $target -Destination $back -Force
   }
+  $touched.Add([PSCustomObject]@{Target=$target;Back=$back;Existed=$before})
   New-Item -ItemType Directory -Force ([IO.Path]::GetDirectoryName($target)) | Out-Null
   # These are program files only; the entire local-data directory is excluded.
   Copy-Item -LiteralPath $file.FullName -Destination $target -Force
