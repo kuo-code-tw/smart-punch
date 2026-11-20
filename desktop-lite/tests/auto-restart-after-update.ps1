@@ -21,7 +21,11 @@ $keep=Join-Path $root 'local-data/BrowserProfile/keep.dat'
 [IO.File]::WriteAllText($site,'OLD WEBSITE CONTENT')
 $childPid=0
 try{
- & ./desktop-lite/app/upgrade-windows.ps1 -Archive $archive -InstallRoot $root -ParentPid 0 -ExpectedDigest $sha
+ # Execute the updater from the installed app folder, not the checkout.
+ # Real updates overwrite this very script while it is running.
+ $installedUpdater=Join-Path $root 'app/upgrade-windows.ps1'
+ if(!(Test-Path $installedUpdater)){throw 'Packaged app is missing its built-in updater'}
+ & $installedUpdater -Archive $archive -InstallRoot $root -ParentPid 0 -ExpectedDigest $sha
  $upgradeLog=Join-Path $root 'local-data/logs/windows-upgrade.txt'
  $lines=Get-Content -LiteralPath $upgradeLog
  $launch=@($lines | Where-Object {$_ -match 'AUTO_RESTART_SUCCESS pid=([0-9]+)'})[-1]
