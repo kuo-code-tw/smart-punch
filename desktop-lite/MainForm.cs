@@ -19,7 +19,6 @@ namespace Port79Lite {
   private readonly ToolStripMenuItem checkUpdatesMenu;
   private readonly ToolStripMenuItem systemUpdateStatusMenu;
   private readonly ToolStripMenuItem cacheStatusMenu;
-  private readonly ToolStripMenuItem updateWindowsMenu;
   private readonly Label cacheTitle;
   private readonly Label cacheDetail;
   private readonly Label cacheCount;
@@ -88,12 +87,10 @@ namespace Port79Lite {
    menu.Items.Add("縮小到系統匣",null,(s,e)=>Hide());
    menu.Items.Add(new ToolStripSeparator());
    menu.Items.Add("管理員登入後重新下載資料",null,async(s,e)=>await ForceDownload());
-   checkUpdatesMenu=new ToolStripMenuItem("更新系統檔案（保留本機資料）",null,async(s,e)=>await CheckUpdates(true));
+   checkUpdatesMenu=new ToolStripMenuItem("更新系統（保留本機資料）",null,async(s,e)=>await CheckUpdates(true));
    menu.Items.Add(checkUpdatesMenu);
    systemUpdateStatusMenu=new ToolStripMenuItem("系統檔案版本：啟動後自動檢查"){Enabled=false};
    menu.Items.Add(systemUpdateStatusMenu);
-   updateWindowsMenu=new ToolStripMenuItem("更新 Windows 主程式（選用）",null,async(s,e)=>await UpgradeWindowsShell());
-   menu.Items.Add(updateWindowsMenu);
    menu.Items.Add("開啟電腦資料夾",null,(s,e)=>OpenLocalData());
    menu.Items.Add(new ToolStripSeparator());
    menu.Items.Add("真正結束程式",null,(s,e)=>ExitApp());
@@ -312,73 +309,99 @@ namespace Port79Lite {
    // The script rechecks the server-issued manager session before doing any download.
    await web.CoreWebView2.ExecuteScriptAsync("window.dispatchEvent(new Event('port79-desktop-force-sync'))");
   }
-  private async Task UpgradeWindowsShell(){
-   if(updateBusy)return;
-   var answer=MessageBox.Show(
-    "將從 79號碼頭官方 GitHub Release 驗證下載新版 Windows 程式，保留 local-data、所有已下載快取與備份。\n\n請先確認沒有正在進行 Excel 匯入、考勤儲存或任何未完成的雲端寫入。\n\n驗證成功後，程式將自動關閉、更新並重新啟動。現在繼續嗎？",
-    "更新 Windows 主程式",MessageBoxButtons.YesNo,MessageBoxIcon.Question);
-   if(answer!=DialogResult.Yes)return;
-   updateBusy=true;updateWindowsMenu.Enabled=false;checkUpdatesMenu.Enabled=false;
-   try{
-    cacheTitle.Text="正在檢查 Windows 程式版本";
-    cacheDetail.Text="從正式發布檢查檔案 SHA-256；不會下載或覆蓋考勤資料庫。";
-    var ready=await ReleaseUpdater.PrepareAsync(root,DataRoot,Log);
-    if(ready==null){
-     cacheTitle.Text="Windows 主程式已是最新版";
-     cacheDetail.Text="已核對目前安裝的版本，無需再次下載。";
-     MessageBox.Show("Windows 主程式已是最新發布版本。","79號碼頭 Windows 更新",MessageBoxButtons.OK,MessageBoxIcon.Information);
-     return;
-    }
-    ReleaseUpdater.Launch(ready,root,Process.GetCurrentProcess().Id);
-    Log("已驗證最新版程式檔；已啟動安全更新工具。系統進入重新啟動流程");
-    ExitApp();
-   }catch(Exception error){
-    Log("Windows 版本更新失敗："+error.Message);
-    cacheTitle.Text="Windows 更新未完成";
-    cacheDetail.Text=error.Message;
-    MessageBox.Show("程式尚未更新，原有資料與 Windows 程式均保留：\n"+error.Message,
-     "79號碼頭 Windows 更新",MessageBoxButtons.OK,MessageBoxIcon.Warning);
-   }finally{
-    updateBusy=false;updateWindowsMenu.Enabled=true;checkUpdatesMenu.Enabled=true;
-   }
-  }
+  // One user-facing update action for both public website code and the
+  // Windows WebView2 shell; the current user profile and backups are untouched.
   private async Task CheckUpdates(bool manual=false){
    if(updateBusy)return;
-   updateBusy=true;checkUpdatesMenu.Enabled=false;updateWindowsMenu.Enabled=false;
+   updateBusy=true;checkUpdatesMenu.Enabled=false;
+   int stagedSite=0;
+   bool websitePending=false;
+   string siteFailure=null,shellFailure=null;
+   ReleaseUpdater.Prepared shell=null;
    try{
     var site=Path.Combine(root,"site","smart-punch");
     var pending=Path.Combine(DataRoot,"updates","pending.json");
-    // A staged, verified update is already waiting for the next real startup.
-    if(File.Exists(pending)){
-     systemUpdateStatusMenu.Text="系統檔案：新版已下載，重新啟動後套用";
-     if(manual)MessageBox.Show(
-      "新版系統檔案已下載並通過校驗。請由系統匣選「真正結束程式」，再開啟程式即可套用。\n\n本機考勤、排班、請假與資料快取不會刪除。",
-      "更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Information);
+    systemUpdateStatusMenu.Text="更新系統：正在比對正式版本…";
+    try{
+     websitePending=File.Exists(pending);
+     if(!websitePending){
+      stagedSite=await Updater.StageFromOfficialAsync(site,DataRoot,Log);
+      websitePending=stagedSite>0;
+     }
+    }catch(Exception e){
+     siteFailure=e.Message;
+     Log("website auto update deferred: "+e.Message);
+    }
+    // Never make an explicit second ZIP download step mandatory for the user.
+    // A release is verified in the app, and kept staged until a safe restart.
+    try{
+     shell=await ReleaseUpdater.PrepareAsync(root,DataRoot,Log);
+    }catch(Exception e){
+     shellFailure=e.Message;
+     Log("Windows shell auto update deferred: "+e.Message);
+    }
+    if(shell!=null){
+     systemUpdateStatusMenu.Text="更新系統：Windows 新版已備妥，待安全重新啟動";
+     if(!manual){
+      tray.ShowBalloonTip(5000,"79號碼頭：已備妥系統更新",
+       "Windows 新版已自動驗證下載；請在不需儲存資料時選「更新系統」套用。",ToolTipIcon.Info);
+     }else{
+      var answer=MessageBox.Show(
+       "已自動下載並驗證 Windows 新版程式"+(websitePending?"及網站更新":"")+"。\n\n"+
+       "套用時會先真正關閉舊程式，更新後自動重新開啟。\n"+
+       "local-data、考勤、請假、排班和瀏覽器快取都會保留。\n\n"+
+       "請先儲存任何正在編輯的內容。現在安全重新啟動並套用嗎？",
+       "更新系統",MessageBoxButtons.YesNo,MessageBoxIcon.Question);
+      if(answer==DialogResult.Yes){
+       ReleaseUpdater.Launch(shell,root,Process.GetCurrentProcess().Id);
+       Log("已啟動單一入口 Windows 系統更新：驗證完成、進入安全重啟");
+       ExitApp();
+      }
+     }
      return;
     }
-    systemUpdateStatusMenu.Text="系統檔案：正在比對正式版…";
-    var result=await Updater.StageFromOfficialAsync(site,DataRoot,Log);
-    if(result>0){
-     systemUpdateStatusMenu.Text="系統檔案：已下載 "+result+" 項，待重新啟動";
-     tray.ShowBalloonTip(5500,"79號碼頭：系統檔案已自動下載",
-      "已驗證 "+result+" 個新版檔案。下次真正結束程式並開啟後自動套用；本機資料不變。",ToolTipIcon.Info);
-     if(manual)MessageBox.Show(
-      "已驗證並下載 "+result+" 個新版系統檔案。\n\n從系統匣選「真正結束程式」，再重新開啟就會套用。\n\n原本 local-data 中的考勤、人資、排班快取均保留。",
-      "更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Information);
-    }else{
-     systemUpdateStatusMenu.Text="系統檔案：與已發佈正式版一致";
-     if(manual)MessageBox.Show(
-      "目前系統檔案與已發佈的正式網站一致。\n\n注意：只在 GitHub 測試分支、尚未合併／發布的修改，不會被正式 Windows 版下載。",
-      "更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Information);
+    if(websitePending){
+     systemUpdateStatusMenu.Text="更新系統：網站新版已備妥，待重新啟動";
+     if(manual){
+      var answer=MessageBox.Show(
+       "已自動下載並校驗網站程式更新"+(stagedSite>0?" "+stagedSite+" 個檔案":"")+"。\n\n"+
+       "不需要重新下載 Windows ZIP，也不會清除 local-data。\n\n"+
+       "請先儲存尚未完成的編輯，現在重新啟動套用嗎？",
+       "更新系統",MessageBoxButtons.YesNo,MessageBoxIcon.Question);
+      if(answer==DialogResult.Yes){
+       Log("網站程式更新已驗證，使用 Windows Restart 套用 staged 版本");
+       exit=true;Application.Restart();Close();
+      }
+     }else{
+      tray.ShowBalloonTip(4000,"79號碼頭：網站程式更新已下載",
+       "下次真正結束並啟動程式後自動套用；local-data 保留。",ToolTipIcon.Info);
+     }
+     return;
     }
-   }catch(Exception ex){
-    Log("system files update: "+ex.Message);
-    systemUpdateStatusMenu.Text="系統檔案：檢查失敗（保留舊版）";
+    if(siteFailure!=null||shellFailure!=null){
+     systemUpdateStatusMenu.Text="更新系統：部分檢查失敗，原版保留";
+     if(manual)MessageBox.Show(
+      "程式沒有下載未驗證的檔案，也沒有更動本機資料。\n"+
+      (siteFailure!=null?"網站檔案："+siteFailure+"\n":"")+
+      (shellFailure!=null?"Windows 程式："+shellFailure+"\n":"")+
+      "\n請確認正式版本已成功發佈。",
+      "更新系統",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+     return;
+    }
+    systemUpdateStatusMenu.Text="更新系統：已是目前正式版本";
     if(manual)MessageBox.Show(
-     "目前無法更新系統檔案：\n"+ex.Message+
-     "\n\n請確認正式網站已發佈並能連線。原有程式和 local-data 均保留。",
-     "更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Warning);
-   }finally{updateBusy=false;checkUpdatesMenu.Enabled=true;updateWindowsMenu.Enabled=true;}
+     "Windows 程式與網站程式已核對，沒有需要下載的更新。\n\n"+
+     "請注意：GitHub 測試分支尚未正式發布的修改，不能當成已更新。\n"+
+     "本機資料及快取未變更。",
+     "更新系統",MessageBoxButtons.OK,MessageBoxIcon.Information);
+   }catch(Exception e){
+    Log("unified system update error: "+e.Message);
+    systemUpdateStatusMenu.Text="更新系統：執行失敗，原資料保留";
+    if(manual)MessageBox.Show("此次系統更新未完成，原本資料和程式均保留：\n"+e.Message,
+     "更新系統",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+   }finally{
+    updateBusy=false;checkUpdatesMenu.Enabled=true;
+   }
   }
  }
 }
