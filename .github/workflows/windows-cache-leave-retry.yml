@@ -1,0 +1,28 @@
+name: Windows cache and Yard source checks
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-data-cache.js'
+      - 'tests/cache-download-transport.cjs'
+      - 'yard-dashboard/**'
+      - 'tests/yard-home-donuts.cjs'
+      - '.github/workflows/windows-cache-leave-retry.yml'
+  workflow_dispatch:
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate JavaScript syntax
+        run: node --check assets/port79-data-cache.js
+      - name: Exercise retry and 7-system partial resume
+        run: node tests/cache-download-transport.cjs
+      - name: Verify native cache isolation and source behavior
+        run: |
+          node tests/device-folder-cache.cjs
+          node tests/native-computer-cache-display.cjs
+          node tests/yard-home-donuts.cjs
+          node tests/yard-dashboard-module.cjs
