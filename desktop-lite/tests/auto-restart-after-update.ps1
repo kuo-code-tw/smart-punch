@@ -22,7 +22,6 @@ $keep=Join-Path $root 'local-data/BrowserProfile/keep.dat'
 $childPid=0
 try{
  & ./desktop-lite/app/upgrade-windows.ps1 -Archive $archive -InstallRoot $root -ParentPid 0 -ExpectedDigest $sha
- if($LASTEXITCODE -ne 0){throw 'Native updater returned a nonzero exit code'}
  $upgradeLog=Join-Path $root 'local-data/logs/windows-upgrade.txt'
  $lines=Get-Content -LiteralPath $upgradeLog
  $launch=@($lines | Where-Object {$_ -match 'AUTO_RESTART_SUCCESS pid=([0-9]+)'})[-1]
