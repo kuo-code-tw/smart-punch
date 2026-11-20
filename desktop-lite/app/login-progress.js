@@ -70,7 +70,7 @@
  function div(){
   let root=document.getElementById('p79WindowsDownloadProgress');if(root)return root;
   root=document.createElement('aside');root.id='p79WindowsDownloadProgress';root.setAttribute('role','status');root.setAttribute('aria-live','polite');
-  root.style.cssText='position:fixed;right:14px;bottom:15px;z-index:12000;width:min(345px,calc(100vw - 28px));box-sizing:border-box;background:#fff;color:#12385c;border:1px solid #cbdff3;border-radius:12px;box-shadow:0 12px 38px #15385b33;padding:12px 15px;font:13px/1.5 Microsoft JhengHei,system-ui,sans-serif';
+  root.style.cssText='position:fixed;right:14px;top:14px;z-index:12000;width:min(286px,calc(100vw - 28px));box-sizing:border-box;background:#fff;color:#12385c;border:1px solid #cbdff3;border-radius:12px;box-shadow:0 12px 38px #15385b33;padding:10px 12px;font:12px/1.45 Microsoft JhengHei,system-ui,sans-serif';
   const label=document.createElement('strong');label.className='p79-desktop-label';label.textContent='正在準備本機快取';root.append(label);
   const detail=document.createElement('div');detail.className='p79-desktop-detail';detail.style.cssText='font-size:12px;color:#54718d;margin:6px 0';root.append(detail);
   const bar=document.createElement('progress');bar.max=SYSTEMS.length;bar.value=0;bar.style.cssText='display:block;width:100%;height:12px;accent-color:#1689e7';root.append(bar);
@@ -79,7 +79,11 @@
  }
  function view(label,detail,count,phase='downloading',show=true){
   if(autoDismissTimer!==null){clearTimeout(autoDismissTimer);autoDismissTimer=null;}
-  const root=div();if(show)root.style.display='block';
+  const root=div();
+  // Windows already renders the compact native top-right progress card.
+  // Avoid showing a second HTML popup for the same download.
+  const nativeCard=typeof window.chrome?.webview?.postMessage==='function';
+  root.style.display=show&&!nativeCard?'block':'none';
   root.querySelector('.p79-desktop-label').textContent=label;root.querySelector('.p79-desktop-detail').textContent=detail;
   // Progress shows confirmed successful downloads, never just attempted/failed modules.
   const currentBar=root.querySelector('progress'),showMonths=(phase==='downloading'||phase==='stalled')&&activeSystem==='考勤'&&monthTotal>0;
