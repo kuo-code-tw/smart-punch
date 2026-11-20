@@ -7,7 +7,7 @@ function setup(handler,{base='https://script.google.com/macros/s/OLD/exec',conte
  const window={GAS_URL:base,P79ManagementContext:context,fetch:async(url,init)=>{calls.push({url:new URL(url),init});return handler(calls.length,url,init)}};
  const ctx={window,sessionStorage:storage,localStorage:storage,URL,URLSearchParams,Request,Response,Blob,AbortController,Date,JSON,Map,Set,Promise,console,setTimeout:(fn,ms)=>setTimeout(fn,fast?1:ms),clearTimeout,document:{getElementById:()=>null},location:{pathname:'/smart-punch/hr/',href:'https://example.invalid/smart-punch/hr/'},saved,progress};
  vm.createContext(ctx);vm.runInContext(source.replace('window.Port79DataCache={','storeApi=async(url,data,sys)=>saved.push({url,data,sys});setProgress=message=>progress.push(message);window.Port79DataCache={read:fetchJson,testToken:token,'),ctx);
- return {api:window.Port79DataCache,calls,saved,progress,values,window};
+ return {api:window.Port79DataCache,calls,saved,progress,values,window,ctx};
 }
 const response=(data={ok:true},status=200)=>new Response(JSON.stringify(data),{status});let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+name)}
 (async()=>{
@@ -22,5 +22,28 @@ const response=(data={ok:true},status=200)=>new Response(JSON.stringify(data),{s
  await test('account change while reading prevents data being saved',async()=>{let x;x=setup(()=>{x.values.set('port79_user_token','different-token');return response()});await assert.rejects(x.api.read('hrGetEmployees'),/登入狀態已變更/);assert.equal(x.saved.length,0)});
  await test('HTTP 200 Google HTML can recover through official endpoint',async()=>{const x=setup(n=>n===1?new Response('<html>retired deployment</html>'):response());await x.api.read('hrGetEmployees');assert.equal(x.calls[1].url.origin+x.calls[1].url.pathname,canonical);assert.equal(x.saved.length,1)});
  await test('failed local persistence never repeats a successful cloud read',async()=>{const x=setup(()=>response());x.saved.push=()=>{throw Error('quota')};await assert.rejects(x.api.read('hrGetEmployees'),/quota/);assert.equal(x.calls.length,1)});
+ await test('cloud leave busy without retryable flag succeeds after delayed read-only retries',async()=>{
+  const x=setup(n=>n<3?response({ok:false,error:'雲端目前正在更新資料，請稍後自動重試'}):response({ok:true,leaveRecords:[{id:'TEST'}]}),{fast:true});
+  const d=await x.api.read('getLeaveData');assert.equal(x.calls.length,3);assert.equal(x.saved.length,1);assert.equal(d.leaveRecords[0].id,'TEST');
+  assert(x.progress.some(msg=>msg.includes('等待後自動重試')));
+ });
+ await test('cloud leave busy stops after four attempts without replacing cache',async()=>{
+  const x=setup(()=>response({ok:false,error:'雲端目前正在更新資料，請稍後自動重試'}),{fast:true});
+  await assert.rejects(x.api.read('getLeaveData'),e=>e.code==='P79_CLOUD'&&/雲端目前正在更新資料/.test(e.message));
+  assert.equal(x.calls.length,4);assert.equal(x.saved.length,0);
+ });
+ await test('a permission denial must not retry even with retryable flag',async()=>{
+  const x=setup(()=>response({ok:false,retryable:true,error:'沒有此系統查詢權限'}),{fast:true});
+  await assert.rejects(x.api.read('getLeaveData'),/沒有此系統查詢權限/);assert.equal(x.calls.length,1);
+ });
+ await test('repeating an incomplete download keeps the six successful systems',async()=>{
+  const x=setup(()=>response(),{fast:true}),counts={};
+  x.window.__mockDownload=async sys=>{counts[sys]=(counts[sys]||0)+1;if(sys==='leave'&&counts.leave===1)throw Error('雲端暫時忙碌');return{ok:true}};
+  vm.runInContext("downloadAttendanceDatabase=async()=>({recordCount:0});downloadSystem=async(sys)=>window.__mockDownload(sys);saveSystemSnapshot=async()=>true;",x.ctx);
+  const first=await x.api.downloadAll(),second=await x.api.downloadAll();
+  assert.equal(first.filter(x=>x.ok).length,6);assert.equal(second.filter(x=>x.ok).length,7);
+  assert.equal(counts.leave,2);for(const sys of ['schedule','efficiency','hr','history'])assert.equal(counts[sys],1);
+  assert.equal(second.filter(x=>x.reused).length,6);
+ });
  console.log(JSON.stringify({passed,scope:'Read-only transport recovery, current session, timeouts and bounded batch; no live credentials'}));
 })().catch(e=>{console.error(e);process.exitCode=1});
