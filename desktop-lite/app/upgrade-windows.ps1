@@ -89,6 +89,7 @@ try{
    elseif(!$item.Existed -and (Test-Path $item.Target)){Remove-Item -LiteralPath $item.Target -Force}
   }catch{Write-Log ('Rollback failed '+$item.Target+' '+$_)}
  }
+ if($TestOnly){throw}
  exit 1
 }finally{
  try{if(Test-Path $stage){Remove-Item $stage -Force -Recurse}}catch{}
