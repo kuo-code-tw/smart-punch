@@ -4,6 +4,7 @@ on:
     paths:
       - 'assets/port79-session-timeout.js'
       - 'tests/idle-settings-save.cjs'
+      - 'tests/windows-desktop-idle-exempt.cjs'
       - 'hr/index.html'
       - '.github/workflows/hr-idle-settings.yml'
   push:
@@ -11,6 +12,7 @@ on:
     paths:
       - 'assets/port79-session-timeout.js'
       - 'tests/idle-settings-save.cjs'
+      - 'tests/windows-desktop-idle-exempt.cjs'
       - 'hr/index.html'
       - '.github/workflows/hr-idle-settings.yml'
 permissions:
@@ -25,4 +27,6 @@ jobs:
         with:
           node-version: '22'
       - name: Test idle session timeout cloud saves
-        run: node tests/idle-settings-save.cjs
+        run: |
+          node tests/idle-settings-save.cjs
+          node tests/windows-desktop-idle-exempt.cjs
