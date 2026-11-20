@@ -25,6 +25,7 @@ namespace Port79Lite {
   private bool exit=false;
   private bool updateBusy=false;
   private bool initiated=false;
+  private bool cacheInProgress=false;
 
   public MainForm(){
    Text="79號碼頭雲端智慧系統";
@@ -99,6 +100,13 @@ namespace Port79Lite {
      OpenSafeExternal(e.Uri);
     };
     web.CoreWebView2.NavigationStarting+=(s,e)=>{
+     if(cacheInProgress){
+      cacheInProgress=false;
+      cacheTitle.Text="⏸ 本機資料下載已中斷";
+      cacheDetail.Text="頁面已切換；已下載的資料仍保留。回到首頁可重新下載。";
+      cacheBar.Style=ProgressBarStyle.Continuous;
+      cacheStatusMenu.Text="資料狀態：已切換頁面，下載中斷";
+     }
      if(e.Uri.StartsWith(LocalRoot,StringComparison.OrdinalIgnoreCase)){
       var current=new Uri(e.Uri);
       if(current.AbsolutePath.EndsWith("/")){
@@ -163,17 +171,22 @@ namespace Port79Lite {
   }
   private void UpdateCacheStatus(CacheStatusPayload value){
    var phase=value.phase??"";
-   if(phase!="idle"&&phase!="waiting"&&phase!="downloading"&&phase!="complete"&&phase!="partial"&&phase!="failed"&&phase!="cached")return;
+   if(phase!="idle"&&phase!="waiting"&&phase!="downloading"&&phase!="stalled"&&phase!="interrupted"&&phase!="complete"&&phase!="partial"&&phase!="failed"&&phase!="cached")return;
    int total=phase=="idle"?7:Math.Max(1,Math.Min(7,value.total));
    int completed=Math.Max(0,Math.Min(total,value.completed));
    cacheTitle.Text="☁ "+SafeStatus(value.title,90);
    cacheDetail.Text=SafeStatus(value.detail,180);
    cacheCount.Text=completed+" / "+total+" 個系統";
-   cacheBar.Maximum=total;cacheBar.Value=completed;
+   cacheInProgress=phase=="downloading"||phase=="stalled";
+   // Moving marquee means the current month is still being processed, NOT complete.
+   cacheBar.Style=cacheInProgress?ProgressBarStyle.Marquee:ProgressBarStyle.Continuous;
+   cacheBar.Maximum=total;
+   if(!cacheInProgress)cacheBar.Value=completed;
+   cacheBar.MarqueeAnimationSpeed=cacheInProgress?25:0;
    cacheStatusMenu.Text=SafeStatus("資料狀態："+value.title,55);
    // Windows notify icons have a limited tooltip length.
    tray.Text=SafeStatus("79號碼頭｜"+completed+"/"+total+"｜"+value.title,60);
-   if(phase=="complete"||phase=="partial"||phase=="failed")Log("download "+phase+" "+completed+"/"+total+" "+SafeStatus(value.detail,120));
+   if(phase=="complete"||phase=="partial"||phase=="failed"||phase=="interrupted")Log("download "+phase+" "+completed+"/"+total+" "+SafeStatus(value.detail,120));
   }
   private static void OpenSafeExternal(string address){
    if(!Uri.TryCreate(address,UriKind.Absolute,out var u)||u.Scheme!="https")return;
