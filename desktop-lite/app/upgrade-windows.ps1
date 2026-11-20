@@ -22,6 +22,7 @@ $stage=Join-Path $updates 'shell-staging'
 $rollback=Join-Path $updates 'shell-rollback'
 $touched=New-Object System.Collections.Generic.List[object]
 $restartAttempted=$false
+$launchedChild=$null
 try{
  Write-Log 'Starting verified app update, user data kept separate'
  if($ExpectedDigest -notmatch '^[0-9a-f]{64}$'){throw 'Bad expected digest'}
@@ -84,11 +85,38 @@ try{
   # successful update that requires the operator to find the EXE manually.
   $exe=Join-Path $root 'Port79WindowsLite.exe'
   $restartAttempted=$true
-  $child=Start-Process -FilePath $exe -WorkingDirectory $root -PassThru -ErrorAction Stop
+  Write-Log ('RESTART_REQUESTED exe='+$exe)
+  $child=Start-Process -FilePath $exe -WorkingDirectory $root -WindowStyle Normal -PassThru -ErrorAction Stop
   if(!$child){throw 'Windows program did not start after update'}
-  Start-Sleep -Milliseconds 1500
-  $child.Refresh()
-  if($child.HasExited){throw ('Windows program exited immediately after update, exit code '+$child.ExitCode)}
+  $launchedChild=$child
+  # A process can exist without ever showing its WinForms main window.
+  # Do not mark the update complete until a visible, valid native window appears.
+  Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class Port79NativeWindow {
+ [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr handle);
+ [DllImport("user32.dll")] public static extern bool ShowWindowAsync(IntPtr handle,int command);
+ [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr handle);
+}
+'@
+  $visible=$false
+  for($attempt=0;$attempt -lt 40;$attempt++){
+   Start-Sleep -Milliseconds 750
+   $child.Refresh()
+   if($child.HasExited){throw ('Windows program exited before opening its main window, exit code '+$child.ExitCode)}
+   $handle=$child.MainWindowHandle
+   if($handle -ne [IntPtr]::Zero){
+    [void][Port79NativeWindow]::ShowWindowAsync($handle,9)
+    [void][Port79NativeWindow]::SetForegroundWindow($handle)
+    if([Port79NativeWindow]::IsWindowVisible($handle)){$visible=$true;break}
+   }
+  }
+  if(!$visible){
+   Write-Log ('ERROR_NO_VISIBLE_WINDOW pid='+$child.Id+' exe='+$exe)
+   throw 'New Windows app process started but its main window did not appear'
+  }
+  Write-Log ('WINDOW_VISIBLE_CONFIRMED pid='+$child.Id)
   [IO.File]::WriteAllText($installedExeHash,(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant())
   [IO.File]::WriteAllText($version,$ExpectedDigest)
   Write-Log ('AUTO_RESTART_SUCCESS pid='+$child.Id+' exe='+$exe)
@@ -100,6 +128,16 @@ try{
  }
 }catch{
  Write-Log ('ERROR '+[string]$_)
+ if($null -ne $launchedChild){
+  try{
+   $launchedChild.Refresh()
+   if(!$launchedChild.HasExited){
+    Stop-Process -Id $launchedChild.Id -Force -ErrorAction Stop
+    $launchedChild.WaitForExit(10000) | Out-Null
+    Write-Log ('STOPPED_FAILED_NEW_PROCESS pid='+$launchedChild.Id)
+   }
+  }catch{Write-Log ('FAILED_TO_STOP_NEW_PROCESS '+[string]$_)}
+ }
  for($i=$touched.Count-1;$i -ge 0;$i--){
   $item=$touched[$i]
   try{
