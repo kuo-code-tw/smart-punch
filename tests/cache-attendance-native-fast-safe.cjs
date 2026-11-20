@@ -38,7 +38,7 @@ function fixture({native=true,onMonth=()=>{},revision='REV1'}={}){
  },URL,URLSearchParams,Request,Response,Blob,AbortController,Date,JSON,Map,Set,Promise,console,
  setTimeout,clearTimeout,sessionStorage,localStorage:sessionStorage,
  location:{pathname:'/smart-punch/hr/',href:'https://unit.invalid/smart-punch/hr/'},
- document:{}};
+ document:{},snapshots};
  vm.createContext(context);
  vm.runInContext(source.replace('window.Port79DataCache={',
  'storeApi=async()=>{};getDisplaySnapshot=async()=>null;saveSystemSnapshot=async(sys,data)=>{snapshots.push({sys,data});return data};applyAttendanceSnapshotToPage=async()=>true;window.Port79DataCache={'),context);
@@ -82,7 +82,7 @@ async function test(name,cb){await cb();console.log('PASS '+name)}
   const result=await f.api.downloadAll();
   assert.equal(f.snapshots.length,0);
   assert.equal(result[0].ok,false);assert.match(result[0].error,/權限範圍/);
-  assert(result.slice(1).every(x=>!x.ok),'Do not download data after scope changes');
+  assert(result.slice(1).every(x=>!x.ok&&x.skipped),'Do not download data after scope changes; remaining modules are skipped, not failed');
  });
  await test('Credential change still cancels and refuses to save to wrong account',async()=>{
   let changed=false;
