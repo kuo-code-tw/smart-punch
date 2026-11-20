@@ -29,8 +29,8 @@ function unit(){
 {
  const s=unit(),a=s.nodes.p79WindowsDownloadLink;
  assert(a.hidden,'Must not display before login');
- assert.equal(s.listeners.get('link:click') instanceof Function,true);
- assert.equal(s.listeners.get('window:pageshow') instanceof Function,true);
+ assert.equal(typeof s.listeners.get('link:click'),'function');
+ assert.equal(typeof s.listeners.get('window:pageshow'),'function');
  s.change('employee',true);assert(a.hidden,'Employee cannot see admin Windows control');
  s.change('admin',false);assert(a.hidden,'Session data without real homepage session is not login');
  s.change('admin',true,false,'');assert(a.hidden,'Missing token hides download button');
