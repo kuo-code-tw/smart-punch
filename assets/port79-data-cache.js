@@ -978,9 +978,15 @@ async function downloadAll(onProgress){
  const systems=['attendance','workhours','leave','schedule','efficiency','hr','history'];const result=[];
  let attendanceSnapshot=null,attendanceError=null,connectionError=null;
  for(let i=0;i<systems.length;i++){
-  const sys=systems[i];onProgress?.(sys,i,systems.length,'loading');
+  const sys=systems[i];
+  // Treat remaining untouched modules as skipped after an identity/scope/transport failure.
+  if(connectionError){
+   result.push({system:sys,ok:false,skipped:true,error:'前一項雲端讀取中斷，尚未下載；原因：'+String(connectionError.message||connectionError)});
+   onProgress?.(sys,i,systems.length,'skipped',connectionError);
+   continue;
+  }
+  onProgress?.(sys,i,systems.length,'loading');
   try{
-   if(connectionError)throw connectionError;
    if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`));
    else if(sys==='workhours'&&attendanceError)throw attendanceError;
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
