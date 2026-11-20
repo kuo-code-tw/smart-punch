@@ -5,6 +5,8 @@
  const names={attendance:'考勤',workhours:'工時',leave:'請假',schedule:'排班',efficiency:'碼頭與船舶',hr:'人資',history:'歷史資料'};
  let running=false,sessionKey='',processed=0,successes=0,errors=0,completedInMemoryKey='',completedInMemoryAt=0,lastFailureKey='',lastNativeMessage='',lastActivityAt=0,lastHeartbeatAt=0,activeSystem='',activeDetail='',leftPage=false,monthCompleted=0,monthTotal=0;
  const STORE='p79-windows-last-download-v1',TWO_HOURS=2*60*60*1000,ATTEMPT_GRACE=20*60*1000;
+ let autoDismissTimer=null;
+ const SUCCESS_NOTICE_MS=6000;
  function session(){
   try{
    const s=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');
@@ -76,6 +78,7 @@
   document.body.append(root);return root;
  }
  function view(label,detail,count,phase='downloading',show=true){
+  if(autoDismissTimer!==null){clearTimeout(autoDismissTimer);autoDismissTimer=null;}
   const root=div();if(show)root.style.display='block';
   root.querySelector('.p79-desktop-label').textContent=label;root.querySelector('.p79-desktop-detail').textContent=detail;
   // Progress shows confirmed successful downloads, never just attempted/failed modules.
@@ -83,6 +86,14 @@
   currentBar.max=showMonths?monthTotal:SYSTEMS.length;
   currentBar.value=showMonths?monthCompleted:Math.min(SYSTEMS.length,Math.max(0,successes));
   nativeProgress(phase,label,detail,Math.min(SYSTEMS.length,Math.max(0,successes)));
+  // A successful download is a temporary notification, not a permanent overlay.
+  // Keep partial failures visible so the operator can read the reason.
+  if(phase==='complete'){
+   autoDismissTimer=setTimeout(()=>{
+    if(root.querySelector('.p79-desktop-label').textContent===label)root.style.display='none';
+    autoDismissTimer=null;
+   },SUCCESS_NOTICE_MS);
+  }
  }
  function record(key){try{const all=JSON.parse(localStorage.getItem(STORE)||'{}');return all[key]||{}}catch{return{}}}
  function save(key,value){try{const all=JSON.parse(localStorage.getItem(STORE)||'{}');all[key]={...all[key],...value};localStorage.setItem(STORE,JSON.stringify(all))}catch{}}
@@ -128,7 +139,10 @@
       }
      }
     }
-    if(state==='done'||state==='error'||state==='skipped'){processed=Math.max(processed,index+1);if(state==='done')successes++;else if(state==='error')errors++;}
+    if(state==='done'||state==='reused'||state==='error'||state==='skipped'){
+     processed=Math.max(processed,index+1);
+     if(state==='done'||state==='reused')successes++;else if(state==='error')errors++;
+    }
     const msg=(detail||names[sys]||sys)+(state==='error'?'（失敗）':state==='skipped'?'（未執行）':'')+'｜已處理 '+processed+'／'+total+'；成功 '+successes+' 項';
     view('正在下載 '+(names[sys]||sys),msg,processed);
    });
@@ -140,7 +154,8 @@
    if(!errors&&!skipped){
     try{if(typeof Event==='function')window.dispatchEvent?.(new Event('p79-folder-sync-changed'))}catch(_){}
     completedInMemoryKey=key;completedInMemoryAt=Date.now();save(key,{completed:completedInMemoryAt});
-    view('✅ 本機資料下載完成','成功 '+results.length+'／'+results.length+' 個系統'+stored,SYSTEMS.length,'complete');
+    successes=results.filter(x=>x.ok).length;
+    view('✅ 本機資料下載完成','成功 '+results.length+'／'+results.length+' 個系統（不含碼頭儲量）'+stored,SYSTEMS.length,'complete');
    }else{
     try{if(typeof Event==='function')window.dispatchEvent?.(new Event('p79-folder-sync-changed'))}catch(_){}
     lastFailureKey=key;
