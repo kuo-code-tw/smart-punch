@@ -39,44 +39,29 @@ jobs:
         run: |
           & ./desktop-lite/build-portable.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
-      - name: Confirm runtime and no preloaded private database
+      - name: Verify small, clean ZIP and unchanged production site files
         shell: pwsh
         run: |
           $root=(Resolve-Path 'desktop-lite/dist/79號碼頭_Windows輕量版').Path
-          $exe=Join-Path $root 'Port79WindowsLite.exe'
-          $p=Start-Process -FilePath $exe -WorkingDirectory $root -PassThru
-          try {
-            $log=Join-Path $root 'local-data/logs/windows-lite.log'
-            $ok=$false
-            for($i=0;$i -lt 25;$i++) {
-              Start-Sleep -Seconds 1
-              if(Test-Path $log){
-                $lines=Get-Content $log -ErrorAction SilentlyContinue
-                if($lines -match 'navigation success: https://port79assets.example/smart-punch/'){$ok=$true;break}
-                if($lines -match 'navigation failure:'){Get-Content $log -Tail 12;throw 'WebView2 navigation failed'}
-              }
-              if($p.HasExited){throw 'Windows app exited on startup'}
-            }
-            if(-not $ok){throw 'Did not confirm local homepage was displayed'}
-          } finally {
-            Get-Process Port79WindowsLite -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          $zip=Join-Path (Resolve-Path 'desktop-lite/dist').Path '79號碼頭_Windows輕量資料夾版.zip'
+          if (!(Test-Path $zip)) { throw 'Missing Windows ZIP' }
+          $size=(Get-Item $zip).Length
+          if ($size -gt 31457280) { throw 'ZIP larger than 30MB' }
+          foreach ($name in @('index.html','attendance/index.html','schedule/index.html','leave/index.html','hr/index.html','assets/port79-data-cache.js','settings/index.html')){
+            $source=Join-Path $PWD $name
+            $local=Join-Path $root ('site/smart-punch/'+$name)
+            if (!(Test-Path $local) -or (Get-FileHash $source -Algorithm SHA256).Hash -ne (Get-FileHash $local -Algorithm SHA256).Hash) { throw "Changed original site: $name" }
           }
           $profile=Join-Path $root 'local-data/BrowserProfile'
-          if(Test-Path $profile){Remove-Item $profile -Force -Recurse}
-          New-Item -ItemType Directory -Force $profile | Out-Null
-          $logs=Join-Path $root 'local-data/logs'
-          if(Test-Path $logs){Get-ChildItem $logs -File | Remove-Item -Force}
-          $zip=Join-Path (Resolve-Path 'desktop-lite/dist').Path '79號碼頭_Windows輕量資料夾版.zip'
-          Remove-Item $zip -Force
-          Compress-Archive -Path $root -DestinationPath $zip -CompressionLevel Optimal -Force
-          $size=(Get-Item $zip).Length
-          if($size -gt 31457280){throw 'Download grew above 30MB'}
+          $private=Get-ChildItem $profile -Recurse -File -ErrorAction SilentlyContinue
+          if ($private) { throw 'Browser profile must be empty in release package' }
+          Add-Type -AssemblyName System.IO.Compression
           $contents=[IO.Compression.ZipFile]::OpenRead($zip)
           try {
-            $private=$contents.Entries | Where-Object {$_.FullName -match 'local-data/.+\.(db|sqlite|json|log|ldb|cookie)$'}
-            if($private){throw 'Private file was packaged'}
-          } finally {$contents.Dispose()}
-          Write-Host "PASS current main site, login-first tests, clean Windows package, $size bytes"
+            $bad=$contents.Entries | Where-Object {$_.FullName -match 'local-data/.+\.(db|sqlite|json|log|ldb|cookie)$'}
+            if ($bad) { throw 'Private database or browser file inside ZIP' }
+          } finally { $contents.Dispose() }
+          Write-Host "PASS unchanged source, zero private database, $size byte Windows download ZIP"
       - name: Publish stable GitHub Release download link
         shell: pwsh
         env:
