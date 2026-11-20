@@ -11,7 +11,7 @@ test('identical public module names and root paths',()=>{
 });
 test('protect local data, backend source, dotfiles and traversal',()=>{
  for(const input of ['local-data/BrowserProfile','backend/private.gs','tests/sample.cjs','.github/workflows/x.yml','assets/../local-data/secret','assets\\evil','../index.html','data-cache/../../secrets'])assert.equal(allowed(input),false,input);
- assert.equal(route('/smart-punch/local-data/BrowserProfile/'),'invalid', 'should be blocked');
+ assert.equal(route('/smart-punch/local-data/BrowserProfile/'),null,'private folder route should be blocked');
 });
 test('real local web server only exposes unchanged site and rejects writes',async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'port79-static-'));
