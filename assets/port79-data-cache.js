@@ -868,8 +868,17 @@ function downloadAttendanceDatabase(targetSys='attendance',onProgress){
  const pending=readAttendanceDatabase(targetSys,onProgress).finally(()=>{if(attendanceDownloads.get(key)===pending)attendanceDownloads.delete(key)});
  attendanceDownloads.set(key,pending);return pending;
 }
+function verifyAttendanceDownloadContext(expected){
+ if(expected.token!==token()||expected.viewer!==viewerKey())
+  throw Object.assign(new Error('登入帳號或憑證確實已變更；未保存舊帳號的考勤資料，請重新登入'),{code:'P79_AUTH'});
+ if(expected.scope!==displayScope())
+  throw Object.assign(new Error('管理權限範圍在下載期間已更新；為避免不同範圍資料混用，請重新核對後再下載'),{code:'P79_SCOPE'});
+ if(expected.stamp!==mutationStamp())
+  throw Object.assign(new Error('考勤下載期間偵測到其他資料修改，已保留原快取並停止儲存舊版本；請重新下載考勤'),{code:'P79_MUTATION'});
+}
 async function readAttendanceDatabase(targetSys='attendance',onProgress){
  const t=token(),viewer=viewerKey(),scope=displayScope(),stamp=mutationStamp();
+ const expected={token:t,viewer,scope,stamp};
  if(!t)throw new Error('找不到登入 Token，請重新由首頁登入');
  const previous=await getDisplaySnapshot('attendance').catch(()=>null);
  const before=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
@@ -890,9 +899,9 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress){
     previous.cacheEndpoint===gasUrl()&&previous.displayScope===scope&&
     JSON.stringify(old.months)===JSON.stringify(months)&&JSON.stringify(old.employees)===JSON.stringify(employees)&&
     months.every(month=>old.monthStats?.some(m=>m.month===month&&m.ok===true))&&Array.isArray(old.records)){
-   if(t!==token()||viewer!==viewerKey()||scope!==displayScope()||stamp!==mutationStamp())throw Object.assign(new Error('登入狀態已變更，未套用舊帳號資料'),{code:'P79_AUTH'});
+  verifyAttendanceDownloadContext(expected);
    const confirmed=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
-   if(t!==token()||viewer!==viewerKey()||scope!==displayScope()||stamp!==mutationStamp())throw Object.assign(new Error('登入或本機資料已變更，請重新核對'),{code:'P79_AUTH'});
+  verifyAttendanceDownloadContext(expected);
    if(String(confirmed?.revision||'')===String(before.revision)){
    onProgress?.('attendance',months.length,months.length,'reused','雲端版本未變，重用電腦完整快取');
    if(targetSys==='attendance'||targetSys==='workhours')await applyAttendanceSnapshotToPage(old,true);
@@ -900,28 +909,45 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress){
    }
  }
 
- let allRecords=[];const monthStats=[];
- for(let i=0;i<months.length;i++){
-  const month=months[i];
-  onProgress?.('attendance',i+1,months.length,'month',`讀取 ${month}`);
-  try{
-   const d=await fetchJson('getAttendanceMonthData',{month,token:t},'');
-   if(!Array.isArray(d?.records))throw new Error('考勤月份資料格式不正確');
-   let rows=d.records;
-   const direct=await fetchJson('getAttendanceMainDirect',{month,token:t},'');
-   if(!Array.isArray(direct?.records))throw new Error('考勤主表資料格式不正確');
-   if(direct.records.length)rows=mergeAttendanceRows(rows.concat(direct.records));
-   allRecords=mergeAttendanceRows(allRecords.concat(rows));
-   monthStats.push({month,count:rows.length,ok:true});
-  }catch(e){
-   if(['P79_AUTH','P79_TRANSPORT'].includes(e?.code))throw e;
-   monthStats.push({month,count:0,ok:false,error:String(e?.message||e)});
+ // Native Windows: two bounded read-only workers; browser: existing sequential behavior.
+ // Each worker makes at most one GAS request at a time and stores no full snapshot
+ // until all months and the final account/version checks succeed.
+ const workerCount=window.chrome?.webview?.postMessage?2:1;
+ const monthResults=new Array(months.length);
+ let nextMonth=0,completedMonths=0,fatal=null;
+ async function worker(){
+  while(nextMonth<months.length&&!fatal){
+   const i=nextMonth++,month=months[i];
+   try{
+    verifyAttendanceDownloadContext(expected);
+    onProgress?.('attendance',completedMonths,months.length,'month',`正在讀取 ${month}｜已完成 ${completedMonths}/${months.length} 月`);
+    const d=await fetchJson('getAttendanceMonthData',{month,token:t},'');
+    if(!Array.isArray(d?.records))throw new Error('考勤月份資料格式不正確');
+    const direct=await fetchJson('getAttendanceMainDirect',{month,token:t},'');
+    if(!Array.isArray(direct?.records))throw new Error('考勤主表資料格式不正確');
+    verifyAttendanceDownloadContext(expected);
+    const rows=direct.records.length?mergeAttendanceRows(d.records.concat(direct.records)):d.records;
+    monthResults[i]={month,rows,ok:true};
+   }catch(e){
+    if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT','P79_MUTATION'].includes(e?.code)){
+     fatal=fatal||e;return;
+    }
+    monthResults[i]={month,rows:[],ok:false,error:String(e?.message||e)};
+   }
+   completedMonths++;
+   onProgress?.('attendance',completedMonths,months.length,'monthDone',`已完成 ${month}｜${completedMonths}/${months.length} 月`);
   }
  }
+ await Promise.all(Array.from({length:Math.min(workerCount,months.length)},()=>worker()));
+ if(fatal)throw fatal;
+ verifyAttendanceDownloadContext(expected);
+ const monthStats=monthResults.map(x=>({month:x.month,count:x.rows.length,ok:x.ok,...(x.ok?{}:{error:x.error})}));
  const failedMonths=monthStats.filter(x=>!x.ok);
  if(failedMonths.length)throw new Error('考勤／工時未完整下載：'+failedMonths.map(x=>x.month+'（'+x.error+'）').join('、')+'；已保留原有完整快取，請重試');
+ // Do record de-duplication once rather than on every month (quadratic cost).
+ const allRecords=mergeAttendanceRows(monthResults.flatMap(x=>x.rows));
  const after=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
- if(t!==token()||viewer!==viewerKey()||scope!==displayScope()||stamp!==mutationStamp())throw Object.assign(new Error('登入狀態已變更，未保存舊帳號資料'),{code:'P79_AUTH'});
+  verifyAttendanceDownloadContext(expected);
  const snapshot={
   sourceRevision:before?.revision&&String(before.revision)===String(after?.revision)?String(before.revision):'',
   ok:true,action:'port79AttendanceFullCache',fullDatabase:true,
@@ -960,7 +986,7 @@ async function downloadAll(onProgress){
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
    else await downloadSystem(sys);
    result.push({system:sys,ok:true});onProgress?.(sys,i,systems.length,'done');
-  }catch(e){if(['P79_AUTH','P79_TRANSPORT'].includes(e?.code))connectionError=e;if(sys==='attendance')attendanceError=e;result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e)}
+  }catch(e){if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT'].includes(e?.code))connectionError=e;if(sys==='attendance')attendanceError=e;result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e)}
  }
  if(currentSystem()==='attendance'&&attendanceSnapshot)await applyAttendanceSnapshotToPage(attendanceSnapshot,true);
  return result;
