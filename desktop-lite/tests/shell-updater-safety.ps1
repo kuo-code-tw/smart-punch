@@ -23,8 +23,11 @@ if((Get-Content (Join-Path $root 'site/smart-punch/index.html') -Raw).Trim() -ne
 if((Get-Content (Join-Path $root 'local-data/BrowserProfile/keep.dat') -Raw).Trim() -ne 'MY PRIVATE DATA'){throw 'User data was changed'}
 if((Get-Content (Join-Path $root 'local-data/updates/installed-shell-sha256.txt') -Raw).Trim() -ne $digest){throw 'Installed SHA version not saved'}
 $old=(Get-Content (Join-Path $root 'Port79WindowsLite.exe') -Raw)
-& ./desktop-lite/app/upgrade-windows.ps1 -Archive $zip -InstallRoot $root -ParentPid 0 -ExpectedDigest ('0'*64) -TestOnly
-if($LASTEXITCODE -eq 0){throw 'Wrong SHA must be rejected'}
+$rejected=$false
+try{
+ & ./desktop-lite/app/upgrade-windows.ps1 -Archive $zip -InstallRoot $root -ParentPid 0 -ExpectedDigest ('0'*64) -TestOnly
+}catch{$rejected=$true}
+if(!$rejected){throw 'Wrong SHA must be rejected'}
 if((Get-Content (Join-Path $root 'Port79WindowsLite.exe') -Raw) -ne $old){throw 'Wrong SHA changed executable'}
 if((Get-Content (Join-Path $root 'local-data/BrowserProfile/keep.dat') -Raw).Trim() -ne 'MY PRIVATE DATA'){throw 'Reject path damaged user data'}
 Write-Host 'PASS one-click shell update, SHA-256 verification, rollback, unchanged local-data cache'
