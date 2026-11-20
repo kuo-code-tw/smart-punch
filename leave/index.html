@@ -375,7 +375,7 @@ html.p79-leave-simple #globalStatus:not(.error):not(.warn){display:none}
       <div class="p79-leave-list-info"><div id="adminLeaveSummary" class="note" role="status" style="font-weight:650"></div>
       <button id="p79CleanupDeletedLeaveButton" type="button" class="btn" onclick="p79CleanupDeletedLeaveCovers()">清除已刪請假的代班殘留</button></div>
       <div id="adminReadOnly" class="status warn hidden">此帳號只有「查看」權限，不能核准、駁回或刪除。</div>
-      <div class="table-wrap"><table class="leave-admin-table"><thead><tr><th>♙ 人員</th><th>▥ 單位</th><th>◇ 假別</th><th>▣ 日期</th><th>☷ 天數</th><th>▤ 事由／代班</th><th>✓ 狀態</th><th>⚙ 操作</th><th>♧ 剩餘年假</th></tr></thead><tbody id="adminLeaveBody"></tbody></table></div>
+      <div class="table-wrap"><table class="leave-admin-table"><thead><tr><th>♙ 人員</th><th>▥ 單位</th><th>◇ 假別</th><th>▣ 日期</th><th>☷ 天數</th><th>▤ 事由／代班</th><th>✓ 請假／加班狀態</th><th>⚙ 操作</th><th>♧ 剩餘年假</th></tr></thead><tbody id="adminLeaveBody"></tbody></table></div>
     </div>
 
   </section>
@@ -699,7 +699,7 @@ function showEmployee(){
  const info=leaveBalanceInfo(currentEmployee);$('balanceEntitled').textContent=fmtDay(info.entitled);$('balanceUsed').textContent=fmtDay(info.used);$('balanceRemaining').textContent=fmtDay(info.effectiveRemaining);$('balanceAsOf').textContent=info.effectiveRemaining==null?'年假基準：尚無每月匯入資料':`年假基準：${info.asOf||'最近一次匯入'}${info.newlyApproved>0?`｜匯入後另核准 ${fmtDay(info.newlyApproved)} 天，已自動扣除`:''}`;renderMy()
 }
 function sameEmployee(l,e){return String(l.empId||'').trim().toUpperCase()===String(e.empId||'').trim().toUpperCase() || (String(l.attNo||'').trim()&&String(l.attNo||'').trim()===String(e.attNo||'').trim())}
-function badge(s){const c=s==='已核准'?'approved':s==='已駁回'?'rejected':'pending';return `<span class="badge ${c}">${esc(s||'待審核')}</span>`}
+function badge(s){const c=s==='已核准'?'approved':s==='已駁回'?'rejected':'pending';return `<span class="badge ${c}">請假${esc(s||'待審核')}</span>`}
 function leaveTypeBadge(value){
  const name=String(value||'未設定假別');
  const kinds={'特休假':'annual','年假':'annual','特休':'annual','特別休假':'annual','事假':'personal','普通傷病假':'sick','病假':'sick','公傷病假':'injury','婚假':'marriage','喪假':'bereavement','公假':'official','產假':'maternity','產檢假':'prenatal','陪產檢及陪產假':'paternity','安胎休養請假':'pregnancy','家庭照顧假':'family','生理假':'menstrual','其他公司公告假別':'other'};
@@ -836,6 +836,83 @@ function p79LeaveCancelledCoverTextV102(leaveId,active,cancellations,people,mont
  return [...messages.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(e=>e[1]).join('；');
 }
 
+
+const p79LeaveOvertimeVerified=new Map();
+let p79LeaveListAudit=null;
+function p79LeaveCoverage(leave,covers=window.p79LeaveCoverAssignments||[],cancellations=window.p79LeaveCoverCancellations||[]){
+ const start=normalizeLeaveFilterDate(leave.startTime||leave.startDate);
+ const end=normalizeLeaveFilterDate(leave.endTime||leave.endDate||leave.startTime||leave.startDate);
+ const empty={complete:false,units:[],signature:'',days:0};
+ if(!start||!end||end<start)return empty;
+ const days=Math.round((Date.parse(end+'T12:00:00Z')-Date.parse(start+'T12:00:00Z'))/86400000)+1;
+ if(!Number.isFinite(days)||days<1||days>62)return empty;
+ const records=(covers||[]).filter(c=>String(c.leaveId)===String(leave.id));
+ const revoked=(cancellations||[]).filter(c=>String(c.leaveId)===String(leave.id));
+ const units=[],parts=[];let complete=true;
+ for(let i=0;i<days;i++){
+  const date=new Date(Date.parse(start+'T12:00:00Z')+i*86400000).toISOString().slice(0,10);
+  const matches=records.flatMap(c=>{
+   if(Array.isArray(c.dailyAssignments)&&c.dailyAssignments.length){
+    return c.dailyAssignments.filter(a=>String(a.date)===date);
+   }
+   const first=normalizeLeaveFilterDate(c.startDate||c.date),last=normalizeLeaveFilterDate(c.endDate||c.startDate||c.date);
+   return first&&last&&first<=date&&last>=date?[c]:[];
+  });
+  const cancelled=revoked.some(c=>{
+   const a=normalizeLeaveFilterDate(c.startDate),b=normalizeLeaveFilterDate(c.endDate||c.startDate);
+   return a&&b&&a<=date&&b>=date;
+  });
+  const record=matches.length===1?matches[0]:null;
+  const ids=Array.isArray(record?.workerIds)?record.workerIds.map(x=>String(x||'').trim()).filter(Boolean):[];
+  const mode=String(record?.mode||'one');
+  const valid=!!record&&!cancelled&&ids.length===(mode==='two'?2:1)&&
+   new Set(ids.map(x=>x.toUpperCase())).size===ids.length&&
+   ids.every(id=>id.toUpperCase()!==String(leave.empId||'').trim().toUpperCase());
+  if(!valid)complete=false;
+  parts.push(date+':'+(valid?mode+'/'+ids.join(','):'incomplete'));
+  if(valid)ids.forEach(empId=>units.push({date,empId,forEmpId:leave.empId,leaveId:String(leave.id),mode}));
+ }
+ return {complete,units,signature:parts.join('|'),days};
+}
+function p79OvertimeIsLinked(leaveId,entry,meta){
+ const report=meta?.overtimeReport;
+ if(!report||!String(report.id||'').trim()||meta?.overtimeExcluded===true)return false;
+ const norm=v=>String(v||'').trim().toUpperCase();
+ const link=String(report.leaveHandoffId||report.leaveId||meta.leaveId||'').trim();
+ const person=norm(report.forEmpId||meta.forEmpId);
+ if(link&&link!==String(leaveId)||person&&person!==norm(entry.forEmpId))return false;
+ // Historical reports without a leave-ID association must be checked by a person
+ // and explicit overtime period code; never infer from a same-day report alone.
+ return link===String(leaveId)||!!person&&person===norm(entry.forEmpId)&&
+  !!String(entry.code||'').trim()&&String(entry.code)===String(report.code||'');
+}
+function p79ApplyCompletion(leaveId,coverComplete,overtimeComplete){
+ const root=$('adminLeaveBody');if(!root)return;
+ for(const el of root.querySelectorAll('[data-p79-completion-button],[data-p79-completion-status]')){
+  if(String(el.dataset.p79LeaveId)!==String(leaveId))continue;
+  const isCover=el.dataset.p79CompletionButton==='cover'||el.dataset.p79CompletionStatus==='cover';
+  const done=isCover?coverComplete:overtimeComplete;
+  el.classList.toggle('p79-workflow-complete',!!done);
+  el.classList.toggle('p79-workflow-incomplete',!done);
+  if(el.hasAttribute('data-p79-completion-status'))
+   el.textContent=isCover?(done?'代班：已安排完成':'代班：未申報完成'):
+    (done?'加班：已申報完成':'加班：未申報完成');
+  if(el.hasAttribute('data-p79-completion-button'))
+   el.title=done?'已核對完成':'未申報完成或雲端資料尚未核對';
+ }
+}
+function p79OvertimeComplete(leave,coverage,cloudMonths){
+ if(!coverage.complete||!coverage.units.length)return false;
+ const norm=v=>String(v||'').trim().toUpperCase();
+ return coverage.units.every(entry=>{
+  const data=cloudMonths.get(entry.date.slice(0,7));
+  const person=data?.schedules?.find(row=>norm(row.empId)===norm(entry.empId));
+  const meta=person?.schedule?.__meta?.[entry.date],report=meta?.overtimeReport;
+  return !!report&&report.planned===false&&p79OvertimeIsLinked(leave.id,entry,meta)&&
+   (!report.overtimeDate||String(report.overtimeDate)===entry.date);
+ });
+}
+
 function renderAdmin(){
  if($('p79CleanupDeletedLeaveButton'))$('p79CleanupDeletedLeaveButton').hidden=leaveAccess!=='manage';
  if(!adminSession)return;
@@ -861,6 +938,9 @@ function renderAdmin(){
    const remainText=remain==null?'--':fmtDay(remain)+' 天';
    const leaveType=/特休|年假/.test(String(l.leaveType||''))?'年假':String(l.leaveType||'');
    const cover=coverIndex.get(String(l.id));
+   const coverage=p79LeaveCoverage(l);
+   const verified=p79LeaveOvertimeVerified.get(String(l.id));
+   const overtimeComplete=coverage.complete&&verified?.signature===coverage.signature&&verified.complete===true&&Date.now()-verified.at<90000;
    const workerIds=Array.isArray(cover?.workerIds)?cover.workerIds.filter(Boolean):[];
    const workerNames=workerIds.map(id=>{
      const e=peopleIndex.get(String(id).trim().toUpperCase());
@@ -871,7 +951,7 @@ function renderAdmin(){
      ? (cover?.mode==='rest'?'排休代班：':'加班代班：')+workerNames.join('、')
      : l.source==='manual-admin-no-cover'?'無須代班人員':'尚未安排代班');
    const coverButton=String(l.status)==='已核准'&&leaveAccess==='manage'
-     ? `<button type="button" class="p79-cover-again" onclick="p79OpenLeaveCover('${esc(l.id)}')">安排代班</button>${workerIds.length?`<button type="button" class="p79-cover-again" onclick="p79ReportSavedLeaveCover('${esc(l.id)}')">加班明細</button>`:''}`
+     ? `<button type="button" class="p79-cover-again p79-leave-step-button ${coverage.complete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-button="cover" data-p79-leave-id="${esc(l.id)}" onclick="p79OpenLeaveCover('${esc(l.id)}')">安排代班</button><button type="button" class="p79-cover-again p79-leave-step-button ${overtimeComplete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-button="overtime" data-p79-leave-id="${esc(l.id)}" onclick="p79ReportSavedLeaveCover('${esc(l.id)}')">申報加班</button>`
      : '';
    const coverDisplay=String(l.status)==='已核准'
      ? `<span class="p79-leave-cover-inline">${coverButton}<span class="p79-leave-cover-names" title="${esc(coverText)}">${esc(coverText)}</span></span>`
@@ -883,7 +963,7 @@ function renderAdmin(){
      <td class="p79-leave-date-inline">${esc(l.startTime||l.startDate||'')} ～ ${esc(l.endTime||l.endDate||l.startTime||l.startDate||'')}</td>
      <td>${esc(l.days??l.hours??'')}</td>
      <td><div class="p79-leave-reason">${l.reason?'<div class="p79-leave-reason-text">'+esc(l.reason)+'</div>':''}${coverDisplay}</div></td>
-     <td><div class="p79-leave-status-inline">${badge(l.status)}</div></td>
+     <td><div class="p79-leave-status-inline">${badge(l.status)}<span class="p79-leave-completion-state ${coverage.complete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-status="cover" data-p79-leave-id="${esc(l.id)}">代班：${coverage.complete?'已安排完成':'未申報完成'}</span><span class="p79-leave-completion-state ${overtimeComplete?'p79-workflow-complete':'p79-workflow-incomplete'}" data-p79-completion-status="overtime" data-p79-leave-id="${esc(l.id)}">加班：${overtimeComplete?'已申報完成':'未申報完成'}</span></div></td>
      <td>${leaveAccess==='manage'?`<div class="actions"><button style="background:#dcfce7;color:#166534" onclick="setLeaveStatus('${esc(l.id)}','已核准')">核准</button><button style="background:#ffe4e6;color:#9f1239" onclick="setLeaveStatus('${esc(l.id)}','已駁回')">駁回</button><button style="background:#e2e8f0;color:#334155" onclick="deleteLeave('${esc(l.id)}')">刪除</button></div>`:'只能查看'}</td>
      <td><span class="leave-remain ${remainClass}">${remainText}</span>${emp&&remain!=null?`<div class="note" style="font-size:11px">${esc(leaveBalanceExplanation(emp,info))}</div>`:''}</td>
    </tr>`;
@@ -2642,6 +2722,28 @@ body[data-p79-system="leave"] #adminMode .leave-admin-table tbody td:first-child
 }
 html.p79-leave-pixel-admin body[data-p79-system="leave"] #adminMode table.leave-admin-table tbody td:first-child {
  height:66px!important;
+}
+</style>
+
+<style id="p79-leave-workflow-completion-20261120">
+body[data-p79-system="leave"] #adminMode table.leave-admin-table .p79-leave-step-button.p79-workflow-incomplete{
+ background:#e2e8f0!important;color:#475569!important;border:1px solid #cbd5e1!important
+}
+body[data-p79-system="leave"] #adminMode table.leave-admin-table .p79-leave-step-button.p79-workflow-complete{
+ background:#dcfce7!important;color:#166534!important;border:1px solid #86efac!important
+}
+body[data-p79-system="leave"] #adminMode table.leave-admin-table .p79-leave-completion-state{
+ display:inline-block!important;padding:3px 6px!important;border-radius:6px!important;
+ font-size:11px!important;font-weight:800!important;line-height:1.35!important;white-space:nowrap!important
+}
+body[data-p79-system="leave"] #adminMode table.leave-admin-table .p79-leave-completion-state.p79-workflow-incomplete{
+ background:#e2e8f0!important;color:#475569!important
+}
+body[data-p79-system="leave"] #adminMode table.leave-admin-table .p79-leave-completion-state.p79-workflow-complete{
+ background:#dcfce7!important;color:#166534!important
+}
+body[data-p79-system="leave"] #adminMode .leave-admin-table .p79-leave-status-inline{
+ flex-wrap:wrap!important;justify-content:center!important;gap:4px!important
 }
 </style>
 </body>
