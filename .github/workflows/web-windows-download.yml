@@ -1,0 +1,32 @@
+name: Verify homepage Windows download after login
+on:
+  push:
+    branches: [feature/web-windows-download-after-login-20261120]
+    paths:
+      - index.html
+      - assets/port79-windows-download.js
+      - tests/windows-download-link.cjs
+      - .github/workflows/web-windows-download.yml
+  pull_request:
+    paths:
+      - index.html
+      - assets/port79-windows-download.js
+      - tests/windows-download-link.cjs
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify download button login/role enforcement and UI source
+        run: node tests/windows-download-link.cjs
+      - name: Verify original homepage login and cloud paths unchanged
+        run: |
+          node tests/system-settings-center.cjs
+          node tests/home-import-auto-close.cjs
+          node tests/home-overtime-converted-hours.cjs
