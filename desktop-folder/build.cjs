@@ -1,6 +1,6 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
-const packager=require('@electron/packager');
+const {packager}=require('@electron/packager');
 const {PUBLIC_DIRS,ROOT_FILES}=require('./app/site-server.cjs');
 const root=path.resolve(__dirname,'..'),dist=path.join(__dirname,'dist');
 const name='Port79Windows';
