@@ -21,6 +21,7 @@ function Write-Log([string]$message){
 $stage=Join-Path $updates 'shell-staging'
 $rollback=Join-Path $updates 'shell-rollback'
 $touched=New-Object System.Collections.Generic.List[object]
+$restartAttempted=$false
 try{
  Write-Log 'Starting verified app update, user data kept separate'
  if($ExpectedDigest -notmatch '^[0-9a-f]{64}$'){throw 'Bad expected digest'}
@@ -77,8 +78,16 @@ try{
  [IO.File]::WriteAllText($version,$ExpectedDigest)
  Write-Log ('PASS '+$files.Count+' files updated. No local-data business snapshots touched.')
  if(!$TestOnly){
+  # Launch the new native program automatically; never leave an apparently
+  # successful update that requires the operator to find the EXE manually.
   $exe=Join-Path $root 'Port79WindowsLite.exe'
-  Start-Process -FilePath $exe -WorkingDirectory $root
+  $restartAttempted=$true
+  $child=Start-Process -FilePath $exe -WorkingDirectory $root -PassThru -ErrorAction Stop
+  if(!$child){throw 'Windows program did not start after update'}
+  Start-Sleep -Milliseconds 1500
+  $child.Refresh()
+  if($child.HasExited){throw ('Windows program exited immediately after update, exit code '+$child.ExitCode)}
+  Write-Log ('AUTO_RESTART_SUCCESS pid='+$child.Id+' exe='+$exe)
  }
 }catch{
  Write-Log ('ERROR '+[string]$_)
@@ -88,6 +97,17 @@ try{
    if($item.Existed -and (Test-Path $item.Back)){Copy-Item -LiteralPath $item.Back -Destination $item.Target -Force}
    elseif(!$item.Existed -and (Test-Path $item.Target)){Remove-Item -LiteralPath $item.Target -Force}
   }catch{Write-Log ('Rollback failed '+$item.Target+' '+$_)}
+ }
+ if(!$TestOnly -and $restartAttempted){
+  # If startup failed, the rollback restores the old executable. Reopen that
+  # version so the computer never stays closed after a failed update.
+  try{
+   $oldExe=Join-Path $root 'Port79WindowsLite.exe'
+   if(Test-Path $oldExe -PathType Leaf){
+    $rollbackApp=Start-Process -FilePath $oldExe -WorkingDirectory $root -PassThru -ErrorAction Stop
+    Write-Log ('ROLLBACK_RESTART_ATTEMPTED pid='+$rollbackApp.Id)
+   }
+  }catch{Write-Log ('ROLLBACK_RESTART_FAILED '+[string]$_)}
  }
  if($TestOnly){throw}
  exit 1
