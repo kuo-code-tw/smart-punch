@@ -5,7 +5,11 @@ on:
       - feature/windows-lite-login-sync-20261120
     paths:
       - '.github/workflows/publish-windows-lite-release.yml'
+      - 'desktop-lite/**'
   workflow_dispatch:
+concurrency:
+  group: publish-windows-lite
+  cancel-in-progress: true
 permissions:
   contents: write
 jobs:
