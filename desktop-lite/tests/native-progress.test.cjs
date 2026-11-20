@@ -41,7 +41,7 @@ function fixture(){
     if(sys==='attendance')cb(sys,i,7,'detail',null,'讀取 2026-10 2/12');
     const fail=behavior==='partial'&&sys==='history';
     cb(sys,i,7,fail?'error':'done',fail?new Error('test failure'):null);
-    return {system:sys,ok:!fail};
+    return {system:sys,ok:!fail,error:fail?'test failure':''};
    });
   },
   async getSystemSnapshot(sys){return {size:sys==='attendance'?1048576:2048,savedAt:hasLocalCache?nowMs:0};},
