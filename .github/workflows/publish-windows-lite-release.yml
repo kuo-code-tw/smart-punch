@@ -1,0 +1,135 @@
+name: Publish small Windows ZIP for website download
+on:
+  push:
+    branches:
+      - feature/windows-lite-login-sync-20261120
+    paths:
+      - '.github/workflows/publish-windows-lite-release.yml'
+      - 'desktop-lite/**'
+  workflow_dispatch:
+concurrency:
+  group: publish-windows-lite
+  cancel-in-progress: true
+permissions:
+  contents: write
+jobs:
+  release-windows-lite:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Check manager-login-only download control
+        shell: pwsh
+        run: node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs
+      - name: Refresh original site files from current production main
+        shell: pwsh
+        run: |
+          git fetch origin main
+          git restore --source origin/main --worktree -- index.html port79-attendance-core.js assets attendance schedule leave hr work-hours aqc-efficiency history-data settings gate-dashboard gate-import yard-dashboard data-cache data-sources previews
+          if ($LASTEXITCODE -ne 0) { throw 'Could not refresh production site sources' }
+      - name: Verify one-click Windows updater preserves existing browser database
+        shell: pwsh
+        run: |
+          & ./desktop-lite/tests/shell-updater-safety.ps1
+      - name: Restore native Windows dependencies
+        shell: pwsh
+        run: dotnet restore desktop-lite/Port79Lite.csproj /p:Platform=x64
+      - name: Build clean original-system folder ZIP
+        shell: pwsh
+        run: |
+          & ./desktop-lite/build-portable.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
+      - name: Native WebView2 verifies all Gate Yard Vessel importer frames are same-origin
+        shell: pwsh
+        run: |
+          $root=(Resolve-Path 'desktop-lite/dist/79號碼頭_Windows輕量版').Path
+          $exe=Join-Path $root 'Port79WindowsLite.exe'
+          $p=Start-Process -FilePath $exe -ArgumentList '--port79-verify-import-frames' -WorkingDirectory $root -PassThru
+          try {
+            $log=Join-Path $root 'local-data/logs/windows-lite.log'
+            $success=$false
+            for($i=0;$i -lt 135;$i++){
+              Start-Sleep -Seconds 1
+              if(Test-Path $log) {
+                $lines=Get-Content $log -ErrorAction SilentlyContinue
+                if($lines -match 'IMPORT FRAME CHECK: .*FAIL'){Get-Content $log -Tail 12;throw 'One or more import frames loaded cross-origin'}
+                if($lines -match 'IMPORT FRAME CHECK: .*PASS imported frames gate, yard, vessel are same-origin'){$success=$true;break}
+              }
+              if($p.HasExited){throw 'Native importer test exited before completion'}
+            }
+            if(!$success){if(Test-Path $log){Get-Content $log -Tail 15};throw 'Importer frames did not prove same-origin'}
+            Write-Host 'PASS native Gate / Yard / Vessel same-origin iframe navigation without any file upload'
+          } finally {
+            Get-Process Port79WindowsLite -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          }
+          # Never distribute Windows CI browser cookies or profile state.
+          $profile=Join-Path $root 'local-data/BrowserProfile'
+          for($i=0;$i -lt 12;$i++){
+            try {if(Test-Path $profile){Remove-Item $profile -Force -Recurse -ErrorAction Stop};break}catch{Start-Sleep -Seconds 2}
+          }
+          New-Item -ItemType Directory -Force $profile | Out-Null
+          $logs=Join-Path $root 'local-data/logs'
+          if(Test-Path $logs){Get-ChildItem $logs -File | Remove-Item -Force}
+      - name: Verify small, clean ZIP and unchanged production site files
+        shell: pwsh
+        run: |
+          $root=(Resolve-Path 'desktop-lite/dist/79號碼頭_Windows輕量版').Path
+          $zip=Join-Path (Resolve-Path 'desktop-lite/dist').Path '79號碼頭_Windows輕量資料夾版.zip'
+          if (!(Test-Path $zip)) { throw 'Missing Windows ZIP' }
+          $size=(Get-Item $zip).Length
+          if ($size -gt 31457280) { throw 'ZIP larger than 30MB' }
+          foreach ($name in @('index.html','attendance/index.html','schedule/index.html','leave/index.html','hr/index.html','assets/port79-data-cache.js','settings/index.html')){
+            $source=Join-Path $PWD $name
+            $local=Join-Path $root ('site/smart-punch/'+$name)
+            if (!(Test-Path $local) -or (Get-FileHash $source -Algorithm SHA256).Hash -ne (Get-FileHash $local -Algorithm SHA256).Hash) { throw "Changed original site: $name" }
+          }
+          $profile=Join-Path $root 'local-data/BrowserProfile'
+          $private=Get-ChildItem $profile -Recurse -File -ErrorAction SilentlyContinue
+          if ($private) { throw 'Browser profile must be empty in release package' }
+          Add-Type -AssemblyName System.IO.Compression
+          $contents=[IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            $bad=$contents.Entries | Where-Object {$_.FullName -match 'local-data/.+\.(db|sqlite|json|log|ldb|cookie)$'}
+            if ($bad) { throw 'Private database or browser file inside ZIP' }
+          } finally { $contents.Dispose() }
+          Write-Host "PASS unchanged source, zero private database, $size byte Windows download ZIP"
+      - name: Publish stable GitHub Release download link
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag='port79-windows-lite-20261120'
+          $repo=$env:GITHUB_REPOSITORY
+          $source='desktop-lite/dist/79號碼頭_Windows輕量資料夾版.zip'
+          $dest='desktop-lite/dist/Port79-Windows-Lite.zip'
+          Copy-Item $source $dest -Force
+          $notes=@'
+          79號碼頭 Windows 輕量資料夾版 (WebView2)
+          - 原網站各模組從本機相同路徑讀取。
+          - 首次開啟只載入原登入畫面；管理員/超級管理員登入後才背景下載七大系統快取，附真實進度。
+          - Windows 10/11 x64；需要 .NET Framework 4.8 和 Microsoft Edge WebView2 Runtime。
+          - 保留系統匣及原網站程式碼更新校驗；不包含私人雲端資料庫。
+          - 視窗底部固定顯示真實成功下載的系統數、考勤月份、雲端等待秒數及第一個失敗原因。
+          - 雲端尚未回應時顯示動態等待，不會假的增加下載百分比；切換頁面中斷會提示。
+          - Windows 專用本機 IndexedDB 快取自動保存在 local-data/BrowserProfile，不需手動選資料夾。
+          - 尚未在實際正式帳號下驗證全部跨來源 API。
+          - 請解壓縮整個 ZIP，勿只取出 exe。
+          '@
+          $noteFile='desktop-lite/dist/RELEASE_NOTES.txt'
+          $notes | Set-Content $noteFile -Encoding utf8
+          gh release view $tag -R $repo *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $dest --clobber -R $repo
+          } else {
+            gh release create $tag $dest -R $repo --title '79號碼頭 Windows 輕量資料夾版' --notes-file $noteFile --target $env:GITHUB_SHA --latest=false
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish Windows ZIP Release' }
+          Write-Host "Published download: https://github.com/$repo/releases/download/$tag/Port79-Windows-Lite.zip"
