@@ -7,7 +7,7 @@ const nativeSource=fs.readFileSync(path.join(__dirname,'../MainForm.cs'),'utf8')
 
 async function eventLoop(){await new Promise(resolve=>setImmediate(resolve));}
 function fixture(){
- let shown=false,role='',token='',online=true,downloads=0,behavior='success';
+ let shown=false,role='',token='',online=true,downloads=0,behavior='success',nowMs=1000000;
  let onTick,initialTick;
  const events=new Map(),received=[],elements=new Map();
  const document={
@@ -34,6 +34,7 @@ function fixture(){
  const cache={
   async downloadAll(cb){
    downloads++;
+   if(behavior==='stall'){cb('attendance',0,7,'loading');return new Promise(()=>{});}
    const names=['attendance','workhours','leave','schedule','efficiency','hr','history'];
    return names.map((sys,i)=>{
     cb(sys,i,7,'loading');
@@ -52,14 +53,15 @@ function fixture(){
  };
  const navigator={get onLine(){return online}};
  const localStorage={getItem(){return null},setItem(){}};
- const ctx={window,document,navigator,sessionStorage,localStorage,Date,JSON,console,
+ const clock=class extends Date{static now(){return nowMs;}};
+ const ctx={window,document,navigator,sessionStorage,localStorage,Date:clock,JSON,console,
   setInterval(fn){onTick=fn;return 1},
   setTimeout(fn){initialTick=fn;return 1},
   clearInterval(){}};
  vm.createContext(ctx);vm.runInContext(source,ctx);
  return {events,received,async tick(){onTick();await eventLoop()},async initial(){initialTick();await eventLoop()},
    get downloads(){return downloads},setAuth(r,s=true,t='TOKEN'){role=r;shown=s;token=t},
-   setOnline(value){online=value},setBehavior(value){behavior=value}};
+   setOnline(value){online=value},setBehavior(value){behavior=value},advance(ms){nowMs+=ms}};
 }
 test('permanently visible native bar receives true module and month progress only after manager login',async()=>{
  const x=fixture();
@@ -99,9 +101,25 @@ test('explicit retry displays errors without fake success when one module fails'
  assert(x.received.some(v=>v.detail?.includes('（失敗）')));
  await x.tick();assert.equal(x.received.at(-1).phase,'partial','Failed state remains visible until user retries');
 });
+test('cloud timeout heartbeat makes stalled first month visible without fake 100%, and page switch reports interruption',async()=>{
+ const x=fixture();x.setAuth('admin');x.setBehavior('stall');
+ await x.tick();assert.equal(x.downloads,1);
+ x.advance(15000);await x.tick();
+ assert.equal(x.received.at(-1).phase,'downloading');
+ assert.match(x.received.at(-1).detail,/已等待 15 秒/);
+ assert.equal(x.received.at(-1).completed,0,'Heartbeat must never pretend a month or system finished');
+ x.advance(72000);await x.tick();
+ assert.equal(x.received.at(-1).phase,'stalled');
+ assert.match(x.received.at(-1).detail,/已等待 87 秒/);
+ x.events.get('pagehide')();
+ assert.equal(x.received.at(-1).phase,'interrupted','Navigate away must disclose interrupted download');
+ assert.equal(x.received.at(-1).completed,0);
+});
 test('native WinForms integration shows status permanently and in tray without accepting commands',()=>{
  assert.match(nativeSource,/Dock=DockStyle.Bottom,Height=74/);
  assert.match(nativeSource,/cacheBar\.Value=completed/);
+ assert.match(nativeSource,/ProgressBarStyle.Marquee/);
+ assert.match(nativeSource,/cacheInProgress/);
  assert.match(nativeSource,/cacheStatusMenu\.Text=/);
  assert.match(nativeSource,/Settings\.IsWebMessageEnabled=true/);
  assert.match(nativeSource,/WebMessageReceived\+=OnCacheMessage/);
