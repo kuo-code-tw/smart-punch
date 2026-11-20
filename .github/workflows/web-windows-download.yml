@@ -5,12 +5,18 @@ on:
     paths:
       - index.html
       - assets/port79-windows-download.js
+      - assets/port79-home-compact-controls.js
+      - assets/port79-home-compact-controls.css
+      - tests/home-compact-controls.cjs
       - tests/windows-download-link.cjs
       - .github/workflows/web-windows-download.yml
   pull_request:
     paths:
       - index.html
       - assets/port79-windows-download.js
+      - assets/port79-home-compact-controls.js
+      - assets/port79-home-compact-controls.css
+      - tests/home-compact-controls.cjs
       - tests/windows-download-link.cjs
 permissions:
   contents: read
@@ -24,7 +30,9 @@ jobs:
         with:
           node-version: '22'
       - name: Verify download button login/role enforcement and UI source
-        run: node tests/windows-download-link.cjs
+        run: |
+          node tests/windows-download-link.cjs
+          node tests/home-compact-controls.cjs
       - name: Verify original homepage login and cloud paths unchanged
         run: |
           node tests/system-settings-center.cjs

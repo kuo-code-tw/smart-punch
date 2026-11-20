@@ -400,7 +400,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
     <div id="sessionBar" class="session">
       <div><strong id="sessionTitle"></strong><small id="sessionMeta"></small></div>
       <div class="p79-windows-download-slot">
-        <a id="p79WindowsDownloadLink" class="p79-windows-download-link" href="https://github.com/kuo-code-tw/smart-punch/releases/download/port79-windows-lite-20261120/Port79-Windows-Lite.zip" target="_blank" rel="noopener noreferrer" hidden aria-label="下載 Windows 電腦版，輕量資料夾 ZIP，約 2.8 MB">⬇ 下載 Windows 電腦版 <small>ZIP 約 2.8 MB</small></a>
+        <a id="p79WindowsDownloadLink" class="p79-windows-download-link" href="https://github.com/kuo-code-tw/smart-punch/releases/download/port79-windows-lite-20261120/Port79-Windows-Lite.zip" target="_blank" rel="noopener noreferrer" hidden aria-label="系統下載（Windows 完整程式 ZIP）" title="下載 Windows 電腦版完整程式（ZIP 約 2.8 MB）">⬇ 系統下載</a>
         <button id="logoutBtn" class="logout" type="button">登出</button>
       </div>
     </div>
@@ -2331,6 +2331,9 @@ html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar .p79-tool
 @media(max-width:900px){html body.p79-workspace #p79WorkspaceTopbar #p79WindowsDownloadLink:not([hidden]){font-size:11px!important;padding:6px!important;margin-right:2px}html body.p79-workspace #p79WorkspaceTopbar #p79WindowsDownloadLink small{display:none!important}}
 @media(max-width:650px){.p79-windows-download-slot{width:100%;display:grid;grid-template-columns:1fr;gap:8px}.p79-windows-download-link{justify-content:center}.p79-windows-download-slot .logout{width:100%}}
 </style>
-<script defer src="./assets/port79-windows-download.js?v=20261120-toolbar-visible-v2"></script>
+<!-- Compact homepage top controls: visual layout only, original download/login handlers preserved. -->
+<link rel="stylesheet" href="./assets/port79-home-compact-controls.css?v=20261121-v1">
+<script defer src="./assets/port79-home-compact-controls.js?v=20261121-v1"></script>
+<script defer src="./assets/port79-windows-download.js?v=20261121-history-inline-v1"></script>
 </body>
 </html>

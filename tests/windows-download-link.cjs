@@ -40,6 +40,11 @@ function unit(){
  assert.match(a.href,/^https:\/\/github\.com\/kuo-code-tw\/smart-punch\/releases\/download\/port79-windows-lite-20261120\/Port79-Windows-Lite\.zip$/);
  let prevented=false;s.listeners.get('link:click')({preventDefault(){prevented=true}});assert(!prevented,'Approved manager can click link');
  s.change('superadmin',true);assert(!a.hidden,'Logged in superadmin sees download button');
+ const compact={querySelector:()=>null,insertBefore(element){element.parentNode=this;}};
+ s.nodes.p79HomeCompactActions=compact;
+ s.change('admin',true);
+ assert.equal(a.parentNode,compact,'With compact UI, original authenticated link must stay beside History module');
+ assert(!a.hidden,'Moving the link never changes permission checks');
  s.change('superadmin',true,true);assert(a.hidden,'Punch-only session cannot download');
  prevented=false;s.listeners.get('link:click')({preventDefault(){prevented=true}});assert(prevented,'Click rejected on revoked manager session');
  s.change(null,false,false,'');assert(a.hidden,'Logout hides link');
@@ -48,8 +53,12 @@ assert(home.includes('id="p79WindowsDownloadLink"'),'Original authenticated sess
 assert(home.includes('id="logoutBtn"'),'Original logout button must remain');
 assert(home.includes('id="loginBox"'),'Original login box must remain');
 assert(home.includes('id="systems"'),'Original system page remains');
-assert(home.includes('assets/port79-windows-download.js?v=20261120-toolbar-visible-v2'));
+assert(home.includes('assets/port79-windows-download.js?v=20261121-history-inline-v1'));
+assert(home.includes('assets/port79-home-compact-controls.css?v=20261121-v1'));
+assert(home.includes('assets/port79-home-compact-controls.js?v=20261121-v1'));
 assert(home.includes('p79-windows-download-link[hidden]{display:none!important}'));
 assert(!source.includes('window.open(')&&!source.includes('fetch(')&&!source.includes('location.href='),'Control never auto-downloads or triggers cloud requests');
-assert.match(home,/p79WorkspaceTopbar #p79WindowsDownloadLink:not\(\[hidden\]\)/,'Download is visible in full-width desktop toolbar');
+const compactCss=fs.readFileSync('assets/port79-home-compact-controls.css','utf8');
+assert.match(compactCss,/p79HomeCompactActions #p79WindowsDownloadLink:not\(\[hidden\]\)/,'Download is visible next to History module');
+assert.match(home,/aria-label="系統下載（Windows 完整程式 ZIP）"/,'Display label is shortened without altering ZIP target');
 console.log('PASS Windows download: hidden before login, admin/superadmin only, requires token and visible session, hide on logout, no auto download, original systems preserved');
