@@ -2302,8 +2302,11 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 .p79-windows-download-link:hover,.p79-windows-download-link:focus-visible{background:#096bad;color:#fff!important;outline-offset:3px}
 .p79-windows-download-link small{color:#dceeff;font-size:10px;margin:0;font-weight:700}
 .p79-windows-download-link[hidden]{display:none!important}
+html body.p79-workspace #p79WorkspaceTopbar #p79WindowsDownloadLink:not([hidden]){display:inline-flex!important;align-items:center!important;flex:0 0 auto;min-height:37px;padding:7px 10px;margin-right:7px;max-width:250px;box-sizing:border-box;background:#0d81ce!important;color:#fff!important;font-size:12px!important;line-height:1.2!important;border-radius:10px!important;white-space:nowrap;z-index:2}
+html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar .p79-toolbar-tools>#p79WindowsDownloadLink:not([hidden]){display:inline-flex!important}
+@media(max-width:900px){html body.p79-workspace #p79WorkspaceTopbar #p79WindowsDownloadLink:not([hidden]){font-size:11px!important;padding:6px!important;margin-right:2px}html body.p79-workspace #p79WorkspaceTopbar #p79WindowsDownloadLink small{display:none!important}}
 @media(max-width:650px){.p79-windows-download-slot{width:100%;display:grid;grid-template-columns:1fr;gap:8px}.p79-windows-download-link{justify-content:center}.p79-windows-download-slot .logout{width:100%}}
 </style>
-<script defer src="./assets/port79-windows-download.js?v=20261120-manager-release-v1"></script>
+<script defer src="./assets/port79-windows-download.js?v=20261120-toolbar-visible-v2"></script>
 </body>
 </html>

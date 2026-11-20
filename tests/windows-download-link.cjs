@@ -4,14 +4,15 @@ const source=fs.readFileSync('assets/port79-windows-download.js','utf8');
 const home=fs.readFileSync('index.html','utf8');
 function unit(){
  const storage=new Map(),listeners=new Map(),observed=[];
+ const topUser={};const toolbar={querySelector:()=>topUser,insertBefore(element){element.parentNode=this;}};
  const nodes={
   p79WindowsDownloadLink:{hidden:true,href:'',addEventListener(type,fn){listeners.set('link:'+type,fn)}},
   sessionBar:{classList:{contains:name=>name==='show'&&visible}},
   systems:{classList:{contains:name=>name==='show'&&visible}}
  };
  let visible=false;
- const document={getElementById:name=>nodes[name],addEventListener:(name,fn)=>listeners.set('document:'+name,fn)};
- const window={addEventListener:(name,fn)=>listeners.set('window:'+name,fn)};
+ const document={getElementById:name=>nodes[name],querySelector:()=>toolbar,addEventListener:(name,fn)=>listeners.set('document:'+name,fn)};
+ const window={addEventListener:(name,fn)=>listeners.set('window:'+name,fn),setInterval:()=>1,clearInterval(){}};
  class MutationObserver{constructor(cb){this.cb=cb;observed.push(cb)}observe(){}}
  const sessionStorage={getItem:k=>storage.get(k)||null};
  const ctx={document,window,sessionStorage,MutationObserver,Set,JSON};
@@ -24,7 +25,7 @@ function unit(){
   else storage.delete('port79_user_token');
   for(const fn of observed)fn();
  }
- return {nodes,storage,change,listeners};
+ return {nodes,toolbar,storage,change,listeners};
 }
 {
  const s=unit(),a=s.nodes.p79WindowsDownloadLink;
@@ -35,6 +36,7 @@ function unit(){
  s.change('admin',false);assert(a.hidden,'Session data without real homepage session is not login');
  s.change('admin',true,false,'');assert(a.hidden,'Missing token hides download button');
  s.change('admin',true);assert(!a.hidden,'Logged in admin sees download button');
+ assert.equal(a.parentNode,s.toolbar,'Windows download must be moved into visible management toolbar');
  assert.match(a.href,/^https:\/\/github\.com\/kuo-code-tw\/smart-punch\/releases\/download\/port79-windows-lite-20261120\/Port79-Windows-Lite\.zip$/);
  let prevented=false;s.listeners.get('link:click')({preventDefault(){prevented=true}});assert(!prevented,'Approved manager can click link');
  s.change('superadmin',true);assert(!a.hidden,'Logged in superadmin sees download button');
@@ -46,7 +48,8 @@ assert(home.includes('id="p79WindowsDownloadLink"'),'Original authenticated sess
 assert(home.includes('id="logoutBtn"'),'Original logout button must remain');
 assert(home.includes('id="loginBox"'),'Original login box must remain');
 assert(home.includes('id="systems"'),'Original system page remains');
-assert(home.includes('assets/port79-windows-download.js?v=20261120-manager-release-v1'));
+assert(home.includes('assets/port79-windows-download.js?v=20261120-toolbar-visible-v2'));
 assert(home.includes('p79-windows-download-link[hidden]{display:none!important}'));
 assert(!source.includes('window.open(')&&!source.includes('fetch(')&&!source.includes('location.href='),'Control never auto-downloads or triggers cloud requests');
+assert.match(home,/p79WorkspaceTopbar #p79WindowsDownloadLink:not\(\[hidden\]\)/,'Download is visible in full-width desktop toolbar');
 console.log('PASS Windows download: hidden before login, admin/superadmin only, requires token and visible session, hide on logout, no auto download, original systems preserved');
