@@ -28,5 +28,5 @@ jobs:
       - name: Verify original homepage login and cloud paths unchanged
         run: |
           node tests/system-settings-center.cjs
-          node tests/home-import-auto-close.cjs
+          node tests/home-drop-import.cjs
           node tests/home-overtime-converted-hours.cjs
