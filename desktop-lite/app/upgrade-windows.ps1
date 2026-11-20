@@ -74,9 +74,11 @@ try{
   # These are program files only; the entire local-data directory is excluded.
   Copy-Item -LiteralPath $file.FullName -Destination $target -Force
  }
+ # Do not record a successful release before verifying that the new app
+ # actually starts. A stale release marker can strand users on an old EXE.
  $version=Join-Path $updates 'installed-shell-sha256.txt'
- [IO.File]::WriteAllText($version,$ExpectedDigest)
- Write-Log ('PASS '+$files.Count+' files updated. No local-data business snapshots touched.')
+ $installedExeHash=Join-Path $updates 'installed-shell-exe-sha256.txt'
+ Write-Log ('FILES_APPLIED '+$files.Count+' program files, no private data touched')
  if(!$TestOnly){
   # Launch the new native program automatically; never leave an apparently
   # successful update that requires the operator to find the EXE manually.
@@ -87,7 +89,14 @@ try{
   Start-Sleep -Milliseconds 1500
   $child.Refresh()
   if($child.HasExited){throw ('Windows program exited immediately after update, exit code '+$child.ExitCode)}
+  [IO.File]::WriteAllText($installedExeHash,(Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant())
+  [IO.File]::WriteAllText($version,$ExpectedDigest)
   Write-Log ('AUTO_RESTART_SUCCESS pid='+$child.Id+' exe='+$exe)
+ }else{
+  # Test-only update proves the file replacement, but does not launch a GUI.
+  $testExe=Join-Path $root 'Port79WindowsLite.exe'
+  [IO.File]::WriteAllText($installedExeHash,(Get-FileHash -LiteralPath $testExe -Algorithm SHA256).Hash.ToLowerInvariant())
+  [IO.File]::WriteAllText($version,$ExpectedDigest)
  }
 }catch{
  Write-Log ('ERROR '+[string]$_)
