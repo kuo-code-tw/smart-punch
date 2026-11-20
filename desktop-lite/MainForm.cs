@@ -60,9 +60,9 @@ namespace Port79Lite {
    menu.Items.Add("縮小到系統匣",null,(s,e)=>Hide());
    menu.Items.Add(new ToolStripSeparator());
    menu.Items.Add("管理員登入後重新下載資料",null,async(s,e)=>await ForceDownload());
-   checkUpdatesMenu=new ToolStripMenuItem("檢查原系統程式更新",null,async(s,e)=>await CheckUpdates());
+   checkUpdatesMenu=new ToolStripMenuItem("更新系統檔案（保留本機資料）",null,async(s,e)=>await CheckUpdates(true));
    menu.Items.Add(checkUpdatesMenu);
-   updateWindowsMenu=new ToolStripMenuItem("一鍵更新 Windows 程式（保留本機資料）",null,async(s,e)=>await UpgradeWindowsShell());
+   updateWindowsMenu=new ToolStripMenuItem("更新 Windows 主程式（選用）",null,async(s,e)=>await UpgradeWindowsShell());
    menu.Items.Add(updateWindowsMenu);
    menu.Items.Add("開啟電腦資料夾",null,(s,e)=>OpenLocalData());
    menu.Items.Add(new ToolStripSeparator());
@@ -256,7 +256,7 @@ namespace Port79Lite {
    if(updateBusy)return;
    var answer=MessageBox.Show(
     "將從 79號碼頭官方 GitHub Release 驗證下載新版 Windows 程式，保留 local-data、所有已下載快取與備份。\n\n請先確認沒有正在進行 Excel 匯入、考勤儲存或任何未完成的雲端寫入。\n\n驗證成功後，程式將自動關閉、更新並重新啟動。現在繼續嗎？",
-    "一鍵更新 Windows 程式",MessageBoxButtons.YesNo,MessageBoxIcon.Question);
+    "更新 Windows 主程式",MessageBoxButtons.YesNo,MessageBoxIcon.Question);
    if(answer!=DialogResult.Yes)return;
    updateBusy=true;updateWindowsMenu.Enabled=false;checkUpdatesMenu.Enabled=false;
    try{
@@ -282,14 +282,22 @@ namespace Port79Lite {
     updateBusy=false;updateWindowsMenu.Enabled=true;checkUpdatesMenu.Enabled=true;
    }
   }
-  private async Task CheckUpdates(){
-   if(updateBusy)return;updateBusy=true;checkUpdatesMenu.Enabled=false;
+  private async Task CheckUpdates(bool manual=false){
+   if(updateBusy)return;
+   updateBusy=true;checkUpdatesMenu.Enabled=false;updateWindowsMenu.Enabled=false;
    try{
     var site=Path.Combine(root,"site","smart-punch");
     var result=await Updater.StageFromOfficialAsync(site,DataRoot,Log);
-    if(result>0){tray.ShowBalloonTip(4000,"79號碼頭程式更新","已驗證 "+result+" 個新版程式檔，下次啟動時套用。",ToolTipIcon.Info);}
-   }catch(Exception ex){Log("check update: "+ex.Message);}
-   finally{updateBusy=false;checkUpdatesMenu.Enabled=true;}
+    if(result>0){
+     tray.ShowBalloonTip(4000,"79號碼頭系統檔案更新","已下載並校驗 "+result+" 個新版系統檔；重新啟動後套用。",ToolTipIcon.Info);
+     if(manual)MessageBox.Show("已驗證 "+result+" 個更新的系統檔案。\n\n從系統匣選「真正結束程式」，再重新開啟後就會套用。\n\n原本 local-data 中的考勤、人資、排班快取均保留，不需要重新下載。","更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Information);
+    }else if(manual){
+     MessageBox.Show("已核對正式網站，系統檔案目前沒有需要下載的更新。\n\n已保存的本機資料沒有變更。","更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Information);
+    }
+   }catch(Exception ex){
+    Log("system files update: "+ex.Message);
+    if(manual)MessageBox.Show("目前無法更新系統檔案：\n"+ex.Message+"\n\n原有程式和 local-data 仍保留。","更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+   }finally{updateBusy=false;checkUpdatesMenu.Enabled=true;updateWindowsMenu.Enabled=true;}
   }
  }
 }
