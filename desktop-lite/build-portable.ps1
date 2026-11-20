@@ -23,6 +23,7 @@ foreach($f in @('index.html','port79-attendance-core.js')){
 $app=Join-Path $target 'app'
 New-Item -ItemType Directory -Force $app | Out-Null
 Copy-Item (Join-Path $PSScriptRoot 'app/login-progress.js') (Join-Path $app 'login-progress.js') -Force
+Copy-Item (Join-Path $PSScriptRoot 'app/upgrade-windows.ps1') (Join-Path $app 'upgrade-windows.ps1') -Force
 foreach($p in @('BrowserProfile','updates','logs','backups')){
  New-Item -ItemType Directory -Force (Join-Path $target "local-data/$p") | Out-Null
 }
