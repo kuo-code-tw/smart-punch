@@ -1,0 +1,26 @@
+name: Verify restored manager session before native cache download
+on:
+  push:
+    branches: [feature/home-restore-cache-download-gate-20261120]
+    paths:
+      - index.html
+      - tests/home-restore-cache-download-gate.cjs
+      - .github/workflows/home-restored-session-cache.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify cloud session refresh cannot race a Windows cache download
+        run: node tests/home-restore-cache-download-gate.cjs
+      - name: Verify home login cache, existing access and Windows download button
+        run: |
+          node tests/windows-download-link.cjs
+          node tests/home-drop-import.cjs
