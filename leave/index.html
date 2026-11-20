@@ -1061,7 +1061,7 @@ async function p79ReportSavedLeaveCover(id){
  const dialog=document.createElement('dialog');
  dialog.id='p79SavedCoverDetailsDialog';
  dialog.style.cssText='width:min(820px,95vw);max-height:86vh;overflow:auto;border:1px solid #cbd5e1;border-radius:16px;padding:18px;background:var(--card,#fff);color:var(--text,#172a44)';
- dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0;font-size:19px">已安排代班／加班明細</h2><button type="button" data-close style="padding:7px 12px">✕ 關閉</button></div>'+
+ dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0;font-size:19px">申報加班｜代班人員明細</h2><button type="button" data-close style="padding:7px 12px">✕ 關閉</button></div>'+
   '<p data-status role="status" aria-live="polite" style="margin:12px 0">正在核對已儲存的請假與代班資料…</p>'+
   '<div data-rows style="display:grid;gap:8px;max-height:54vh;overflow:auto"></div>'+
   '<div style="display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:14px"><button type="button" data-reload>重新核對雲端</button><button type="button" data-continue class="btn btn-pri" hidden>接續尚未申報的加班</button></div>';
@@ -1102,7 +1102,7 @@ async function p79ReportSavedLeaveCover(id){
     '<b>'+esc(e.name)+'</b> <small>'+esc(e.empId)+'</small>｜'+esc(e.date)+
     '<div data-entry-status style="margin-top:5px;font-size:13px">正在核對加班申報…</div></div>').join('');
    const cells=Array.from(body.querySelectorAll('[data-entry-status]')),monthContexts=new Map(),pending=[];
-   let reported=0,unverified=0,restCovers=0;
+   let reported=0,planned=0,unverified=0,restCovers=0;
    for(let i=0;i<entries.length;i++){
     if(!dialog.isConnected)return;
     const entry=entries[i],cell=cells[i];
@@ -1119,7 +1119,7 @@ async function p79ReportSavedLeaveCover(id){
      if(!dialog.isConnected)return;
      const employeeRow=cloud.schedules.find(row=>norm(row.empId)===norm(entry.empId));
      if(!employeeRow)throw Error('雲端找不到這位代班人員的班表');
-     const report=employeeRow.schedule?.__meta?.[entry.date]?.overtimeReport;
+     const meta=employeeRow.schedule?.__meta?.[entry.date]||{},report=meta.overtimeReport;
       const oldDay=entry.coverDate&&entry.coverDate!==entry.date?
        employeeRow.schedule?.__meta?.[entry.coverDate]?.overtimeReport:null;
       if(!report&&oldDay?.id&&oldDay.category==='延'&&
@@ -1129,6 +1129,10 @@ async function p79ReportSavedLeaveCover(id){
        unverified++;continue;
       }
      if(report&&(String(report.id||'').trim()||String(report.code||'').trim())){
+      if(!p79OvertimeIsLinked(id,entry,meta)){
+       cell.textContent='此日有加班紀錄，但尚未證實屬於本筆請假代班（需核對請假單、員工與原報單 ID）';
+       unverified++;continue;
+      }
       if(entry.overtimeDate&&entry.overtimeDate!==entry.date&&String(report.overtimeDate||'')!==entry.overtimeDate){
        cell.textContent='⚠ 已有雲端申報，但尚未確認 '+entry.overtimeDate+' 的加班歸屬；保留原報單 ID，不重複新增。';
        unverified++;continue;
@@ -1139,8 +1143,16 @@ async function p79ReportSavedLeaveCover(id){
        report.convertedHours!=null&&String(report.convertedHours)!==''?'換算 '+report.convertedHours+' 小時':'',
        period.originalCode?'原申報代碼 '+period.originalCode+'（包含正常班；未修改雲端報單）':'',
        period.warning||'',report.note||''].filter(Boolean);
-      cell.textContent=(report.planned===true?'已儲存預排｜':'已正式申報｜')+fields.join('｜');
-      reported++;
+      if(report.planned===true){
+       cell.textContent='已預排（尚未正式申報）｜'+fields.join('｜');
+       planned++;
+      }else if(report.planned===false&&String(report.id||'').trim()){
+       cell.textContent='已正式申報｜'+fields.join('｜');
+       reported++;
+      }else{
+       cell.textContent='無法確認此紀錄是預排或正式申報；不可當作完成';
+       unverified++;
+      }
      }else if(entry.mode==='rest'){
       cell.textContent='排休代班（目前沒有加班申報）';restCovers++;
      }else{
@@ -1157,9 +1169,15 @@ async function p79ReportSavedLeaveCover(id){
     }
    }
    if(!dialog.isConnected)return;
-   status.textContent='已列出 '+entries.length+' 筆代班日期｜已申報／預排 '+reported+
-    ' 筆｜未申報 '+pending.length+' 筆'+(restCovers?'｜排休代班 '+restCovers+' 筆':'')+
-    (unverified?'｜未核對 '+unverified+' 筆（請重新核對雲端）':'');
+   status.textContent='已列出 '+entries.length+' 筆代班日期｜已正式申報 '+reported+
+    ' 筆｜僅預排 '+planned+' 筆｜未申報 '+pending.length+' 筆'+
+    (restCovers?'｜排休代班未正式申報 '+restCovers+' 筆':'')+
+    (unverified?'｜未確認 '+unverified+' 筆（不可視為已申報）':'');
+   const coverage=p79LeaveCoverage(leave,fresh.leaveCoverAssignments||[],fresh.leaveCoverCancellations||[]);
+   const complete=coverage.complete&&coverage.units.length===entries.length&&
+    reported===entries.length&&planned===0&&pending.length===0&&restCovers===0&&unverified===0;
+   p79LeaveOvertimeVerified.set(String(id),{signature:coverage.signature,complete,at:Date.now()});
+   p79ApplyCompletion(id,coverage.complete,complete);
    continueButton.hidden=!pending.length||unverified>0;
    continueButton.onclick=async()=>{
     if(!pending.length||unverified>0)return;
@@ -1170,7 +1188,12 @@ async function p79ReportSavedLeaveCover(id){
     await p79OpenLeaveOvertimeHandoff();
    };
   }catch(error){
-   if(dialog.isConnected)status.textContent='加班明細讀取失敗：'+String(error.message||error)+'；視窗會保留，可重新核對雲端。';
+   if(dialog.isConnected){
+    status.textContent='加班明細讀取失敗：'+String(error.message||error)+'；視窗會保留，可重新核對雲端。';
+    p79LeaveOvertimeVerified.delete(String(id));
+    const displayed=leaveRecords.find(l=>String(l.id)===String(id));
+    p79ApplyCompletion(id,displayed?p79LeaveCoverage(displayed).complete:false,false);
+   }
   }finally{p79SavedCoverReportBusy=false;}
  };
  dialog.querySelector('[data-reload]').onclick=refresh;
