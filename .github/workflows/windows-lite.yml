@@ -45,7 +45,7 @@ jobs:
               if (Test-Path $log) {
                 $lines=Get-Content $log -ErrorAction SilentlyContinue
                 if ($lines -match 'navigation success: https://port79assets.example/smart-punch/') {$loaded=$true;break}
-                if ($lines -match 'navigation failure:') {throw 'WebView2 local site navigation error'}
+                if ($lines -match 'navigation failure:') {Get-Content $log -Tail 12;throw 'WebView2 local site navigation error'}
               }
               if ($p.HasExited) {throw 'Windows lite process exited during startup'}
             }
