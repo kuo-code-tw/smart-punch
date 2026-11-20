@@ -19,6 +19,44 @@
   const wire=JSON.stringify(payload);if(wire===lastNativeMessage)return;lastNativeMessage=wire;
   try{if(typeof window.chrome?.webview?.postMessage==='function')window.chrome.webview.postMessage(wire)}catch(_){}
  }
+ function useNativeComputerFolder(){
+  // In the Windows app WebView2 already persists IndexedDB under
+  // local-data/BrowserProfile. The website folder picker is unrelated to it.
+  // Show true local cache state instead of incorrectly saying '未連接'.
+  const api=window.Port79DataCache;
+  if(!api||!window.chrome?.webview||typeof api.getFolderSyncStatus!=='function')return;
+  if(api.__port79DesktopStatusMapped)return;
+  const original=api.getFolderSyncStatus.bind(api);
+  api.__port79DesktopStatusMapped=true;
+  api.getFolderSyncStatus=async function(){
+   const result=await original();
+   if(result?.state&&result.state!=='idle'||!session())return result;
+   let savedAt=0;
+   if(typeof api.getSystemSnapshot==='function'){
+    try{
+     const rows=await Promise.all(SYSTEMS.map(sys=>api.getSystemSnapshot(sys).catch(()=>null)));
+     for(const row of rows)savedAt=Math.max(savedAt,Number(row?.savedAt)||0);
+    }catch(_){}
+   }
+   return {state:savedAt?'done':'idle',label:savedAt?'本機快取已保存':'已連接，待下載',folder:'Windows local-data/BrowserProfile',savedAt};
+  };
+  const open=api.openCenter?.bind(api);
+  if(open)api.openCenter=async function(...args){
+   const r=await open(...args);
+   const modal=document.getElementById('p79CacheBackdrop');
+   if(modal){
+    for(const a of ['folder','reconnect','disconnect']){
+     const control=modal.querySelector('[data-cache-action="'+a+'"]');
+     if(control)control.hidden=true;
+    }
+    const status=modal.querySelector('#p79DeviceStatus');
+    if(status)status.textContent='Windows 電腦版已自動使用 local-data/BrowserProfile 的 IndexedDB 快取；不需選擇資料夾。';
+   }
+   return r;
+  };
+  // The status bar can refresh as soon as the native cache integration is ready.
+  try{window.dispatchEvent(new Event('p79-folder-sync-changed'))}catch(_){}
+ }
  function div(){
   let root=document.getElementById('p79WindowsDownloadProgress');if(root)return root;
   root=document.createElement('aside');root.id='p79WindowsDownloadProgress';root.setAttribute('role','status');root.setAttribute('aria-live','polite');
@@ -63,6 +101,7 @@
    return;
   }
   running=true;leftPage=false;processed=0;successes=0;errors=0;sessionKey=key;lastFailureKey='';lastActivityAt=now;lastHeartbeatAt=now;activeSystem='考勤';activeDetail='正在核對雲端資料';save(key,{attempt:now});
+  useNativeComputerFolder();
   view('正在下載本機資料','已處理 0／7 個系統；下載不會阻止你使用首頁。',0);
   try{
    const results=await api.downloadAll((sys,index,total,state,error,detail)=>{
@@ -112,6 +151,7 @@
   if(key!==priorSessionKey){priorSessionKey=key;nativeProgress('waiting','管理員已登入，準備下載','登入驗證完成後，開始依序下載七大系統。',0);}
   if(!running)void start(false);
  }
+ useNativeComputerFolder();
  const homePage=!!document.getElementById('systems');
  nativeProgress(homePage?'idle':'waiting',homePage?'等待管理員登入':'請回首頁查看下載狀態',homePage?'登入後才下載私人資料庫；目前尚未開始下載。':'本機資料仍保留；切換系統頁面會中斷首頁的下載工作，請回首頁重新下載。',0);
  const interval=setInterval(()=>{if(document.body)poll()},1200);
