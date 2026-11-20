@@ -263,7 +263,32 @@ namespace Port79Lite {
     }
     if(payload.kind!="port79-cache-status-v1")return;
     UpdateCacheStatus(payload);
+    // UI-only relay for the compact homepage indicator beside History status.
+    // Do not read or change employee records, credentials or download behavior.
+    _=DisplayInlineCacheProgress(payload);
    }catch(Exception error){Log("native cache status rejected: "+error.Message);}
+  }
+  private async Task DisplayInlineCacheProgress(CacheStatusPayload data){
+   if(web.CoreWebView2==null)return;
+   try{
+    var item=new {
+     phase=SafeStatus(data.phase,32),
+     title=SafeStatus(data.title,90),
+     detail=SafeStatus(data.detail,170),
+     completed=Math.Max(0,Math.Min(7,data.completed)),
+     total=Math.Max(1,Math.Min(7,data.total))
+    };
+    var encoded=new JavaScriptSerializer().Serialize(item);
+    var javascript="(function(){"+
+     "if(!document.getElementById('p79HomeDownloadProgress'))return false;"+
+     "window.dispatchEvent(new CustomEvent('port79-desktop-progress',{detail:"+encoded+"}));"+
+     "return true;})()";
+    var rendered=await web.CoreWebView2.ExecuteScriptAsync(javascript);
+    // If the homepage has the inline status, do not overlay a second
+    // native download card at the top-right. Other pages keep the native one.
+    if(String.Equals(rendered,"true",StringComparison.OrdinalIgnoreCase))
+     cachePanel.Visible=false;
+   }catch(Exception e){Log("inline download progress unavailable; native fallback kept: "+e.Message);}
   }
   private sealed class CacheStatusPayload{
    public string kind {get;set;}
