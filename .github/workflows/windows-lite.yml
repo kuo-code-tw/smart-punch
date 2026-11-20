@@ -41,6 +41,10 @@ jobs:
         run: |
           & ./desktop-lite/build-portable.ps1
           if ($LASTEXITCODE -ne 0) { throw 'Windows lite build failed' }
+      - name: End-to-end native update must automatically reopen app and keep local profile
+        shell: pwsh
+        run: |
+          & ./desktop-lite/tests/auto-restart-after-update.ps1
       - name: Native Windows executable smoke; original homepage loaded from local folder
         shell: pwsh
         run: |
