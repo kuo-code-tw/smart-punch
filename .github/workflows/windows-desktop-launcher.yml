@@ -1,0 +1,50 @@
+name: Test and build Port79 Windows desktop launcher
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/windows-desktop-launcher-20261120
+    paths:
+      - "desktop-windows/**"
+      - ".github/workflows/windows-desktop-launcher.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  native-windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: desktop-windows
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Test native Windows code without accessing production
+        run: go test -v ./...
+      - name: Vet source code
+        run: go vet ./...
+      - name: Build original-site Windows GUI launcher
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force ../desktop-windows-dist | Out-Null
+          go build -trimpath -ldflags="-H windowsgui -s -w" -o ../desktop-windows-dist/Port79_Windows.exe .
+      - name: Validate Windows GUI PE and publish hash
+        shell: pwsh
+        run: |
+          $exe = "../desktop-windows-dist/Port79_Windows.exe"
+          if (!(Test-Path $exe)) { throw "Windows EXE missing" }
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $exe))
+          if ($bytes[0] -ne 0x4D -or $bytes[1] -ne 0x5A) { throw "Not an executable PE" }
+          $offset = [BitConverter]::ToInt32($bytes,0x3C)
+          if ([System.Text.Encoding]::ASCII.GetString($bytes,$offset,4) -ne "PE`0`0") { throw "Invalid PE signature" }
+          Get-FileHash $exe -Algorithm SHA256 | Format-List
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Port79-Windows-original-site
+          path: desktop-windows-dist/Port79_Windows.exe
+          if-no-files-found: error
