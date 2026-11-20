@@ -197,7 +197,7 @@ test('system file restart and verified Windows updater reopen the app automatica
  assert.match(updater,/Port79NativeWindow/,'Updater checks Windows native window visibility');
  assert.match(updater,/ERROR_NO_VISIBLE_WINDOW/,'Missing window is an explicit error, not a success');
  assert.match(updater,/STOPPED_FAILED_NEW_PROCESS/,'Failed invisible new app must stop before rollback');
- assert.match(updater,/Start-Process -FilePath \$exe -WorkingDirectory \$root -PassThru/,'New Windows executable starts by itself');
+ assert.match(updater,/Start-Process -FilePath \$exe -WorkingDirectory \$root -WindowStyle Normal -PassThru/,'New Windows executable starts visibly by itself');
  assert.match(updater,/if\(\$child.HasExited\)/,'A failed immediate restart must not be called successful');
  assert.match(updater,/ROLLBACK_RESTART_ATTEMPTED/,'Failed update attempts to reopen the old program');
  assert.match(updater,/if\(!\$TestOnly\)/,'Tests cannot launch installed Windows app');
