@@ -76,8 +76,9 @@
  function view(label,detail,count,phase='downloading',show=true){
   const root=div();if(show)root.style.display='block';
   root.querySelector('.p79-desktop-label').textContent=label;root.querySelector('.p79-desktop-detail').textContent=detail;
-  root.querySelector('progress').value=Math.min(SYSTEMS.length,Math.max(0,count));
-  nativeProgress(phase,label,detail,count);
+  // Progress shows confirmed successful downloads, never just attempted/failed modules.
+  root.querySelector('progress').value=Math.min(SYSTEMS.length,Math.max(0,successes));
+  nativeProgress(phase,label,detail,Math.min(SYSTEMS.length,Math.max(0,successes)));
  }
  function record(key){try{const all=JSON.parse(localStorage.getItem(STORE)||'{}');return all[key]||{}}catch{return{}}}
  function save(key,value){try{const all=JSON.parse(localStorage.getItem(STORE)||'{}');all[key]={...all[key],...value};localStorage.setItem(STORE,JSON.stringify(all))}catch{}}
@@ -144,7 +145,7 @@
   lastHeartbeatAt=now;
   const explanation=waitSeconds>=70?'雲端讀取較慢，正在等待原系統逾時／重試結果':'請求仍在處理；系統進度只在實際完成後增加';
   const detail=activeDetail+'｜已等待 '+waitSeconds+' 秒｜'+explanation+'｜已處理 '+processed+'／7 系統';
-  nativeProgress(waitSeconds>=70?'stalled':'downloading','正在等待 '+activeSystem+' 雲端資料',detail,processed);
+  nativeProgress(waitSeconds>=70?'stalled':'downloading','正在等待 '+activeSystem+' 雲端資料',detail,successes);
  }
  window.addEventListener('port79-desktop-force-sync',()=>void start(true));
  let priorSessionKey='';
@@ -168,7 +169,7 @@
   if(running){
    // Do not block returning to the homepage for 20 minutes after a real page switch.
    save(sessionKey,{attempt:0});
-   nativeProgress('interrupted','下載已中斷：切換頁面','已處理 '+processed+'／7 系統；本機原有快取保留。返回首頁可以重新下載。',processed);
+   nativeProgress('interrupted','下載已中斷：切換頁面','成功 '+successes+'／7、已處理 '+processed+'／7 系統；本機快取保留。返回首頁可重新下載。',successes);
   }
  });
  setTimeout(poll,1000);
