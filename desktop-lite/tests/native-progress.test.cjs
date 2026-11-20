@@ -59,13 +59,13 @@ function fixture(){
  const ctx={window,document,navigator,sessionStorage,localStorage,Date:clock,JSON,console,
   setInterval(fn){onTick=fn;return 1},
   setTimeout(fn){initialTick=fn;return 1},
-  clearInterval(){}};
+  clearInterval(){},clearTimeout(){}};
  vm.createContext(ctx);vm.runInContext(source,ctx);
  return {events,received,cache,async tick(){onTick();await eventLoop()},async initial(){initialTick();await eventLoop()},
-   get downloads(){return downloads},setAuth(r,s=true,t='TOKEN'){role=r;shown=s;token=t},
+   get downloads(){return downloads},get popup(){return elements.get('p79WindowsDownloadProgress')},setAuth(r,s=true,t='TOKEN'){role=r;shown=s;token=t},
    setOnline(value){online=value},setBehavior(value){behavior=value},advance(ms){nowMs+=ms},setCached(value){hasLocalCache=value}};
 }
-test('permanently visible native bar receives true module and month progress only after manager login',async()=>{
+test('compact native top-right progress receives true module and month counters only after manager login',async()=>{
  const x=fixture();
  assert.equal(x.received[0].phase,'idle');
  assert.equal(x.received[0].completed,0);
@@ -78,6 +78,9 @@ test('permanently visible native bar receives true module and month progress onl
  assert(x.received.some(v=>v.phase==='waiting'&&/離線/.test(v.title)));
  x.setOnline(true);await x.tick();await eventLoop();
  assert.equal(x.downloads,1);
+ assert.equal(x.popup.style.display,'none','Native WebView2 progress must not duplicate an HTML popup');
+ assert.match(x.popup.style.cssText,/top:14px/);
+ assert(!/bottom:15px/.test(x.popup.style.cssText),'No bottom popup');
  assert(x.received.some(v=>v.phase==='downloading'&&/2026-10｜2\/12 月/.test(v.detail)),
   'Must show the real downloaded attendance month');
  assert(x.received.some(v=>v.phase==='downloading'&&v.monthCompleted===2&&v.monthTotal===12),
@@ -144,7 +147,13 @@ test('installed Windows cache is automatically recognized without asking to pick
  assert.equal(saved.savedAt,1000000);
 });
 test('native WinForms integration shows status permanently and in tray without accepting commands',()=>{
- assert.match(nativeSource,/Dock=DockStyle.Bottom,Height=74/);
+ assert.match(nativeSource,/Width=326,Height=96/,'Compact progress must not take up a full-width row');
+ assert.match(nativeSource,/Anchor=AnchorStyles.Top\|AnchorStyles.Right/);
+ assert.match(nativeSource,/PositionCachePanel\(\)/);
+ assert.doesNotMatch(nativeSource,/Dock=DockStyle.Bottom,Height=74/);
+ assert.match(nativeSource,/Interval=6000/,'Success closes after six seconds');
+ assert.match(nativeSource,/if\(phase=="complete"\)cacheDismissTimer.Start\(\)/);
+ assert.match(nativeSource,/AccessibleName="隱藏下載進度"/);
  assert.match(nativeSource,/cacheBar\.Value=completed/);
  assert.match(nativeSource,/ProgressBarStyle.Marquee/);
  assert.match(nativeSource,/cacheBar.Value=monthCompleted/);
