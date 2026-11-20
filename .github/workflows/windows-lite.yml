@@ -1,0 +1,84 @@
+name: Test and build small Windows WebView2 folder app
+on:
+  push:
+    branches: [feature/windows-lite-login-sync-20261120]
+    paths:
+      - 'desktop-lite/**'
+      - '.github/workflows/windows-lite.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-native:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - name: Test zero cloud database downloads before verified administrator login
+        shell: pwsh
+        run: node --test desktop-lite/tests/login-after-admin.test.cjs
+      - name: Restore WebView2 WinForms dependencies
+        shell: pwsh
+        run: dotnet restore desktop-lite/Port79Lite.csproj /p:Platform=x64
+      - name: Build portable native Windows WebView2 folder and verify clean profile
+        shell: pwsh
+        run: |
+          & ./desktop-lite/build-portable.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Windows lite build failed' }
+      - name: Native Windows executable smoke; original homepage loaded from local folder
+        shell: pwsh
+        run: |
+          $root=(Resolve-Path 'desktop-lite/dist/79號碼頭_Windows輕量版').Path
+          $exe=Join-Path $root 'Port79WindowsLite.exe'
+          $p=Start-Process -FilePath $exe -WorkingDirectory $root -PassThru
+          try {
+            $log=Join-Path $root 'local-data/logs/windows-lite.log'
+            $loaded=$false
+            for ($i=0;$i -lt 18;$i++){
+              Start-Sleep -Seconds 1
+              if (Test-Path $log) {
+                $lines=Get-Content $log -ErrorAction SilentlyContinue
+                if ($lines -match 'navigation success: https://port79assets.example/smart-punch/') {$loaded=$true;break}
+                if ($lines -match 'navigation failure:') {throw 'WebView2 local site navigation error'}
+              }
+              if ($p.HasExited) {throw 'Windows lite process exited during startup'}
+            }
+            if (-not $loaded){
+              if (Test-Path $log){Get-Content $log -Tail 15}
+              throw 'WebView2 did not confirm original homepage navigation'
+            }
+            Write-Host 'PASS native WebView2 local-homepage launch; no admin session or DB access attempted'
+          } finally {
+            Get-Process Port79WindowsLite -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          }
+      - name: Check portable ZIP has no private data and is smaller than 30MB
+        shell: pwsh
+        run: |
+          $zip=Join-Path (Resolve-Path 'desktop-lite/dist').Path '79號碼頭_Windows輕量資料夾版.zip'
+          if (!(Test-Path $zip)){throw 'ZIP missing'}
+          if ((Get-Item $zip).Length -gt 31457280){throw 'ZIP exceeds 30 MB'}
+          Add-Type -AssemblyName System.IO.Compression
+          $zf=[System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            $names=$zf.Entries.FullName
+            foreach ($p in @('site/smart-punch/index.html','site/smart-punch/attendance/index.html','site/smart-punch/schedule/index.html','Port79WindowsLite.exe')){
+              if (-not ($names -match [regex]::Escape($p))){throw "Missing packaged path $p"}
+            }
+            $private=$zf.Entries | Where-Object { $_.FullName -match 'local-data/.+\.(db|sqlite|json|log|ldb|txt|cookie)$' }
+            if ($private){throw 'Release ZIP unexpectedly contains data files'}
+          }finally{$zf.Dispose()}
+          Write-Host "PASS clean lightweight ZIP bytes: $((Get-Item $zip).Length)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Port79-Windows-Lite-Login-First
+          path: |
+            desktop-lite/dist/79號碼頭_Windows輕量資料夾版.zip
+            desktop-lite/dist/SHA256.txt
+          retention-days: 30
+          if-no-files-found: error
