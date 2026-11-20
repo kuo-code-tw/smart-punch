@@ -27,6 +27,7 @@ namespace Port79Lite {
   private bool updateBusy=false;
   private bool initiated=false;
   private bool cacheInProgress=false;
+  private bool probedImportFrames=false;
 
   public MainForm(){
    Text="79號碼頭雲端智慧系統";
@@ -133,6 +134,10 @@ namespace Port79Lite {
        var progress=Path.Combine(root,"app","login-progress.js");
        if(File.Exists(progress)) await web.CoreWebView2.ExecuteScriptAsync(File.ReadAllText(progress));
       }catch(Exception x){Log("progress overlay: "+x.Message);}
+      if(!probedImportFrames&&Array.Exists(Environment.GetCommandLineArgs(),
+       a=>a=="--port79-verify-import-frames")){
+       probedImportFrames=true;await ProbeImportFrames();
+      }
      }
     };
     web.CoreWebView2.Navigate(LocalRoot+"index.html");
@@ -145,6 +150,44 @@ namespace Port79Lite {
     MessageBox.Show("無法開啟本機系統。Windows 需要 WebView2 Runtime，並且整個程式資料夾必須完整。\n"+ex.Message,
       "79號碼頭 Windows 版",MessageBoxButtons.OK,MessageBoxIcon.Error);
    }
+  }
+  // Windows CI-only read-only probe: actually load all three importer iframes
+  // from the native virtual host and verify their contentWindow is same-origin.
+  // No Excel file is supplied and no cloud data is written.
+  private async Task ProbeImportFrames(){
+   const string code=@"(async function(){
+    const modules=['gate-import','yard-dashboard','aqc-efficiency'];
+    for(const moduleName of modules){
+     const frame=document.createElement('iframe');
+     frame.style.display='none';
+     const expected=new URL('./'+moduleName+'/index.html?embed=1&homeImport=1',location.href);
+     let timer;
+     const result=await new Promise(resolve=>{
+      let done=false;
+      const finish=value=>{if(done)return;done=true;clearTimeout(timer);resolve(value)};
+      frame.onload=()=>{
+       try{
+        const child=frame.contentWindow;
+        const locationCheck=new URL(child.location.href);
+        if(locationCheck.origin!==location.origin||locationCheck.pathname!==expected.pathname)
+         return finish('ORIGIN MISMATCH '+moduleName+' '+locationCheck.origin);
+        if(!frame.contentDocument)return finish('NO CHILD DOM '+moduleName);
+        finish('OK '+moduleName);
+       }catch(error){finish('CROSS-ORIGIN '+moduleName+' '+String(error.message||error))}
+      };
+      frame.onerror=()=>finish('FAILED TO LOAD '+moduleName);
+      timer=setTimeout(()=>finish('TIMEOUT '+moduleName),45000);
+      frame.src=expected.href;document.body.appendChild(frame);
+     });
+     frame.remove();
+     if(!result.startsWith('OK '))return 'FAIL '+result;
+    }
+    return 'PASS imported frames gate, yard, vessel are same-origin';
+   })()";
+   try{
+    var result=await web.CoreWebView2.ExecuteScriptAsync(code);
+    Log("IMPORT FRAME CHECK: "+result);
+   }catch(Exception ex){Log("IMPORT FRAME CHECK: ERROR "+ex.Message);}
   }
   // Ignore any progress message not sent by our original locally hosted webpage.
   // It carries status text/counters only; never accepts tokens, credentials, URLs or commands.
