@@ -1,12 +1,13 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
 const source=fs.readFileSync(require('path').join(__dirname,'../assets/port79-data-cache.js'),'utf8');
 const canonical='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
-function setup(handler,{base='https://script.google.com/macros/s/OLD/exec',context,fast=false}={}){
+function setup(handler,{base='https://script.google.com/macros/s/OLD/exec',context,fast=false,mockDownload=null}={}){
  const values=new Map([['port79_user_token','current-user-token'],['port79_admin_token','stale-admin-token'],['port79_gc_superadmin_token','stale-super-token'],['port79_user_session',JSON.stringify({empId:'QA',adminRole:'admin'})]]);
  const storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,String(v))};const calls=[],saved=[],progress=[];
  const window={GAS_URL:base,P79ManagementContext:context,fetch:async(url,init)=>{calls.push({url:new URL(url),init});return handler(calls.length,url,init)}};
+ window.__mockDownload=mockDownload;
  const ctx={window,sessionStorage:storage,localStorage:storage,URL,URLSearchParams,Request,Response,Blob,AbortController,Date,JSON,Map,Set,Promise,console,setTimeout:(fn,ms)=>setTimeout(fn,fast?1:ms),clearTimeout,document:{getElementById:()=>null},location:{pathname:'/smart-punch/hr/',href:'https://example.invalid/smart-punch/hr/'},saved,progress};
- vm.createContext(ctx);vm.runInContext(source.replace('window.Port79DataCache={','storeApi=async(url,data,sys)=>saved.push({url,data,sys});setProgress=message=>progress.push(message);window.Port79DataCache={read:fetchJson,testToken:token,'),ctx);
+ vm.createContext(ctx);vm.runInContext(source.replace('window.Port79DataCache={','if(window.__mockDownload){downloadAttendanceDatabase=window.__mockDownload.attendance;downloadSystem=window.__mockDownload.system;saveSystemSnapshot=window.__mockDownload.save;}storeApi=async(url,data,sys)=>saved.push({url,data,sys});setProgress=message=>progress.push(message);window.Port79DataCache={read:fetchJson,testToken:token,'),ctx);
  return {api:window.Port79DataCache,calls,saved,progress,values,window,ctx};
 }
 const response=(data={ok:true},status=200)=>new Response(JSON.stringify(data),{status});let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+name)}
@@ -37,9 +38,13 @@ const response=(data={ok:true},status=200)=>new Response(JSON.stringify(data),{s
   await assert.rejects(x.api.read('getLeaveData'),/沒有此系統查詢權限/);assert.equal(x.calls.length,1);
  });
  await test('repeating an incomplete download keeps the six successful systems',async()=>{
-  const x=setup(()=>response(),{fast:true}),counts={};
-  x.window.__mockDownload=async sys=>{counts[sys]=(counts[sys]||0)+1;if(sys==='leave'&&counts.leave===1)throw Error('雲端暫時忙碌');return{ok:true}};
-  vm.runInContext("downloadAttendanceDatabase=async()=>({recordCount:0});downloadSystem=async(sys)=>window.__mockDownload(sys);saveSystemSnapshot=async()=>true;",x.ctx);
+  const counts={};
+  const mocks={
+   attendance:async()=>({recordCount:0}),
+   system:async sys=>{counts[sys]=(counts[sys]||0)+1;if(sys==='leave'&&counts.leave===1)throw Error('雲端暫時忙碌');return{ok:true}},
+   save:async()=>true
+  };
+  const x=setup(()=>response(),{fast:true,mockDownload:mocks});
   const first=await x.api.downloadAll(),second=await x.api.downloadAll();
   assert.equal(first.filter(x=>x.ok).length,6,JSON.stringify(first));assert.equal(second.filter(x=>x.ok).length,7,JSON.stringify(second));
   assert.equal(counts.leave,2);for(const sys of ['schedule','efficiency','hr','history'])assert.equal(counts[sys],1);
