@@ -24,6 +24,7 @@
 <link rel="stylesheet" href="assets/port79-all-backup.css?v=20261114-backup-above-vessel-v3">
 <link rel="stylesheet" href="assets/port79-home-drop-import.css?v=20261115-auto-dispatch-v1">
 <script defer src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script defer src="assets/port79-yard-account-sync.js?v=1"></script>
 <script defer src="assets/port79-home-drop-import.js?v=20261120-webview2-explicit-iframe-v1"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script defer src="assets/port79-backup-excel.js?v=20261115-diagnostic-v124"></script>
@@ -1392,7 +1393,7 @@ function showSession(session){
    const badge=yardCard.querySelector('.badge');if(badge)badge.textContent=canUseYard?permissionLabel(session.systemPermissions.efficiency||'view'):'';
   }
   $('p79HomeYardPanel').hidden=!canUseYard;
-  if(canUseYard)renderHomeYardSummary(session);
+  if(canUseYard){renderHomeYardSummary(session);void refreshHomeYardCloud(session);}
 }
 
 async function punchLogin(){
@@ -1708,11 +1709,34 @@ function renderHomeYardSummary(session){
   note.textContent='資料日期 '+latest.date+'｜來源 '+String(saved.fileName||'先前匯入 Excel')+'｜20 呎=1 TEU、40／45 呎=2 TEU；45呎須有獨立場存資料（換算值）；Excel 原始 TEU 不變。重櫃／空櫃／冷凍櫃的容許櫃數與 TEU 由管理員設定；冷凍櫃為內含分類、不重複加總；僅存於此瀏覽器。';
  }catch(error){note.textContent='本機儲位資料暫時無法讀取，請進入碼頭儲量管理確認 Excel 與容量設定。';}
 }
+async function refreshHomeYardCloud(session){
+ if(!window.Port79YardAccountSync||!canViewHomeYard(session))return;
+ const id=String(session.empId||session.employeeId||session.id||session.accountId||session.email||session.username||'').trim();
+ if(!id)return;
+ const account=encodeURIComponent(id.slice(0,120)),token=getToken();
+ try{
+  let data=await window.Port79YardAccountSync.sync(account);
+  if(getToken()!==token||!canViewHomeYard(currentSession))return;
+  if(!data.length&&location.hostname==='kuo-code-tw.github.io'&&
+     (session.adminRole==='superadmin'||session.systemPermissions?.efficiency==='manage')){
+   const local=JSON.parse(localStorage.getItem(YARD_HOME_STORAGE_PREFIX+account)||'null');
+   if(Array.isArray(local?.rows)&&local.rows.length){
+    const latest=local.rows.slice().sort((a,b)=>a.date.localeCompare(b.date)).slice(-366);
+    data=await window.Port79YardAccountSync.sync(account,latest);
+   }
+  }
+  if(getToken()!==token||!canViewHomeYard(currentSession))return;
+  window.Port79YardAccountSync.merge(account,data);
+  renderHomeYardSummary(currentSession);
+ }catch(error){
+  console.warn('雲端儲量讀取未完成',String(error?.message||error));
+ }
+}
 window.addEventListener('p79-home-import-complete',event=>{
  if(event?.detail?.kinds?.includes('yard')&&currentSession&&canViewHomeYard(currentSession))
   renderHomeYardSummary(currentSession);
 });
-window.addEventListener('pageshow',()=>{if(currentSession&&canViewHomeYard(currentSession))renderHomeYardSummary(currentSession);});
+window.addEventListener('pageshow',()=>{if(currentSession&&canViewHomeYard(currentSession)){renderHomeYardSummary(currentSession);void refreshHomeYardCloud(currentSession);}});
 /* A backup batch currently runs on this page. Preserve its page lifetime when a
  * manager opens another system; server-owned background jobs are still required
  * for backups to survive closing the original browser tab. */

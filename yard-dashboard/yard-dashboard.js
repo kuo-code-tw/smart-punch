@@ -465,7 +465,11 @@ async function importFile(file){
   if(changed.length&&!(await confirmHomeYardOverwrite('這份報表有 '+changed.length+' 個已儲存日期的數字不同。確認以新 Excel 的原始資料覆蓋這些日期？\n（其他日期會保留，不會累加。）'))){
     message('已取消覆蓋，原資料保持不變');return;
   }
-  imported.forEach(r=>existing.set(r.date,r));
+  if(g.Port79YardAccountSync){
+   const cloud=await g.Port79YardAccountSync.sync(accountId,imported);
+   if(identity()!==accountId)throw Error('登入已變更，已停止匯入');
+   cloud.forEach(r=>existing.set(r.date,validateRecord(r)));
+  }else imported.forEach(r=>existing.set(r.date,r));
   rows=[...existing.values()].sort((a,b)=>a.date.localeCompare(b.date));
   fileName=file.name;updatedAt=new Date().toISOString();selectedDate=imported[imported.length-1].date;
   const saved=persist();render();
@@ -737,6 +741,12 @@ function init(){
  }
  storageKey=STORAGE_PREFIX+accountId;
  restore();restoreAllowedCounts();render();
+ if(g.Port79YardAccountSync)void g.Port79YardAccountSync.sync(accountId).then(cloud=>{
+  if(identity()!==accountId||importBusy)return;
+  cloud.forEach(validateRecord);
+  g.Port79YardAccountSync.merge(accountId,cloud);
+  restore();render();
+ }).catch(error=>message('雲端儲量讀取未完成：'+error.message,'error'));
  if(rows.length)message('已載入目前登入帳號在本瀏覽器儲存的 '+rows.length+' 天資料（'+safe(fileName)+'）。尚未同步雲端。','success');
  $('yardImport').addEventListener('click',()=>$('yardFile').click());
  $('yardEmptyImport').addEventListener('click',()=>$('yardFile').click());

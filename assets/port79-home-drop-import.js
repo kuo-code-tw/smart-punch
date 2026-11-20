@@ -247,11 +247,12 @@ async function start(input){
    throw Error('同一批次 Gate／Yard 各限 1 份、船舶最多 30 份；為避免重複覆蓋已停止');
   const groups=['gate','yard','vessel'].filter(k=>grouped[k].length);
   for(let i=0;i<groups.length;i++){
+   if(!canUse()||id!==taskId)throw Error('登入狀態已變更，已停止');
    const kind=groups[i],list=grouped[kind];
    display('已分流至 '+names[kind]+'，正在啟動原系統…','info',20+65*i/groups.length);
-   await loadOriginal(kind);
-   display(names[kind]+' 原系統已載入，正在核對與匯入 '+list.length+' 份檔案…','info',25+65*i/groups.length);
    try{
+    await loadOriginal(kind);
+    display(names[kind]+' 原系統已載入，正在核對與匯入 '+list.length+' 份檔案…','info',25+65*i/groups.length);
     const outcome=await runKind(kind,list);
     resultLog.push({kind,tone:outcome.tone,message:outcome.message});
    }catch(err){
@@ -263,12 +264,13 @@ async function start(input){
   const summary=resultLog.map(r=>r.message).join('\n');
   display((failures.length?'匯入未全部完成：\n':uncertain?'已完成原系統處理：\n':'匯入完成：\n')+summary,
     failures.length?'error':uncertain?'pending':'success',100);
-  if(!failures.length&&!uncertain&&id===taskId){
-   if(typeof w.CustomEvent==='function'&&typeof w.dispatchEvent==='function'){
-    try{w.dispatchEvent(new w.CustomEvent('p79-home-import-complete',{detail:{kinds:resultLog.map(r=>r.kind)}}));}
+  const savedKinds=resultLog.filter(r=>r.tone==='success').map(r=>r.kind);
+  if(id===taskId&&canUse()){
+   if(savedKinds.length&&typeof w.CustomEvent==='function'&&typeof w.dispatchEvent==='function'){
+    try{w.dispatchEvent(new w.CustomEvent('p79-home-import-complete',{detail:{kinds:savedKinds}}));}
     catch(error){console.warn('匯入已成功，但首頁更新通知失敗',error);}
    }
-   if(modal.open)modal.close();
+   if(!failures.length&&!uncertain&&modal.open)modal.close();
   }
  }catch(err){
   display('已停止：'+String(err?.message||err),'error',100);

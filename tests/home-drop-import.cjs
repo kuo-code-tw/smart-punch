@@ -78,7 +78,10 @@ const session=new Map([
  ['port79_user_session',JSON.stringify({adminRole:'superadmin'})],
  ['port79_user_token','TEST']
 ]);
+const completedImports=[];
 const host={
+ CustomEvent:class {constructor(type,options){this.type=type;this.detail=options.detail;}},
+ dispatchEvent(event){completedImports.push(Array.from(event.detail.kinds));},
  document,location:{origin},sessionStorage:{getItem:k=>session.get(k)||null},XLSX,
  addEventListener(){},confirm(){return true}
 };
@@ -147,7 +150,12 @@ function file(name,marker){return {name,size:1000,arrayBuffer:async()=>Uint8Arra
  assert.equal(modal.open,false,'readback-confirmed vessel closes');
  gateFails=true;await host.Port79HomeDropImport.start([file('gate.xlsx',3)]);
  assert.equal(modal.open,true,'failed Gate remains open');
- assert.equal(status.dataset.tone,'error');gateFails=false;
+ assert.equal(status.dataset.tone,'error');
+ await host.Port79HomeDropImport.start([file('gate.xlsx',3),file('yard.xlsx',2)]);
+ assert.equal(modal.open,true,'mixed result keeps the failed Gate status visible');
+ assert.equal(status.dataset.tone,'error');
+ assert.deepEqual(completedImports.at(-1),['yard'],'successful Yard still refreshes the homepage when Gate fails');
+ gateFails=false;
  yardFails=true;await host.Port79HomeDropImport.start([file('yard.xlsx',2)]);
  assert.equal(modal.open,true,'failed Yard remains open');
  assert.equal(status.dataset.tone,'error');yardFails=false;
