@@ -7,7 +7,7 @@ const nativeSource=fs.readFileSync(path.join(__dirname,'../MainForm.cs'),'utf8')
 
 async function eventLoop(){await new Promise(resolve=>setImmediate(resolve));}
 function fixture(){
- let shown=false,role='',token='',online=true,downloads=0,behavior='success',nowMs=1000000;
+ let shown=false,role='',token='',online=true,downloads=0,behavior='success',nowMs=1000000,hasLocalCache=false;
  let onTick,initialTick;
  const events=new Map(),received=[],elements=new Map();
  const document={
@@ -44,7 +44,8 @@ function fixture(){
     return {system:sys,ok:!fail};
    });
   },
-  async getSystemSnapshot(sys){return {size:sys==='attendance'?1048576:2048};}
+  async getSystemSnapshot(sys){return {size:sys==='attendance'?1048576:2048,savedAt:hasLocalCache?nowMs:0};},
+  async getFolderSyncStatus(){return {state:'idle',label:'未連接'};}
  };
  const window={
   chrome:{webview:{postMessage(raw){received.push(JSON.parse(raw));}}},
@@ -59,9 +60,9 @@ function fixture(){
   setTimeout(fn){initialTick=fn;return 1},
   clearInterval(){}};
  vm.createContext(ctx);vm.runInContext(source,ctx);
- return {events,received,async tick(){onTick();await eventLoop()},async initial(){initialTick();await eventLoop()},
+ return {events,received,cache,async tick(){onTick();await eventLoop()},async initial(){initialTick();await eventLoop()},
    get downloads(){return downloads},setAuth(r,s=true,t='TOKEN'){role=r;shown=s;token=t},
-   setOnline(value){online=value},setBehavior(value){behavior=value},advance(ms){nowMs+=ms}};
+   setOnline(value){online=value},setBehavior(value){behavior=value},advance(ms){nowMs+=ms},setCached(value){hasLocalCache=value}};
 }
 test('permanently visible native bar receives true module and month progress only after manager login',async()=>{
  const x=fixture();
@@ -114,6 +115,21 @@ test('cloud timeout heartbeat makes stalled first month visible without fake 100
  x.events.get('pagehide')();
  assert.equal(x.received.at(-1).phase,'interrupted','Navigate away must disclose interrupted download');
  assert.equal(x.received.at(-1).completed,0);
+});
+test('installed Windows cache is automatically recognized without asking to pick folder',async()=>{
+ const x=fixture();
+ const original=await x.cache.getFolderSyncStatus();
+ assert.equal(original.label,'未連接','No login still uses original security state');
+ x.setAuth('admin');
+ const initial=await x.cache.getFolderSyncStatus();
+ assert.equal(initial.label,'已連接，待下載');
+ assert.equal(initial.folder,'Windows local-data/BrowserProfile');
+ assert.equal(initial.state,'idle');
+ x.setCached(true);
+ const saved=await x.cache.getFolderSyncStatus();
+ assert.equal(saved.state,'done');
+ assert.equal(saved.label,'本機快取已保存');
+ assert.equal(saved.savedAt,1000000);
 });
 test('native WinForms integration shows status permanently and in tray without accepting commands',()=>{
  assert.match(nativeSource,/Dock=DockStyle.Bottom,Height=74/);
