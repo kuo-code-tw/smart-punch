@@ -14,9 +14,9 @@ const review=$('p79HomeImportReview'),reviewText=$('p79HomeImportReviewText');
 const yes=$('p79HomeImportReviewYes'),no=$('p79HomeImportReviewNo'),close=$('p79HomeImportClose');
 const names={gate:'Gate 進出站',yard:'Yard 儲量',vessel:'船舶作業'};
 const targets={
- gate:'./gate-import/?embed=1&homeImport=1',
- yard:'./yard-dashboard/?embed=1&homeImport=1',
- vessel:'./aqc-efficiency/?homeImport=1'
+ gate:'./gate-import/index.html?embed=1&homeImport=1',
+ yard:'./yard-dashboard/index.html?embed=1&homeImport=1',
+ vessel:'./aqc-efficiency/index.html?homeImport=1'
 };
 let busy=false,taskId=0,approval=null,lastVesselError='',resultLog=[];
 function canUse(){
@@ -135,12 +135,12 @@ function reportImportIssue(message,source){
 yes?.addEventListener('click',()=>{settle(true);display('已確認，交由原系統完成匯入…','info');});
 no?.addEventListener('click',()=>{settle(false);display('已取消本次匯入，原資料保留','pending');});
 function updateGateStatus(){
- const el=frame.contentDocument?.getElementById('gateMessage');
+ let el=null;try{el=frame.contentDocument?.getElementById('gateMessage')}catch(_){}
  return {message:String(el?.textContent||'').trim(),kind:el?.dataset?.kind||''};
 }
 function waitGateResult(){
  return new Promise((resolve,reject)=>{
-  const el=frame.contentDocument?.getElementById('gateMessage');
+  let el=null;try{el=frame.contentDocument?.getElementById('gateMessage')}catch(_){}
   if(!el){reject(Error('Gate 原系統的狀態區無法讀取'));return;}
   let finished=false;
   const observer=new MutationObserver(check);
@@ -171,13 +171,18 @@ async function loadOriginal(kind){
   }
   frame.onload=()=>{
    try{
-    if(frame.contentWindow?.location?.origin!==w.location.origin)
-     throw Error('匯入頁面來源不符，已停止');
-    const path=frame.contentWindow.location.pathname||'';
+    // WebView2 virtual-host mappings need an explicit HTML file path.
+    // If the embedded page failed to load, inspecting cross-origin location
+    // itself throws SecurityError. Stop before giving it any File objects.
+    const actual=new URL(frame.contentWindow.location.href);
+    const expected=new URL(url,w.location.href);
+    if(actual.origin!==expected.origin||actual.pathname!==expected.pathname)
+     throw Error('匯入來源不符，已停止');
+    const path=actual.pathname;
     if(!path.includes(kind==='vessel'?'/aqc-efficiency/':kind==='yard'?'/yard-dashboard/':'/gate-import/'))
      throw Error('載入的原系統不是指定匯入頁');
     finish();
-   }catch(err){finish(err)}
+   }catch(err){finish(Error(names[kind]+' 原系統無法從同一網域載入，請更新 Windows 程式檔案後重試；未寫入任何資料'))}
   };
   frame.onerror=()=>finish(Error('原系統載入失敗'));
   frame.src=url+'&homeDropVersion=20261116-auto-import-v2';
@@ -185,7 +190,11 @@ async function loadOriginal(kind){
 }
 async function runKind(kind,files){
  const child=frame.contentWindow;
- if(!child||child.location.origin!==w.location.origin)throw Error('來源驗證未通過');
+ try{
+  if(!child||child.location.origin!==w.location.origin)throw Error('來源不符');
+ }catch(_){
+  throw Error(names[kind]+' 匯入視窗無法同網域存取；已停止匯入，沒有變更正式資料。請更新 Windows 程式。');
+ }
  if(kind==='gate'){
   if(typeof child.P79GateImport?.chooseFile!=='function')throw Error('Gate 原匯入程式尚未載入');
   const done=waitGateResult();
@@ -195,7 +204,7 @@ async function runKind(kind,files){
  if(kind==='yard'){
   if(typeof child.P79YardDashboard?.importFile!=='function')throw Error('Yard 原匯入程式尚未載入');
   await child.P79YardDashboard.importFile(files[0]);
-  const el=frame.contentDocument?.getElementById('yardStatus');
+  let el=null;try{el=frame.contentDocument?.getElementById('yardStatus')}catch(_){}
   const text=String(el?.textContent||'').trim();
   if(el?.dataset?.tone!=='success')throw Error(text||'Yard 原系統匯入未完成');
   return {message:'Yard｜'+(text||'原系統已儲存'),tone:'success'};
