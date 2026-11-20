@@ -20,7 +20,10 @@
  // The original homepage session bar is hidden by the full-width management shell,
  // so the download must move to the always-visible top toolbar after login.
  function placeInVisibleToolbar(){
-  const tools=document.querySelector?.('#p79WorkspaceTopbar .p79-toolbar-tools');
+  // The compact homepage toolbar sits beside History system status.
+  // Keep using this same authenticated link and its original click guard.
+  const tools=document.getElementById('p79HomeCompactActions')||
+   document.querySelector?.('#p79WorkspaceTopbar .p79-toolbar-tools');
   if(!tools||link.parentNode===tools)return;
   const user=tools.querySelector('.p79-toolbar-user');
   tools.insertBefore(link,user||null);
