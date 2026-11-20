@@ -59,7 +59,8 @@ namespace Port79Lite {
    File.Move(next,path);
   }
   public static int ApplyIfVerified(string site,string data,Action<string> log){
-   var updates=Path.Combine(data,"updates"),manifestFile=Path.Combine(updates,"pending.json");
+   var updates=Path.Combine(data,"updates");
+   var manifestFile=Path.Combine(updates,"pending.json");
    if(!File.Exists(manifestFile))return 0;
    var manifest=Json.Deserialize<Manifest>(File.ReadAllText(manifestFile));
    if(manifest?.files==null||manifest.files.Length>LimitFiles)throw new InvalidDataException("更新清單不完整");
@@ -95,7 +96,8 @@ namespace Port79Lite {
    }
   }
   public static async Task<int> StageFromOfficialAsync(string site,string data,Action<string> log) {
-   var updates=Path.Combine(data,"updates"),pending=Path.Combine(updates,"pending.json");
+   var updates=Path.Combine(data,"updates");
+   var pending=Path.Combine(updates,"pending.json");
    if(File.Exists(pending))return 0;
    ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
    using(var client=new HttpClient {Timeout=TimeSpan.FromSeconds(35)}){
