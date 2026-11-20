@@ -45,12 +45,21 @@ namespace Port79Lite {
      log("Windows 主程式已是最新版本："+digest.Substring(0,12));
      return null;
     }
-    log("正在從正式發布下載 Windows 程式，不影響本機資料…");
-    var bytes=await client.GetByteArrayAsync(Url).ConfigureAwait(true);
-    if(bytes.Length>Limit||bytes.LongLength!=asset.size||Sha256(bytes)!=digest)
-     throw new InvalidDataException("下載內容與 GitHub 正式發布 SHA-256 不一致；已取消更新");
     var zip=Path.Combine(updates,"pending-windows-release.zip");
-    File.WriteAllBytes(zip,bytes);
+    // When the verified release is already staged, pressing "更新系統" again
+    // must not download the same complete ZIP for a second time.
+    byte[] bytes=null;
+    if(File.Exists(zip)&&new FileInfo(zip).Length==asset.size){
+     var cached=File.ReadAllBytes(zip);
+     if(Sha256(cached)==digest){bytes=cached;log("沿用已驗證的 Windows 更新檔，沒有再次下載");}
+    }
+    if(bytes==null){
+     log("首次自動下載正式 Windows 更新檔，無須使用者自行取得 ZIP…");
+     bytes=await client.GetByteArrayAsync(Url).ConfigureAwait(true);
+     if(bytes.Length>Limit||bytes.LongLength!=asset.size||Sha256(bytes)!=digest)
+      throw new InvalidDataException("下載內容與 GitHub 正式發布 SHA-256 不一致；已取消更新");
+     File.WriteAllBytes(zip,bytes);
+    }
     // Before the previous app exits, verify paths cannot target local-data.
     using(var archive=ZipFile.OpenRead(zip)){
      if(archive.Entries.Count>2000)throw new InvalidDataException("Windows 更新檔包含過多項目");
@@ -67,6 +76,32 @@ namespace Port79Lite {
       if(entry.Length>15*1024*1024)throw new InvalidDataException("單一更新程式檔超過安全上限");
      }
      if(!shell||!site)throw new InvalidDataException("下載 ZIP 缺少 Windows 主程式或原系統首頁");
+     // A freshly unpacked official release has no installed-shell marker.
+     // Compare all local shell/app files before treating it as an update;
+     // site/ files have an independent updater and are intentionally excluded.
+     bool identical=true,foundShell=false;
+     var prefix="79號碼頭_Windows輕量版/";
+     foreach(var entry in archive.Entries){
+      var name=entry.FullName.Replace('\\','/');
+      if(!name.StartsWith(prefix,StringComparison.Ordinal)||name.EndsWith("/")||
+         name.StartsWith(prefix+"site/",StringComparison.Ordinal)||
+         name.StartsWith(prefix+"local-data/",StringComparison.Ordinal))continue;
+      var relative=name.Substring(prefix.Length);
+      if(relative=="Port79WindowsLite.exe")foundShell=true;
+      if(relative.Contains("../")||relative.Contains(":")){identical=false;break;}
+      var local=Path.Combine(root,relative.Replace('/',Path.DirectorySeparatorChar));
+      if(!File.Exists(local)||new FileInfo(local).Length!=entry.Length){identical=false;break;}
+      using(var stream=entry.Open())
+      using(var memory=new MemoryStream()){
+       stream.CopyTo(memory);
+       if(Sha256(memory.ToArray())!=Sha256(File.ReadAllBytes(local))){identical=false;break;}
+      }
+     }
+     if(foundShell&&identical){
+      File.WriteAllText(installedFile,digest);
+      log("Windows 主程式檔案已與發佈版本相同，沒有重裝或重複下載");
+      return null;
+     }
     }
     return new Prepared{Zip=zip,Digest=digest,Runner=runner};
    }
