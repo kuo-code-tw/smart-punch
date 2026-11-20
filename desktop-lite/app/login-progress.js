@@ -3,7 +3,7 @@
  if(window.__port79FolderProgress)return;window.__port79FolderProgress=true;
  const SYSTEMS=['attendance','workhours','leave','schedule','efficiency','hr','history'];
  const names={attendance:'考勤',workhours:'工時',leave:'請假',schedule:'排班',efficiency:'碼頭與船舶',hr:'人資',history:'歷史資料'};
- let running=false,sessionKey='',completed=0,errors=0;
+ let running=false,sessionKey='',completed=0,errors=0,completedInMemoryKey='',completedInMemoryAt=0;
  const STORE='p79-windows-last-download-v1',TWO_HOURS=2*60*60*1000,ATTEMPT_GRACE=20*60*1000;
  function session(){
   try{
@@ -35,7 +35,7 @@
   const id=session(),api=window.Port79DataCache;
   if(!id||!api||typeof api.downloadAll!=='function')return;
   const key=id.key+'|'+id.scope,last=record(key),now=Date.now();
-  if(!force&&((last.completed&&now-last.completed<TWO_HOURS)||(last.attempt&&now-last.attempt<ATTEMPT_GRACE)))return;
+  if(!force&&((completedInMemoryKey===key&&now-completedInMemoryAt<TWO_HOURS)||(last.completed&&now-last.completed<TWO_HOURS)||(last.attempt&&now-last.attempt<ATTEMPT_GRACE)))return;
   running=true;completed=0;errors=0;sessionKey=key;save(key,{attempt:now});
   view('正在下載電腦本機資料','進入系統不需等下載完成；已完成 0／7 個系統',0);
   try{
@@ -47,7 +47,7 @@
    });
    if(!session()||sessionKey!==key)return;
    errors=results.filter(x=>!x.ok).length;
-   if(!errors){save(key,{completed:Date.now()});view('✅ 本機快取下載完成','共 7 個系統；下次開啟會先讀取本機資料',SYSTEMS.length);}
+   if(!errors){completedInMemoryKey=key;completedInMemoryAt=Date.now();save(key,{completed:completedInMemoryAt});view('✅ 本機快取下載完成','共 7 個系統；下次開啟會先讀取本機資料',SYSTEMS.length);}
    else view('⚠ 本機快取部分未完成','成功 '+(results.length-errors)+'／'+results.length+'，未完成 '+errors+' 項；原資料均保留',SYSTEMS.length);
   }catch(error){view('❌ 本機下載未完成',String(error&&error.message||error),completed)}
   finally{running=false}
