@@ -41,7 +41,7 @@ const response=(data={ok:true},status=200)=>new Response(JSON.stringify(data),{s
   x.window.__mockDownload=async sys=>{counts[sys]=(counts[sys]||0)+1;if(sys==='leave'&&counts.leave===1)throw Error('雲端暫時忙碌');return{ok:true}};
   vm.runInContext("downloadAttendanceDatabase=async()=>({recordCount:0});downloadSystem=async(sys)=>window.__mockDownload(sys);saveSystemSnapshot=async()=>true;",x.ctx);
   const first=await x.api.downloadAll(),second=await x.api.downloadAll();
-  assert.equal(first.filter(x=>x.ok).length,6);assert.equal(second.filter(x=>x.ok).length,7);
+  assert.equal(first.filter(x=>x.ok).length,6,JSON.stringify(first));assert.equal(second.filter(x=>x.ok).length,7,JSON.stringify(second));
   assert.equal(counts.leave,2);for(const sys of ['schedule','efficiency','hr','history'])assert.equal(counts[sys],1);
   assert.equal(second.filter(x=>x.reused).length,6);
  });
