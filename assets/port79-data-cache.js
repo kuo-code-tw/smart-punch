@@ -818,11 +818,12 @@ async function fetchJson(action,params={},sys=''){
     // A transient server lock may be returned without retryable:true by older deployments.
     // GET requests are read-only and safe to retry; never retry auth/permission failures.
     const busyRead=/雲端目前正在(?:更新|處理)|資料(?:更新中|處理中)|cloud (?:busy|updating)/i.test(message);
+    const permission=/沒有.*權限|無權|禁止|拒絕|未授權|permission denied/i.test(message);
     const delay=Number(data.retryAfterMs);
     throw Object.assign(new Error(label+'：'+message),{
      code:auth?'P79_AUTH':'P79_CLOUD',
-     retryable:!auth&&(data.retryable===true||busyRead),
-     busyRetry:!auth&&busyRead,
+     retryable:!auth&&!permission&&(data.retryable===true||busyRead),
+     busyRetry:!auth&&!permission&&busyRead,
      retryAfterMs:Number.isFinite(delay)&&delay>0?Math.min(5000,Math.max(500,delay)):0
     });
    }
