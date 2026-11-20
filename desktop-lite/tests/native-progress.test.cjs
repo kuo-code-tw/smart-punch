@@ -38,10 +38,11 @@ function fixture(){
    const names=['attendance','workhours','leave','schedule','efficiency','hr','history'];
    return names.map((sys,i)=>{
     cb(sys,i,7,'loading');
-    if(sys==='attendance')cb(sys,i,7,'detail',null,'讀取 2026-10 2/12');
-    const fail=behavior==='partial'&&sys==='history';
-    cb(sys,i,7,fail?'error':'done',fail?new Error('test failure'):null);
-    return {system:sys,ok:!fail,error:fail?'test failure':''};
+    if(sys==='attendance')cb(sys,i,7,'detail',null,'已完成 2026-10｜2/12 月');
+    const fail=(behavior==='partial'&&sys==='history')||(behavior==='skipped'&&sys==='attendance');
+    const skipped=behavior==='skipped'&&i>0;
+    cb(sys,i,7,skipped?'skipped':fail?'error':'done',fail?new Error('test failure'):null);
+    return {system:sys,ok:!fail&&!skipped,skipped,error:fail?'test failure':skipped?'未執行':''};
    });
   },
   async getSystemSnapshot(sys){return {size:sys==='attendance'?1048576:2048,savedAt:hasLocalCache?nowMs:0};},
@@ -77,8 +78,10 @@ test('permanently visible native bar receives true module and month progress onl
  assert(x.received.some(v=>v.phase==='waiting'&&/離線/.test(v.title)));
  x.setOnline(true);await x.tick();await eventLoop();
  assert.equal(x.downloads,1);
- assert(x.received.some(v=>v.phase==='downloading'&&/2026-10 2\/12/.test(v.detail)),
+ assert(x.received.some(v=>v.phase==='downloading'&&/2026-10｜2\/12 月/.test(v.detail)),
   'Must show the real downloaded attendance month');
+ assert(x.received.some(v=>v.phase==='downloading'&&v.monthCompleted===2&&v.monthTotal===12),
+  'True attendance month ratio must reach native Windows bar before system 1/7 completes');
  assert(x.received.some(v=>v.phase==='downloading'&&v.completed>0&&v.completed<7),
   'Native bar must receive intermediate completion counts');
  const final=x.received.at(-1);
@@ -99,10 +102,17 @@ test('explicit retry displays errors without fake success when one module fails'
  const last=x.received.at(-1);
  assert.equal(last.phase,'partial');
  assert.equal(last.completed,6,'Failed module must not count as downloaded');
- assert.match(last.detail,/成功 6／7，失敗 1 項/);
+ assert.match(last.detail,/成功 6／7，實際失敗 1 項，未執行 0 項/);
  assert.match(last.detail,/第一個錯誤：歷史資料：test failure/);
  assert(x.received.some(v=>v.detail?.includes('（失敗）')));
  await x.tick();assert.equal(x.received.at(-1).phase,'partial','Failed state remains visible until user retries');
+});
+test('one real error and six untouched modules are not displayed as seven failed downloads',async()=>{
+ const x=fixture();x.setAuth('admin');x.setBehavior('skipped');
+ await x.tick();await eventLoop();
+ assert.equal(x.received.at(-1).phase,'partial');
+ assert.match(x.received.at(-1).detail,/成功 0／7，實際失敗 1 項，未執行 6 項/);
+ assert.equal(x.received.at(-1).completed,0);
 });
 test('cloud timeout heartbeat makes stalled first month visible without fake 100%, and page switch reports interruption',async()=>{
  const x=fixture();x.setAuth('admin');x.setBehavior('stall');
@@ -137,6 +147,8 @@ test('native WinForms integration shows status permanently and in tray without a
  assert.match(nativeSource,/Dock=DockStyle.Bottom,Height=74/);
  assert.match(nativeSource,/cacheBar\.Value=completed/);
  assert.match(nativeSource,/ProgressBarStyle.Marquee/);
+ assert.match(nativeSource,/cacheBar.Value=monthCompleted/);
+ assert.match(nativeSource,/monthTotal=Math.Max/);
  assert.match(nativeSource,/cacheInProgress/);
  assert.match(nativeSource,/cacheStatusMenu\.Text=/);
  assert.match(nativeSource,/Settings\.IsWebMessageEnabled=true/);
