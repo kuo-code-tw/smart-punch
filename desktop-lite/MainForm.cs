@@ -104,7 +104,12 @@ namespace Port79Lite {
    tray.DoubleClick+=(s,e)=>ShowWindow();
    FormClosing+=(s,e)=>{if(!exit){e.Cancel=true;Hide();}};
    FormClosed+=(s,e)=>{cacheDismissTimer.Dispose();cacheTooltip.Dispose();tray.Visible=false;tray.Dispose();web.Dispose();};
-   Shown+=async(s,e)=>await Initialize();
+   Shown+=async(s,e)=>{
+    // A successful update must put the actual Windows main window on screen,
+    // not leave only a background process or a tray icon behind.
+    ShowWindow();
+    await Initialize();
+   };
   }
   private void PositionCachePanel(){
    cachePanel.Location=new Point(Math.Max(8,ClientSize.Width-cachePanel.Width-12),8);
