@@ -81,18 +81,25 @@ namespace Port79Lite {
    tray=new NotifyIcon{Icon=SystemIcons.Application,Visible=true,Text="79號碼頭雲端智慧系統"};
    var menu=new ContextMenuStrip();
    menu.Items.Add("開啟系統",null,(s,e)=>ShowWindow());
-   cacheStatusMenu=new ToolStripMenuItem("資料狀態：尚未登入"){Enabled=false};
-   menu.Items.Add(cacheStatusMenu);
    menu.Items.Add("縮小到系統匣",null,(s,e)=>Hide());
    menu.Items.Add(new ToolStripSeparator());
-   menu.Items.Add("管理員登入後重新下載資料",null,async(s,e)=>await ForceDownload());
-   checkUpdatesMenu=new ToolStripMenuItem("更新系統（保留本機資料）",null,async(s,e)=>await CheckUpdates(true));
+   // One update command. Updates both the Windows program and modified
+   // website UI/code, preserving local-data; no user-managed ZIP download.
+   checkUpdatesMenu=new ToolStripMenuItem("檢查並更新系統（程式及畫面）",null,async(s,e)=>await CheckUpdates(true)){
+    ToolTipText="只更新正式發布後有變更的程式與畫面；Windows 主程式更新由系統內部處理。保留本機資料，不用自行下載 ZIP。"
+   };
    menu.Items.Add(checkUpdatesMenu);
-   systemUpdateStatusMenu=new ToolStripMenuItem("系統檔案版本：啟動後自動檢查"){Enabled=false};
+   var syncDataMenu=new ToolStripMenuItem("重新同步資料（考勤等七項）",null,async(s,e)=>await ForceDownload()){
+    ToolTipText="僅重新讀取考勤、工時、請假、排班、效率、人資、歷史等資料，不會更新 Windows 程式或碼頭儲量 Excel。"
+   };
+   menu.Items.Add(syncDataMenu);
+   systemUpdateStatusMenu=new ToolStripMenuItem("系統更新狀態：啟動後自動檢查"){Enabled=false};
+   cacheStatusMenu=new ToolStripMenuItem("資料同步狀態：尚未登入"){Enabled=false};
    menu.Items.Add(systemUpdateStatusMenu);
-   menu.Items.Add("開啟電腦資料夾",null,(s,e)=>OpenLocalData());
+   menu.Items.Add(cacheStatusMenu);
    menu.Items.Add(new ToolStripSeparator());
-   menu.Items.Add("真正結束程式",null,(s,e)=>ExitApp());
+   menu.Items.Add("開啟本機資料夾",null,(s,e)=>OpenLocalData());
+   menu.Items.Add("關閉程式",null,(s,e)=>ExitApp());
    tray.ContextMenuStrip=menu;
    tray.DoubleClick+=(s,e)=>ShowWindow();
    FormClosing+=(s,e)=>{if(!exit){e.Cancel=true;Hide();}};
@@ -147,7 +154,7 @@ namespace Port79Lite {
       cacheBar.Style=ProgressBarStyle.Continuous;
       cachePanel.Visible=true;
       cacheDismissTimer.Stop();
-      cacheStatusMenu.Text="資料狀態：已切換頁面，下載中斷";
+      cacheStatusMenu.Text="資料同步狀態：頁面切換，下載中斷";
      }
      if(e.Uri.StartsWith(LocalRoot,StringComparison.OrdinalIgnoreCase)){
       var current=new Uri(e.Uri);
@@ -296,7 +303,7 @@ namespace Port79Lite {
     else cacheBar.Value=completed;
    }
    cacheBar.MarqueeAnimationSpeed=animate?25:0;
-   cacheStatusMenu.Text=SafeStatus("資料狀態："+value.title,55);
+   cacheStatusMenu.Text=SafeStatus("資料同步狀態："+value.title,55);
    // Windows notify icons have a limited tooltip length.
    tray.Text=SafeStatus("79號碼頭｜"+(showMonths?monthCompleted+"/"+monthTotal+"月":"系統"+completed+"/"+total)+"｜"+value.title,60);
    if(phase=="complete"||phase=="partial"||phase=="failed"||phase=="interrupted")Log("download "+phase+" "+completed+"/"+total+" "+SafeStatus(value.detail,120));
@@ -376,7 +383,7 @@ namespace Port79Lite {
       }
      }else{
       tray.ShowBalloonTip(4000,"79號碼頭：網站程式更新已下載",
-       "下次真正結束並啟動程式後自動套用；local-data 保留。",ToolTipIcon.Info);
+       "下次重新啟動程式後自動套用；local-data 保留。",ToolTipIcon.Info);
      }
      return;
     }
