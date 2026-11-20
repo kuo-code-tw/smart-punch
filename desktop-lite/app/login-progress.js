@@ -10,7 +10,7 @@
    const s=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');
    const token=String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'');
    if(!s||!token||!document.getElementById('systems')?.classList.contains('show')||!['admin','superadmin'].includes(String(s.adminRole||'').toLowerCase())||s.punchOnly===true)return null;
-   return {key:String(s.empId||'').toUpperCase()+'@'+s.adminRole,scope:JSON.stringify(s.dataScope||{})};
+   return {key:String(s.empId||'').toUpperCase()+'@'+s.adminRole,scope:JSON.stringify([s.systemPermissions||{},s.dataScope||{},s.dataScopeJobs||{}])};
   }catch{return null}
  }
  function nativeProgress(phase,title,detail,count){
@@ -101,6 +101,7 @@
   if(running)return;
   const id=session(),api=window.Port79DataCache;
   if(!id)return;
+  if(window.__port79CachedSessionRefreshPending===true){nativeProgress('waiting','正在核對管理員登入權限','首頁登入權限核對完成後才開始下載，避免用舊帳號範圍下載幾十個月份。',0);return;}
   if(!navigator.onLine){nativeProgress('waiting','網路離線，尚未下載','已下載的本機快取會保留；連線後才會核對雲端。',0);return;}
   if(!api||typeof api.downloadAll!=='function'){nativeProgress('waiting','等待本機快取模組','登入後會自動開始下載，原登入功能不受影響。',0);return;}
   const key=id.key+'|'+id.scope,last=record(key),now=Date.now();
