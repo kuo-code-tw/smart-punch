@@ -129,7 +129,9 @@
    }else{
     try{if(typeof Event==='function')window.dispatchEvent?.(new Event('p79-folder-sync-changed'))}catch(_){}
     lastFailureKey=key;
-    view('⚠ 部分資料下載失敗','成功 '+(results.length-errors)+'／'+results.length+'，失敗 '+errors+' 項'+stored+'；原快取保留',SYSTEMS.length,'partial');
+    const first=results.find(x=>!x.ok);
+    const reason=first?(names[first.system]||first.system)+'：'+String(first.error||'未知錯誤').replace(/(?:userToken|adminToken|token)=[^&\\s]+/gi,'憑證=已隱藏').slice(0,140):'未知';
+    view('⚠ 部分資料下載失敗','成功 '+(results.length-errors)+'／'+results.length+'，失敗 '+errors+' 項｜第一個錯誤：'+reason+stored+'；原快取保留',SYSTEMS.length,'partial');
    }
   }catch(error){
    lastFailureKey=key;view('❌ 下載中斷，原快取保留',String(error&&error.message||error),processed,'failed');
