@@ -197,3 +197,19 @@ test('system file restart and verified Windows updater reopen the app automatica
  assert.match(updater,/ROLLBACK_RESTART_ATTEMPTED/,'Failed update attempts to reopen the old program');
  assert.match(updater,/if\(!\$TestOnly\)/,'Tests cannot launch installed Windows app');
 });
+
+test('Windows app has one unmistakable update entry and a dedicated 79 icon',()=>{
+ const csproj=fs.readFileSync(path.join(__dirname,'../Port79Lite.csproj'),'utf8');
+ const build=fs.readFileSync(path.join(__dirname,'../build-portable.ps1'),'utf8');
+ const generator=fs.readFileSync(path.join(__dirname,'../generate-icon.ps1'),'utf8');
+ assert.match(nativeSource,/檢查並更新系統（程式及畫面）/);
+ assert.match(nativeSource,/重新同步資料（考勤等七項）/);
+ assert.match(nativeSource,/關閉程式/);
+ assert.doesNotMatch(nativeSource,/真正結束程式/);
+ assert.doesNotMatch(nativeSource,/更新 Windows 主程式（選用）/);
+ assert.match(nativeSource,/Icon=System\.Drawing\.Icon\.ExtractAssociatedIcon\(Application\.ExecutablePath\)/);
+ assert.match(nativeSource,/tray=new NotifyIcon\{Icon=Icon \?\? SystemIcons\.Application/);
+ assert.match(csproj,/<ApplicationIcon>Port79Icon\.ico<\/ApplicationIcon>/);
+ assert.match(build,/generate-icon\.ps1/);
+ assert.match(generator,/DrawString\('79'/);
+});
