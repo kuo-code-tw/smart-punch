@@ -35,6 +35,11 @@ jobs:
           git fetch origin main
           git restore --source origin/main --worktree -- index.html port79-attendance-core.js assets attendance schedule leave hr work-hours aqc-efficiency history-data settings gate-dashboard gate-import yard-dashboard data-cache data-sources previews
           if ($LASTEXITCODE -ne 0) { throw 'Could not refresh production site sources' }
+      - name: Verify one-click Windows updater preserves existing browser database
+        shell: pwsh
+        run: |
+          & ./desktop-lite/tests/shell-updater-safety.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Windows updater safety test failed' }
       - name: Restore native Windows dependencies
         shell: pwsh
         run: dotnet restore desktop-lite/Port79Lite.csproj /p:Platform=x64
