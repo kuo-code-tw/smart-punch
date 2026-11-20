@@ -83,6 +83,8 @@ namespace Port79Lite {
      OpenSafeExternal(e.Uri);
     };
     web.CoreWebView2.NavigationCompleted+=async(s,e)=>{
+     if(e.IsSuccess)Log("navigation success: "+web.Source);
+     else Log("navigation failure: "+e.WebErrorStatus);
      if(e.IsSuccess&&web.Source?.AbsoluteUri.StartsWith(LocalRoot,StringComparison.OrdinalIgnoreCase)==true){
       try{
        var progress=Path.Combine(root,"app","login-progress.js");
