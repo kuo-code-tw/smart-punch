@@ -802,7 +802,7 @@ async function fetchJson(action,params={},sys=''){
  if(!validDownloadGasUrl(primary.toString()))throw new Error('雲端網址設定不正確，請由首頁重新進入系統');
  const labels={getAttendanceMonths:'考勤月份清單',getAttendanceEmployeeMaster:'員工主檔',getAttendanceMonthData:'考勤月份資料',getAttendanceMainDirect:'考勤主表',getLeaveData:'請假',getScheduleDataSecure:'排班',gcGetData:'效率',hrGetEmployees:'人資',getHistoricalDataCatalog:'歷史資料',historyGetMonthData:'歷史月份資料'};
  const label=labels[action]||'雲端資料';
- for(let attempt=0;attempt<2;attempt++){
+ for(let attempt=0;attempt<4;attempt++){
   const c=new AbortController();let timedOut=false,data;
   const to=setTimeout(()=>{timedOut=true;c.abort()},DOWNLOAD_TIMEOUT_MS);
   try{
@@ -815,14 +815,23 @@ async function fetchJson(action,params={},sys=''){
    if(data.ok===false||data.retryable){
     const message=String(data.error||'雲端暫時無法讀取');
     const auth=/請.*登入|登入.*(?:逾時|過期|不存在|失效|重新)|(?:token|憑證).*(?:失效|過期|不存在)/i.test(message);
-    throw Object.assign(new Error(label+'：'+message),{code:auth?'P79_AUTH':'P79_CLOUD',retryable:!auth&&data.retryable===true});
+    // A transient server lock may be returned without retryable:true by older deployments.
+    // GET requests are read-only and safe to retry; never retry auth/permission failures.
+    const busyRead=/雲端目前正在(?:更新|處理)|資料(?:更新中|處理中)|cloud (?:busy|updating)/i.test(message);
+    const delay=Number(data.retryAfterMs);
+    throw Object.assign(new Error(label+'：'+message),{
+     code:auth?'P79_AUTH':'P79_CLOUD',
+     retryable:!auth&&(data.retryable===true||busyRead),
+     busyRetry:!auth&&busyRead,
+     retryAfterMs:Number.isFinite(delay)&&delay>0?Math.min(5000,Math.max(500,delay)):0
+    });
    }
    if(viewerKey()!==viewer||token()!==credential)throw Object.assign(new Error('登入狀態已變更，未保存其他帳號資料'),{code:'P79_AUTH'});
   }catch(error){
    if(timedOut||error?.name==='AbortError')error=Object.assign(new Error(label+'：雲端讀取逾時（60 秒），請稍後重試'),{retryable:true,code:'P79_TRANSPORT'});
    else if(error?.name==='TypeError')error=Object.assign(new Error(label+'：無法連接雲端，請檢查網路'),{retryable:true,code:'P79_TRANSPORT'});
    lastError=error;
-   if(attempt===1||!error.retryable)throw error;
+   if(!error.retryable||attempt===3||(attempt>=1&&!error.busyRetry))throw error;
    // Only safe reads are retried. A retired deployment may recover through the
    // same official /exec URL used by the system entrance; never change access.
    const next=new URL(url);
@@ -830,7 +839,11 @@ async function fetchJson(action,params={},sys=''){
     next.protocol=canonical.protocol;next.host=canonical.host;next.pathname=canonical.pathname;
    }
    next.searchParams.set('_',String(Date.now()+attempt+1));url=next.toString();
-   setProgress(label+'連線未完成，正在重試一次…');
+   if(error.busyRetry){
+    const waitMs=error.retryAfterMs||[750,1500,2500][attempt];
+    setProgress(label+'：雲端更新中，等待後自動重試（'+(attempt+2)+'/4），已成功的本機資料不會清除…');
+    await new Promise(resolve=>setTimeout(resolve,waitMs));
+   }else setProgress(label+'連線未完成，正在重試一次…');
    continue;
   }finally{clearTimeout(to)}
   readVersions.set(action,(readVersions.get(action)||0)+1);
@@ -974,11 +987,22 @@ async function downloadSystem(sys,onProgress){
  }
  throw new Error('未知系統：'+sys);
 }
+let lastAllDownload=null;
 async function downloadAll(onProgress){
  const systems=['attendance','workhours','leave','schedule','efficiency','hr','history'];const result=[];
+ // Within a short same-login retry, keep the six successful snapshots and fetch
+ // only modules that actually failed. A new session/scope or later refresh starts fresh.
+ const batchKey=[viewerKey(),token(),gasUrl(),displayScope()].join('|');
+ const prior=lastAllDownload?.key===batchKey&&Date.now()-lastAllDownload.at<180000&&
+             lastAllDownload.result.some(row=>!row.ok)?lastAllDownload.result:null;
  let attendanceSnapshot=null,attendanceError=null,connectionError=null;
  for(let i=0;i<systems.length;i++){
   const sys=systems[i];
+  if(prior?.some(row=>row.system===sys&&row.ok)){
+   result.push({system:sys,ok:true,reused:true});
+   onProgress?.(sys,i,systems.length,'reused');
+   continue;
+  }
   // Treat remaining untouched modules as skipped after an identity/scope/transport failure.
   if(connectionError){
    result.push({system:sys,ok:false,skipped:true,error:'前一項雲端讀取中斷，尚未下載；原因：'+String(connectionError.message||connectionError)});
@@ -995,6 +1019,7 @@ async function downloadAll(onProgress){
   }catch(e){if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT'].includes(e?.code))connectionError=e;if(sys==='attendance')attendanceError=e;result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e)}
  }
  if(currentSystem()==='attendance'&&attendanceSnapshot)await applyAttendanceSnapshotToPage(attendanceSnapshot,true);
+ lastAllDownload={key:batchKey,at:Date.now(),result};
  return result;
 }
 
@@ -1016,7 +1041,7 @@ function ensureModal(){
    if(act==='persist'){setProgress(await retainDeviceData());await refreshModal()}
    if(act==='clear'){if(confirm('確定清除此瀏覽器的七大系統本機快取？')){await clear();setProgress('已清除瀏覽器快取；硬碟資料夾檔案仍保留，啟用時可重新讀取。');await refreshModal()}}
    if(act==='current'){const sys=currentSystem();setProgress(`正在下載 ${SYSTEM_LABELS[sys]}…`);const snap=await downloadSystem(sys,(s,i,total,state,label)=>setProgress(`⬇️ ${label||SYSTEM_LABELS[sys]} ${i}/${total}`));setProgress(sys==='attendance'||sys==='workhours'?`✅ ${SYSTEM_LABELS[sys]}完整資料已載入｜考勤 ${Number(snap?.recordCount||0)} 筆｜員工主檔 ${Number(snap?.employeeCount||0)} 人`:`✅ ${SYSTEM_LABELS[sys]} 快取完成。`);await refreshModal()}
-   if(act==='all'){const res=await downloadAll((sys,i,total,state,err,detail)=>{setProgress(detail?`⬇️ ${SYSTEM_LABELS[sys]}｜${detail}`:`${state==='error'?'⚠️':'⬇️'} ${i+1}/${total} ${SYSTEM_LABELS[sys]} ${state==='loading'?'下載中…':state==='done'?'完成':state==='detail'?'整理中…':'失敗'}`)});const ok=res.filter(x=>x.ok).length;const bad=res.filter(x=>!x.ok);setProgress(`完成：${ok}/7 個系統${bad.length?'；未完成：'+bad.map(x=>SYSTEM_LABELS[x.system]+'：'+x.error).join('；'):''}`);await refreshModal()}
+   if(act==='all'){const res=await downloadAll((sys,i,total,state,err,detail)=>{setProgress(detail?`⬇️ ${SYSTEM_LABELS[sys]}｜${detail}`:`${state==='error'?'⚠️':'⬇️'} ${i+1}/${total} ${SYSTEM_LABELS[sys]} ${state==='loading'?'下載中…':state==='done'?'完成':state==='reused'?'沿用成功快取':state==='detail'?'整理中…':'失敗'}`)});const ok=res.filter(x=>x.ok).length;const bad=res.filter(x=>!x.ok);setProgress(`完成：${ok}/7 個系統${bad.length?'；未完成：'+bad.map(x=>SYSTEM_LABELS[x.system]+'：'+x.error).join('；'):''}`);await refreshModal()}
   }catch(err){setProgress(err?.name==='AbortError'?'已取消選擇，原有快取保持不變。':'❌ '+String(err?.message||err))}finally{buttons.forEach(x=>x.disabled=false)}});
  return b;
 }
