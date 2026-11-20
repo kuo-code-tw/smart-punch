@@ -344,4 +344,5 @@ namespace Port79Lite {
      "更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Warning);
    }finally{updateBusy=false;checkUpdatesMenu.Enabled=true;updateWindowsMenu.Enabled=true;}
   }
+ }
 }
