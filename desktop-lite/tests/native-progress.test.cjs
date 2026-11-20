@@ -98,6 +98,7 @@ test('explicit retry displays errors without fake success when one module fails'
  assert.equal(x.downloads,1);
  const last=x.received.at(-1);
  assert.equal(last.phase,'partial');
+ assert.equal(last.completed,6,'Failed module must not count as downloaded');
  assert.match(last.detail,/成功 6／7，失敗 1 項/);
  assert(x.received.some(v=>v.detail?.includes('（失敗）')));
  await x.tick();assert.equal(x.received.at(-1).phase,'partial','Failed state remains visible until user retries');
