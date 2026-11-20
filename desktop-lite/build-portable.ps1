@@ -5,6 +5,8 @@ $out=Join-Path $PSScriptRoot 'out'
 $dist=Join-Path $PSScriptRoot 'dist'
 $target=Join-Path $dist '79號碼頭_Windows輕量版'
 Remove-Item $out,$dist -Recurse -Force -ErrorAction SilentlyContinue
+& (Join-Path $PSScriptRoot 'generate-icon.ps1')
+if(!(Test-Path (Join-Path $PSScriptRoot 'Port79Icon.ico'))){throw 'Windows app icon generation failed'}
 dotnet build (Join-Path $PSScriptRoot 'Port79Lite.csproj') --configuration Release --output $out /p:Platform=x64 --no-restore
 if($LASTEXITCODE -ne 0){throw 'C# native build failed'}
 New-Item -ItemType Directory -Force $target | Out-Null
