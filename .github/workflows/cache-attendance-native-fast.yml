@@ -1,0 +1,32 @@
+name: Verify native Windows attendance acceleration and safe cache
+on:
+  push:
+    branches: [feature/attendance-download-concurrent-recovery-20261120]
+    paths:
+      - assets/port79-data-cache.js
+      - tests/cache-attendance-native-fast-safe.cjs
+      - .github/workflows/cache-attendance-native-fast.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript parse check
+        run: node --check assets/port79-data-cache.js
+      - name: Verify Windows two-month concurrency, account identity, permission and mutation safety
+        run: node tests/cache-attendance-native-fast-safe.cjs
+      - name: Verify original complete attendance downloads and cloud revision protection
+        run: node tests/cache-attendance-download.cjs
+      - name: Verify timeout, transport failures, retry limit and account restrictions
+        run: node tests/cache-download-transport.cjs
+      - name: Verify existing native computer cache integration and monthly export guard
+        run: |
+          node tests/native-computer-cache-display.cjs
+          node tests/attendance-export-cache.cjs
