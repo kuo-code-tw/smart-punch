@@ -147,11 +147,13 @@ test('installed Windows cache is automatically recognized without asking to pick
  assert.equal(saved.savedAt,1000000);
 });
 test('native WinForms integration shows status permanently and in tray without accepting commands',()=>{
- assert.match(nativeSource,/Width=326,Height=96/,'Compact progress must not take up a full-width row');
+ assert.match(nativeSource,/Width=222,Height=52/,'Tiny cloud-progress icon must not take up a full-width row');
  assert.match(nativeSource,/Anchor=AnchorStyles.Top\|AnchorStyles.Right/);
  assert.match(nativeSource,/PositionCachePanel\(\)/);
  assert.doesNotMatch(nativeSource,/Dock=DockStyle.Bottom,Height=74/);
  assert.match(nativeSource,/Interval=6000/,'Success closes after six seconds');
+ assert.match(nativeSource,/cacheTooltip.SetToolTip\(cacheTitle,cacheDetail.Text\)/,'Details are available on hover instead of a wide notification');
+ assert.doesNotMatch(nativeSource,/layout.Controls.Add\(cacheDetail/,'No bulky multi-line progress popup');
  assert.match(nativeSource,/if\(phase=="complete"\)cacheDismissTimer.Start\(\)/);
  assert.match(nativeSource,/AccessibleName="隱藏下載進度"/);
  assert.match(nativeSource,/cacheBar\.Value=completed/);
@@ -183,4 +185,15 @@ test('one Update System menu handles both website and native shell without separ
  assert.match(releaseSource,/if\(foundShell&&identical\)/,'Newly unpacked identical shell is not reinstalled');
  assert.match(releaseSource,/installed-shell-sha256\.txt/,'Installed version is preserved');
  assert.match(releaseSource,/relative\.StartsWith\("local-data\//,'User data is excluded from release');
+});
+
+test('system file restart and verified Windows updater reopen the app automatically',()=>{
+ const updater=fs.readFileSync(path.join(__dirname,'../app/upgrade-windows.ps1'),'utf8');
+ assert.match(nativeSource,/exit=true;Application\.Restart\(\);Close\(\);/,'Site-file update restarts the Windows app');
+ assert.match(nativeSource,/ReleaseUpdater\.Launch\(shell,root,Process\.GetCurrentProcess\(\)\.Id\)/,'Native update launches helper before shutdown');
+ assert.match(updater,/AUTO_RESTART_SUCCESS pid=/,'Updater logs verified automatic reopening');
+ assert.match(updater,/Start-Process -FilePath \$exe -WorkingDirectory \$root -PassThru/,'New Windows executable starts by itself');
+ assert.match(updater,/if\(\$child.HasExited\)/,'A failed immediate restart must not be called successful');
+ assert.match(updater,/ROLLBACK_RESTART_ATTEMPTED/,'Failed update attempts to reopen the old program');
+ assert.match(updater,/if\(!\$TestOnly\)/,'Tests cannot launch installed Windows app');
 });
