@@ -232,3 +232,13 @@ test('a stale version marker must never hide an old bottom-bar executable',()=>{
  const restartPos=script.indexOf('if($child.HasExited)'),markerPos=script.indexOf('WriteAllText($version,$ExpectedDigest)');
  assert(restartPos>=0&&markerPos>restartPos,'Only mark successful release after new executable was launched');
 });
+
+test('desktop progress is shown once beside History when new homepage indicator exists',()=>{
+ assert.match(nativeSource,/DisplayInlineCacheProgress\(payload\)/,'Native counts are relayed to compact homepage');
+ assert.match(nativeSource,/p79HomeDownloadProgress/,'Only pages with inline compact indicator suppress native status card');
+ assert.match(nativeSource,/port79-desktop-progress/,'Uses display-only browser event');
+ assert.match(nativeSource,/Math\.Max\(0,Math\.Min\(7,data\.completed\)\)/,'Only bounded real native count is shown');
+ assert.match(nativeSource,/cachePanel\.Visible=false/,'Duplicate native popup is hidden');
+ assert.match(nativeSource,/if\(!document\.getElementById/,'Other pages keep the native fallback');
+ assert.doesNotMatch(nativeSource,/window\.__port79DesktopToken/,'No credentials enter display-only event');
+});
