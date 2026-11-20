@@ -24,6 +24,7 @@ namespace Port79Lite {
   private readonly Label cacheCount;
   private readonly ProgressBar cacheBar;
   private readonly Panel cachePanel;
+  private readonly ToolTip cacheTooltip;
   private readonly System.Windows.Forms.Timer cacheDismissTimer;
   private bool exit=false;
   private bool updateBusy=false;
@@ -39,41 +40,39 @@ namespace Port79Lite {
    Icon=SystemIcons.Application;
    web=new WebView2{Dock=DockStyle.Fill};
    Controls.Add(web);
-   // Compact, floating native progress at the top-right; never reserve a
-   // full-width row below the webpage and never duplicate the HTML toast.
+   // Tiny icon and slim progress at the upper-right; no full-width strip.
    cachePanel=new Panel {
-    Width=326,Height=96,BackColor=Color.FromArgb(246,251,255),
-    Padding=new Padding(9,7,9,7),BorderStyle=BorderStyle.FixedSingle,
+    Width=222,Height=52,BackColor=Color.FromArgb(246,251,255),
+    Padding=new Padding(6,4,6,4),BorderStyle=BorderStyle.FixedSingle,
     Anchor=AnchorStyles.Top|AnchorStyles.Right,Visible=false
    };
-   var layout=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=3,RowCount=3,Margin=Padding.Empty };
-   layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,67));
+   var layout=new TableLayoutPanel { Dock=DockStyle.Fill,ColumnCount=3,RowCount=2,Margin=Padding.Empty };
+   layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,66));
    layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,24));
-   layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,9));
-   layout.RowStyles.Add(new RowStyle(SizeType.Absolute,26));
-   layout.RowStyles.Add(new RowStyle(SizeType.Absolute,25));
+   layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,10));
+   layout.RowStyles.Add(new RowStyle(SizeType.Absolute,23));
    layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-   cacheTitle=new Label { Dock=DockStyle.Fill,Text="☁ 正在下載",AutoEllipsis=true,
-    Font=new Font("Microsoft JhengHei",9,FontStyle.Bold),ForeColor=Color.FromArgb(19,65,113),
+   cacheTitle=new Label { Dock=DockStyle.Fill,Text="☁ 下載中",AutoEllipsis=true,
+    Font=new Font("Microsoft JhengHei",8,FontStyle.Bold),ForeColor=Color.FromArgb(19,65,113),
     TextAlign=ContentAlignment.MiddleLeft };
    cacheCount=new Label { Dock=DockStyle.Fill,Text="0/7",AutoEllipsis=true,
     TextAlign=ContentAlignment.MiddleRight,Font=new Font("Microsoft JhengHei",8,FontStyle.Bold),
     ForeColor=Color.FromArgb(23,101,169) };
-   cacheDetail=new Label { Dock=DockStyle.Fill,AutoEllipsis=true,
-    Text="資料下載進度",Font=new Font("Microsoft JhengHei",8),ForeColor=Color.FromArgb(61,97,130),
-    TextAlign=ContentAlignment.MiddleLeft };
+   cacheDetail=new Label { Visible=false,Text="資料下載進度" };
    cacheBar=new ProgressBar { Dock=DockStyle.Fill,Minimum=0,Maximum=7,Value=0,
-    Style=ProgressBarStyle.Continuous,Margin=new Padding(2,4,2,5) };
+    Style=ProgressBarStyle.Continuous,Margin=new Padding(3,2,3,2) };
    var dismiss=new Button { Text="×",Dock=DockStyle.Fill,FlatStyle=FlatStyle.Flat,
-    TabStop=false,Margin=Padding.Empty,Font=new Font("Microsoft JhengHei",9),AccessibleName="隱藏下載進度" };
+    TabStop=false,Margin=Padding.Empty,Font=new Font("Microsoft JhengHei",8),AccessibleName="隱藏下載進度" };
    dismiss.FlatAppearance.BorderSize=0;
    dismiss.Click+=(s,e)=>{cachePanel.Visible=false;cacheDismissTimer.Stop();};
    layout.Controls.Add(cacheTitle,0,0);
    layout.Controls.Add(cacheCount,1,0);
    layout.Controls.Add(dismiss,2,0);
-   layout.Controls.Add(cacheDetail,0,1);layout.SetColumnSpan(cacheDetail,3);
-   layout.Controls.Add(cacheBar,0,2);layout.SetColumnSpan(cacheBar,3);
+   layout.Controls.Add(cacheBar,0,1);layout.SetColumnSpan(cacheBar,3);
    cachePanel.Controls.Add(layout);Controls.Add(cachePanel);
+   cacheTooltip=new ToolTip { ShowAlways=true };
+   cacheTooltip.SetToolTip(cachePanel,"本機資料下載進度");
+   cacheTooltip.SetToolTip(cacheTitle,"本機資料下載進度");
    cachePanel.BringToFront();
    cacheDismissTimer=new System.Windows.Forms.Timer { Interval=6000 };
    cacheDismissTimer.Tick+=(s,e)=>{cacheDismissTimer.Stop();cachePanel.Visible=false;};
@@ -97,11 +96,11 @@ namespace Port79Lite {
    tray.ContextMenuStrip=menu;
    tray.DoubleClick+=(s,e)=>ShowWindow();
    FormClosing+=(s,e)=>{if(!exit){e.Cancel=true;Hide();}};
-   FormClosed+=(s,e)=>{cacheDismissTimer.Dispose();tray.Visible=false;tray.Dispose();web.Dispose();};
+   FormClosed+=(s,e)=>{cacheDismissTimer.Dispose();cacheTooltip.Dispose();tray.Visible=false;tray.Dispose();web.Dispose();};
    Shown+=async(s,e)=>await Initialize();
   }
   private void PositionCachePanel(){
-   cachePanel.Location=new Point(Math.Max(8,ClientSize.Width-cachePanel.Width-16),12);
+   cachePanel.Location=new Point(Math.Max(8,ClientSize.Width-cachePanel.Width-12),8);
   }
   private void ShowWindow(){Show();WindowState=FormWindowState.Maximized;Activate();}
   private void ExitApp(){exit=true;tray.Visible=false;Close();}
@@ -275,6 +274,9 @@ namespace Port79Lite {
    int completed=Math.Max(0,Math.Min(total,value.completed));
    cacheTitle.Text="☁ "+SafeStatus(value.title,90);
    cacheDetail.Text=SafeStatus(value.detail,180);
+   cacheTooltip.SetToolTip(cachePanel,cacheDetail.Text);
+   cacheTooltip.SetToolTip(cacheTitle,cacheDetail.Text);
+   cacheTitle.Text=phase=="complete"?"✓ 已完成":phase=="partial"||phase=="failed"?"⚠ 未完成":phase=="interrupted"?"⏸ 已中斷":"☁ 下載中";
    cacheInProgress=phase=="downloading"||phase=="stalled";
    cacheDismissTimer.Stop();
    cachePanel.Visible=phase=="downloading"||phase=="stalled"||phase=="complete"||
