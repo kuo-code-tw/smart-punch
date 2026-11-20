@@ -114,24 +114,25 @@
    const results=await api.downloadAll((sys,index,total,state,error,detail)=>{
     if(!session()||sessionKey!==key)return;
     lastActivityAt=Date.now();lastHeartbeatAt=lastActivityAt;activeSystem=names[sys]||sys;activeDetail=detail||((state==='loading'?'開始下載：':'正在處理：')+activeSystem);
-    if(state==='done'||state==='error'){processed=Math.max(processed,index+1);if(state==='done')successes++;else errors++;}
-    const msg=(detail||names[sys]||sys)+(state==='error'?'（失敗）':'')+'｜已處理 '+processed+'／'+total+'；成功 '+successes+' 項';
+    if(state==='done'||state==='error'||state==='skipped'){processed=Math.max(processed,index+1);if(state==='done')successes++;else if(state==='error')errors++;}
+    const msg=(detail||names[sys]||sys)+(state==='error'?'（失敗）':state==='skipped'?'（未執行）':'')+'｜已處理 '+processed+'／'+total+'；成功 '+successes+' 項';
     view('正在下載 '+(names[sys]||sys),msg,processed);
    });
    if(!session()||sessionKey!==key)return;
-   errors=results.filter(x=>!x.ok).length;
+   errors=results.filter(x=>!x.ok&&!x.skipped).length;
+   const skipped=results.filter(x=>x.skipped).length;
    const size=readableSize(await cachedBytes(api));
    const stored=size?'｜已儲存本機快取約 '+size+'（不是網路下載量）':'';
-   if(!errors){
+   if(!errors&&!skipped){
     try{if(typeof Event==='function')window.dispatchEvent?.(new Event('p79-folder-sync-changed'))}catch(_){}
     completedInMemoryKey=key;completedInMemoryAt=Date.now();save(key,{completed:completedInMemoryAt});
     view('✅ 本機資料下載完成','成功 '+results.length+'／'+results.length+' 個系統'+stored,SYSTEMS.length,'complete');
    }else{
     try{if(typeof Event==='function')window.dispatchEvent?.(new Event('p79-folder-sync-changed'))}catch(_){}
     lastFailureKey=key;
-    const first=results.find(x=>!x.ok);
+    const first=results.find(x=>!x.ok&&!x.skipped)||results.find(x=>!x.ok);
     const reason=first?(names[first.system]||first.system)+'：'+String(first.error||'未知錯誤').replace(/(?:userToken|adminToken|token)=[^&\\s]+/gi,'憑證=已隱藏').slice(0,140):'未知';
-    view('⚠ 部分資料下載失敗','成功 '+(results.length-errors)+'／'+results.length+'，失敗 '+errors+' 項｜第一個錯誤：'+reason+stored+'；原快取保留',SYSTEMS.length,'partial');
+    view('⚠ 本機資料未全部完成','成功 '+successes+'／'+results.length+'，實際失敗 '+errors+' 項，未執行 '+skipped+' 項｜第一個錯誤：'+reason+stored+'；原快取保留',SYSTEMS.length,'partial');
    }
   }catch(error){
    lastFailureKey=key;view('❌ 下載中斷，原快取保留',String(error&&error.message||error),processed,'failed');
