@@ -173,7 +173,7 @@ test('native WinForms integration shows status permanently and in tray without a
 
 test('one Update System menu handles both website and native shell without separate ZIP action',()=>{
  const releaseSource=fs.readFileSync(path.join(__dirname,'../ReleaseUpdater.cs'),'utf8');
- assert.match(nativeSource,/ToolStripMenuItem\("更新系統（保留本機資料）"/);
+ assert.match(nativeSource,/ToolStripMenuItem\("檢查並更新系統（程式及畫面）"/);
  assert.doesNotMatch(nativeSource,/ToolStripMenuItem\("更新 Windows 主程式/,'No separate manual shell update menu');
  assert.match(nativeSource,/await Updater\.StageFromOfficialAsync/,'Updates only changed public site files');
  assert.match(nativeSource,/await ReleaseUpdater\.PrepareAsync/,'Checks native shell in same action');
