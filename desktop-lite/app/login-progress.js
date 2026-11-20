@@ -51,6 +51,12 @@
     }
     const status=modal.querySelector('#p79DeviceStatus');
     if(status)status.textContent='Windows 電腦版已自動使用 local-data/BrowserProfile 的 IndexedDB 快取；不需選擇資料夾。';
+    const notes=modal.querySelectorAll('.p79-cache-note');
+    for(const note of notes){
+     if(note.textContent?.includes('電腦：請先建立並選擇')){
+      note.textContent='Windows 電腦版會自動保存已下載的本機快取，不必選取資料夾。電腦本機快取不是完整備份；新增、修改與審批仍以正式雲端回覆為準。';
+     }
+    }
    }
    return r;
   };
@@ -116,9 +122,11 @@
    const size=readableSize(await cachedBytes(api));
    const stored=size?'｜已儲存本機快取約 '+size+'（不是網路下載量）':'';
    if(!errors){
+    try{if(typeof Event==='function')window.dispatchEvent?.(new Event('p79-folder-sync-changed'))}catch(_){}
     completedInMemoryKey=key;completedInMemoryAt=Date.now();save(key,{completed:completedInMemoryAt});
     view('✅ 本機資料下載完成','成功 '+results.length+'／'+results.length+' 個系統'+stored,SYSTEMS.length,'complete');
    }else{
+    try{if(typeof Event==='function')window.dispatchEvent?.(new Event('p79-folder-sync-changed'))}catch(_){}
     lastFailureKey=key;
     view('⚠ 部分資料下載失敗','成功 '+(results.length-errors)+'／'+results.length+'，失敗 '+errors+' 項'+stored+'；原快取保留',SYSTEMS.length,'partial');
    }
