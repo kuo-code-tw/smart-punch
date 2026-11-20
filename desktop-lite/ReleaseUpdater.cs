@@ -41,10 +41,20 @@ namespace Port79Lite {
     if(!HashValid(digest))throw new InvalidDataException("Windows 發布 SHA-256 格式錯誤");
     var updates=Path.Combine(data,"updates");Directory.CreateDirectory(updates);
     var installedFile=Path.Combine(updates,"installed-shell-sha256.txt");
-    if(File.Exists(installedFile)&&String.Equals(File.ReadAllText(installedFile).Trim(),digest,StringComparison.OrdinalIgnoreCase)){
-     log("Windows 主程式已是最新版本："+digest.Substring(0,12));
+    var installedExeHash=Path.Combine(updates,"installed-shell-exe-sha256.txt");
+    var exeFile=Path.Combine(root,"Port79WindowsLite.exe");
+    // The release marker alone is NOT proof the executable was replaced:
+    // a failed/rolled-back update or a copied old EXE can leave it stale.
+    // Always validate the on-disk EXE against the recorded EXE SHA.
+    var markerMatches=File.Exists(installedFile)&&
+      String.Equals(File.ReadAllText(installedFile).Trim(),digest,StringComparison.OrdinalIgnoreCase);
+    var exeHash=File.Exists(installedExeHash)?File.ReadAllText(installedExeHash).Trim().ToLowerInvariant():"";
+    if(markerMatches&&HashValid(exeHash)&&File.Exists(exeFile)&&
+       String.Equals(Sha256(File.ReadAllBytes(exeFile)),exeHash,StringComparison.OrdinalIgnoreCase)){
+     log("Windows EXE 已核對最新版："+digest.Substring(0,12));
      return null;
     }
+    if(markerMatches)log("版本紀錄存在但 EXE 尚未核對，重新驗證 Windows 主程式，不會清除本機資料");
     var zip=Path.Combine(updates,"pending-windows-release.zip");
     // When the verified release is already staged, pressing "更新系統" again
     // must not download the same complete ZIP for a second time.
@@ -98,8 +108,9 @@ namespace Port79Lite {
       }
      }
      if(foundShell&&identical){
+      File.WriteAllText(installedExeHash,Sha256(File.ReadAllBytes(exeFile)));
       File.WriteAllText(installedFile,digest);
-      log("Windows 主程式檔案已與發佈版本相同，沒有重裝或重複下載");
+      log("Windows 主程式檔案已與發佈版本相同，已重新核對 EXE 並保留本機資料");
       return null;
      }
     }
