@@ -1,7 +1,7 @@
 name: Test and build small Windows WebView2 folder app
 on:
   push:
-    branches: [feature/windows-lite-login-sync-20261120]
+    branches: [test/windows-update-handoff-20261120]
     paths:
       - 'desktop-lite/**'
       - '.github/workflows/windows-lite.yml'
