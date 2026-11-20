@@ -17,6 +17,7 @@ namespace Port79Lite {
   private readonly NotifyIcon tray;
   private readonly WebView2 web;
   private readonly ToolStripMenuItem checkUpdatesMenu;
+  private readonly ToolStripMenuItem systemUpdateStatusMenu;
   private readonly ToolStripMenuItem cacheStatusMenu;
   private readonly ToolStripMenuItem updateWindowsMenu;
   private readonly Label cacheTitle;
@@ -62,6 +63,8 @@ namespace Port79Lite {
    menu.Items.Add("管理員登入後重新下載資料",null,async(s,e)=>await ForceDownload());
    checkUpdatesMenu=new ToolStripMenuItem("更新系統檔案（保留本機資料）",null,async(s,e)=>await CheckUpdates(true));
    menu.Items.Add(checkUpdatesMenu);
+   systemUpdateStatusMenu=new ToolStripMenuItem("系統檔案版本：啟動後自動檢查"){Enabled=false};
+   menu.Items.Add(systemUpdateStatusMenu);
    updateWindowsMenu=new ToolStripMenuItem("更新 Windows 主程式（選用）",null,async(s,e)=>await UpgradeWindowsShell());
    menu.Items.Add(updateWindowsMenu);
    menu.Items.Add("開啟電腦資料夾",null,(s,e)=>OpenLocalData());
@@ -91,7 +94,14 @@ namespace Port79Lite {
     Directory.CreateDirectory(Path.Combine(DataRoot,"BrowserProfile"));
     Directory.CreateDirectory(Path.Combine(DataRoot,"updates"));
     // Stage files never overwrite the browser profile or cloud data.
-    Updater.ApplyIfVerified(site,DataRoot,Log);
+    // A corrupt/incomplete staged download must never block the saved local system.
+    try {
+     var applied=Updater.ApplyIfVerified(site,DataRoot,Log);
+     if(applied>0)systemUpdateStatusMenu.Text="系統檔案：已套用 "+applied+" 項新版";
+    }catch(Exception error){
+     Log("staged system update rejected, preserved existing site: "+error.Message);
+     systemUpdateStatusMenu.Text="系統檔案：更新未完成，原檔保留";
+    }
     var env=await CoreWebView2Environment.CreateAsync(null,Path.Combine(DataRoot,"BrowserProfile"));
     await web.EnsureCoreWebView2Async(env);
     web.CoreWebView2.SetVirtualHostNameToFolderMapping(Host,Path.Combine(root,"site"),CoreWebView2HostResourceAccessKind.DenyCors);
@@ -141,8 +151,12 @@ namespace Port79Lite {
      }
     };
     web.CoreWebView2.Navigate(LocalRoot+"index.html");
-    // Software files only: does not download any private database or employee records.
-    var tick=new Timer{Interval=600000};
+    // Check immediately on startup, not only after the first ten-minute timer tick.
+    // Read-only public program files are verified and staged; active pages are
+    // never replaced in-place, so unsaved form edits cannot be interrupted.
+    _=CheckUpdates(false);
+    // Periodically check for subsequent public site revisions while running.
+    var tick=new Timer{Interval=300000};
     tick.Tick+=async(s,e)=>await CheckUpdates();
     tick.Start();
    }catch(Exception ex){
@@ -297,17 +311,37 @@ namespace Port79Lite {
    updateBusy=true;checkUpdatesMenu.Enabled=false;updateWindowsMenu.Enabled=false;
    try{
     var site=Path.Combine(root,"site","smart-punch");
+    var pending=Path.Combine(DataRoot,"updates","pending.json");
+    // A staged, verified update is already waiting for the next real startup.
+    if(File.Exists(pending)){
+     systemUpdateStatusMenu.Text="系統檔案：新版已下載，重新啟動後套用";
+     if(manual)MessageBox.Show(
+      "新版系統檔案已下載並通過校驗。請由系統匣選「真正結束程式」，再開啟程式即可套用。\n\n本機考勤、排班、請假與資料快取不會刪除。",
+      "更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Information);
+     return;
+    }
+    systemUpdateStatusMenu.Text="系統檔案：正在比對正式版…";
     var result=await Updater.StageFromOfficialAsync(site,DataRoot,Log);
     if(result>0){
-     tray.ShowBalloonTip(4000,"79號碼頭系統檔案更新","已下載並校驗 "+result+" 個新版系統檔；重新啟動後套用。",ToolTipIcon.Info);
-     if(manual)MessageBox.Show("已驗證 "+result+" 個更新的系統檔案。\n\n從系統匣選「真正結束程式」，再重新開啟後就會套用。\n\n原本 local-data 中的考勤、人資、排班快取均保留，不需要重新下載。","更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Information);
-    }else if(manual){
-     MessageBox.Show("已核對正式網站，系統檔案目前沒有需要下載的更新。\n\n已保存的本機資料沒有變更。","更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Information);
+     systemUpdateStatusMenu.Text="系統檔案：已下載 "+result+" 項，待重新啟動";
+     tray.ShowBalloonTip(5500,"79號碼頭：系統檔案已自動下載",
+      "已驗證 "+result+" 個新版檔案。下次真正結束程式並開啟後自動套用；本機資料不變。",ToolTipIcon.Info);
+     if(manual)MessageBox.Show(
+      "已驗證並下載 "+result+" 個新版系統檔案。\n\n從系統匣選「真正結束程式」，再重新開啟就會套用。\n\n原本 local-data 中的考勤、人資、排班快取均保留。",
+      "更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Information);
+    }else{
+     systemUpdateStatusMenu.Text="系統檔案：與已發佈正式版一致";
+     if(manual)MessageBox.Show(
+      "目前系統檔案與已發佈的正式網站一致。\n\n注意：只在 GitHub 測試分支、尚未合併／發布的修改，不會被正式 Windows 版下載。",
+      "更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Information);
     }
    }catch(Exception ex){
     Log("system files update: "+ex.Message);
-    if(manual)MessageBox.Show("目前無法更新系統檔案：\n"+ex.Message+"\n\n原有程式和 local-data 仍保留。","更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+    systemUpdateStatusMenu.Text="系統檔案：檢查失敗（保留舊版）";
+    if(manual)MessageBox.Show(
+     "目前無法更新系統檔案：\n"+ex.Message+
+     "\n\n請確認正式網站已發佈並能連線。原有程式和 local-data 均保留。",
+     "更新系統檔案",MessageBoxButtons.OK,MessageBoxIcon.Warning);
    }finally{updateBusy=false;checkUpdatesMenu.Enabled=true;updateWindowsMenu.Enabled=true;}
   }
- }
 }
