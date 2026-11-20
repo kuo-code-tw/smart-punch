@@ -17,7 +17,15 @@
     bar.classList.contains('show')&&systems.classList.contains('show');
   }catch(_){return false;}
  }
- function update(){link.hidden=!managerSession();}
+ // The original homepage session bar is hidden by the full-width management shell,
+ // so the download must move to the always-visible top toolbar after login.
+ function placeInVisibleToolbar(){
+  const tools=document.querySelector?.('#p79WorkspaceTopbar .p79-toolbar-tools');
+  if(!tools||link.parentNode===tools)return;
+  const user=tools.querySelector('.p79-toolbar-user');
+  tools.insertBefore(link,user||null);
+ }
+ function update(){link.hidden=!managerSession();if(!link.hidden)placeInVisibleToolbar();}
  link.href=DOWNLOAD_URL;
  link.addEventListener('click',event=>{
   if(!managerSession()){event.preventDefault();update();}
@@ -26,6 +34,9 @@
  observer.observe(bar,{attributes:true,attributeFilter:['class']});
  observer.observe(systems,{attributes:true,attributeFilter:['class']});
  window.addEventListener('pageshow',update);
+ // The toolbar is constructed asynchronously after the homepage validates login.
+ const retry=window.setInterval?.(update,600);
+ window.addEventListener('pagehide',()=>window.clearInterval?.(retry));
  document.addEventListener('visibilitychange',update);
  update();
 })();
