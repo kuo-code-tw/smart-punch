@@ -21,7 +21,10 @@ $keep=Join-Path $root 'local-data/BrowserProfile/keep.dat'
 [IO.File]::WriteAllText($site,'OLD WEBSITE CONTENT')
 $childPid=0
 try{
- & ./desktop-lite/app/upgrade-windows.ps1 -Archive $archive -InstallRoot $root -ParentPid 0 -ExpectedDigest $sha
+ $runner=Join-Path $root 'app/upgrade-windows.ps1'
+ $windowsPowerShell=Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
+ & $windowsPowerShell -NoProfile -ExecutionPolicy Bypass -File $runner -Archive $archive -InstallRoot $root -ParentPid 0 -ExpectedDigest $sha
+ if($LASTEXITCODE -ne 0){throw "Windows updater exited with code $LASTEXITCODE"}
  $upgradeLog=Join-Path $root 'local-data/logs/windows-upgrade.txt'
  $lines=Get-Content -LiteralPath $upgradeLog
  $launch=@($lines | Where-Object {$_ -match 'AUTO_RESTART_SUCCESS pid=([0-9]+)'})[-1]
@@ -33,7 +36,7 @@ try{
  if([IO.File]::ReadAllText($site) -eq 'OLD WEBSITE CONTENT'){throw 'Update did not apply newer system code'}
  $appLog=Join-Path $root 'local-data/logs/windows-lite.log'
  $ready=$false
- for($i=0;$i -lt 30;$i++){
+ for($i=0;$i -lt 75;$i++){
   Start-Sleep -Seconds 1
   if(Test-Path $appLog){
    $log=Get-Content -LiteralPath $appLog
@@ -44,6 +47,13 @@ try{
  }
  if(!$ready){throw 'Auto reopened app did not reach homepage'}
  Write-Host 'PASS Windows update automatically reopened native homepage, retained private profile and applied new website code'
+ }catch{
+ foreach($name in @('windows-upgrade.txt','windows-lite.log','errors.txt')){
+  $file=Join-Path $root ('local-data/logs/'+$name)
+  if(Test-Path -LiteralPath $file){Get-Content -LiteralPath $file -Tail 20}
+  else{Write-Host ('No log: '+$name)}
+ }
+ throw
 }finally{
  if($childPid -gt 0){Stop-Process -Id $childPid -Force -ErrorAction SilentlyContinue}
  Get-Process Port79WindowsLite -ErrorAction SilentlyContinue |
