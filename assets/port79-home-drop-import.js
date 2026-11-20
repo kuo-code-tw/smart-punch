@@ -174,8 +174,9 @@ async function loadOriginal(kind){
     // WebView2 virtual-host mappings need an explicit HTML file path.
     // If the embedded page failed to load, inspecting cross-origin location
     // itself throws SecurityError. Stop before giving it any File objects.
-    const actual=new URL(frame.contentWindow.location.href);
-    const expected=new URL(url,w.location.href);
+    const location=frame.contentWindow.location;
+    const actual=new URL(location.href||location.origin+location.pathname);
+    const expected=new URL(url,w.location.href||w.location.origin+'/');
     if(actual.origin!==expected.origin||actual.pathname!==expected.pathname)
      throw Error('匯入來源不符，已停止');
     const path=actual.pathname;
