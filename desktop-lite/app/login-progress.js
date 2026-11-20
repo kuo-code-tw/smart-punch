@@ -3,7 +3,7 @@
  if(window.__port79FolderProgress)return;window.__port79FolderProgress=true;
  const SYSTEMS=['attendance','workhours','leave','schedule','efficiency','hr','history'];
  const names={attendance:'考勤',workhours:'工時',leave:'請假',schedule:'排班',efficiency:'碼頭與船舶',hr:'人資',history:'歷史資料'};
- let running=false,sessionKey='',processed=0,successes=0,errors=0,completedInMemoryKey='',completedInMemoryAt=0,lastFailureKey='',lastNativeMessage='',lastActivityAt=0,lastHeartbeatAt=0,activeSystem='',activeDetail='',leftPage=false;
+ let running=false,sessionKey='',processed=0,successes=0,errors=0,completedInMemoryKey='',completedInMemoryAt=0,lastFailureKey='',lastNativeMessage='',lastActivityAt=0,lastHeartbeatAt=0,activeSystem='',activeDetail='',leftPage=false,monthCompleted=0,monthTotal=0;
  const STORE='p79-windows-last-download-v1',TWO_HOURS=2*60*60*1000,ATTEMPT_GRACE=20*60*1000;
  function session(){
   try{
@@ -15,7 +15,9 @@
  }
  function nativeProgress(phase,title,detail,count){
   // Only progress is sent; never send cloud tokens, employee IDs or business records.
-  const payload={kind:'port79-cache-status-v1',phase,title,detail,completed:count,total:SYSTEMS.length};
+  const months=(phase==='downloading'||phase==='stalled')&&activeSystem==='考勤'&&monthTotal>0;
+  const payload={kind:'port79-cache-status-v1',phase,title,detail,completed:count,total:SYSTEMS.length,
+   monthCompleted:months?monthCompleted:0,monthTotal:months?monthTotal:0};
   const wire=JSON.stringify(payload);if(wire===lastNativeMessage)return;lastNativeMessage=wire;
   try{if(typeof window.chrome?.webview?.postMessage==='function')window.chrome.webview.postMessage(wire)}catch(_){}
  }
@@ -77,7 +79,9 @@
   const root=div();if(show)root.style.display='block';
   root.querySelector('.p79-desktop-label').textContent=label;root.querySelector('.p79-desktop-detail').textContent=detail;
   // Progress shows confirmed successful downloads, never just attempted/failed modules.
-  root.querySelector('progress').value=Math.min(SYSTEMS.length,Math.max(0,successes));
+  const currentBar=root.querySelector('progress'),showMonths=(phase==='downloading'||phase==='stalled')&&activeSystem==='考勤'&&monthTotal>0;
+  currentBar.max=showMonths?monthTotal:SYSTEMS.length;
+  currentBar.value=showMonths?monthCompleted:Math.min(SYSTEMS.length,Math.max(0,successes));
   nativeProgress(phase,label,detail,Math.min(SYSTEMS.length,Math.max(0,successes)));
  }
  function record(key){try{const all=JSON.parse(localStorage.getItem(STORE)||'{}');return all[key]||{}}catch{return{}}}
@@ -107,13 +111,22 @@
    if(lastFailureKey!==key)nativeProgress('waiting','上次下載尚未全部確認','為避免重複雲端請求暫停自動重試；可從系統匣手動重新下載。',0);
    return;
   }
-  running=true;leftPage=false;processed=0;successes=0;errors=0;sessionKey=key;lastFailureKey='';lastActivityAt=now;lastHeartbeatAt=now;activeSystem='考勤';activeDetail='正在核對雲端資料';save(key,{attempt:now});
+  running=true;leftPage=false;processed=0;successes=0;errors=0;monthCompleted=0;monthTotal=0;sessionKey=key;lastFailureKey='';lastActivityAt=now;lastHeartbeatAt=now;activeSystem='考勤';activeDetail='正在核對雲端資料';save(key,{attempt:now});
   useNativeComputerFolder();
   view('正在下載本機資料','已處理 0／7 個系統；下載不會阻止你使用首頁。',0);
   try{
    const results=await api.downloadAll((sys,index,total,state,error,detail)=>{
     if(!session()||sessionKey!==key)return;
     lastActivityAt=Date.now();lastHeartbeatAt=lastActivityAt;activeSystem=names[sys]||sys;activeDetail=detail||((state==='loading'?'開始下載：':'正在處理：')+activeSystem);
+    if(sys==='attendance'&&state==='detail'){
+     const match=String(detail||'').match(/(\d+)\s*\/\s*(\d+)\s*月/);
+     if(match){
+      const count=Number(match[1]),totalMonths=Number(match[2]);
+      if(totalMonths>0&&totalMonths<=240&&count>=0&&count<=totalMonths){
+       monthTotal=totalMonths;monthCompleted=Math.max(monthCompleted,count);
+      }
+     }
+    }
     if(state==='done'||state==='error'||state==='skipped'){processed=Math.max(processed,index+1);if(state==='done')successes++;else if(state==='error')errors++;}
     const msg=(detail||names[sys]||sys)+(state==='error'?'（失敗）':state==='skipped'?'（未執行）':'')+'｜已處理 '+processed+'／'+total+'；成功 '+successes+' 項';
     view('正在下載 '+(names[sys]||sys),msg,processed);
