@@ -92,6 +92,13 @@ jobs:
           $dest = Join-Path (Resolve-Path 'desktop-folder/dist').Path '79號碼頭_Windows系統資料夾'
           if ($folder.FullName -ne $dest) { Rename-Item -Path $folder.FullName -NewName '79號碼頭_Windows系統資料夾' }
           $dir = (Resolve-Path $dest).Path
+          # The runtime smoke generated a temporary Chromium profile on the test runner.
+          # Never distribute any cookies, test logs, databases or runner-local cache.
+          $profile = Join-Path $dir 'local-data/BrowserProfile'
+          if (Test-Path $profile) { Remove-Item $profile -Force -Recurse }
+          New-Item -ItemType Directory -Force $profile | Out-Null
+          $logDir = Join-Path $dir 'local-data/logs'
+          if (Test-Path $logDir) { Get-ChildItem $logDir -File | Remove-Item -Force }
           $zip = Join-Path (Resolve-Path 'desktop-folder/dist').Path '79號碼頭_Windows系統資料夾版.zip'
           Compress-Archive -Path $dir -DestinationPath $zip -CompressionLevel Optimal -Force
           $exe = Join-Path $dir 'Port79Windows.exe'
