@@ -53,12 +53,12 @@ namespace Port79Lite {
     if(sha.Length<40)return "";
     sha=sha.Substring(0,40);
     foreach(var c in sha)if(!Uri.IsHexDigit(c))return "";
-    var revision=Convert.ToUInt32(sha.Substring(0,8),16).ToString("D10");
+    var revision=(Convert.ToUInt32(sha.Substring(0,8),16)%100000).ToString("D5");
     var human=System.Text.RegularExpressions.Regex.Match(text,
-     @"(?m)^版本號:\s*(\d{18})\s*$");
+     @"(?m)^版本號:\s*(V\d{6}\.\d{5})\s*$");
     if(human.Success&&human.Groups[1].Value.EndsWith(revision,StringComparison.Ordinal))
      return human.Groups[1].Value;
-    // Never expose hexadecimal Git identifiers in the displayed version.
+    // Keep the complete Git SHA internal; avoid showing a mismatched version.
     return "";
    }catch{return "";}
   }

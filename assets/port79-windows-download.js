@@ -45,9 +45,10 @@
    const match=/^port79-windows-lite-([0-9]{4})([0-9]{2})([0-9]{2})-([a-f0-9]{12})$/.exec(tag);
    if(!match||release.draft===true)throw Error('Unexpected release version');
    const version=match[4];
-   // Numeric version is YYYYMMDD plus the same SHA prefix in decimal.
-   // Preserve the full immutable GitHub release tag only for URL validation.
-   const human=match[1]+match[2]+match[3]+Number.parseInt(version.slice(0,8),16).toString().padStart(10,'0');
+   // Compact visual version: V + YYMMDD + five decimal revision digits.
+   // Immutable GitHub release tags and SHA checks remain unchanged.
+   const human='V'+match[1].slice(-2)+match[2]+match[3]+'.'+
+    (Number.parseInt(version.slice(0,8),16)%100000).toString().padStart(5,'0');
    const uniqueName='Port79-Windows-Lite-'+version+'.zip';
    const named=Array.isArray(release.assets)?release.assets.find(a=>a?.name===uniqueName):null;
    const stable=Array.isArray(release.assets)?release.assets.find(a=>a?.name==='Port79-Windows-Lite.zip'):null;
