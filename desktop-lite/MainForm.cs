@@ -16,6 +16,10 @@ namespace Port79Lite {
   private readonly string root=AppDomain.CurrentDomain.BaseDirectory;
   private readonly NotifyIcon tray;
   private readonly WebView2 web;
+  private WebView2 cloudWorker;
+  private bool cloudWorkerReady=false;
+  private bool cloudWorkerJobActive=false;
+  private CacheStatusPayload lastCacheStatus;
   private readonly ToolStripMenuItem checkUpdatesMenu;
   private readonly ToolStripMenuItem systemUpdateStatusMenu;
   private readonly ToolStripMenuItem cacheStatusMenu;
@@ -103,7 +107,7 @@ namespace Port79Lite {
    tray.ContextMenuStrip=menu;
    tray.DoubleClick+=(s,e)=>ShowWindow();
    FormClosing+=(s,e)=>{if(!exit){e.Cancel=true;Hide();}};
-   FormClosed+=(s,e)=>{cacheDismissTimer.Dispose();cacheTooltip.Dispose();tray.Visible=false;tray.Dispose();web.Dispose();};
+   FormClosed+=(s,e)=>{cacheDismissTimer.Dispose();cacheTooltip.Dispose();tray.Visible=false;tray.Dispose();cloudWorker?.Dispose();web.Dispose();};
    Shown+=async(s,e)=>{
     // A successful update must put the actual Windows main window on screen,
     // not leave only a background process or a tray icon behind.
@@ -152,14 +156,21 @@ namespace Port79Lite {
      OpenSafeExternal(e.Uri);
     };
     web.CoreWebView2.NavigationStarting+=(s,e)=>{
-     if(cacheInProgress){
+     if(cloudWorkerJobActive){
+      // This navigation only destroys the visible page, not the independent
+      // cloud worker. Keep native progress visible while the user works.
+      cachePanel.Visible=true;
+      cachePanel.BringToFront();
+     }else if(cacheInProgress){
+      // Older in-page downloads cannot survive a page reload; do not claim
+      // success when the legacy webpage was actually torn down.
       cacheInProgress=false;
-      cacheTitle.Text="⏸ 本機資料下載已中斷";
-      cacheDetail.Text="頁面已切換；已下載的資料仍保留。回到首頁可重新下載。";
+      cacheTitle.Text="⏸ 舊式頁面下載已中斷";
+      cacheDetail.Text="請使用新版背景雲端同步；已下載資料仍保留。";
       cacheBar.Style=ProgressBarStyle.Continuous;
       cachePanel.Visible=true;
       cacheDismissTimer.Stop();
-      cacheStatusMenu.Text="資料同步狀態：頁面切換，下載中斷";
+      cacheStatusMenu.Text="資料同步狀態：舊式頁面下載中斷";
      }
      if(e.Uri.StartsWith(LocalRoot,StringComparison.OrdinalIgnoreCase)){
       var current=new Uri(e.Uri);
@@ -181,9 +192,14 @@ namespace Port79Lite {
      else Log("navigation failure: "+e.WebErrorStatus);
      if(e.IsSuccess&&web.Source?.AbsoluteUri.StartsWith(LocalRoot,StringComparison.OrdinalIgnoreCase)==true){
       try{
+       // Before the injected automatic downloader runs, tell it this native
+       // shell owns the separate navigation-safe WebView2 worker.
+       await web.CoreWebView2.ExecuteScriptAsync("window.__port79NativeShellHasBackgroundWorker=true");
        var progress=Path.Combine(root,"app","login-progress.js");
        if(File.Exists(progress)) await web.CoreWebView2.ExecuteScriptAsync(File.ReadAllText(progress));
       }catch(Exception x){Log("progress overlay: "+x.Message);}
+      await AdvertiseCloudWorker();
+      if(cloudWorkerJobActive&&lastCacheStatus!=null)await DisplayInlineCacheProgress(lastCacheStatus);
       if(!probedImportFrames&&Array.Exists(Environment.GetCommandLineArgs(),
        a=>a=="--port79-verify-import-frames")){
        probedImportFrames=true;await ProbeImportFrames();
@@ -191,6 +207,9 @@ namespace Port79Lite {
      }
     };
     web.CoreWebView2.Navigate(LocalRoot+"index.html");
+    // The second WebView2 stays at its own fixed same-origin worker URL.
+    // Navigating the visible WebView cannot terminate its fetch or IndexedDB.
+    _=InitializeCloudWorker(env);
     // Check immediately on startup, not only after the first ten-minute timer tick.
     // Read-only public program files are verified and staged; active pages are
     // never replaced in-place, so unsaved form edits cannot be interrupted.
@@ -205,6 +224,59 @@ namespace Port79Lite {
       "79號碼頭 Windows 版",MessageBoxButtons.OK,MessageBoxIcon.Error);
    }
   }
+  private async Task InitializeCloudWorker(CoreWebView2Environment env){
+   try{
+    var file=Path.Combine(root,"site","smart-punch","assets","port79-cache-worker.html");
+    if(!File.Exists(file))throw new FileNotFoundException("背景雲端下載頁缺少，請執行正式系統更新");
+    // Keep a live separate browser document, offscreen; Visible=false can
+    // suspend initialization on some WebView2 runtime versions.
+    cloudWorker=new WebView2 {Location=new Point(-100,-100),Size=new Size(1,1),
+     TabStop=false,Visible=true};
+    Controls.Add(cloudWorker);
+    cloudWorker.SendToBack();
+    await cloudWorker.EnsureCoreWebView2Async(env);
+    cloudWorker.CoreWebView2.SetVirtualHostNameToFolderMapping(Host,Path.Combine(root,"site"),
+     CoreWebView2HostResourceAccessKind.DenyCors);
+    cloudWorker.CoreWebView2.Settings.IsWebMessageEnabled=true;
+    cloudWorker.CoreWebView2.Settings.AreDevToolsEnabled=false;
+    cloudWorker.CoreWebView2.WebMessageReceived+=OnCacheMessage;
+    cloudWorker.CoreWebView2.ProcessFailed+=(sender,args)=>{
+     cloudWorkerReady=false;
+     if(cloudWorkerJobActive){
+      cloudWorkerJobActive=false;
+      UpdateCacheStatus(new CacheStatusPayload {kind="port79-cache-status-v1",
+       phase="interrupted",title="背景同步中斷",
+       detail="Windows 背景下載器已停止；已完成快取保留，可重新下載",
+       completed=lastCacheStatus?.completed??0,total=7});
+     }
+     Log("background cache WebView process failed");
+    };
+    cloudWorker.CoreWebView2.Navigate(LocalRoot+"assets/port79-cache-worker.html");
+   }catch(Exception error){
+    cloudWorkerReady=false;
+    Log("background sync init: "+error.Message);
+   }
+  }
+  private async Task AdvertiseCloudWorker(){
+   if(!cloudWorkerReady||web.CoreWebView2==null)return;
+   try{await web.CoreWebView2.ExecuteScriptAsync("window.__port79NativeCloudWorkerReady=true");}
+   catch(Exception e){Log("cloud worker capability not delivered: "+e.Message);}
+  }
+  private const string CaptureCloudSessionScript=@"(function(){
+   const storage={};
+   const permitted=/^(?:port79_[A-Za-z0-9_-]+|aqc_[A-Za-z0-9_-]+|admin_session|gasUrl|GAS_URL)$/;
+   try{
+    for(let i=0;i<sessionStorage.length&&i<200;i++){
+     const key=sessionStorage.key(i);
+     if(permitted.test(key)){const val=sessionStorage.getItem(key);if(typeof val==='string'&&val.length<40000)storage[key]=val;}
+    }
+   }catch(e){return null}
+   let token=storage.port79_user_token||storage.port79_admin_token||storage.port79_gc_superadmin_token||'';
+   let gas=storage.port79_gas_url||storage.gasUrl||storage.GAS_URL||'';
+   try{token=window.P79ManagementContext?.token?.()||token}catch(e){}
+   try{gas=window.P79ManagementContext?.gas?.()||window.GAS_URL||gas}catch(e){}
+   return {storage,token:String(token||''),gas:String(gas||'')};
+  })()";
   // Windows CI-only read-only probe: actually load all three importer iframes
   // from the native virtual host and verify their contentWindow is same-origin.
   // No Excel file is supplied and no cloud data is written.
@@ -261,7 +333,30 @@ namespace Port79Lite {
     if(payload.kind=="port79-import-probe-v1"){
      Log("IMPORT FRAME CHECK: "+SafeStatus(payload.title,320));return;
     }
+    if(payload.kind=="port79-background-worker-ready-v1"){
+     // Only the fixed local worker page can announce readiness.
+     if(source.AbsolutePath.Equals("/smart-punch/assets/port79-cache-worker.html",
+       StringComparison.OrdinalIgnoreCase)){
+      cloudWorkerReady=true;
+      Log("background worker ready");
+      _=AdvertiseCloudWorker();
+     }
+     return;
+    }
+    if(payload.kind=="port79-cache-command-v1"){
+     // A manager clicking the existing cloud-download button may start
+     // background sync from any locally hosted application page.
+     if(payload.action=="download-all"&&sender==web.CoreWebView2)_=ForceDownload();
+     return;
+    }
     if(payload.kind!="port79-cache-status-v1")return;
+    // A newly navigated management page may emit "idle" or "waiting";
+    // it must not erase the actual background download progress.
+    if(cloudWorkerJobActive&&sender==web.CoreWebView2)return;
+    if(sender==cloudWorker?.CoreWebView2&&
+      (payload.phase=="complete"||payload.phase=="partial"||
+       payload.phase=="failed"||payload.phase=="interrupted"))
+     cloudWorkerJobActive=false;
     UpdateCacheStatus(payload);
     // UI-only relay for the compact homepage indicator beside History status.
     // Do not read or change employee records, credentials or download behavior.
@@ -294,6 +389,7 @@ namespace Port79Lite {
   }
   private sealed class CacheStatusPayload{
    public string kind {get;set;}
+   public string action {get;set;}
    public string phase {get;set;}
    public string title {get;set;}
    public string detail {get;set;}
@@ -307,6 +403,7 @@ namespace Port79Lite {
    return text.Length>limit?text.Substring(0,limit):text;
   }
   private void UpdateCacheStatus(CacheStatusPayload value){
+   lastCacheStatus=value;
    var phase=value.phase??"";
    if(phase!="idle"&&phase!="waiting"&&phase!="downloading"&&phase!="stalled"&&phase!="interrupted"&&phase!="complete"&&phase!="partial"&&phase!="failed"&&phase!="cached")return;
    int total=phase=="idle"?7:Math.Max(1,Math.Min(7,value.total));
@@ -346,27 +443,42 @@ namespace Port79Lite {
   }
   private async Task ForceDownload(){
    ShowWindow();
+   if(cloudWorkerJobActive){
+    cachePanel.Visible=true;cachePanel.BringToFront();
+    cacheStatusMenu.Text="資料同步狀態：背景下載仍在進行";
+    return;
+   }
    try{
-    if(web.CoreWebView2==null)throw new InvalidOperationException("首頁尚未載入完成，請開啟管理首頁後再執行同步");
-    // Require the actual JS handler; previously the event was fired without a
-    // listener and pressing the tray command appeared to do nothing.
-    var dispatched=await web.CoreWebView2.ExecuteScriptAsync(
-     "(function(){"+
-     "if(window.__port79NativeCloudSyncReady!==true||typeof window.Port79DataCache?.downloadAll!=='function')return false;"+
-     "window.dispatchEvent(new Event('port79-desktop-force-sync'));return true;})()");
-    if(!String.Equals(dispatched,"true",StringComparison.OrdinalIgnoreCase))
-     throw new InvalidOperationException("目前網頁尚未載入雲端下載功能，請透過正式系統更新取得新版");
+    if(!cloudWorkerReady||cloudWorker?.CoreWebView2==null)
+     throw new InvalidOperationException("背景雲端下載器尚未啟動，請先執行正式系統更新");
+    if(web.CoreWebView2==null||web.Source?.AbsoluteUri.StartsWith(LocalRoot,StringComparison.OrdinalIgnoreCase)!=true)
+     throw new InvalidOperationException("請先在 79號碼頭管理系統登入後同步雲端資料");
+    // Fetch session only from the current trusted local site; credentials
+    // stay in the same local WebView2 browser profile and are never logged,
+    // sent to a remote updater or written to the Windows release ZIP.
+    string current=await web.CoreWebView2.ExecuteScriptAsync(CaptureCloudSessionScript);
+    if(String.IsNullOrWhiteSpace(current)||current=="null")
+     throw new InvalidOperationException("找不到管理員登入狀態，請重新登入");
+    cloudWorkerJobActive=true;
+    string started=await cloudWorker.CoreWebView2.ExecuteScriptAsync(
+     "window.port79StartCloudSync("+current+")");
+    if(!String.Equals(started,"true",StringComparison.OrdinalIgnoreCase))
+     throw new InvalidOperationException("背景同步未能開始：請確認管理員權限、登入 Token 及雲端網址");
+    UpdateCacheStatus(new CacheStatusPayload{
+     kind="port79-cache-status-v1",phase="downloading",title="背景雲端同步",
+     detail="背景下載已開始；可以繼續切換各大系統工作",
+     completed=0,total=7
+    });
    }catch(Exception error){
-    Log("manual cloud data sync did not start: "+error.Message);
-    cacheStatusMenu.Text="資料同步狀態：未開始（"+SafeStatus(error.Message,38)+"）";
+    cloudWorkerJobActive=false;
+    Log("background cloud sync could not start: "+error.Message);
     UpdateCacheStatus(new CacheStatusPayload{
      kind="port79-cache-status-v1",phase="failed",
-     title="雲端資料同步",detail=error.Message,completed=0,total=7
+     title="背景雲端同步未啟動",detail=error.Message,completed=0,total=7
     });
    }
   }
-  // One user-facing update action for both public website code and the
-  // Windows WebView2 shell; the current user profile and backups are untouched.
+
   private async Task CheckUpdates(bool manual=false){
    if(updateBusy)return;
    updateBusy=true;checkUpdatesMenu.Enabled=false;

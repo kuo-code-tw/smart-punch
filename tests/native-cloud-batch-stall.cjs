@@ -33,7 +33,10 @@ function suite({failure={}, attendanceMonths=10}={}){
    if(failure[sys])throw failure[sys];
    return {ok:true};
   },
-  getDisplaySnapshot:async()=>null
+  getDisplaySnapshot:async()=>null,
+  reusableSystemDownload:async()=>null,
+  getSystemSnapshot:async()=>null,
+  put:async()=>true
  };
  vm.createContext(context);
  vm.runInContext(code,context,{timeout:3000});
@@ -45,7 +48,7 @@ test('interactive Windows batch completes quick independent systems before long 
  assert.deepEqual(f.calls,['leave','schedule','efficiency','hr','history','attendance']);
  assert.equal(res.length,7);assert(res.every(x=>x.ok));
  assert.deepEqual(Array.from(res,x=>x.system),['leave','schedule','efficiency','hr','history','attendance','workhours']);
- assert.deepEqual(f.writes,['workhours']);
+ assert.deepEqual(f.writes,['leave','schedule','efficiency','hr','history','workhours']);
  assert(f.timeouts.every(x=>x===30),'manual batch uses bounded 30-second cloud request');
  const m=f.progress.find(x=>x.sys==='attendance'&&x.state==='detail');
  assert.equal(m.meta.monthCompleted,2);assert.equal(m.meta.monthTotal,10);
@@ -63,7 +66,7 @@ test('one isolated network error does not discard five successful independent sy
  assert.equal(res[0].system,'leave');assert.equal(res[0].ok,false);
  assert.equal(res.filter(x=>x.ok).length,6);
  assert(f.calls.includes('hr')&&f.calls.includes('attendance'));
- assert.deepEqual(f.writes,['workhours']);
+ assert.deepEqual(f.writes,['schedule','efficiency','hr','history','workhours']);
 });
 test('two consecutive network failures stop batch safely; no seven repeated timeouts',async()=>{
  const err=Object.assign(new Error('雲端傳輸逾時'),{code:'P79_TRANSPORT'});

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head><meta charset="UTF-8"><title>79號碼頭背景雲端資料同步</title></head>
+<body>
+<!-- Runs only inside the local Windows WebView2 worker; not a user-facing page.
+     Uses the same origin and browser profile as the management pages so
+     authenticated IndexedDB snapshots remain available after navigation. -->
+<script src="./port79-data-cache.js"></script>
+<script>
+(function(){
+ 'use strict';
+ var allowed=/^(?:port79_[A-Za-z0-9_-]+|aqc_[A-Za-z0-9_-]+|admin_session|gasUrl|GAS_URL)$/;
+ var running=false, lastAccount='', lastSyncKey='';
+ function writeAutoSyncState(changes){
+  if(!lastSyncKey)return;
+  try{
+   var key='p79-windows-last-download-v1';
+   var all=JSON.parse(localStorage.getItem(key)||'{}');
+   all[lastSyncKey]=Object.assign({},all[lastSyncKey]||{},changes);
+   localStorage.setItem(key,JSON.stringify(all));
+  }catch(ignore){}
+ }
+ window.port79StartCloudSync=function(data){
+  if(running||!data||typeof data!=='object'||!data.storage||
+     typeof window.Port79DataCache?.downloadAll!=='function')return false;
+  var user=data.storage.port79_user_session||data.storage.admin_session;
+  if(typeof user!=='string'||!user)return false;
+  var auth='';
+  try{
+   var s=JSON.parse(user);
+   auth=String(s&&s.empId||'').trim().toUpperCase();
+   if(s.punchOnly||!['admin','superadmin'].includes(String(s.adminRole||s.role||'').toLowerCase()))return false;
+  }catch(e){return false}
+  if(!auth||typeof data.token!=='string'||!data.token.trim()||
+     typeof data.gas!=='string'||!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(data.gas))return false;
+  // Never accept an unbounded data dump from arbitrary callers.
+  var entries=Object.entries(data.storage);
+  if(entries.length>100)return false;
+  try{
+   sessionStorage.clear();
+   for(var i=0;i<entries.length;i++){
+    var k=entries[i][0],v=entries[i][1];
+    if(allowed.test(k)&&typeof v==='string'&&v.length<40000)sessionStorage.setItem(k,v);
+   }
+   sessionStorage.setItem('port79_user_session',user);
+   sessionStorage.setItem('port79_user_token',data.token);
+   sessionStorage.setItem('port79_gas_url',data.gas);
+  }catch(e){return false}
+  running=true;
+  lastAccount=auth;
+  var s=JSON.parse(user);
+  lastSyncKey=String(s.empId||'').toUpperCase()+'@'+s.adminRole+'|'+
+   JSON.stringify([s.systemPermissions||{},s.dataScope||{},s.dataScopeJobs||{}]);
+  writeAutoSyncState({attempt:Date.now()});
+  // Automatic login downloads and manual downloads share the same worker.
+  // On success, persist completion for the next homepage / app restart.
+  window.__port79CloudWorkerDone=function(success){
+   if(success===true)writeAutoSyncState({completed:Date.now()});
+   running=false;
+  };
+  window.dispatchEvent(new Event('port79-desktop-force-sync'));
+  return true;
+ };
+ window.chrome?.webview?.postMessage?.(JSON.stringify({
+  kind:'port79-background-worker-ready-v1',
+  title:'背景雲端下載器已載入'
+ }));
+})();
+</script>
+</body>
+</html>

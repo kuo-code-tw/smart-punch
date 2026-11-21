@@ -909,6 +909,39 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  const master=await fetchJson('getAttendanceEmployeeMaster',{token:t},'',readOptions);
  if(!Array.isArray(master?.employees))throw new Error('員工主檔格式不正確，已保留原有快取');
  const employees=master.employees;
+ // Incomplete month downloads were previously lost on page navigation.
+ // Persist each verified month only under the same account/scope/endpoint
+ // and a stable server revision. A changed revision invalidates all chunks.
+ const cloudRevision=String(before?.revision||'');
+ const monthCheckpointSignature=cloudRevision?JSON.stringify([
+  cloudRevision,String(catalog.revision||''),String(master.revision||''),months,employees
+ ]):'';
+ const checkpointMaxAgeMs=24*60*60*1000;
+ async function checkpointMonth(month){
+  if(!monthCheckpointSignature)return null;
+  const row=await get(systemKey('attendance')+'|checkpoint|'+month).catch(()=>null);
+  if(!row||!currentViewerRow(row)||row.kind!=='system'||row.system!=='attendance'||
+     row.displayScope!==scope||row.cacheEndpoint!==gasUrl()||
+     row.savedAt<stamp||row.savedAt>Date.now()+60000||
+     Date.now()-row.savedAt>checkpointMaxAgeMs||
+     row.data?.signature!==monthCheckpointSignature||
+     !Array.isArray(row.data?.rows)||row.data?.month!==month)return null;
+  return row.data.rows;
+ }
+ async function storeMonthCheckpoint(month,rows){
+  if(!monthCheckpointSignature)return;
+  verifyAttendanceDownloadContext(expected);
+  const data={ok:true,month,rows,signature:monthCheckpointSignature};
+  // Checkpoints are a best-effort acceleration, never a prerequisite for
+  // valid business data. Browser/test contexts without IndexedDB must still
+  // finish a correct full download rather than fail each historical month.
+  try{
+   await put({key:systemKey('attendance')+'|checkpoint|'+month,
+    kind:'system',system:'attendance',savedAt:Date.now(),size:safeSize(data),data});
+  }catch(error){
+   console.warn('考勤月份快取暫時無法保存；繼續正常下載',String(error?.message||error));
+  }
+ }
  // The catalog alone has no revision. Compare an explicit cloud revision and the
  // authenticated scoped master, never a timestamp or another viewer's folder.
  const old=previous?.data;
@@ -937,6 +970,15 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
    const i=nextMonth++,month=months[i];
    try{
     verifyAttendanceDownloadContext(expected);
+    const resumed=await checkpointMonth(month);
+    if(resumed){
+     verifyAttendanceDownloadContext(expected);
+     monthResults[i]={month,rows:resumed,ok:true,reused:true};
+     completedMonths++;
+     onProgress?.('attendance',completedMonths,months.length,'monthDone',
+      `沿用已完成的 ${month} 快取｜${completedMonths}/${months.length} 月`);
+     continue;
+    }
     onProgress?.('attendance',completedMonths,months.length,'month',`正在讀取 ${month}｜已完成 ${completedMonths}/${months.length} 月`);
     const d=await fetchJson('getAttendanceMonthData',{month,token:t},'',readOptions);
     if(!Array.isArray(d?.records))throw new Error('考勤月份資料格式不正確');
@@ -945,6 +987,7 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
     verifyAttendanceDownloadContext(expected);
     const rows=direct.records.length?mergeAttendanceRows(d.records.concat(direct.records)):d.records;
     monthResults[i]={month,rows,ok:true};
+    await storeMonthCheckpoint(month,rows);
    }catch(e){
     if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT','P79_MUTATION'].includes(e?.code)){
      fatal=fatal||e;return;
@@ -964,7 +1007,12 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  // Do record de-duplication once rather than on every month (quadratic cost).
  const allRecords=mergeAttendanceRows(monthResults.flatMap(x=>x.rows));
  const after=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
-  verifyAttendanceDownloadContext(expected);
+ verifyAttendanceDownloadContext(expected);
+ // A revision may change while a full download is running. Preserve the
+ // original completed-data behavior, but mark sourceRevision='' below so it
+ // can NEVER be reused as an unchanged cloud revision on the next visit.
+ if(cloudRevision&&String(after?.revision||'')!==cloudRevision)
+  console.warn('雲端考勤版本於讀取期間變更，完整快取將在下次重新核對');
  const snapshot={
   sourceRevision:before?.revision&&String(before.revision)===String(after?.revision)?String(before.revision):'',
   ok:true,action:'port79AttendanceFullCache',fullDatabase:true,
@@ -998,6 +1046,19 @@ async function downloadSystem(sys,onProgress,readOptions={}){
  }
  throw new Error('未知系統：'+sys);
 }
+// Successfully downloaded independent systems are persisted in IndexedDB, not
+// just in lastAllDownload's page-local three-minute memory.
+const SYSTEM_REUSE_MAX_AGE_MS=30*60*1000;
+async function reusableSystemDownload(sys,scopeAtStart){
+ if(!['leave','schedule','efficiency','hr','history'].includes(sys))return null;
+ const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
+ if(!snapshot||snapshot.data?.ok!==true||snapshot.displayScope!==scopeAtStart)return null;
+ if(Date.now()-Number(snapshot.savedAt)>SYSTEM_REUSE_MAX_AGE_MS)return null;
+ if(snapshot.system!==sys||snapshot.kind!=='system')return null;
+ // The current month is part of scoped, mutable efficiency results.
+ if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
+ return snapshot;
+}
 let lastAllDownload=null;
 async function downloadAll(onProgress,options={}){
  // Interactive Windows batches show usable independent system data before the
@@ -1007,6 +1068,7 @@ async function downloadAll(onProgress,options={}){
   ['attendance','workhours','leave','schedule','efficiency','hr','history'];
  const result=[];
  const readOptions=fastFirst?{interactive:true}:{};
+ const batchViewer=viewerKey(),batchToken=token(),batchScope=displayScope(),batchGas=gasUrl(),batchStamp=mutationStamp();
  // Within a short same-login retry, keep the six successful snapshots and fetch
  // only modules that actually failed. A new session/scope or later refresh starts fresh.
  const batchKey=[viewerKey(),token(),gasUrl(),displayScope(),mutationStamp()].join('|');
@@ -1018,7 +1080,19 @@ async function downloadAll(onProgress,options={}){
   if(prior?.some(row=>row.system===sys&&row.ok)){
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true,reused:true});
-   onProgress?.(sys,i,systems.length,'reused');
+   onProgress?.(sys,i,systems.length,'reused',null,'此系統先前已完成，沿用快取');
+   continue;
+  }
+  // Resume verified independent systems after navigation and app restart.
+  // A cache is valid only for this account, permission scope, endpoint and
+  // mutation generation; older snapshots are refreshed, not called current.
+  if(fastFirst&&await reusableSystemDownload(sys,batchScope)){
+   if(batchViewer!==viewerKey()||batchToken!==token()||
+      batchScope!==displayScope()||batchGas!==gasUrl()||batchStamp!==mutationStamp())
+    throw Object.assign(new Error('登入或管理權限已變更，停止沿用快取'),{code:'P79_SCOPE'});
+   consecutiveTransportFailures=0;
+   result.push({system:sys,ok:true,reused:true});
+   onProgress?.(sys,i,systems.length,'reused',null,'沿用本機已完成的雲端快取（30 分鐘內）');
    continue;
   }
   // Treat remaining untouched modules as skipped after an identity/scope/transport failure.
@@ -1032,7 +1106,20 @@ async function downloadAll(onProgress,options={}){
    if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`,{monthCompleted:mi,monthTotal:mt}),readOptions);
    else if(sys==='workhours'&&attendanceError)throw attendanceError;
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
-   else await downloadSystem(sys,null,readOptions);
+   else{
+    const payload=await downloadSystem(sys,null,readOptions);
+    if(fastFirst&&['leave','schedule','efficiency','hr','history'].includes(sys)&&payload?.ok===true){
+     if(batchViewer!==viewerKey()||batchToken!==token()||batchScope!==displayScope()||
+        batchGas!==gasUrl()||batchStamp!==mutationStamp())
+      throw Object.assign(new Error('登入權限變更，拒絕保存舊帳號資料'),{code:'P79_SCOPE'});
+     await saveSystemSnapshot(sys,payload);
+     // Efficiency is month-scoped; do not reuse it after the month changes.
+     if(sys==='efficiency'){
+      const row=await getSystemSnapshot(sys);
+      if(row){row.month=ymNow();await put(row);}
+     }
+    }
+   }
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true});onProgress?.(sys,i,systems.length,'done');
   }catch(e){
@@ -1069,7 +1156,17 @@ function ensureModal(){
    if(act==='persist'){setProgress(await retainDeviceData());await refreshModal()}
    if(act==='clear'){if(confirm('確定清除此瀏覽器的七大系統本機快取？')){await clear();setProgress('已清除瀏覽器快取；硬碟資料夾檔案仍保留，啟用時可重新讀取。');await refreshModal()}}
    if(act==='current'){const sys=currentSystem();setProgress(`正在下載 ${SYSTEM_LABELS[sys]}…`);const snap=await downloadSystem(sys,(s,i,total,state,label)=>setProgress(`⬇️ ${label||SYSTEM_LABELS[sys]} ${i}/${total}`));setProgress(sys==='attendance'||sys==='workhours'?`✅ ${SYSTEM_LABELS[sys]}完整資料已載入｜考勤 ${Number(snap?.recordCount||0)} 筆｜員工主檔 ${Number(snap?.employeeCount||0)} 人`:`✅ ${SYSTEM_LABELS[sys]} 快取完成。`);await refreshModal()}
-   if(act==='all'){const res=await downloadAll((sys,i,total,state,err,detail)=>{setProgress(detail?`⬇️ ${SYSTEM_LABELS[sys]}｜${detail}`:`${state==='error'?'⚠️':'⬇️'} ${i+1}/${total} ${SYSTEM_LABELS[sys]} ${state==='loading'?'下載中…':state==='done'?'完成':state==='reused'?'沿用成功快取':state==='detail'?'整理中…':'失敗'}`)},{quickFirst:true});const ok=res.filter(x=>x.ok).length;const bad=res.filter(x=>!x.ok);setProgress(`完成：${ok}/7 個系統${bad.length?'；未完成：'+bad.map(x=>SYSTEM_LABELS[x.system]+'：'+x.error).join('；'):''}`);await refreshModal()}
+   if(act==='all'){
+   // Windows has a separate same-origin WebView2 worker that continues across
+   // page navigation; keep the existing modal as the single download entry.
+   if(window.chrome?.webview?.postMessage){
+    window.chrome.webview.postMessage(JSON.stringify({
+     kind:'port79-cache-command-v1',action:'download-all'
+    }));
+    setProgress('已交由 Windows 背景同步；可切換考勤、排班等頁面，原本進度會繼續顯示。');
+    return;
+   }
+   const res=await downloadAll((sys,i,total,state,err,detail)=>{setProgress(detail?`⬇️ ${SYSTEM_LABELS[sys]}｜${detail}`:`${state==='error'?'⚠️':'⬇️'} ${i+1}/${total} ${SYSTEM_LABELS[sys]} ${state==='loading'?'下載中…':state==='done'?'完成':state==='reused'?'沿用成功快取':state==='detail'?'整理中…':'失敗'}`)},{quickFirst:true});const ok=res.filter(x=>x.ok).length;const bad=res.filter(x=>!x.ok);setProgress(`完成：${ok}/7 個系統${bad.length?'；未完成：'+bad.map(x=>SYSTEM_LABELS[x.system]+'：'+x.error).join('；'):''}`);await refreshModal()}
   }catch(err){setProgress(err?.name==='AbortError'?'已取消選擇，原有快取保持不變。':'❌ '+String(err?.message||err))}finally{buttons.forEach(x=>x.disabled=false)}});
  return b;
 }
@@ -1101,7 +1198,7 @@ let nativeCloudSyncBusy=false;
 async function nativeCloudSyncFromDesktop(){
  const total=7;
  const done=new Set();
- let lastActivity=Date.now(),lastDetail='正在確認雲端連線',lastMonthCompleted=0,lastMonthTotal=0,pulse=null;
+ let lastActivity=Date.now(),lastDetail='正在確認雲端連線',lastMonthCompleted=0,lastMonthTotal=0,pulse=null,fullyCompleted=false;
  function status(phase,detail,completed=done.size,month=null,heartbeat=false){
   if(!heartbeat){
    lastActivity=Date.now();
@@ -1157,6 +1254,7 @@ async function nativeCloudSyncFromDesktop(){
    status('downloading',message,done.size,month);
   },{quickFirst:true});
   const success=result.filter(x=>x.ok).length,failures=result.filter(x=>!x.ok);
+  fullyCompleted=success===total&&!failures.length;
   status(failures.length?(success?'partial':'failed'):'complete',
    failures.length?'已成功 '+success+'/'+total+' 系統；未完成：'+failures.map(x=>(SYSTEM_LABELS[x.system]||x.system)+' '+x.error).join('；').slice(0,105):
     '七大系統已讀取完成（不含碼頭儲量）；已保留原有快取。',
@@ -1166,6 +1264,7 @@ async function nativeCloudSyncFromDesktop(){
  }finally{
   if(pulse!==null&&typeof clearInterval==='function')clearInterval(pulse);
   nativeCloudSyncBusy=false;
+  try{window.__port79CloudWorkerDone?.(fullyCompleted)}catch(_){}
  }
 }
 if(typeof window.addEventListener==='function'){
