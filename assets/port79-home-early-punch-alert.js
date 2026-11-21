@@ -335,7 +335,13 @@ function bind(recheckCallback){
   root.P79HomeAuditInlineEditor?.close(true);
   dialog.close();
  }));
- dialog.addEventListener('close',()=>root.P79HomeAuditInlineEditor?.close(true));
+ dialog.addEventListener('cancel',event=>{
+  if(root.P79HomeAuditInlineEditor?.isWriting?.()){
+   event.preventDefault();
+   status('正式考勤仍在寫入雲端，請確認完成後再關閉。');
+  }
+ });
+ dialog.addEventListener('close',()=>root.P79HomeAuditInlineEditor?.close());
 
 }
 return {analyze,render,reset,bind};

@@ -12,6 +12,9 @@ assert.match(home,/assets\/port79-home-audit-inline-editor\.js\?v=20261121-inpla
 assert.match(home,/assets\/port79-home-early-punch-alert\.js\?v=20261121-inplace-v1/);
 assert.match(src,/P79HomeAuditInlineEditor/);
 assert.match(src,/bridge\.open\(/);
+assert.match(src,/addEventListener\('cancel',event=>/,'Escape cannot interrupt active cloud writing');
+assert.match(src,/event\.preventDefault\(\)/,'Pending writes remain active');
+assert.match(src,/addEventListener\('close',\(\)=>root\.P79HomeAuditInlineEditor\?\.close\(\)\)/,'Do not force-close the original writer');
 assert.doesNotMatch(src,/root\.location\.href=url\.href/,'Never navigate away from pending-duty details');
 assert.doesNotMatch(home,/data-early-attendance/,'No jump-to-attendance button inside the audit dialog');
 assert.doesNotMatch(src,/launchSystem\('attendance'\)/,'No attendance page navigation in this dialog');
