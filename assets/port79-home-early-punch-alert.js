@@ -285,6 +285,23 @@ function render(attendanceData,scheduleData,month,options={}){
  if($('p79DashEarlyPunchDialog')?.open){status(options.preview?'目前為快取初步比對，雲端尚未確認。':last.reason||'已核對正式班表、考勤與已核准請假');renderDialog();}
  return last;
 }
+// The status card must never sit on an unexplained dash for minutes.
+// Incomplete sources are displayed as *unverified*, never as 0 missing cards.
+function unavailable(reason){
+ const message=String(reason||'正式考勤、班表或核准請假尚未完成核對').slice(0,600);
+ last={count:null,details:null,unknownDays:0,reason:message};
+ const btn=$('p79DashEarlyPunchTrigger'),value=$('p79DashEarlyPunchCount'),hint=$('p79DashEarlyPunchHint');
+ if(btn){btn.dataset.alertState='unverified';btn.setAttribute('aria-label','班表出勤待核：'+message);}
+ if(value)value.textContent='—';
+ if(hint){
+  hint.textContent=(/正在|讀取中|核對中/.test(message)?'核對中，點擊查看進度 ›':
+   /權限/.test(message)?'資料權限不足，查看原因 ›':
+   /逾時/.test(message)?'連線逾時，查看原因 ›':'資料未完成，查看原因 ›');
+  hint.title=message;
+ }
+ if($('p79DashEarlyPunchDialog')?.open){status(message);renderDialog();}
+ return last;
+}
 function reset(){
  root.P79HomeAuditInlineEditor?.close();
  last=null;
@@ -344,5 +361,5 @@ function bind(recheckCallback){
  dialog.addEventListener('close',()=>root.P79HomeAuditInlineEditor?.close());
 
 }
-return {analyze,render,reset,bind};
+return {analyze,render,unavailable,reset,bind};
 });
