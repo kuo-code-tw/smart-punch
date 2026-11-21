@@ -8,6 +8,10 @@ const script=fs.readFileSync(path.join(root,'app','upgrade-windows.ps1'),'utf8')
 const safety=fs.readFileSync(path.join(root,'tests','shell-updater-safety.ps1'),'utf8');
 const marker='runner-ready-';
 assert(native.includes(marker),'Windows native updater must pass a ready file');
+assert(native.includes('async Task LaunchAsync('),'Native handoff should not freeze the GUI thread');
+assert(native.includes('await Task.Delay(150)'),'Handoff polling must yield to WebView2');
+const main=fs.readFileSync(path.join(root,'MainForm.cs'),'utf8');
+assert(main.includes('await ReleaseUpdater.LaunchAsync('),'GUI must await the verified handoff before closing');
 assert(native.includes('-ReadyFile '),'Windows launcher supplies handshake path');
 assert(native.includes('accepted=!process.HasExited'),'Do not quit for an exited updater');
 assert(native.includes('if(!accepted)'),'Unconfirmed updater must produce an explicit failure');
