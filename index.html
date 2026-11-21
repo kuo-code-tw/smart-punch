@@ -368,7 +368,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
 @media(max-width:360px){.p79-yard-kpis{grid-template-columns:minmax(0,1fr)}}
 </style>
 <link rel="stylesheet" href="./assets/port79-modern-home.css?v=20261029-admin-v1">
-<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261110-clean-four-v3&auditEditor=20261121-1">
+<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261110-clean-four-v3&auditEditor=20261121-inline-pencil-v2">
 </head>
 <body>
 <!-- v2026.09.27.7.8：五大系統入口 SSO 快速交接版；入口驗證一次後完整傳送 Token／角色／工號／姓名／GAS URL。 -->
@@ -400,7 +400,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
     <div id="sessionBar" class="session">
       <div><strong id="sessionTitle"></strong><small id="sessionMeta"></small></div>
       <div class="p79-windows-download-slot">
-        <a id="p79WindowsDownloadLink" class="p79-windows-download-link" href="https://github.com/kuo-code-tw/smart-punch/releases/download/port79-windows-lite-20261120/Port79-Windows-Lite.zip" target="_blank" rel="noopener noreferrer" hidden aria-label="系統下載（Windows 完整程式 ZIP）" title="下載 Windows 電腦版完整程式（ZIP 約 2.8 MB）">⬇ 系統下載</a>
+        <a id="p79WindowsDownloadLink" class="p79-windows-download-link" href="https://github.com/kuo-code-tw/smart-punch/releases/latest/download/Port79-Windows-Lite.zip" target="_blank" rel="noopener noreferrer" hidden aria-label="系統下載（Windows 完整程式 ZIP）" title="下載 GitHub 已驗證的最新正式 Windows 電腦版（ZIP）；新版本發布完成後自動切換">⬇ 系統下載</a>
         <button id="logoutBtn" class="logout" type="button">登出</button>
       </div>
     </div>
@@ -621,12 +621,12 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
     <dialog id="p79DashEarlyPunchDialog" class="p79d-early-dialog" aria-labelledby="p79EarlyPunchDialogTitle">
       <div class="p79d-early-dialog-head"><h3 id="p79EarlyPunchDialogTitle">⚠ 早／中／晚班表出勤待核明細</h3><button type="button" data-early-close aria-label="關閉早班警示">✕</button></div>
       <p id="p79EarlyPunchDialogStatus" role="status" aria-live="polite">開啟時會讀取最新正式考勤與排班資料。</p>
-      <p class="p79d-early-note">依正式班表核對早班 08–16、中班 16–24、晚班次日 00–08；上班 30 分鐘後、下班（含核准延長工時）60 分鐘後再比對打卡。已核准整班請假不列漏卡；部分請假與資料不足標示待核對，不認定缺勤。</p>
+      <p class="p79d-early-note">依正式班表核對早班 08–16、中班 16–24、晚班次日 00–08；上班 30 分鐘後、下班（含核准延長工時）60 分鐘後再比對打卡。管理員可點上／下班卡旁的 ✎ 修改或補登；已核准整班請假不列漏卡，部分請假與資料不足仍待核對。</p>
       <div id="p79EarlyPunchRows">正在準備資料…</div>
       <section id="p79EarlyPunchEditor" class="p79d-early-editor" aria-label="正式考勤編輯畫面" hidden>
         <div class="p79d-early-editor-head">
           <div><strong id="p79EarlyPunchEditorWho">新增／修正考勤</strong>
-            <p>以下直接使用原本的正式考勤系統。選好人員及日期後新增或修改上下班時間，確認儲存完成再返回查核。</p>
+            <p>點上班卡或下班卡旁的 ✎，會自動開啟指定人員的正式考勤修改／補卡表單。核對日期與時間、儲存後，再返回查核。</p>
           </div>
           <button type="button" data-early-editor-back>返回出勤查核並重新核對</button>
         </div>
@@ -2112,7 +2112,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
 <script src="./assets/port79-vessel-versions.js?v=20261030-separate-calls-v3"></script>
 <script src="./assets/port79-approved-leave-summary.js?v=20261101-unit-leave-v1"></script>
-<script src="./assets/port79-home-early-punch-alert.js?v=20261111-verified-rest-v1&edit=20261121-1"></script>
+<script src="./assets/port79-home-early-punch-alert.js?v=20261111-verified-rest-v1&edit=20261121-inline-pencil-v2"></script>
 <script src="./assets/port79-monthly-dashboard.js?v=20261116-import-ranking-refresh-v1&prior=20261111-overtime-live-and-json-v1&ot=20261112-converted-home-v2&ot=20261112-switch-leave-donut-v1&compact=20261113-single-line-v1&precision=20261113-converted-two-decimals-v1"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261109-home-overtime-name-center-v1&donut=20261112-v1&ot=20261112-switch-leave-donut-v1&compact=20261113-single-line-v1&layout=20261113-equal-attendance-kpi-v4">
 <link rel="stylesheet" href="./assets/port79-gate-home.css?v=20261107-gate-equal-height-v2-six-metrics-visible-v3">
@@ -2351,6 +2351,6 @@ html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar .p79-tool
 <!-- Compact homepage top controls: visual layout only, original download/login handlers preserved. -->
 <link rel="stylesheet" href="./assets/port79-home-compact-controls.css?v=20261121-v1">
 <script defer src="./assets/port79-home-compact-controls.js?v=20261121-v1"></script>
-<script defer src="./assets/port79-windows-download.js?v=20261121-history-inline-v1"></script>
+<script defer src="./assets/port79-windows-download.js?v=20261121-latest-release-v2"></script>
 </body>
 </html>

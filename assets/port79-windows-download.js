@@ -1,8 +1,8 @@
 (function(){
  'use strict';
- // The release file is a public distribution asset. Visibility in this page is
+ // Point at the latest *immutable-versioned* official release, not the old\n // 2026-11-20 compatibility tag whose overwritten ZIP can remain cached.\n // The release file is a public distribution asset. Visibility in this page is
  // limited to signed-in managers; all cloud/business permissions stay unchanged.
- const DOWNLOAD_URL='https://github.com/kuo-code-tw/smart-punch/releases/download/port79-windows-lite-20261120/Port79-Windows-Lite.zip';
+ const DOWNLOAD_URL='https://github.com/kuo-code-tw/smart-punch/releases/latest/download/Port79-Windows-Lite.zip';
  const allowedRoles=new Set(['admin','superadmin']);
  const link=document.getElementById('p79WindowsDownloadLink');
  const bar=document.getElementById('sessionBar');

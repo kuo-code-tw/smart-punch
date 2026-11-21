@@ -125,6 +125,10 @@ function analyze(attendanceData,scheduleData,month,options={}){
     return nearFirst||nearLast;
    });
    const ins=matched.filter(s=>s.clockIn),outs=matched.filter(s=>s.clockOut);
+   // Retain exact original event references so a pencil cannot edit the wrong
+   // employee or another shift with the same event ID.
+   const inEvents=[...new Map(ins.map(s=>s.clockIn).filter(Boolean).map(p=>[String(p.id||'')+'|'+String(p.timeStr||''),p])).values()];
+   const outEvents=[...new Map(outs.map(s=>s.clockOut).filter(Boolean).map(p=>[String(p.id||'')+'|'+String(p.timeStr||''),p])).values()];
    const hasIn=ins.length>0,hasOut=outs.length>0;
    if(hasIn&&hasOut)continue;
    // Share the scheduling calendar's independently confirmed rest status.
@@ -150,8 +154,10 @@ function analyze(attendanceData,scheduleData,month,options={}){
     empId:String(person.empId||person.id||''),attNo:String(person.attNo||person.attendanceNo||''),
     dept:String(person.dept||person.department||''),group:String(dates.__personnel?.group||person.group||''),
     shift:period.label,scheduled:period.label==='早'?'08:00–16:00':period.label==='中'?'16:00–24:00':'00:00–08:00（次日）',
-    clockIn:ins.map(s=>String(s.clockIn.timeStr||'')).filter(Boolean).join('／'),
-    clockOut:outs.map(s=>String(s.clockOut.timeStr||'')).filter(Boolean).join('／'),
+    clockIn:inEvents.map(p=>String(p.timeStr||'')).filter(Boolean).join('／'),
+    clockOut:outEvents.map(p=>String(p.timeStr||'')).filter(Boolean).join('／'),
+    clockInEvents:inEvents.map(p=>({id:String(p.id??''),timeStr:String(p.timeStr||'')})),
+    clockOutEvents:outEvents.map(p=>({id:String(p.id??''),timeStr:String(p.timeStr||'')})),
     reason,stage:now>=endGrace?'班次已結束':period.label+'班已開始',
     explanation:'已核對正式班表、打卡配對與核准請假；此項為待人工確認，不代表認定缺勤。'
    });
@@ -160,7 +166,7 @@ function analyze(attendanceData,scheduleData,month,options={}){
  details.sort((a,b)=>b.date.localeCompare(a.date)||a.shift.localeCompare(b.shift,'zh-TW')||a.name.localeCompare(b.name,'zh-TW'));
  return {count:details.length,details,unknownDays,reason:unknownDays?'部分日期休息狀態或跨日考勤尚未核實；整班無卡不直接認定漏卡，已核實休息日不列警示':''};
 }
-let last=null,refresh=null,bound=false;
+let last=null,refresh=null,bound=false,editorGeneration=0;
 const $=key=>root.document?.getElementById(key);
 function status(message){const el=$('p79EarlyPunchDialogStatus');if(el)el.textContent=message;}
 // Only reuse the original attendance page, with its own cloud preflight,
@@ -175,25 +181,117 @@ function officialEditorUrl(){
  }catch(e){return '';}
 }
 function editorOpen(){return !!$('p79EarlyPunchEditor')&&!$('p79EarlyPunchEditor').hidden;}
-function showEditor(record=null){
+function pencilCell(record,index,side,editable){
+ const label=side==='IN'?'上班卡':'下班卡';
+ const time=side==='IN'?record.clockIn:record.clockOut;
+ if(!editable)return html(time||'—');
+ return '<span class="p79-early-time-edit"><span>'+html(time||'—')+'</span>'+
+  '<button type="button" class="p79-early-pencil" data-early-edit="'+index+
+  '" data-early-side="'+side+'" title="'+(time?'修改':'補登')+label+
+  '" aria-label="'+html(record.name)+' '+html(record.date)+' '+(time?'修改':'補登')+label+'時間">✏️</button></span>';
+}
+function dayAfter(date){
+ const dt=new Date(date+'T00:00:00Z');
+ if(!Number.isFinite(dt.getTime()))return date;
+ return new Date(dt.getTime()+DAY).toISOString().slice(0,10);
+}
+async function focusOriginalAttendanceEditor(frame,person,side,generation,attempt=0){
+ if(!editorOpen()||generation!==editorGeneration)return;
+ let child,doc;
+ try{
+  child=frame.contentWindow;
+  doc=child?.document;
+  if(!child||!doc||child.location.origin!==root.location.origin)throw Error('跨來源視窗不可操作');
+ }catch(e){
+  status('考勤編輯頁面來源不一致，已停止自動定位；不會變更資料。');
+  return;
+ }
+ const existing=side==='IN'?person.clockInEvents:person.clockOutEvents;
+ const matches=Array.isArray(existing)?existing:[];
+ if(matches.length>1){
+  status('這個時段有多筆打卡，無法唯一確認。請在下方正式考勤表選擇要修改的那一筆。');
+  return;
+ }
+ if(matches.length===1&&!String(matches[0].id||'')){
+  status('已有打卡時間，但缺少可核對的原始紀錄編號；請在下方考勤表選取紀錄，禁止當成缺卡重複新增。');
+  return;
+ }
+ const hasTarget=matches.length===1&&!!String(matches[0].id||'');
+ const action=hasTarget?'edit':'add';
+ const counts=typeof child.p79AttendanceRecordCounts==='function'?child.p79AttendanceRecordCounts():null;
+ const ready=typeof child.openEditRecordModal==='function'&&
+  typeof child.openRowManualAdd==='function'&&doc.getElementById('viewAdmin')&&
+  (!hasTarget||Number(counts?.visibleRawRecords||0)>0);
+ if(!ready){
+  if(attempt<50){
+   root.setTimeout?.(()=>focusOriginalAttendanceEditor(frame,person,side,generation,attempt+1),500);
+  }else{
+   status('正式考勤頁尚未讀齊資料，請在下方考勤系統確認載入後操作；沒有寫入任何修改。');
+  }
+  return;
+ }
+ const chosen=matches[0];
+ status((action==='edit'?'正在開啟這筆':'正在開啟補登')+(side==='IN'?'上班卡':'下班卡')+'的正式考勤編輯表單…');
+ try{
+  if(action==='edit'){
+   // Require the same record ID, direction, original timestamp and employee.
+   // The native modal additionally validates the official cloud baseline.
+   await child.openEditRecordModal(chosen.id,side,chosen.timeStr,
+    {empId:person.empId,attNo:person.attNo,name:person.name},null,true);
+  }else{
+   const opposite=side==='IN'?person.clockOutEvents:person.clockInEvents;
+   const paired=Array.isArray(opposite)&&opposite.length===1?opposite[0]:null;
+   // For 00-08 overnight duty, an entirely blank side belongs to next day.
+   // The original add flow handles a 23:xx opposite IN crossing midnight.
+   const workDate=person.shift==='晚'&&!paired?dayAfter(person.date):person.date;
+   await child.openRowManualAdd(
+    encodeURIComponent(person.empId||person.attNo||person.name),encodeURIComponent(workDate),
+    side==='IN'?'上班簽到':'下班簽退',
+    encodeURIComponent(paired?.id||''),encodeURIComponent(person.attNo||''),
+    encodeURIComponent(person.name||''),encodeURIComponent(paired?.timeStr||''));
+  }
+  if(generation!==editorGeneration)return;
+  const modal=doc.getElementById(action==='edit'?'editRecordModal':'addRecordModal');
+  if(modal&&!modal.classList.contains('hidden')){
+   status('已開啟 '+person.name+' 的'+(side==='IN'?'上班卡':'下班卡')+
+    '時間'+(action==='edit'?'修改':'補登')+'表單。請調整日期、時間並在正式考勤表單儲存。');
+  }else{
+   status('正式考勤未確認這筆紀錄或人員，請在下方考勤頁查核後再修改；不會自動寫入。');
+  }
+ }catch(error){
+  if(generation===editorGeneration)status('無法自動開啟考勤編輯表單：'+String(error?.message||error)+
+   '。請在下方正式考勤頁操作，未修改任何資料。');
+ }
+}
+function showEditor(record=null,side=''){
  const url=officialEditorUrl();
  if(!url){status('此帳號沒有正式考勤管理權限，不能新增或修正考勤。');return false;}
  const editor=$('p79EarlyPunchEditor'),frame=$('p79EarlyPunchEditorFrame'),rows=$('p79EarlyPunchRows');
  if(!editor||!frame||!rows)return false;
+ const typed=side==='IN'||side==='OUT'?side:'';
+ const label=typed?(typed==='IN'?'上班卡':'下班卡'):'出勤';
  $('p79EarlyPunchEditorWho').textContent=record
-  ?'正式考勤新增／修正：'+record.name+'｜'+record.date+'｜'+record.shift+'班'
+  ?'正式考勤'+label+'修正：'+record.name+'｜'+record.date+'｜'+record.shift+'班'
   :'正式考勤新增／修正';
  rows.hidden=true;
  editor.hidden=false;
  $('p79DashEarlyPunchDialog')?.classList.add('p79-early-editing');
+ const generation=++editorGeneration;
+ frame.onload=()=>{
+  frame.onload=null; // A later navigation inside attendance must not reopen the edit modal.
+  if(record&&typed)void focusOriginalAttendanceEditor(frame,record,typed,generation);
+ };
  // Assign the verified SSO URL only on user action, never in HTML source.
  frame.src=url;
- status('請在下方正式考勤畫面選擇人員及日期，完成儲存後按「返回出勤查核並重新核對」。');
+ status(record&&typed
+  ?'正在進入正式考勤，將直接開啟 '+record.name+' 的'+label+'時間修改／補登表單…'
+  :'請在下方正式考勤畫面選擇人員及日期，完成儲存後按「返回出勤查核並重新核對」。');
  return true;
 }
 function hideEditor(){
+ editorGeneration++;
  const frame=$('p79EarlyPunchEditorFrame'),editor=$('p79EarlyPunchEditor'),rows=$('p79EarlyPunchRows');
- if(frame)frame.removeAttribute('src');
+ if(frame){frame.onload=null;frame.removeAttribute('src');}
  if(editor)editor.hidden=true;
  if(rows)rows.hidden=false;
  $('p79DashEarlyPunchDialog')?.classList.remove('p79-early-editing');
@@ -214,8 +312,8 @@ function renderDialog(){
  if(add)add.hidden=!editable;
  if(!last||!Array.isArray(last.details)){host.innerHTML='<p>目前無法確認班表出勤待核人數，請重新讀取正式考勤與排班。</p>';return;}
  if(!last.details.length){host.innerHTML='<p>目前沒有可確認的班表出勤待核紀錄。</p>';return;}
- host.innerHTML='<div class="p79-early-table-scroll"><table><thead><tr><th>日期</th><th>姓名</th><th>工號／考勤號</th><th>組別</th><th>班別</th><th>應出勤時段</th><th>上班卡</th><th>下班卡</th><th>待核原因</th>'+(editable?'<th>考勤修正</th>':'')+'</tr></thead><tbody>'+
-  last.details.slice(0,200).map((r,index)=>'<tr><td>'+html(r.date)+'</td><td>'+html(r.name)+'</td><td>'+html(r.empId||r.attNo||'—')+'</td><td>'+html(r.group||'—')+'</td><td>'+html(r.shift)+'</td><td>'+html(r.scheduled)+'</td><td>'+html(r.clockIn||'—')+'</td><td>'+html(r.clockOut||'—')+'</td><td class="p79-early-reason">'+html(r.reason)+'</td>'+(editable?'<td><button type="button" data-early-edit="'+index+'" aria-label="新增或修正 '+html(r.name)+' '+html(r.date)+' 出勤時間">新增／修正</button></td>':'')+'</tr>').join('')+
+ host.innerHTML='<div class="p79-early-table-scroll"><table><thead><tr><th>日期</th><th>姓名</th><th>工號／考勤號</th><th>組別</th><th>班別</th><th>應出勤時段</th><th>上班卡</th><th>下班卡</th><th>待核原因</th></tr></thead><tbody>'+
+  last.details.slice(0,200).map((r,index)=>'<tr><td>'+html(r.date)+'</td><td>'+html(r.name)+'</td><td>'+html(r.empId||r.attNo||'—')+'</td><td>'+html(r.group||'—')+'</td><td>'+html(r.shift)+'</td><td>'+html(r.scheduled)+'</td><td>'+pencilCell(r,index,'IN',editable)+'</td><td>'+pencilCell(r,index,'OUT',editable)+'</td><td class="p79-early-reason">'+html(r.reason)+'</td></tr>').join('')+
  '</tbody></table></div>';
  if(last.details.length>200)host.insertAdjacentHTML('beforeend','<p>畫面先顯示前 200 筆，完整資料請至考勤系統核對。</p>');
 }
@@ -262,7 +360,7 @@ function bind(recheckCallback){
   if(!action||!last?.details)return;
   const position=Number(action.dataset.earlyEdit);
   if(!Number.isInteger(position)||position<0||position>=Math.min(200,last.details.length))return;
-  showEditor(last.details[position]);
+  showEditor(last.details[position],String(action.dataset.earlySide||''));
  });
  dialog.querySelector('[data-early-add]')?.addEventListener('click',()=>showEditor());
  dialog.querySelector('[data-early-editor-back]')?.addEventListener('click',async()=>{
