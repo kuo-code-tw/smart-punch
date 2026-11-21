@@ -127,6 +127,27 @@
    if(lastFailureKey!==key)nativeProgress('waiting','上次下載尚未全部確認','為避免重複雲端請求暫停自動重試；可從系統匣手動重新下載。',0);
    return;
   }
+  // Delegate automatic Windows sync to the same permanent worker used by
+  // manual download. A page change must never destroy the cloud scan.
+  if(window.__port79NativeShellHasBackgroundWorker===true){
+   if(window.__port79NativeCloudWorkerReady!==true){
+    nativeProgress('waiting','正在準備背景雲端下載器','載入後自動開始，你可以切換頁面處理工作。',0);
+    return;
+   }
+   try{
+    if(typeof window.chrome?.webview?.postMessage!=='function')
+     throw new Error('Windows 背景同步橋接尚未載入');
+    save(key,{attempt:now});
+    window.chrome.webview.postMessage(JSON.stringify({
+     kind:'port79-cache-command-v1',action:'download-all'
+    }));
+    nativeProgress('waiting','背景雲端同步已啟動','可以切換考勤、排班、請假等工作；已完成快取不會重複下載。',0);
+   }catch(error){
+    save(key,{attempt:0});
+    nativeProgress('failed','背景同步沒有開始',String(error?.message||error),0);
+   }
+   return;
+  }
   running=true;leftPage=false;processed=0;successes=0;errors=0;monthCompleted=0;monthTotal=0;sessionKey=key;lastFailureKey='';lastActivityAt=now;lastHeartbeatAt=now;activeSystem='考勤';activeDetail='正在核對雲端資料';save(key,{attempt:now});
   useNativeComputerFolder();
   view('正在下載本機資料','已處理 0／7 個系統；下載不會阻止你使用首頁。',0);
