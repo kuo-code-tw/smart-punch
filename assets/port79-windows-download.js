@@ -42,9 +42,10 @@
    if(!response?.ok)throw Error('Release metadata unavailable');
    const release=await response.json();
    const tag=String(release?.tag_name||'');
-   const match=/^port79-windows-lite-[0-9]{8}-([a-f0-9]{12})$/.exec(tag);
+   const match=/^port79-windows-lite-([0-9]{4})([0-9]{2})([0-9]{2})-([a-f0-9]{12})$/.exec(tag);
    if(!match||release.draft===true)throw Error('Unexpected release version');
-   const version=match[1];
+   const version=match[4];
+   const human='V'+match[1]+'.'+match[2]+'.'+match[3]+'-'+version;
    const uniqueName='Port79-Windows-Lite-'+version+'.zip';
    const named=Array.isArray(release.assets)?release.assets.find(a=>a?.name===uniqueName):null;
    const stable=Array.isArray(release.assets)?release.assets.find(a=>a?.name==='Port79-Windows-Lite.zip'):null;
@@ -55,7 +56,7 @@
       !(Number(chosen.size)>0&&Number(chosen.size)<31457280))throw Error('Release asset not verified');
    if(!managerSession())return;
    link.href=expected;
-   link.textContent='⬇ 系統下載 v'+version.slice(0,8);
+   link.textContent='⬇ 系統下載 '+human;
    link.title='下載 79號碼頭正式 Windows '+tag+'（SHA-256 已提供驗證）';
   }catch(_){
    // GitHub API can be rate limited. Its releases/latest redirect still tracks
