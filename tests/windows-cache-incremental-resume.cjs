@@ -62,6 +62,21 @@ test('interrupted 6/7 previous download resumes only the missing history catalog
  assert.equal(result.filter(x=>x.reused).length,6);
  assert.equal(result.filter(x=>x.ok).length,7);
 });
+test('Windows startup completes 6/6 while missing history catalog stays on demand',async()=>{
+ const f=fixture({missing:['history'],ageMinutes:72});
+ const result=await f.run({quickFirst:true,resumeExisting:true,historyOnDemand:true});
+ assert.equal(result.length,6);
+ assert.equal(result.filter(x=>x.reused).length,6);
+ assert.deepEqual(f.calls,[],'No history server call and no repeated fetches');
+ assert(result.every(x=>x.system!=='history'));
+ assert(f.progress.every(x=>x[2]===6),'Never display stale 6/7 count');
+});
+test('Windows manual refresh verifies six modules only, with history requested by month',async()=>{
+ const f=fixture({missing:['history'],ageMinutes:72});
+ const result=await f.run({quickFirst:true,historyOnDemand:true});
+ assert.equal(result.length,6);
+ assert.deepEqual(f.calls,['leave','schedule','efficiency','hr','attendance']);
+});
 test('manual refresh is not suppressed by long startup resume cache',async()=>{
  const f=fixture({ageMinutes:70});await f.run({quickFirst:true});
  assert.deepEqual(f.calls,['leave','schedule','efficiency','hr','history','attendance']);
@@ -99,4 +114,8 @@ test('startup resume is explicit while the user-triggered sync still refreshes c
  assert.match(native,/if\(sender==cloudWorker\?\.CoreWebView2&&!cloudWorkerJobActive/);
  assert.match(src,/row\.savedAt<mutationStamp\(\)/);
  assert.match(src,/row\.cacheEndpoint&&row\.cacheEndpoint!==gasUrl\(\)/);
+ assert(src.includes('historyOnDemand=options?.historyOnDemand===true'));
+ assert(src.includes('historyOnDemand?6:7'));
+ assert(src.includes('resumeExisting:window.__port79WorkerResumeOnly===true,historyOnDemand'));
+ assert(native.includes('重新核對六項基本資料（歷史按月）'));
 });
