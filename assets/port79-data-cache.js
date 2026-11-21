@@ -932,8 +932,15 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
   if(!monthCheckpointSignature)return;
   verifyAttendanceDownloadContext(expected);
   const data={ok:true,month,rows,signature:monthCheckpointSignature};
-  await put({key:systemKey('attendance')+'|checkpoint|'+month,
-   kind:'system',system:'attendance',savedAt:Date.now(),size:safeSize(data),data});
+  // Checkpoints are a best-effort acceleration, never a prerequisite for
+  // valid business data. Browser/test contexts without IndexedDB must still
+  // finish a correct full download rather than fail each historical month.
+  try{
+   await put({key:systemKey('attendance')+'|checkpoint|'+month,
+    kind:'system',system:'attendance',savedAt:Date.now(),size:safeSize(data),data});
+  }catch(error){
+   console.warn('考勤月份快取暫時無法保存；繼續正常下載',String(error?.message||error));
+  }
  }
  // The catalog alone has no revision. Compare an explicit cloud revision and the
  // authenticated scoped master, never a timestamp or another viewer's folder.
