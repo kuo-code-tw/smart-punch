@@ -1,0 +1,144 @@
+name: Publish verified Windows updates after Pages
+
+on:
+  pull_request:
+    paths: ['.github/workflows/port79-windows-updates.yml']
+  push:
+    branches: [main]
+    paths: ['.github/workflows/port79-windows-updates.yml']
+  workflow_run:
+    workflows: ['Publish static site to GitHub Pages']
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: port79-windows-official-update
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event != 'pull_request')
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          path: production
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          # Known Windows code previously used to build the official release.
+          ref: d1b0e4f8d046025016153b96ceced0a28b268520
+          path: windows-source
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Assemble production website with pinned native app source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $src=Join-Path $env:GITHUB_WORKSPACE 'windows-source/desktop-lite'
+          $dst=Join-Path $env:GITHUB_WORKSPACE 'production/desktop-lite'
+          if(!(Test-Path (Join-Path $src 'Port79Lite.csproj'))){throw 'Native source missing'}
+          if(Test-Path $dst){throw 'Unexpected desktop source conflict'}
+          Copy-Item -LiteralPath $src -Destination $dst -Recurse
+      - name: Verify program and update rollback rules
+        shell: pwsh
+        working-directory: production
+        run: |
+          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs
+          if($LASTEXITCODE -ne 0){throw 'Windows unit tests failed'}
+          & ./desktop-lite/tests/shell-updater-safety.ps1
+          if($LASTEXITCODE -ne 0){throw 'Updater preservation tests failed'}
+      - name: Build native Windows EXE and full production website
+        shell: pwsh
+        working-directory: production
+        run: |
+          dotnet restore desktop-lite/Port79Lite.csproj /p:Platform=x64
+          if($LASTEXITCODE -ne 0){throw 'Restore failed'}
+          & ./desktop-lite/build-portable.ps1
+          if($LASTEXITCODE -ne 0){throw 'Build failed'}
+      - name: Reject private data and stale website files
+        shell: pwsh
+        working-directory: production
+        run: |
+          $ErrorActionPreference='Stop'
+          $zip='desktop-lite/dist/79號碼頭_Windows輕量資料夾版.zip'
+          if(!(Test-Path $zip) -or (Get-Item $zip).Length -gt 30MB){throw 'Invalid ZIP'}
+          Add-Type -AssemblyName System.IO.Compression
+          $z=[IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip).Path)
+          try {
+            $prefix='79號碼頭_Windows輕量版/'
+            $names=@($z.Entries | ForEach-Object { $_.FullName.Replace('\','/') })
+            foreach($required in @('Port79WindowsLite.exe','app/upgrade-windows.ps1','site/smart-punch/index.html')){
+              if($names -notcontains ($prefix+$required)){throw "Missing $required"}
+            }
+            foreach($entry in $z.Entries){
+              $name=$entry.FullName.Replace('\','/')
+              if(!$name.StartsWith($prefix,[StringComparison]::Ordinal) -or $name.Contains('../') -or $name.Contains(':')){throw "Unsafe path: $name"}
+              if($name.StartsWith($prefix+'local-data/',[StringComparison]::OrdinalIgnoreCase) -and $entry.Length -gt 0){throw 'Private local-data must never be published'}
+              if($name -match 'port79-yard-private-recovery|private.*backup|\.sqlite|\.ldb'){throw "Private material: $name"}
+            }
+            foreach($relative in @('index.html','assets/port79-gate-home.js','yard-dashboard/yard-dashboard.js')){
+              $e=$z.Entries | Where-Object { $_.FullName -eq ($prefix+'site/smart-punch/'+$relative) } | Select-Object -First 1
+              if(!$e){throw "Missing website file: $relative"}
+              $expected=(Get-FileHash $relative -Algorithm SHA256).Hash.ToLowerInvariant()
+              $hash=[System.Security.Cryptography.SHA256]::Create()
+              try {
+                $stream=$e.Open()
+                try {$actual=[BitConverter]::ToString($hash.ComputeHash($stream)).Replace('-','').ToLowerInvariant()}
+                finally {$stream.Dispose()}
+              } finally {$hash.Dispose()}
+              if($actual -ne $expected){throw "Old website source in ZIP: $relative"}
+            }
+          } finally {$z.Dispose()}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-port79-windows
+          path: production/desktop-lite/dist/79號碼頭_Windows輕量資料夾版.zip
+          retention-days: 30
+          if-no-files-found: error
+
+  release:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-port79-windows
+          path: dist
+      - name: Publish verified Windows release and update legacy link
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SITE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          cp 'dist/79號碼頭_Windows輕量資料夾版.zip' dist/Port79-Windows-Lite.zip
+          tag="port79-windows-lite-$(date -u +%Y%m%d)-${SITE_SHA:0:12}"
+          if gh release view "$tag" -R "$REPO" >/dev/null 2>&1; then
+            echo "Already published $tag; no duplicate release"
+            exit 0
+          fi
+          gh release create "$tag" dist/Port79-Windows-Lite.zip -R "$REPO" \
+            --title "79號碼頭 Windows 正式更新 ($tag)" --target "$SITE_SHA" --latest \
+            --notes "Verified Windows native package and production site $SITE_SHA. No local-data or private yard backup."
+          # Older Windows EXEs check this fixed legacy tag.
+          gh release upload port79-windows-lite-20261120 dist/Port79-Windows-Lite.zip --clobber -R "$REPO"
+          echo "Published $tag and refreshed stable legacy download"
