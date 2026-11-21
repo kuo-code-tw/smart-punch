@@ -21,7 +21,22 @@ try{
   if(!(Test-Path $marker) -or (Get-Content -LiteralPath $marker -Raw).Trim() -ne $digest){
     throw 'Updater did not record verified release digest'
   }
-  Write-Host 'PASS Windows native smoke: SHA-256, file replacement, visible homepage and automatic restart'
+  # The background worker must actually initialize inside Windows WebView2.
+  # A source-only check cannot prove its off-screen browser context survives.
+  $nativeLog=Join-Path $root 'local-data/logs/windows-lite.log'
+  $backgroundReady=$false
+  for($i=0;$i -lt 36;$i++){
+    if(Test-Path $nativeLog){
+      $text=Get-Content -LiteralPath $nativeLog -Raw -ErrorAction SilentlyContinue
+      if($text -match 'background worker ready'){$backgroundReady=$true;break}
+      if($text -match 'background sync init:'){
+        throw ('Native background worker failed to load: '+($text -split 'background sync init:')[-1].Trim())
+      }
+    }
+    Start-Sleep -Milliseconds 500
+  }
+  if(!$backgroundReady){throw 'Windows WebView2 background cloud worker did not initialize'}
+  Write-Host 'PASS Windows native smoke: SHA-256, visible homepage, automatic restart and persistent background worker'
 }finally{
   Get-Process -Name 'Port79WindowsLite' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 }
