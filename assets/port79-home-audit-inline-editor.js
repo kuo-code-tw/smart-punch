@@ -98,7 +98,7 @@ function open({url,row=null,side='',onStatus=()=>{},onSynced=async()=>{}}={}){
    const style=doc.createElement('style');
    style.id='p79InlineAuditOnlyStyle';
    style.textContent='html,body{background:transparent!important;min-height:100%!important;overflow:hidden!important}'+
-    'body>*:not(#editRecordModal):not(#addRecordModal){display:none!important}'+
+    'body>*:not(#editRecordModal):not(#addRecordModal):not(#toastContainer){display:none!important}'+
     '#editRecordModal,#addRecordModal{z-index:2147483600!important}'+
     '#editRecordModal:not(.hidden),#addRecordModal:not(.hidden){display:flex!important}'+
     '#editRecordModal .max-w-md,#addRecordModal .max-w-md{max-width:560px!important}';

@@ -19,7 +19,7 @@ assert.doesNotMatch(src,/root\.location\.href=url\.href/,'Never navigate away fr
 assert.doesNotMatch(home,/data-early-attendance/,'No jump-to-attendance button inside the audit dialog');
 assert.doesNotMatch(src,/launchSystem\('attendance'\)/,'No attendance page navigation in this dialog');
 assert.match(bridge,/frame\.hidden=false;loading\.hidden=true/,'Only display the original form after it opens');
-assert.match(bridge,/body>\*:not\(#editRecordModal\):not\(#addRecordModal\)/,'Hide all original attendance page chrome');
+assert.match(bridge,/body>\*:not\(#editRecordModal\):not\(#addRecordModal\):not\(#toastContainer\)/,'Hide all original attendance page chrome');
 assert.match(bridge,/win\.postToCloud/,'Capture only existing attendance cloud writes');
 assert.match(bridge,/data\?\.ok===true&&data\.localOnly!==true/,'No false cloud synchronization success');
 assert.match(bridge,/onSynced\(\)/);
