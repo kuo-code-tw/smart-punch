@@ -9,6 +9,10 @@ on:
       - 'tests/yard-home-manual-capacity.cjs'
       - 'tests/yard-home-donuts.cjs'
       - 'index.html'
+      - 'assets/port79-yard-account-sync.js'
+      - 'backend/yard-cloud-store.gs'
+      - 'backend/yard-cloud-deployment.md'
+      - 'tests/yard-cloud-store.cjs'
       - '.github/workflows/verify-yard-dashboard.yml'
   pull_request:
     paths:
@@ -19,6 +23,10 @@ on:
       - 'tests/yard-home-manual-capacity.cjs'
       - 'tests/yard-home-donuts.cjs'
       - 'index.html'
+      - 'assets/port79-yard-account-sync.js'
+      - 'backend/yard-cloud-store.gs'
+      - 'backend/yard-cloud-deployment.md'
+      - 'tests/yard-cloud-store.cjs'
       - '.github/workflows/verify-yard-dashboard.yml'
 jobs:
   yard-validation:
@@ -32,3 +40,4 @@ jobs:
           node tests/yard-drag-drop.cjs
           node tests/yard-home-manual-capacity.cjs
           node tests/yard-home-donuts.cjs
+          node --test tests/yard-cloud-store.cjs
