@@ -267,20 +267,31 @@ function renderDialog(){
  const add=$('p79DashEarlyPunchDialog')?.querySelector('[data-early-add]');
  if(add)add.hidden=!editable;
  if(!last||!Array.isArray(last.details)){host.innerHTML='<p>'+html(last?.reason||'正式考勤、班表或核准請假資料尚未讀齊；不會將資料不足誤判為零筆。')+'</p>';return;}
- if(!last.details.length){host.innerHTML='<p>目前沒有可確認的班表出勤待核紀錄。</p>';return;}
- host.innerHTML='<div class="p79-early-table-scroll"><table><thead><tr><th>日期</th><th>姓名</th><th>工號／考勤號</th><th>組別</th><th>班別</th><th>應出勤時段</th><th>上班卡</th><th>下班卡</th><th>待核原因</th></tr></thead><tbody>'+
+ if(!last.details.length){host.innerHTML='<p>'+(last.preview?'初步資料未找到待核候選，正式班表或請假仍待核對。':'目前沒有可確認的班表出勤待核紀錄。')+'</p>';return;}
+ host.innerHTML=(last.preview?'<p class="p79-early-provisional" role="status">'+html(last.reason)+'</p>':'')+'<div class="p79-early-table-scroll"><table><thead><tr><th>日期</th><th>姓名</th><th>工號／考勤號</th><th>組別</th><th>班別</th><th>應出勤時段</th><th>上班卡</th><th>下班卡</th><th>待核原因</th></tr></thead><tbody>'+
   last.details.slice(0,200).map((r,index)=>'<tr><td>'+html(r.date)+'</td><td>'+html(r.name)+'</td><td>'+html(r.empId||r.attNo||'—')+'</td><td>'+html(r.group||'—')+'</td><td>'+html(r.shift)+'</td><td>'+html(r.scheduled)+'</td><td>'+pencilCell(r,index,'IN',editable)+'</td><td>'+pencilCell(r,index,'OUT',editable)+'</td><td class="p79-early-reason">'+html(r.reason)+'</td></tr>').join('')+
  '</tbody></table></div>';
  if(last.details.length>200)host.insertAdjacentHTML('beforeend','<p>畫面先顯示前 200 筆，完整資料請至考勤系統核對。</p>');
 }
 function render(attendanceData,scheduleData,month,options={}){
  last=analyze(attendanceData,scheduleData,month,options);
+ if(options.preview&&Array.isArray(last.details)){
+  const warning=String(options.provisionalReason||'正式來源還在核對').slice(0,400);
+  last={...last,preview:true,
+   reason:'以下只是待核候選，並非確認缺勤：'+warning,
+   details:last.details.map(row=>({...row,reason:row.reason+'（候選）',
+    explanation:'候選資料尚未完成正式班表與核准請假核對，不能視為已認定缺勤。'}))
+  };
+ }
  const btn=$('p79DashEarlyPunchTrigger'),value=$('p79DashEarlyPunchCount'),hint=$('p79DashEarlyPunchHint');
  if(!btn)return last;
  const mode=options.preview?'unverified':last.count===null?'unverified':last.count>0?'pending':last.unknownDays?'unverified':'clear';
  btn.dataset.alertState=mode;
- if(value)value.textContent=last.count===null||last.count===0&&last.unknownDays?'—':String(last.count);
- if(hint)hint.textContent=options.preview?'初步 '+(last.count===null?'資料不足':last.count+' 筆')+'，待正式雲端核對 ›':last.count===null?'資料待核對，點擊查看原因 ›':last.count>0?'點擊核對人員 ›':last.unknownDays?'部分日期待核 ›':'目前無漏卡待核 ›';
+ if(value)value.textContent=last.count===null?'—':options.preview?String(last.count)+'?':last.count===0&&last.unknownDays?'—':String(last.count);
+ if(hint){
+  hint.textContent=options.preview?'初步候選，點擊核對 ›':last.count===null?'資料待核對，點擊查看原因 ›':last.count>0?'點擊核對人員 ›':last.unknownDays?'部分日期待核 ›':'目前無漏卡待核 ›';
+  hint.title=last.reason||'';
+ }
  btn.setAttribute('aria-label','班表出勤待核：'+(last.count===null?'尚未確認':last.count+' 筆待核')+'，點擊查看明細');
  if($('p79DashEarlyPunchDialog')?.open){status(options.preview?'目前為快取初步比對，雲端尚未確認。':last.reason||'已核對正式班表、考勤與已核准請假');renderDialog();}
  return last;
@@ -335,7 +346,9 @@ function bind(recheckCallback){
    ]);
   }catch(e){
    if(!dialog.open)return;
-   status('最新雲端核對尚未完成：'+String(e?.message||e)+'；畫面保留上次資料，請勿視為最新審核結論。');
+   const reason='最新雲端核對未完成：'+String(e?.message||e);
+   if(!last?.details)unavailable(reason);
+   status(reason+'；畫面保留上次資料，不可視為正式已確認。');
    if(!last?.details&&host)host.textContent=last?.reason||'尚無可確認資料；請檢查正式考勤、班表及請假權限。';
   }finally{if(timer)root.clearTimeout(timer);}
  });

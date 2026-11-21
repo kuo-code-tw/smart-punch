@@ -9,7 +9,7 @@ const handoff=fs.readFileSync('assets/port79-attendance-audit-handoff.js','utf8'
 assert.match(home,/id="p79DashEarlyPunchDialog"/);
 assert.doesNotMatch(home,/id="p79EarlyPunchEditorFrame"/,'old gray full-page iframe must never return');
 assert.match(home,/assets\/port79-home-audit-inline-editor\.js\?v=20261121-inplace-v1/);
-assert.match(home,/assets\/port79-home-early-punch-alert\.js\?v=20261121-punch-priority-v5/);
+assert.match(home,/assets\/port79-home-early-punch-alert\.js\?v=20261121-punch-visible-v6/);
 assert.match(src,/P79HomeAuditInlineEditor/);
 assert.match(src,/bridge\.open\(/);
 assert.match(src,/addEventListener\('cancel',event=>/,'Escape cannot interrupt active cloud writing');

@@ -122,8 +122,8 @@ const js=fs.readFileSync(path.join(__dirname,'../assets/port79-monthly-dashboard
 assert(html.includes('id="p79DashEarlyPunchTrigger"'));
 assert(html.includes('id="p79DashEarlyPunchCount"'));
 assert(html.includes('id="p79DashEarlyPunchDialog"'));
-assert(html.includes('assets/port79-home-early-punch-alert.js?v=20261121-punch-priority-v5'));
-assert(html.includes('port79-monthly-dashboard.js?v=20261121-punch-priority-v5'), 'dashboard version assertion matches current production asset');
+assert(html.includes('assets/port79-home-early-punch-alert.js?v=20261121-punch-visible-v6'));
+assert(html.includes('port79-monthly-dashboard.js?v=20261121-punch-visible-v6'), 'dashboard version assertion matches current production asset');
 const block=html.slice(html.indexOf('<section class="p79d-section p79d-attendance"'),html.indexOf('<dialog id="p79DashEarlyPunchDialog"'));
 const head=block.slice(0,block.indexOf('<div class="p79d-kpis">'));
 const cards=block.slice(block.indexOf('<div class="p79d-kpis">'));

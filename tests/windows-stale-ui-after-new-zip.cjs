@@ -25,7 +25,7 @@ assert(updater.includes('File.Delete(manifestFile)'),'Outdated pending patch is 
 assert(build.includes("Join-Path $site '版本資訊.txt'"),'Bundle carries visible source identity');
 assert(release.includes('ZIP site version does not match source commit'),
  'Release CI rejects packages where the bundled UI differs from source');
-assert(index.includes('port79-home-early-punch-alert.js')&&index.includes('20261121-punch-priority-v5'),
+assert(index.includes('port79-home-early-punch-alert.js')&&index.includes('20261121-punch-visible-v6'),
  'Current ZIP opens the original attendance modal in place without full page iframe');
 assert(!index.includes('id="p79EarlyPunchEditorFrame"'),'No broken embedded attendance frame in Windows UI');
 assert(fs.readFileSync('attendance/index.html','utf8').includes('port79-attendance-audit-handoff.js?v=20261121-inplace-v2'),
