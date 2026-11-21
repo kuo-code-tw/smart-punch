@@ -25,6 +25,8 @@ on:
       # Keep the deployment gate verifiable when a regression harness is repaired.
       - 'tests/**'
       - '.github/workflows/pages-static.yml'
+      # Version/packaging changes must publish the same commit as Windows.
+      - '.github/workflows/port79-windows-updates.yml'
   workflow_dispatch:
 
 permissions:
