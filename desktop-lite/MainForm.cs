@@ -32,6 +32,8 @@ namespace Port79Lite {
   private readonly System.Windows.Forms.Timer cacheDismissTimer;
   private bool exit=false;
   private bool updateBusy=false;
+  // Only restart in the background when the user has not begun working.
+  private bool userInteractedSinceLaunch=false;
   private bool initiated=false;
   private bool cacheInProgress=false;
   private bool probedImportFrames=false;
@@ -149,6 +151,12 @@ namespace Port79Lite {
     web.CoreWebView2.SetVirtualHostNameToFolderMapping(Host,Path.Combine(root,"site"),CoreWebView2HostResourceAccessKind.DenyCors);
     web.CoreWebView2.Settings.IsWebMessageEnabled=true;
     web.CoreWebView2.WebMessageReceived+=OnCacheMessage;
+    // The native updater may restart unattended only before any human input.
+    await web.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(
+     "(function(){var sent=false;function used(){if(sent)return;sent=true;"+
+     "try{window.chrome.webview.postMessage('port79-user-interaction-v1')}catch(e){}}"+
+     "['pointerdown','keydown','input','change'].forEach(function(name){"+
+     "document.addEventListener(name,used,true)})})()");
     web.CoreWebView2.Settings.AreDevToolsEnabled=false;
     web.CoreWebView2.NewWindowRequested+=(s,e)=>{
      e.Handled=true;
@@ -328,6 +336,10 @@ namespace Port79Lite {
       !source.AbsolutePath.StartsWith("/smart-punch/",StringComparison.OrdinalIgnoreCase))return;
     var raw=args.TryGetWebMessageAsString();
     if(raw==null||raw.Length>1600)return;
+    if(raw=="port79-user-interaction-v1"&&sender==web.CoreWebView2){
+     userInteractedSinceLaunch=true;
+     return;
+    }
     var payload=new JavaScriptSerializer().Deserialize<CacheStatusPayload>(raw);
     if(payload==null)return;
     if(payload.kind=="port79-import-probe-v1"){
@@ -508,65 +520,44 @@ namespace Port79Lite {
      shellFailure=e.Message;
      Log("Windows shell auto update deferred: "+e.Message);
     }
+    // Explicit menu action already requests restart; do not ask again.
+    // Background checks restart only before user input and when sync is idle.
+    bool restartSafe=!cloudWorkerJobActive&&!cacheInProgress&&
+     (manual||!userInteractedSinceLaunch);
     if(shell!=null){
-     systemUpdateStatusMenu.Text="更新系統：Windows 新版已備妥，待安全重新啟動";
-     if(!manual){
-      tray.ShowBalloonTip(5000,"79號碼頭：已備妥系統更新",
-       "Windows 新版已自動驗證下載；請在不需儲存資料時選「更新系統」套用。",ToolTipIcon.Info);
-     }else{
-      var answer=MessageBox.Show(
-       "已自動下載並驗證 Windows 新版程式"+(websitePending?"及網站更新":"")+"。\n\n"+
-       "套用時會先真正關閉舊程式，更新後自動重新開啟。\n"+
-       "local-data、考勤、請假、排班和瀏覽器快取都會保留。\n\n"+
-       "請先儲存任何正在編輯的內容。現在安全重新啟動並套用嗎？",
-       "更新系統",MessageBoxButtons.YesNo,MessageBoxIcon.Question);
-      if(answer==DialogResult.Yes){
-       await ReleaseUpdater.LaunchAsync(shell,root,Process.GetCurrentProcess().Id);
-       Log("已啟動單一入口 Windows 系統更新：驗證完成、進入安全重啟");
-       ExitApp();
-      }
+     if(!restartSafe){
+      systemUpdateStatusMenu.Text="更新系統：新版已下載；工作或同步中，待下次安全啟動套用";
+      Log("Windows update staged; restart deferred because the user or cloud sync is active");
+      return;
      }
+     systemUpdateStatusMenu.Text="更新系統：Windows 新版已驗證，準備自動重啟";
+     await ReleaseUpdater.LaunchAsync(shell,root,Process.GetCurrentProcess().Id);
+     Log("Windows updater accepted handoff; old app closing for automatic restart");
+     ExitApp();
      return;
     }
     if(websitePending){
-     systemUpdateStatusMenu.Text="更新系統：網站新版已備妥，待重新啟動";
-     if(manual){
-      var answer=MessageBox.Show(
-       "已自動下載並校驗網站程式更新"+(stagedSite>0?" "+stagedSite+" 個檔案":"")+"。\n\n"+
-       "不需要重新下載 Windows ZIP，也不會清除 local-data。\n\n"+
-       "請先儲存尚未完成的編輯，現在重新啟動套用嗎？",
-       "更新系統",MessageBoxButtons.YesNo,MessageBoxIcon.Question);
-      if(answer==DialogResult.Yes){
-       Log("網站程式更新已驗證，使用 Windows Restart 套用 staged 版本");
-       exit=true;Application.Restart();Close();
-      }
-     }else{
-      tray.ShowBalloonTip(4000,"79號碼頭：網站程式更新已下載",
-       "下次重新啟動程式後自動套用；local-data 保留。",ToolTipIcon.Info);
+     if(!restartSafe){
+      systemUpdateStatusMenu.Text="更新系統：網站新版已下載；工作或同步中，待下次安全啟動套用";
+      Log("Website update staged; restart deferred because the user or cloud sync is active");
+      return;
      }
+     systemUpdateStatusMenu.Text="更新系統：網站新版已驗證，正在自動重啟";
+     Log("Website update verified; restart to apply staged site without a prompt");
+     exit=true;
+     Application.Restart();
+     Close();
      return;
     }
     if(siteFailure!=null||shellFailure!=null){
-     systemUpdateStatusMenu.Text="更新系統：部分檢查失敗，原版保留";
-     if(manual)MessageBox.Show(
-      "程式沒有下載未驗證的檔案，也沒有更動本機資料。\n"+
-      (siteFailure!=null?"網站檔案："+siteFailure+"\n":"")+
-      (shellFailure!=null?"Windows 程式："+shellFailure+"\n":"")+
-      "\n請確認正式版本已成功發佈。",
-      "更新系統",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+     systemUpdateStatusMenu.Text="更新系統：部分檢查失敗，原版保留（詳見更新紀錄）";
+     Log("Update check incomplete. Website: "+siteFailure+"; Windows: "+shellFailure);
      return;
     }
     systemUpdateStatusMenu.Text="更新系統：已是目前正式版本";
-    if(manual)MessageBox.Show(
-     "Windows 程式與網站程式已核對，沒有需要下載的更新。\n\n"+
-     "請注意：GitHub 測試分支尚未正式發布的修改，不能當成已更新。\n"+
-     "本機資料及快取未變更。",
-     "更新系統",MessageBoxButtons.OK,MessageBoxIcon.Information);
    }catch(Exception e){
     Log("unified system update error: "+e.Message);
-    systemUpdateStatusMenu.Text="更新系統：執行失敗，原資料保留";
-    if(manual)MessageBox.Show("此次系統更新未完成，原本資料和程式均保留：\n"+e.Message,
-     "更新系統",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+    systemUpdateStatusMenu.Text="更新系統：執行失敗，原資料保留（詳見更新紀錄）";
    }finally{
     updateBusy=false;checkUpdatesMenu.Enabled=true;
    }
