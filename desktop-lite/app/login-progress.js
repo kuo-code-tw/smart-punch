@@ -18,7 +18,8 @@
  function nativeProgress(phase,title,detail,count){
   // Only progress is sent; never send cloud tokens, employee IDs or business records.
   const months=(phase==='downloading'||phase==='stalled')&&activeSystem==='考勤'&&monthTotal>0;
-  const payload={kind:'port79-cache-status-v1',phase,title,detail,completed:count,total:SYSTEMS.length,
+  const nativeTotal=window.__port79NativeShellHasBackgroundWorker===true?6:SYSTEMS.length;
+  const payload={kind:'port79-cache-status-v1',phase,title,detail,completed:Math.min(count,nativeTotal),total:nativeTotal,
    monthCompleted:months?monthCompleted:0,monthTotal:months?monthTotal:0};
   const wire=JSON.stringify(payload);if(wire===lastNativeMessage)return;lastNativeMessage=wire;
   try{if(typeof window.chrome?.webview?.postMessage==='function')window.chrome.webview.postMessage(wire)}catch(_){}
@@ -214,7 +215,10 @@
    return;
   }
   const key=id.key+'|'+id.scope;
-  if(key!==priorSessionKey){priorSessionKey=key;nativeProgress('waiting','管理員已登入，準備下載','登入驗證完成後，開始依序下載七大系統。',0);}
+  if(key!==priorSessionKey){priorSessionKey=key;nativeProgress('waiting','管理員已登入，準備下載',
+    window.__port79NativeShellHasBackgroundWorker===true?
+    '優先沿用六項基本系統快取；歷史資料請到歷史中心選月份讀取。':
+    '登入驗證完成後，開始依序下載七大系統。',0);}
   if(!running)void start(false);
  }
  useNativeComputerFolder();

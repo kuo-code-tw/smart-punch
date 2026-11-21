@@ -79,7 +79,7 @@ jobs:
         shell: pwsh
         working-directory: production
         run: |
-          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs tests/windows-release-version-contract.cjs tests/windows-cache-incremental-resume.cjs tests/windows-stale-ui-after-new-zip.cjs
+          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs tests/windows-release-version-contract.cjs tests/windows-cache-incremental-resume.cjs tests/windows-stale-ui-after-new-zip.cjs tests/windows-download-link.cjs
           if($LASTEXITCODE -ne 0){throw 'Windows unit tests failed'}
           & ./desktop-lite/tests/shell-updater-safety.ps1
           if($LASTEXITCODE -ne 0){throw 'Updater preservation tests failed'}
@@ -122,6 +122,10 @@ jobs:
             try {$versionText=$reader.ReadToEnd()} finally {$reader.Dispose()}
             $builtSha=(& git rev-parse HEAD).Trim()
             if(!$versionText.Contains('GitHub Commit: '+$builtSha)){throw 'ZIP site version does not match source commit'}
+            $commitDate=(& git log -1 --format=%cs).Trim()
+            $humanVersion='V'+$commitDate.Replace('-','.')+'-'+$builtSha.Substring(0,12)
+            if(!$versionText.Contains('版本號: '+$humanVersion)){throw 'ZIP human V version does not match commit and date'}
+            Write-Host ('WINDOWS PACKAGE VERIFIED: '+$humanVersion)
             foreach($entry in $z.Entries){
               $name=$entry.FullName.Replace('\','/')
               if(!$name.StartsWith($prefix,[StringComparison]::Ordinal) -or $name.Contains('../') -or $name.Contains(':')){throw "Unsafe path: $name"}

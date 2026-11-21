@@ -26,7 +26,11 @@ foreach($f in @('index.html','port79-attendance-core.js')){
 # the actually extracted code, rather than a browser's old ZIP filename.
 $commit=((& git -C $repo rev-parse HEAD) | Out-String).Trim()
 if($LASTEXITCODE -ne 0 -or $commit -notmatch '^[a-f0-9]{40}$'){throw 'Cannot identify verified source commit'}
+$commitDate=((& git -C $repo log -1 --format=%cs) | Out-String).Trim()
+if($LASTEXITCODE -ne 0 -or $commitDate -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'){throw 'Cannot identify release commit date'}
+$version='V'+$commitDate.Replace('-','.')+'-'+$commit.Substring(0,12)
 ("79號碼頭 Windows 正式程式版本"+[Environment]::NewLine+
+ "版本號: "+$version+[Environment]::NewLine+
  "GitHub Commit: "+$commit+[Environment]::NewLine+
  "此檔案位於下載 ZIP 的 site/smart-punch 資料夾內；核對正式發布的版本編號。") |
  Set-Content (Join-Path $site '版本資訊.txt') -Encoding UTF8
