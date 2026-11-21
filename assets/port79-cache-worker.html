@@ -39,15 +39,10 @@
   }catch(e){return false}
   running=true;
   lastAccount=auth;
-  Promise.resolve().then(function(){
-   window.dispatchEvent(new Event('port79-desktop-force-sync'));
-  }).finally(function(){
-   // The actual download runs asynchronously in the registered listener.
-   // Its status messages are forwarded directly to the Windows progress UI.
-  });
-  // The listener owns its own busy flag. Do not keep a second stale flag:
-  // completion from the worker is signaled by the same seven-system statuses.
-  running=false;
+  // Only the download handler signals completion; navigation in the visible
+  // WebView2 cannot reset this worker or start a second copy of the job.
+  window.__port79CloudWorkerDone=function(){running=false;};
+  window.dispatchEvent(new Event('port79-desktop-force-sync'));
   return true;
  };
  window.chrome?.webview?.postMessage?.(JSON.stringify({
