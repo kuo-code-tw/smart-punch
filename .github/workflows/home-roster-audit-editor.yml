@@ -7,6 +7,7 @@ on:
       - 'assets/port79-home-early-punch-alert.js'
       - 'assets/port79-monthly-dashboard.css'
       - 'tests/home-roster-audit-embedded-editor.cjs'
+      - 'tests/home-early-shift-punch-alert.cjs'
       - '.github/workflows/home-roster-audit-editor.yml'
   push:
     branches: [main]
@@ -15,6 +16,7 @@ on:
       - 'assets/port79-home-early-punch-alert.js'
       - 'assets/port79-monthly-dashboard.css'
       - 'tests/home-roster-audit-embedded-editor.cjs'
+      - 'tests/home-early-shift-punch-alert.cjs'
       - '.github/workflows/home-roster-audit-editor.yml'
 
 permissions:
