@@ -209,14 +209,14 @@ async function recheck(){
 
 function renderDialog(){
  const host=$('p79EarlyPunchRows');if(!host)return;
+ const editable=!!officialEditorUrl();
+ const add=$('p79DashEarlyPunchDialog')?.querySelector('[data-early-add]');
+ if(add)add.hidden=!editable;
  if(!last||!Array.isArray(last.details)){host.innerHTML='<p>目前無法確認班表出勤待核人數，請重新讀取正式考勤與排班。</p>';return;}
  if(!last.details.length){host.innerHTML='<p>目前沒有可確認的班表出勤待核紀錄。</p>';return;}
- const editable=!!officialEditorUrl();
  host.innerHTML='<div class="p79-early-table-scroll"><table><thead><tr><th>日期</th><th>姓名</th><th>工號／考勤號</th><th>組別</th><th>班別</th><th>應出勤時段</th><th>上班卡</th><th>下班卡</th><th>待核原因</th>'+(editable?'<th>考勤修正</th>':'')+'</tr></thead><tbody>'+
   last.details.slice(0,200).map((r,index)=>'<tr><td>'+html(r.date)+'</td><td>'+html(r.name)+'</td><td>'+html(r.empId||r.attNo||'—')+'</td><td>'+html(r.group||'—')+'</td><td>'+html(r.shift)+'</td><td>'+html(r.scheduled)+'</td><td>'+html(r.clockIn||'—')+'</td><td>'+html(r.clockOut||'—')+'</td><td class="p79-early-reason">'+html(r.reason)+'</td>'+(editable?'<td><button type="button" data-early-edit="'+index+'" aria-label="新增或修正 '+html(r.name)+' '+html(r.date)+' 出勤時間">新增／修正</button></td>':'')+'</tr>').join('')+
  '</tbody></table></div>';
- const add=$('p79DashEarlyPunchDialog')?.querySelector('[data-early-add]');
- if(add)add.hidden=!editable;
  if(last.details.length>200)host.insertAdjacentHTML('beforeend','<p>畫面先顯示前 200 筆，完整資料請至考勤系統核對。</p>');
 }
 function render(attendanceData,scheduleData,month,options={}){
