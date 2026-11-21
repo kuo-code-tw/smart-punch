@@ -1149,7 +1149,7 @@ function ensureModal(){
    if(act==='all'){
    // Windows has a separate same-origin WebView2 worker that continues across
    // page navigation; keep the existing modal as the single download entry.
-   if(window.__port79NativeCloudWorkerReady===true&&window.chrome?.webview?.postMessage){
+   if(window.chrome?.webview?.postMessage){
     window.chrome.webview.postMessage(JSON.stringify({
      kind:'port79-cache-command-v1',action:'download-all'
     }));
