@@ -127,7 +127,7 @@ test('cloud-data center delegates to Windows worker, never another page-local do
  assert.match(modal,/if\(window\.chrome\?\.webview\?\.postMessage\)/);
  assert.match(modal,/kind:'port79-cache-command-v1',action:'download-all'/);
  assert.match(modal,/可切換考勤、排班等頁面/);
- assert.match(cacheSource,/window\.__port79CloudWorkerDone\?\.\(\)/);
+ assert.match(cacheSource,/window\.__port79CloudWorkerDone\?\.\(fullyCompleted\)/);
  assert.match(native,/if\(payload\.kind=="port79-cache-command-v1"\)/);
 });
 test('completed independent modules survive page refresh and skip unnecessary re-downloads',async()=>{
