@@ -1008,8 +1008,11 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  const allRecords=mergeAttendanceRows(monthResults.flatMap(x=>x.rows));
  const after=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
  verifyAttendanceDownloadContext(expected);
+ // A revision may change while a full download is running. Preserve the
+ // original completed-data behavior, but mark sourceRevision='' below so it
+ // can NEVER be reused as an unchanged cloud revision on the next visit.
  if(cloudRevision&&String(after?.revision||'')!==cloudRevision)
-  throw Object.assign(new Error('雲端考勤版本在下載期間變更，保留舊快取；下次核對新版本後補下載'),{code:'P79_MUTATION'});
+  console.warn('雲端考勤版本於讀取期間變更，完整快取將在下次重新核對');
  const snapshot={
   sourceRevision:before?.revision&&String(before.revision)===String(after?.revision)?String(before.revision):'',
   ok:true,action:'port79AttendanceFullCache',fullDatabase:true,
