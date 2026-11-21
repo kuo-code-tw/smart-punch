@@ -139,6 +139,13 @@ jobs:
           SITE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
         run: |
           set -euo pipefail
+          # Pages deployment can finish after a newer native-shell change.
+          # Never overwrite the stable Windows update with a stale build.
+          latest_main="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+          if [[ "$SITE_SHA" != "$latest_main" ]]; then
+            echo "Skip outdated Windows release $SITE_SHA; current main is $latest_main"
+            exit 0
+          fi
           cp 'dist/79號碼頭_Windows輕量資料夾版.zip' dist/Port79-Windows-Lite.zip
           tag="port79-windows-lite-$(date -u +%Y%m%d)-${SITE_SHA:0:12}"
           if gh release view "$tag" -R "$REPO" >/dev/null 2>&1; then
