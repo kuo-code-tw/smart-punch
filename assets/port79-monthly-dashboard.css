@@ -154,6 +154,20 @@ html[data-theme="dark"] body:has(#systems.show) #p79Dashboard .p79d-kpi{backgrou
 #p79Dashboard .p79d-early-dialog-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:9px;margin-top:14px}
 #p79Dashboard .p79d-early-dialog-actions button{padding:9px 13px;border-radius:9px;border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;font-weight:850;cursor:pointer}
 
+/* Native attendance editor mounted only on manager action in the original
+   roster-audit dialog. The audit remains read-only; the original attendance
+   page owns all cloud saves, edit conflict checks and access controls. */
+#p79Dashboard .p79d-early-dialog.p79-early-editing{width:min(1400px,98vw);max-height:97vh;padding:12px}
+#p79Dashboard .p79d-early-editor[hidden],#p79Dashboard #p79EarlyPunchRows[hidden],
+#p79Dashboard .p79d-early-dialog-actions button[hidden]{display:none!important}
+#p79Dashboard .p79d-early-editor-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:12px 0}
+#p79Dashboard .p79d-early-editor-head strong{font-size:15px;color:#123b66}
+#p79Dashboard .p79d-early-editor-head p{margin:5px 0;font-size:12px;color:#526b86}
+#p79Dashboard .p79d-early-editor-head button,
+#p79Dashboard [data-early-edit]{padding:7px 11px;border:1px solid #bad6f3;border-radius:8px;background:#ecf5ff;color:#1758a2;font-weight:850;white-space:nowrap;cursor:pointer}
+#p79Dashboard [data-early-edit]:hover,#p79Dashboard .p79d-early-editor-head button:hover{background:#dbeeff}
+#p79Dashboard #p79EarlyPunchEditorFrame{display:block;width:100%;height:min(73vh,750px);border:1px solid #cbd8e9;border-radius:10px;background:white}
+
 
 /* 2026-11-10: one clean row of four equal attendance KPI cards.
    No nested mini-cards, no desktop inner scrollbars, no data-source changes. */

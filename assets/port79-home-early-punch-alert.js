@@ -1,4 +1,4 @@
-/* 79 號碼頭首頁：早／中／晚班表出勤待核；必須同時核對正式班表、考勤與核准請假。唯讀。 */
+/* 79 號碼頭首頁：早／中／晚班表出勤待核。核對唯讀；有管理權限者可在同視窗使用原正式考勤編輯器。 */
 (function(root,factory){
   const api=factory(root);
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -163,12 +163,59 @@ function analyze(attendanceData,scheduleData,month,options={}){
 let last=null,refresh=null,bound=false;
 const $=key=>root.document?.getElementById(key);
 function status(message){const el=$('p79EarlyPunchDialogStatus');if(el)el.textContent=message;}
+// Only reuse the original attendance page, with its own cloud preflight,
+// permission checks, record history and add/update actions.
+function officialEditorUrl(){
+ const candidate=typeof root.p79AuditAttendanceEditorUrl==='function'?root.p79AuditAttendanceEditorUrl():'';
+ if(!candidate||!root.location?.href)return '';
+ try{
+  const url=new URL(candidate,root.location.href);
+  if(url.origin!==root.location.origin||!/\/attendance\/(?:index\.html)?$/.test(url.pathname))return '';
+  return url.href;
+ }catch(e){return '';}
+}
+function editorOpen(){return !!$('p79EarlyPunchEditor')&&!$('p79EarlyPunchEditor').hidden;}
+function showEditor(record=null){
+ const url=officialEditorUrl();
+ if(!url){status('此帳號沒有正式考勤管理權限，不能新增或修正考勤。');return false;}
+ const editor=$('p79EarlyPunchEditor'),frame=$('p79EarlyPunchEditorFrame'),rows=$('p79EarlyPunchRows');
+ if(!editor||!frame||!rows)return false;
+ $('p79EarlyPunchEditorWho').textContent=record
+  ?'正式考勤新增／修正：'+record.name+'｜'+record.date+'｜'+record.shift+'班'
+  :'正式考勤新增／修正';
+ rows.hidden=true;
+ editor.hidden=false;
+ $('p79DashEarlyPunchDialog')?.classList.add('p79-early-editing');
+ // Assign the verified SSO URL only on user action, never in HTML source.
+ frame.src=url;
+ status('請在下方正式考勤畫面選擇人員及日期，完成儲存後按「返回出勤查核並重新核對」。');
+ return true;
+}
+function hideEditor(){
+ const frame=$('p79EarlyPunchEditorFrame'),editor=$('p79EarlyPunchEditor'),rows=$('p79EarlyPunchRows');
+ if(frame)frame.removeAttribute('src');
+ if(editor)editor.hidden=true;
+ if(rows)rows.hidden=false;
+ $('p79DashEarlyPunchDialog')?.classList.remove('p79-early-editing');
+}
+async function recheck(){
+ if(typeof refresh!=='function')throw Error('目前無法重新核對資料');
+ const next=await refresh();
+ if(!next||!Array.isArray(next.attendance?.records)||!Array.isArray(next.schedule?.schedules)||!Array.isArray(next.leaveData?.leaveRecords))
+  throw Error('正式考勤、排班或核准請假資料未讀齊');
+ render(next.attendance,next.schedule,next.month,{leaveData:next.leaveData,restEvidence:next.restEvidence});
+ status(last?.reason||'最新正式資料核對完成；編輯結果依雲端正式考勤為準。');
+}
+
 function renderDialog(){
  const host=$('p79EarlyPunchRows');if(!host)return;
+ const editable=!!officialEditorUrl();
+ const add=$('p79DashEarlyPunchDialog')?.querySelector('[data-early-add]');
+ if(add)add.hidden=!editable;
  if(!last||!Array.isArray(last.details)){host.innerHTML='<p>目前無法確認班表出勤待核人數，請重新讀取正式考勤與排班。</p>';return;}
  if(!last.details.length){host.innerHTML='<p>目前沒有可確認的班表出勤待核紀錄。</p>';return;}
- host.innerHTML='<div class="p79-early-table-scroll"><table><thead><tr><th>日期</th><th>姓名</th><th>工號／考勤號</th><th>組別</th><th>班別</th><th>應出勤時段</th><th>上班卡</th><th>下班卡</th><th>待核原因</th></tr></thead><tbody>'+
-  last.details.slice(0,200).map(r=>'<tr><td>'+html(r.date)+'</td><td>'+html(r.name)+'</td><td>'+html(r.empId||r.attNo||'—')+'</td><td>'+html(r.group||'—')+'</td><td>'+html(r.shift)+'</td><td>'+html(r.scheduled)+'</td><td>'+html(r.clockIn||'—')+'</td><td>'+html(r.clockOut||'—')+'</td><td class="p79-early-reason">'+html(r.reason)+'</td></tr>').join('')+
+ host.innerHTML='<div class="p79-early-table-scroll"><table><thead><tr><th>日期</th><th>姓名</th><th>工號／考勤號</th><th>組別</th><th>班別</th><th>應出勤時段</th><th>上班卡</th><th>下班卡</th><th>待核原因</th>'+(editable?'<th>考勤修正</th>':'')+'</tr></thead><tbody>'+
+  last.details.slice(0,200).map((r,index)=>'<tr><td>'+html(r.date)+'</td><td>'+html(r.name)+'</td><td>'+html(r.empId||r.attNo||'—')+'</td><td>'+html(r.group||'—')+'</td><td>'+html(r.shift)+'</td><td>'+html(r.scheduled)+'</td><td>'+html(r.clockIn||'—')+'</td><td>'+html(r.clockOut||'—')+'</td><td class="p79-early-reason">'+html(r.reason)+'</td>'+(editable?'<td><button type="button" data-early-edit="'+index+'" aria-label="新增或修正 '+html(r.name)+' '+html(r.date)+' 出勤時間">新增／修正</button></td>':'')+'</tr>').join('')+
  '</tbody></table></div>';
  if(last.details.length>200)host.insertAdjacentHTML('beforeend','<p>畫面先顯示前 200 筆，完整資料請至考勤系統核對。</p>');
 }
@@ -185,36 +232,52 @@ function render(attendanceData,scheduleData,month,options={}){
  return last;
 }
 function reset(){
+ hideEditor();
  last=null;
  const btn=$('p79DashEarlyPunchTrigger');
  if(btn)btn.dataset.alertState='unverified';
  if($('p79DashEarlyPunchCount'))$('p79DashEarlyPunchCount').textContent='—';
  if($('p79DashEarlyPunchHint'))$('p79DashEarlyPunchHint').textContent='等待考勤資料 ›';
 }
-function bind(recheck){
- refresh=recheck;
+function bind(recheckCallback){
+ refresh=recheckCallback;
  const btn=$('p79DashEarlyPunchTrigger'),dialog=$('p79DashEarlyPunchDialog');
  if(bound||!btn||!dialog)return;
  bound=true;
  btn.addEventListener('click',async()=>{
   if(dialog.open)return;
+  hideEditor();
   dialog.showModal();status('正在核對早／中／晚班表、正式考勤及核准請假…');
   const host=$('p79EarlyPunchRows');if(host)host.textContent='雲端核對中…';
   try{
-   if(typeof refresh!=='function')throw Error('目前無法重新核對資料');
-   const next=await refresh();
-   if(!dialog.open)return;
-   if(!next||!Array.isArray(next.attendance?.records)||!Array.isArray(next.schedule?.schedules)||!Array.isArray(next.leaveData?.leaveRecords))
-     throw Error('正式考勤、排班或核准請假資料未讀齊');
-   render(next.attendance,next.schedule,next.month,{leaveData:next.leaveData,restEvidence:next.restEvidence});
-   status(last?.reason||'最新正式資料核對完成；所有紀錄僅供人工確認。');
+   await recheck();
   }catch(e){
    if(!dialog.open)return;
    status('最新雲端核對未完成：'+String(e?.message||e));
    if(host)host.textContent='請確認連線後重新點選卡片。未驗證資料不會顯示為已漏卡。';
   }
  });
+ $('p79EarlyPunchRows')?.addEventListener('click',event=>{
+  const action=event.target.closest?.('[data-early-edit]');
+  if(!action||!last?.details)return;
+  const position=Number(action.dataset.earlyEdit);
+  if(!Number.isInteger(position)||position<0||position>=Math.min(200,last.details.length))return;
+  showEditor(last.details[position]);
+ });
+ dialog.querySelector('[data-early-add]')?.addEventListener('click',()=>showEditor());
+ dialog.querySelector('[data-early-editor-back]')?.addEventListener('click',async()=>{
+  if(!editorOpen())return;
+  hideEditor();status('正在重新讀取正式考勤，核對剛才的新增或修正…');
+  const host=$('p79EarlyPunchRows');if(host)host.textContent='雲端核對中…';
+  try{await recheck();}
+  catch(e){
+   if(!dialog.open)return;
+   status('重新核對尚未完成：'+String(e?.message||e));
+   if(host)host.textContent='雲端尚未確認更新，請稍後重新開啟查核；不會把本次修改誤判為已完成。';
+  }
+ });
  dialog.querySelectorAll('[data-early-close]').forEach(button=>button.addEventListener('click',()=>dialog.close()));
+ dialog.addEventListener('close',hideEditor);
  dialog.querySelector('[data-early-attendance]')?.addEventListener('click',()=>{
   dialog.close();
   if(typeof root.launchSystem==='function')root.launchSystem('attendance');

@@ -368,7 +368,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
 @media(max-width:360px){.p79-yard-kpis{grid-template-columns:minmax(0,1fr)}}
 </style>
 <link rel="stylesheet" href="./assets/port79-modern-home.css?v=20261029-admin-v1">
-<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261110-clean-four-v3">
+<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261110-clean-four-v3&auditEditor=20261121-1">
 </head>
 <body>
 <!-- v2026.09.27.7.8：五大系統入口 SSO 快速交接版；入口驗證一次後完整傳送 Token／角色／工號／姓名／GAS URL。 -->
@@ -623,7 +623,16 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
       <p id="p79EarlyPunchDialogStatus" role="status" aria-live="polite">開啟時會讀取最新正式考勤與排班資料。</p>
       <p class="p79d-early-note">依正式班表核對早班 08–16、中班 16–24、晚班次日 00–08；上班 30 分鐘後、下班（含核准延長工時）60 分鐘後再比對打卡。已核准整班請假不列漏卡；部分請假與資料不足標示待核對，不認定缺勤。</p>
       <div id="p79EarlyPunchRows">正在準備資料…</div>
-      <div class="p79d-early-dialog-actions"><button type="button" data-early-attendance>前往考勤管理核對 ›</button><button type="button" data-early-close>關閉</button></div>
+      <section id="p79EarlyPunchEditor" class="p79d-early-editor" aria-label="正式考勤編輯畫面" hidden>
+        <div class="p79d-early-editor-head">
+          <div><strong id="p79EarlyPunchEditorWho">新增／修正考勤</strong>
+            <p>以下直接使用原本的正式考勤系統。選好人員及日期後新增或修改上下班時間，確認儲存完成再返回查核。</p>
+          </div>
+          <button type="button" data-early-editor-back>返回出勤查核並重新核對</button>
+        </div>
+        <iframe id="p79EarlyPunchEditorFrame" title="正式考勤管理：新增或修正出勤時間" loading="lazy" referrerpolicy="no-referrer"></iframe>
+      </section>
+      <div class="p79d-early-dialog-actions"><button type="button" data-early-add hidden>＋ 新增出勤</button><button type="button" data-early-attendance>另至考勤管理 ›</button><button type="button" data-early-close>關閉</button></div>
     </dialog>
     <div class="p79d-panels p79d-attendance-panels">
       <article class="p79d-panel p79r-current-shift-card"><div class="p79d-panel-title"><b>目前班別人員</b><span id="p79CurrentShiftPeriod">依目前班別</span></div><div id="p79CurrentShiftList" class="p79r-current-shift-list" role="region" aria-label="目前班別人員名單" tabindex="0">正在讀取目前班別名單…</div><div hidden>
@@ -1578,7 +1587,15 @@ function buildSsoHref(base){
   if(name)params.set('name',name);
   return versioned+'#'+params.toString();
 }
-function canViewHomeYard(session){
+// Same-origin entry point for the existing attendance editor.
+ // Never duplicate attendance write rules or bypass module permissions.
+ window.p79AuditAttendanceEditorUrl=function(){
+  if(!currentSession||!getToken()||currentSession.punchOnly)return '';
+  const role=String(currentSession.adminRole||'employee').toLowerCase();
+  if(normalizePermissions(currentSession.systemPermissions,role).attendance!=='manage')return '';
+  return new URL(buildSsoHref(PATHS.attendance),location.href).href;
+ };
+ function canViewHomeYard(session){
  const role=String(session?.adminRole||'employee').toLowerCase();
  if(!session||session.punchOnly||!getToken())return false;
  if(role==='superadmin')return true;
@@ -2095,7 +2112,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
 <script src="./assets/port79-vessel-versions.js?v=20261030-separate-calls-v3"></script>
 <script src="./assets/port79-approved-leave-summary.js?v=20261101-unit-leave-v1"></script>
-<script src="./assets/port79-home-early-punch-alert.js?v=20261111-verified-rest-v1"></script>
+<script src="./assets/port79-home-early-punch-alert.js?v=20261111-verified-rest-v1&edit=20261121-1"></script>
 <script src="./assets/port79-monthly-dashboard.js?v=20261116-import-ranking-refresh-v1&prior=20261111-overtime-live-and-json-v1&ot=20261112-converted-home-v2&ot=20261112-switch-leave-donut-v1&compact=20261113-single-line-v1&precision=20261113-converted-two-decimals-v1"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261109-home-overtime-name-center-v1&donut=20261112-v1&ot=20261112-switch-leave-donut-v1&compact=20261113-single-line-v1&layout=20261113-equal-attendance-kpi-v4">
 <link rel="stylesheet" href="./assets/port79-gate-home.css?v=20261107-gate-equal-height-v2-six-metrics-visible-v3">
