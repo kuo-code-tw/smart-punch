@@ -22,14 +22,15 @@ namespace Port79Lite {
   const long Limit=30L*1024*1024;
   public sealed class GitAsset {public string name {get;set;} public string browser_download_url {get;set;} public string digest {get;set;} public long size {get;set;} }
   public sealed class GitRelease {public bool draft {get;set;} public string tag_name {get;set;} public GitAsset[] assets {get;set;} }
-  public sealed class Prepared {public string Zip {get;set;} public string Digest {get;set;} public string Runner {get;set;} }
+  public sealed class Prepared {public string Zip {get;set;} public string Digest {get;set;} public string Helper {get;set;} }
   static readonly JavaScriptSerializer Json=new JavaScriptSerializer {MaxJsonLength=1000000};
   static bool HashValid(string text){return text?.Length==64&&text.All(x=>(x>='0'&&x<='9')||(x>='a'&&x<='f'));}
   static string Sha256(byte[] bytes){using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(bytes)).Replace("-","").ToLowerInvariant();}
   public static async Task<Prepared> PrepareAsync(string root,string data,Action<string> log){
    ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
-   var runner=Path.Combine(root,"app","upgrade-windows.ps1");
-   if(!File.Exists(runner))throw new FileNotFoundException("缺少內建更新工具 upgrade-windows.ps1，請確認整個程式資料夾完整。");
+   var helper=Path.Combine(root,"app","Port79Updater.exe");
+   if(!File.Exists(helper))throw new FileNotFoundException(
+    "目前的 Windows 程式缺少原生更新器 Port79Updater.exe。為保護 local-data，請只將最新版 ZIP 的程式檔更新一次；不用調整 PowerShell 安全設定。");
    using(var client=new HttpClient {Timeout=TimeSpan.FromSeconds(60)}){
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Port79-WindowsLite-Updater/1.0");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
@@ -121,7 +122,7 @@ namespace Port79Lite {
       return null;
      }
     }
-    return new Prepared{Zip=zip,Digest=digest,Runner=runner};
+    return new Prepared{Zip=zip,Digest=digest,Helper=helper};
    }
   }
   static string Quote(string s){
@@ -131,40 +132,64 @@ namespace Port79Lite {
   public static async Task LaunchAsync(Prepared p,string root,int parentPid){
    if(p==null)throw new ArgumentNullException("p");
    if(parentPid<=0)throw new ArgumentOutOfRangeException("parentPid");
-   // Process.Start alone does not prove that PowerShell reached the updater.
+   // Native .NET helper is used instead of PowerShell, so Group Policy,
+   // execution policy and blocked .ps1 files cannot silently prevent updates.
+   if(!File.Exists(p.Helper))throw new FileNotFoundException(
+    "找不到本機 Windows 原生更新工具，舊系統不會關閉；請先修復更新程式檔案。",p.Helper);
    var updateDir=Path.Combine(root,"local-data","updates");
    Directory.CreateDirectory(updateDir);
    var ready=Path.Combine(updateDir,"runner-ready-"+parentPid+".flag");
+   var fail=Path.Combine(updateDir,"native-update-launch-error.txt");
    if(File.Exists(ready))File.Delete(ready);
-   var psi=new ProcessStartInfo("powershell.exe"){
-    Arguments="-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "+Quote(p.Runner)+
-      " -Archive "+Quote(p.Zip)+" -InstallRoot "+Quote(root)+" -ParentPid "+parentPid+
-      " -ExpectedDigest "+Quote(p.Digest)+" -ReadyFile "+Quote(ready),
+   if(File.Exists(fail))File.Delete(fail);
+   // Running a verified copy prevents the helper itself from locking the
+   // app/Port79Updater.exe file while installing an updated helper version.
+   var launch=Path.Combine(updateDir,
+    "native-launch-"+parentPid+"-"+Guid.NewGuid().ToString("N")+".exe");
+   File.Copy(p.Helper,launch,false);
+   var psi=new ProcessStartInfo(launch){
+    Arguments="--archive "+Quote(p.Zip)+" --install-root "+Quote(root)+
+      " --parent-pid "+parentPid+" --expected-digest "+Quote(p.Digest)+
+      " --ready-file "+Quote(ready),
     UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=root
    };
-   var process=Process.Start(psi);
-   if(process==null)throw new InvalidOperationException("無法啟動內建 Windows 更新工具");
+   Process process=null;
    bool accepted=false;
+   int? exitCode=null;
    try{
-    var deadline=DateTime.UtcNow.AddSeconds(15);
+    process=Process.Start(psi);
+    if(process==null)throw new InvalidOperationException(
+     "無法啟動 Windows 原生更新器；目前程式與本機資料均未變更。");
+    var deadline=DateTime.UtcNow.AddSeconds(30);
     while(DateTime.UtcNow<deadline){
      if(File.Exists(ready)&&File.ReadAllText(ready).Trim()=="ready:"+parentPid){
       accepted=!process.HasExited;
       if(accepted)break;
      }
-     if(process.HasExited)break;
-     await Task.Delay(150).ConfigureAwait(true);
+     if(process.HasExited){exitCode=process.ExitCode;break;}
+     await Task.Delay(200).ConfigureAwait(true);
     }
     if(!accepted){
-     if(!process.HasExited){try{process.Kill();process.WaitForExit(3000);}catch{/* Keep original UI on handoff failure. */}}
-     var upgradeLog=Path.Combine(root,"local-data","logs","windows-upgrade.txt");
+     if(!process.HasExited){
+      try{process.Kill();process.WaitForExit(3000);}catch{}
+     }
+     if(process.HasExited)exitCode=process.ExitCode;
+     var reason=File.Exists(fail)?File.ReadAllText(fail).Trim():"";
+     var log=Path.Combine(root,"local-data","logs","windows-upgrade.txt");
+     if(String.IsNullOrEmpty(reason))
+      reason="原生更新器沒有回覆接手訊號"+(exitCode.HasValue?"（結束代碼 "+exitCode.Value+"）":"（啟動逾時）");
      throw new InvalidOperationException(
-      "Windows 更新器未確認接手，已保留原本系統。"+
-      (File.Exists(upgradeLog)?"請查看更新紀錄 windows-upgrade.txt。":"更新器未產生執行紀錄，請檢查 PowerShell 安全設定。"));
+      "Windows 原生更新未能啟動，原本系統已保留。\n"+
+      reason+"\n"+
+      "請查看更新紀錄：local-data\\logs\\windows-upgrade.txt"+
+      (File.Exists(log)?"":"（沒有產生紀錄，可能被安全軟體限制執行）"));
     }
    }finally{
     try{if(File.Exists(ready))File.Delete(ready);}catch{}
-    process.Dispose();
+    if(process!=null)process.Dispose();
+    // Do not delete the in-use helper; cleanup of old launcher copies occurs
+    // when the next app session starts, outside the active updater process.
+    if(!accepted){try{if(File.Exists(launch))File.Delete(launch);}catch{}}
    }
   }
  }

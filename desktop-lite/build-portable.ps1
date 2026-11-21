@@ -9,6 +9,16 @@ Remove-Item $out,$dist -Recurse -Force -ErrorAction SilentlyContinue
 if(!(Test-Path (Join-Path $PSScriptRoot 'Port79Icon.ico'))){throw 'Windows app icon generation failed'}
 dotnet build (Join-Path $PSScriptRoot 'Port79Lite.csproj') --configuration Release --output $out /p:Platform=x64 --no-restore
 if($LASTEXITCODE -ne 0){throw 'C# native build failed'}
+# Build the small native updater separately so a blocked PowerShell script
+# never strands the user at the Windows handoff stage.
+$updaterProject=Join-Path $PSScriptRoot 'NativeUpdater/Port79Updater.csproj'
+$updaterOut=Join-Path $PSScriptRoot 'updater-out'
+if(Test-Path $updaterOut){Remove-Item $updaterOut -Recurse -Force}
+dotnet restore $updaterProject /p:Platform=x64
+if($LASTEXITCODE -ne 0){throw 'Native updater restore failed'}
+dotnet build $updaterProject --configuration Release --output $updaterOut /p:Platform=x64 --no-restore
+if($LASTEXITCODE -ne 0){throw 'Native updater build failed'}
+if(!(Test-Path (Join-Path $updaterOut 'Port79Updater.exe'))){throw 'Missing native .NET updater EXE'}
 New-Item -ItemType Directory -Force $target | Out-Null
 Copy-Item (Join-Path $out '*') $target -Recurse -Force
 $public=@('assets','attendance','schedule','leave','hr','work-hours','aqc-efficiency','history-data','settings','gate-dashboard','gate-import','yard-dashboard','data-cache','data-sources','previews')
@@ -45,6 +55,7 @@ $app=Join-Path $target 'app'
 New-Item -ItemType Directory -Force $app | Out-Null
 Copy-Item (Join-Path $PSScriptRoot 'app/login-progress.js') (Join-Path $app 'login-progress.js') -Force
 Copy-Item (Join-Path $PSScriptRoot 'app/upgrade-windows.ps1') (Join-Path $app 'upgrade-windows.ps1') -Force
+Copy-Item (Join-Path $updaterOut 'Port79Updater.exe') (Join-Path $app 'Port79Updater.exe') -Force
 foreach($p in @('BrowserProfile','updates','logs','backups')){
  New-Item -ItemType Directory -Force (Join-Path $target "local-data/$p") | Out-Null
 }
@@ -55,7 +66,7 @@ foreach($p in @('BrowserProfile','updates','logs','backups')){
 2. 開啟 Port79WindowsLite.exe，會從本機 site/smart-punch 讀取原系統程式畫面。
 3. 沒有登入之前，不會下載七大系統的私人雲端資料。正式管理員或超級管理員登入後，才顯示下載進度並背景讀取到 local-data/BrowserProfile 快取。
 4. 關閉視窗會縮小到系統匣，在右下角圖示選「真正結束程式」才完全退出。
-5. 程式檔（HTML/JS/CSS）可檢查正式網站更新，校驗後在下次啟動套用。不會變更 local-data。本 EXE 核心本身若更改，仍要下載新版 ZIP。
+5. 原生 Windows 更新器會檢查、驗證並套用網站及 EXE 更新，安全關閉後自動重新開啟。不變更 local-data，正常更新不需反覆下載 ZIP。
 6. 需要 Windows 10/11、.NET Framework 4.8 及 Microsoft Edge WebView2 Runtime（大多數 Windows 11 已有）。如果沒有 WebView2 Runtime，須先安裝。
 7. 本機快取不是完整備份。任何新增、審批、刪除、匯入仍走正式原系統雲端權限。
 8. 這是測試版，尚未拿正式帳密完成登入雲端與跨帳號同步的實機驗收。

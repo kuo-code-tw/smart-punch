@@ -95,7 +95,11 @@ jobs:
         shell: pwsh
         working-directory: production
         run: |
+          & ./desktop-lite/tests/native-updater-safety.ps1
+          if(-not $?){throw 'Native updater security/preservation regression failed'}
           & ./desktop-lite/tests/native-restart-smoke.ps1
+          if(-not $?){throw 'Legacy recovery smoke failed'}
+          & ./desktop-lite/tests/native-updater-restart-smoke.ps1
           # A PowerShell script can complete successfully while LASTEXITCODE
           # still contains a stale result from a prior native process.
           if(-not $?){throw 'Windows native restart smoke failed'}
@@ -111,7 +115,7 @@ jobs:
           try {
             $prefix='79號碼頭_Windows輕量版/'
             $names=@($z.Entries | ForEach-Object { $_.FullName.Replace('\','/') })
-            foreach($required in @('Port79WindowsLite.exe','app/upgrade-windows.ps1','site/smart-punch/index.html','site/smart-punch/版本資訊.txt','site/smart-punch/assets/port79-cache-worker.html')){
+            foreach($required in @('Port79WindowsLite.exe','app/Port79Updater.exe','app/upgrade-windows.ps1','site/smart-punch/index.html','site/smart-punch/版本資訊.txt','site/smart-punch/assets/port79-cache-worker.html')){
               if($names -notcontains ($prefix+$required)){throw "Missing $required"}
             }
             # A release is invalid unless its embedded visible version is
