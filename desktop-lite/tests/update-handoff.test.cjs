@@ -21,7 +21,7 @@ assert.match(native,/accepted=!process\.HasExited/);
 assert.match(native,/if\(!accepted\)/);
 assert.match(native,/process\.Kill\(\)/);
 assert.match(native,/CreateNoWindow=true/);
-assert.match(native,/TimeSpan\.FromSeconds\(30\)/);
+assert.match(native,/DateTime\.UtcNow\.AddSeconds\(30\)/);
 assert.match(helper,/UPDATER_READY parent=/);
 assert.match(helper,/File\.WriteAllText\(Ready,"ready:"\+ParentPid/);
 assert(helper.indexOf('NATIVE_ARCHIVE_SHA256_OK')<helper.indexOf('File.WriteAllText(Ready,'),
