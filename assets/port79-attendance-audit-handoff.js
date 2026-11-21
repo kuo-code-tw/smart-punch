@@ -50,7 +50,9 @@ function dayAfter(date){
 }
 function fail(message){
  pending=null;clear();if(watch){root.clearInterval(watch);watch=null;}
- notice(message+'；請在目前的考勤管理原始列表手動確認，系統沒有新增或修改任何卡。');
+ if(typeof root.P79AttendanceInlineReport==='function')
+  root.P79AttendanceInlineReport('error',message+'；沒有新增或修改任何卡');
+ notice(message+'；系統沒有新增或修改任何卡。');
 }
 async function openOriginal(){
  if(busy||!pending)return false;
@@ -123,7 +125,12 @@ function start(){
  };
  watch=root.setInterval(tick,400);tick();
 }
-if(root.document?.readyState==='complete')start();
+// In inline mode the SAME verified handoff is explicitly started after the
+// parent gives the exact row through a same-origin, nonce-bound message.
+let isInline=false;
+try{isInline=new URL(root.location.href).searchParams.get('homeInline')==='1';}catch(_){}
+if(isInline){root.P79AttendanceAuditHandoffStart=start;}
+else if(root.document?.readyState==='complete')start();
 else root.addEventListener('load',start,{once:true});
 if(typeof module==='object'&&module.exports)module.exports={read,matchingIdentity,recordType,openOriginal};
 })(typeof window!=='undefined'?window:globalThis);

@@ -5229,7 +5229,7 @@ const now = new Date();
                 setCloudSyncStatus('☁️ Google Apps Script URL 無效', 'idle');
             }
             startAttendanceRevisionWatch();
-            startAutoUpdateCheck();
+            if(new URL(location.href).searchParams.get('homeInline')!=='1')startAutoUpdateCheck();
         }, { once: true });
 
         let cloudSyncBusy = false;
@@ -25565,7 +25565,8 @@ setInterval(()=>{if(!document.hidden)reconcile()},60000);
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1&menu=20261112-clean-v1">
 <script src="../assets/port79-management-workspace.js?v=20261115-shared-user-activity-v3&sidebar=20261118-overtime-label-v1"></script>
 <script>window.Port79OrgContext.configure({system:'attendance',container:()=>document.getElementById('viewAdmin'),people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
-<script src="../assets/port79-attendance-audit-handoff.js?v=20261121-inplace-v2"></script>
+<script src="../assets/port79-attendance-audit-handoff.js?v=20261121-inline-channel-v3"></script>
+<script src="../assets/port79-attendance-inline-guest.js?v=20261121-inline-channel-v3"></script>
 </body>
 </html>
 

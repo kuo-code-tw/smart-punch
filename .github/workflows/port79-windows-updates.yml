@@ -100,9 +100,11 @@ jobs:
           & ./desktop-lite/tests/native-restart-smoke.ps1
           if(-not $?){throw 'Legacy recovery smoke failed'}
           & ./desktop-lite/tests/native-updater-restart-smoke.ps1
+          if(-not $?){throw 'Windows native restart smoke failed'}
+          & ./desktop-lite/tests/attendance-inline-native-smoke.ps1
           # A PowerShell script can complete successfully while LASTEXITCODE
           # still contains a stale result from a prior native process.
-          if(-not $?){throw 'Windows native restart smoke failed'}
+          if(-not $?){throw 'Real attendance inline WebView2 handshake failed'}
       - name: Reject private data and stale website files
         shell: pwsh
         working-directory: production

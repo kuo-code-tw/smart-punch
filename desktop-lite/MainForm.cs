@@ -39,6 +39,7 @@ namespace Port79Lite {
   private bool initiated=false;
   private bool cacheInProgress=false;
   private bool probedImportFrames=false;
+  private bool probedAttendanceInline=false;
   private readonly string displayVersion;
 
   // The visible title confirms which Windows ZIP was actually extracted
@@ -282,6 +283,10 @@ namespace Port79Lite {
        a=>a=="--port79-verify-import-frames")){
        probedImportFrames=true;await ProbeImportFrames();
       }
+      if(!probedAttendanceInline&&Array.Exists(Environment.GetCommandLineArgs(),
+       a=>a=="--port79-verify-attendance-inline")){
+       probedAttendanceInline=true;await ProbeAttendanceInlineChannel();
+      }
      }
     };
     // Fresh document URL, same virtual origin and same retained profile.
@@ -400,6 +405,48 @@ namespace Port79Lite {
     Log("IMPORT FRAME CHECK: asynchronous probe started");
    }catch(Exception ex){Log("IMPORT FRAME CHECK: FAIL "+ex.Message);}
   }
+  // Windows CI-only probe for the exact failure reported by the operator.
+  // It loads the real 1.4MB attendance HTML inside the production virtual
+  // host, then verifies its same-origin postMessage handshake. It sends NO
+  // SSO token, NO employee identifiers and NO cloud mutations.
+  private async Task ProbeAttendanceInlineChannel(){
+   const string code=@"(async function(){
+    const nonce='0123456789abcdef0123456789abcdef';
+    const origin=location.origin;
+    const frame=document.createElement('iframe');
+    frame.style.display='none';
+    const target=new URL('./attendance/index.html?homeInline=1&p79InlineNonce='+nonce,location.href);
+    return await new Promise(resolve=>{
+     let done=false;
+     let timer;
+     const finish=message=>{
+      if(done)return;
+      done=true;clearTimeout(timer);
+      window.removeEventListener('message',onMessage);
+      frame.remove();resolve(message);
+     };
+     const onMessage=event=>{
+      if(event.source!==frame.contentWindow)return;
+      if(event.origin!==origin)return finish('FAIL unexpected child origin');
+      const m=event.data;
+      if(m?.type==='p79-attendance-inline-v2'&&m.nonce===nonce&&m.action==='ready')
+       return finish('PASS same-origin real attendance frame handshake; no DOM access');
+     };
+     window.addEventListener('message',onMessage);
+     timer=setTimeout(()=>finish('FAIL 30s no attendance ready message'),30000);
+     frame.src=target.href;
+     document.body.appendChild(frame);
+    });
+   })().then(result=>window.chrome.webview.postMessage(JSON.stringify({
+    kind:'port79-attendance-inline-probe-v1',title:result
+   }))).catch(error=>window.chrome.webview.postMessage(JSON.stringify({
+    kind:'port79-attendance-inline-probe-v1',title:'FAIL '+String(error&&error.message||error)
+   })))";
+   try{
+    await web.CoreWebView2.ExecuteScriptAsync(code);
+    Log("ATTENDANCE INLINE CHECK: asynchronous native WebView2 probe started");
+   }catch(Exception ex){Log("ATTENDANCE INLINE CHECK: FAIL "+ex.Message);}
+  }
   // Ignore any progress message not sent by our original locally hosted webpage.
   // It carries status text/counters only; never accepts tokens, credentials, URLs or commands.
   private void OnCacheMessage(object sender,CoreWebView2WebMessageReceivedEventArgs args){
@@ -417,6 +464,9 @@ namespace Port79Lite {
     if(payload==null)return;
     if(payload.kind=="port79-import-probe-v1"){
      Log("IMPORT FRAME CHECK: "+SafeStatus(payload.title,320));return;
+    }
+    if(payload.kind=="port79-attendance-inline-probe-v1"){
+     Log("ATTENDANCE INLINE CHECK: "+SafeStatus(payload.title,320));return;
     }
     if(payload.kind=="port79-background-worker-ready-v1"){
      // Only the fixed local worker page can announce readiness.

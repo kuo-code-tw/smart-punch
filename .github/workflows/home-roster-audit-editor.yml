@@ -6,6 +6,7 @@ on:
       - 'index.html'
       - 'assets/port79-home-early-punch-alert.js'
       - 'assets/port79-home-audit-inline-editor.js'
+      - 'assets/port79-attendance-inline-guest.js'
       - 'assets/port79-login-version-check.js'
       - 'assets/port79-monthly-dashboard.js'
       - 'assets/port79-attendance-audit-handoff.js'
@@ -14,6 +15,7 @@ on:
       - 'tests/home-roster-audit-embedded-editor.cjs'
       - 'tests/home-audit-punch-inline-pencil.cjs'
       - 'tests/home-inline-attendance-bridge.cjs'
+      - 'tests/home-attendance-inline-channel.cjs'
       - 'tests/attendance-home-audit-handoff.cjs'
       - 'tests/home-early-shift-punch-alert.cjs'
       - 'tests/home-punch-priority-deadline.cjs'
@@ -26,6 +28,7 @@ on:
       - 'index.html'
       - 'assets/port79-home-early-punch-alert.js'
       - 'assets/port79-home-audit-inline-editor.js'
+      - 'assets/port79-attendance-inline-guest.js'
       - 'assets/port79-login-version-check.js'
       - 'assets/port79-monthly-dashboard.js'
       - 'assets/port79-attendance-audit-handoff.js'
@@ -34,6 +37,7 @@ on:
       - 'tests/home-roster-audit-embedded-editor.cjs'
       - 'tests/home-audit-punch-inline-pencil.cjs'
       - 'tests/home-inline-attendance-bridge.cjs'
+      - 'tests/home-attendance-inline-channel.cjs'
       - 'tests/attendance-home-audit-handoff.cjs'
       - 'tests/home-early-shift-punch-alert.cjs'
       - 'tests/home-punch-priority-deadline.cjs'
@@ -57,6 +61,7 @@ jobs:
           node tests/home-roster-audit-embedded-editor.cjs
           node tests/home-audit-punch-inline-pencil.cjs
           node tests/home-inline-attendance-bridge.cjs
+          node tests/home-attendance-inline-channel.cjs
           node tests/attendance-home-audit-handoff.cjs
           node tests/windows-download-link.cjs
           node tests/home-early-shift-punch-alert.cjs
