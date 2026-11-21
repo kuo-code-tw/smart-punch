@@ -123,8 +123,9 @@ jobs:
             $builtSha=(& git rev-parse HEAD).Trim()
             if(!$versionText.Contains('GitHub Commit: '+$builtSha)){throw 'ZIP site version does not match source commit'}
             $commitDate=(& git log -1 --format=%cs).Trim()
-            $humanVersion='V'+$commitDate.Replace('-','.')+'-'+$builtSha.Substring(0,12)
-            if(!$versionText.Contains('版本號: '+$humanVersion)){throw 'ZIP human V version does not match commit and date'}
+            $humanVersion=$commitDate.Replace('-','')+[Convert]::ToUInt32($builtSha.Substring(0,8),16).ToString('D10')
+            if($humanVersion -notmatch '^[0-9]{18}$'){throw 'ZIP visible version must be digits only'}
+            if(!$versionText.Contains('版本號: '+$humanVersion)){throw 'ZIP numeric-only version does not match commit and date'}
             Write-Host ('WINDOWS PACKAGE VERIFIED: '+$humanVersion)
             foreach($entry in $z.Entries){
               $name=$entry.FullName.Replace('\','/')
