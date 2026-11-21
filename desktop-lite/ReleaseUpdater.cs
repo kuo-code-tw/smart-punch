@@ -121,7 +121,7 @@ namespace Port79Lite {
    if(String.IsNullOrEmpty(s)||s.IndexOf('"')>=0||s.IndexOf('\n')>=0||s.IndexOf('\r')>=0)throw new InvalidDataException("Windows 更新路徑含有不合法字元");
    return "\""+s+"\"";
   }
-  public static void Launch(Prepared p,string root,int parentPid){
+  public static async Task LaunchAsync(Prepared p,string root,int parentPid){
    if(p==null)throw new ArgumentNullException("p");
    if(parentPid<=0)throw new ArgumentOutOfRangeException("parentPid");
    // Process.Start alone does not prove that PowerShell reached the updater.
@@ -146,10 +146,10 @@ namespace Port79Lite {
       if(accepted)break;
      }
      if(process.HasExited)break;
-     System.Threading.Thread.Sleep(150);
+     await Task.Delay(150).ConfigureAwait(true);
     }
     if(!accepted){
-     if(!process.HasExited){process.Kill();process.WaitForExit(3000);}
+     if(!process.HasExited){try{process.Kill();process.WaitForExit(3000);}catch{/* Keep original UI on handoff failure. */}}
      var upgradeLog=Path.Combine(root,"local-data","logs","windows-upgrade.txt");
      throw new InvalidOperationException(
       "Windows 更新器未確認接手，已保留原本系統。"+
