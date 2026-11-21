@@ -32,7 +32,7 @@ function batchHarness(shared,scope='team-A'){
  vm.createContext(context);vm.runInContext(cacheSource.slice(start,end),context);
  return {calls,progress,run:()=>context.downloadAll((...args)=>progress.push(args),{quickFirst:true})};
 }
-function monthHarness(){
+function monthHarness({storageFailure=false}={}){
  const start=cacheSource.indexOf('function verifyAttendanceDownloadContext(');
  const end=cacheSource.indexOf('\nasync function downloadSystem(',start);
  assert(start>0&&end>start,'attendance with revision-safe month checkpoint is available');
@@ -49,7 +49,8 @@ function monthHarness(){
   getDisplaySnapshot:async()=>null,
   currentViewerRow:row=>row.key.startsWith('USER@admin|'),
   get:async key=>shared.get(key)||null,
-  put:async row=>{row.cacheEndpoint='https://script.google.com/macros/s/TEST/exec';
+  put:async row=>{if(storageFailure)throw Error('indexedDB is not defined');
+   row.cacheEndpoint='https://script.google.com/macros/s/TEST/exec';
    row.displayScope=scope;shared.set(row.key,row);return true;},
   saveSystemSnapshot:async (sys,data)=>{full.push({sys,data});return data;},
   applyAttendanceSnapshotToPage:async()=>null,
@@ -222,4 +223,13 @@ test('automatic Windows login sync runs in worker and remains active after pageh
  await second.initial();
  assert.equal(second.messages.filter(x=>x.kind==='port79-cache-command-v1').length,0,
   'New homepage uses persistent attempt status and does not restart a second scan');
+});
+
+test('IndexedDB unavailable must not cancel valid cloud attendance downloads',async()=>{
+ const f=monthHarness({storageFailure:true});
+ const full=await f.run();
+ assert.equal(full.monthStats.length,3);
+ assert(full.monthStats.every(row=>row.ok===true));
+ assert.equal(f.calls.filter(x=>x.startsWith('getAttendanceMonthData')).length,3);
+ assert.equal(f.full.length,2,'Original complete attendance and workhours commits still run');
 });
