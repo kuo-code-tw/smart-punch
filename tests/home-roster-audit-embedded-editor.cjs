@@ -22,7 +22,7 @@ assert.match(bridge,/data\?\.ok===true&&data\.localOnly!==true/,'No false cloud 
 assert.match(bridge,/onSynced\(\)/);
 assert.match(bridge,/url\.origin!==root\.location\.origin/,'Keep strict same-origin SSO');
 assert.match(css,/#p79Dashboard #p79EarlyInlineEditor iframe\[hidden\]/);
-assert.match(attendance,/port79-attendance-audit-handoff\.js\?v=20261121-original-management-v3/);
+assert.match(attendance,/port79-attendance-audit-handoff\.js\?v=20261121-inplace-v2/);
 assert.match(handoff,/await edit\(source\.id,p\.side,source\.timeStr/);
 assert.match(handoff,/await add\(encodeURIComponent/);
 assert.match(handoff,/matchingIdentity/);
