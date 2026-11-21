@@ -123,14 +123,42 @@ namespace Port79Lite {
   }
   public static void Launch(Prepared p,string root,int parentPid){
    if(p==null)throw new ArgumentNullException("p");
+   if(parentPid<=0)throw new ArgumentOutOfRangeException("parentPid");
+   // Process.Start alone does not prove that PowerShell reached the updater.
+   var updateDir=Path.Combine(root,"local-data","updates");
+   Directory.CreateDirectory(updateDir);
+   var ready=Path.Combine(updateDir,"runner-ready-"+parentPid+".flag");
+   if(File.Exists(ready))File.Delete(ready);
    var psi=new ProcessStartInfo("powershell.exe"){
-    Arguments="-NoProfile -ExecutionPolicy Bypass -File "+Quote(p.Runner)+" -Archive "+Quote(p.Zip)+
-      " -InstallRoot "+Quote(root)+" -ParentPid "+parentPid+
-      " -ExpectedDigest "+Quote(p.Digest),
+    Arguments="-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "+Quote(p.Runner)+
+      " -Archive "+Quote(p.Zip)+" -InstallRoot "+Quote(root)+" -ParentPid "+parentPid+
+      " -ExpectedDigest "+Quote(p.Digest)+" -ReadyFile "+Quote(ready),
     UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=root
    };
    var process=Process.Start(psi);
    if(process==null)throw new InvalidOperationException("無法啟動內建 Windows 更新工具");
+   bool accepted=false;
+   try{
+    var deadline=DateTime.UtcNow.AddSeconds(15);
+    while(DateTime.UtcNow<deadline){
+     if(File.Exists(ready)&&File.ReadAllText(ready).Trim()=="ready:"+parentPid){
+      accepted=!process.HasExited;
+      if(accepted)break;
+     }
+     if(process.HasExited)break;
+     System.Threading.Thread.Sleep(150);
+    }
+    if(!accepted){
+     if(!process.HasExited){process.Kill();process.WaitForExit(3000);}
+     var upgradeLog=Path.Combine(root,"local-data","logs","windows-upgrade.txt");
+     throw new InvalidOperationException(
+      "Windows 更新器未確認接手，已保留原本系統。"+
+      (File.Exists(upgradeLog)?"請查看更新紀錄 windows-upgrade.txt。":"更新器未產生執行紀錄，請檢查 PowerShell 安全設定。"));
+    }
+   }finally{
+    try{if(File.Exists(ready))File.Delete(ready);}catch{}
+    process.Dispose();
+   }
   }
  }
 }
