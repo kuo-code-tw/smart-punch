@@ -101,6 +101,10 @@ jobs:
             exit 1
           fi
           echo 'PASS: No new failing tests compared with previous production main'
+      - name: Stamp the exact published website version
+        run: |
+          node scripts/write-port79-version.cjs .
+          node -e "const v=require('./port79-version.json');if(!/^V[0-9]{6}\.[0-9]{5}$/.test(v.version)||!/^[a-f0-9]{40}$/.test(v.commit))process.exit(1)"
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Upload static site

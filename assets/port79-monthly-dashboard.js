@@ -680,6 +680,25 @@ async function request(kind,ym,token,forceCloud){
  });
 }
 // 本月加班必須以正式雲端班表為主，不能只讀可能尚未更新的歷史月份快照。
+// Preview only a valid, scoped, unexpired IndexedDB entry. Never launch a
+// second history cloud read just to make the pending-punch card look fast.
+async function previewHomeMonth(kind,ym,token){
+ const base=String(root.sessionStorage.getItem('port79_gas_url')||'').trim();
+ if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(base)||
+    !root.Port79DataCache?.getHistoryPreview)return null;
+ const url=new URL(base);
+ url.searchParams.set('action','historyGetMonthData');
+ url.searchParams.set('type',kind);
+ url.searchParams.set('month',ym);
+ url.searchParams.set('token',token);
+ url.searchParams.set('gcToken',token);
+ const preview=await Promise.race([
+  root.Port79DataCache.getHistoryPreview(url.toString()).catch(()=>null),
+  new Promise(resolve=>root.setTimeout(()=>resolve(null),1200))
+ ]);
+ if(!preview||preview.ok!==true||preview.month&&String(preview.month)!==ym)return null;
+ return preview;
+}
 async function requestHomeCurrentSchedule(ym,token){
  const base=String(root.sessionStorage.getItem('port79_gas_url')||'').trim();
  if(!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(base))throw Error('尚未取得已驗證的班表服務網址');
@@ -835,8 +854,10 @@ async function verifiedHomeRestEvidence(scheduleData,ym,token){
  }catch(error){return null;} // Unknown evidence never becomes missing or writes.
 }
 async function renderVerifiedHomePunch(attendance,schedule,ym,leaveData,token){
- const restEvidence=attendance&&schedule&&leaveData
-  ?await verifiedHomeRestEvidence(schedule,ym,token):null;
+ // A full-month rest audit reads separate official punch sources and can take
+ // tens of seconds. Do not block the punch KPI on that secondary audit.
+ // Unknown zero-punch/rest days remain explicitly unverified instead.
+ const restEvidence=null;
  if(month()!==ym||!session()||!permissions().attendance||!permissions().schedule)return;
  if((root.sessionStorage.getItem('port79_user_token')||
      root.sessionStorage.getItem('port79_admin_token')||'')!==token)return;
@@ -869,6 +890,25 @@ async function load(forceCloud=false){
  statusText('p79DashMessage','正在唯讀查詢 '+selectedMonthTitle()+' 的船舶與考勤資料…');
  const failures=[];
  let scheduleSnapshot=null,attendanceSnapshot=null,leaveSnapshot=null,attendanceBoundaryError='';
+ let authoritativePunchRendered=false;
+ // Fast read-only preview uses already downloaded month snapshots. It never
+ // writes attendance or claims that the cached count is formally verified.
+ const leavePromise=requestApprovedLeave(token);
+ const previewPromise=Promise.allSettled([
+  p.attendance?previewHomeMonth('attendance',ym,token):Promise.resolve(null),
+  p.schedule?previewHomeMonth('schedule',ym,token):Promise.resolve(null),
+  leavePromise
+ ]).then(([a,b,l])=>{
+  const valid=month()===ym&&session()?.empId===s.empId&&
+   (root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'')===token&&
+   permissions().attendance&&permissions().schedule&&!authoritativePunchRendered;
+  if(!valid)return;
+  const att=a.status==='fulfilled'?a.value:null;
+  const schedule=b.status==='fulfilled'?b.value:null;
+  const leave=l.status==='fulfilled'?l.value:null;
+  root.P79HomeEarlyPunchAlert?.render(att,schedule,ym,{leaveData:leave,preview:true});
+ });
+ void previewPromise.catch(error=>console.warn('考勤預覽未完成',error));
  try{
   for(const [kind,allowed,captionId,render] of [['vessel',p.vessel,'p79DashShipSource',showVessels],['attendance',p.attendance,'p79DashAttendanceSource',showAttendance],['schedule',p.schedule,'p79DashScheduleSource',showOvertime]]){
    if(!allowed){statusText(captionId,accessError());if(kind==='schedule'){root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'目前帳號沒有職稱加班統計的檢視權限'});renderHomeOvertimeList(null);}continue}
@@ -906,7 +946,7 @@ async function load(forceCloud=false){
    }catch(error){if(kind==='vessel'&&vesselEpochAtStart!==vesselRefreshEpoch)continue;const message=error?.message||String(error);failures.push((kind==='vessel'?'船舶':kind==='schedule'?'加班':'考勤')+'：'+message);statusText(captionId,'無法載入：'+message);if(kind==='schedule'){root.P79ReferenceDashboard?.setOvertimeReport({month:ym,error:'加班申報資料讀取失敗：'+message});renderHomeOvertimeList(null);} }
   }
   try{
-   const data=await requestApprovedLeave(token);
+   const data=await leavePromise;
    if(month()!==ym||session()?.empId!==s.empId||(root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'')!==token)return;
    root.P79ReferenceDashboard?.setLeaveReport(root.P79ApprovedLeaveSummary.aggregate({...data,month:ym}));
    leaveSnapshot=data;
@@ -914,6 +954,7 @@ async function load(forceCloud=false){
    if(scheduleSnapshot&&p.schedule)showOvertime({...analyzeOvertime({...scheduleSnapshot,employees:data.employees},ym),sourceWarning:scheduleSnapshot.p79HomeLiveWarning||'',sourceMode:scheduleSnapshot.p79HomeScheduleSource||'history'});
   }catch(error){if(month()===ym)root.P79ReferenceDashboard?.setLeaveReport({month:ym,error:'核准請假資料未完成核對：'+String(error.message||error)});}
   if(month()===ym&&permissions().attendance&&permissions().schedule){
+   authoritativePunchRendered=true;
    await renderVerifiedHomePunch(attendanceBoundaryError?null:attendanceSnapshot,scheduleSnapshot,ym,leaveSnapshot,token);
   }
   loadedKey=ym;
@@ -941,14 +982,15 @@ function init(){
   if(!p.attendance||!p.schedule||!token)throw Error('沒有正式考勤與排班的完整檢視權限');
   const [attendance,schedule,leaveData]=await Promise.all([
    request('attendance',ym,token,true),
-   request('schedule',ym,token,true),
+   requestHomeOvertimeSchedule(ym,token,true),
    requestApprovedLeave(token)
   ]);
   const currentToken=root.sessionStorage.getItem('port79_user_token')||root.sessionStorage.getItem('port79_admin_token')||'';
   if(month()!==ym||String(session()?.empId||'')!==account||token!==currentToken||!permissions().attendance||!permissions().schedule)
     throw Error('月份或登入身分已變更，請重新開啟警示');
-  const restEvidence=await verifiedHomeRestEvidence(schedule,ym,token);
-  return {attendance,schedule,leaveData,restEvidence,month:ym};
+  // Live records are sufficient to show the real punch pairs immediately.
+  // A slow full-month rest audit must never blank the operator's table.
+  return {attendance,schedule,leaveData,restEvidence:null,month:ym};
  });
  root.addEventListener?.('p79-home-import-complete',onHomeVesselImportComplete);
  root.addEventListener?.('pageshow',event=>{if(event.persisted)void refreshImportedVessels();});

@@ -37,6 +37,10 @@ $version='V'+$commitDate.Substring(2).Replace('-','')+'.'+$revision
  "GitHub Commit: "+$commit+[Environment]::NewLine+
  "此檔案位於下載 ZIP 的 site/smart-punch 資料夾內；核對正式發布的版本編號。") |
  Set-Content (Join-Path $site '版本資訊.txt') -Encoding UTF8
+# Same immutable number shown on the live website; never infer an installed
+# Windows version from an old ZIP filename or a cached login screen.
+$buildInfo=@{version=$version;commit=$commit;kind='windows'} | ConvertTo-Json -Compress
+[System.IO.File]::WriteAllText((Join-Path $site 'port79-version.json'),$buildInfo,(New-Object System.Text.UTF8Encoding($false)))
 $app=Join-Path $target 'app'
 New-Item -ItemType Directory -Force $app | Out-Null
 Copy-Item (Join-Path $PSScriptRoot 'app/login-progress.js') (Join-Path $app 'login-progress.js') -Force

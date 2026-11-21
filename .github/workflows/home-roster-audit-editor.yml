@@ -5,6 +5,8 @@ on:
     paths:
       - 'index.html'
       - 'assets/port79-home-early-punch-alert.js'
+      - 'assets/port79-login-version-check.js'
+      - 'assets/port79-monthly-dashboard.js'
       - 'assets/port79-attendance-audit-handoff.js'
       - 'attendance/index.html'
       - 'assets/port79-monthly-dashboard.css'
@@ -12,12 +14,15 @@ on:
       - 'tests/home-audit-punch-inline-pencil.cjs'
       - 'tests/attendance-home-audit-handoff.cjs'
       - 'tests/home-early-shift-punch-alert.cjs'
+      - 'tests/home-login-version-fast-audit.cjs'
       - '.github/workflows/home-roster-audit-editor.yml'
   push:
     branches: [main]
     paths:
       - 'index.html'
       - 'assets/port79-home-early-punch-alert.js'
+      - 'assets/port79-login-version-check.js'
+      - 'assets/port79-monthly-dashboard.js'
       - 'assets/port79-attendance-audit-handoff.js'
       - 'attendance/index.html'
       - 'assets/port79-monthly-dashboard.css'
@@ -25,6 +30,7 @@ on:
       - 'tests/home-audit-punch-inline-pencil.cjs'
       - 'tests/attendance-home-audit-handoff.cjs'
       - 'tests/home-early-shift-punch-alert.cjs'
+      - 'tests/home-login-version-fast-audit.cjs'
       - '.github/workflows/home-roster-audit-editor.yml'
 
 permissions:
@@ -45,5 +51,6 @@ jobs:
           node tests/attendance-home-audit-handoff.cjs
           node tests/windows-download-link.cjs
           node tests/home-early-shift-punch-alert.cjs
+          node tests/home-login-version-fast-audit.cjs
           node tests/attendance-editor-opening.cjs
           node tests/attendance-manual-picker.cjs

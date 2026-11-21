@@ -1,4 +1,4 @@
-/* 79 號碼頭首頁：早／中／晚班表出勤待核。核對唯讀；有管理權限者可在同視窗使用原正式考勤編輯器。 */
+/* 79 號碼頭首頁：早／中／晚班表出勤待核。只讀核對；正式編輯統一交給原考勤管理頁。 */
 (function(root,factory){
   const api=factory(root);
   if(typeof module==='object'&&module.exports)module.exports=api;
@@ -32,9 +32,9 @@ function at(value){
 const leaveInvalid=r=>r?.deleted===true||r?.isDeleted===true||r?.cancelled===true||
  r?.canceled===true||r?.revoked===true||r?.deletedAt||r?.cancelledAt||r?.canceledAt;
 const leaveConfirmed=r=>['已核准','核准','approved'].includes(String(r?.status||'').trim().toLowerCase());
-function leaveEvidence(person,date,scheduleData,leaveData){
+function leaveEvidence(person,date,scheduleData,leaveData,leaveIndex){
  const key=id(person.empId||person.id);
- const recs=[...(scheduleData?.leaveRecords||[]),...(leaveData?.leaveRecords||[])];
+ const recs=leaveIndex?leaveIndex.get(key)||[]:[...(scheduleData?.leaveRecords||[]),...(leaveData?.leaveRecords||[])];
  let found=false,full=false;
  for(const r of recs){
   if(leaveInvalid(r)||!leaveConfirmed(r)||!key||id(r.empId||r.employeeId)!==key)continue;
@@ -96,9 +96,42 @@ function analyze(attendanceData,scheduleData,month,options={}){
  const nameCounts=new Map(),roster=scheduleData.schedules;
  for(const r of roster){const n=personName(r.name||r.empName);if(n)nameCounts.set(n,(nameCounts.get(n)||0)+1);}
  const uniqueName=new Set([...nameCounts].filter(([,n])=>n===1).map(([n])=>n));
+ // Index each punch session by real employee identifiers once. Filtering every
+ // monthly session for each person/day made the large-company audit quadratic.
+ const punchIndex=new Map(),addPunch=(key,shift)=>{
+  if(!key)return;
+  if(!punchIndex.has(key))punchIndex.set(key,[]);
+  punchIndex.get(key).push(shift);
+ };
+ for(const shift of punches){
+  const keys=new Set();
+  for(const item of [shift,shift.clockIn,shift.clockOut]){
+   if(!item)continue;
+   const worker=id(item.empId||item.employeeId);
+   const number=att(item.attNo||item.attendanceNo);
+   const name=personName(item.name||item.empName);
+   if(worker)keys.add('I:'+worker);
+   if(number)keys.add('A:'+number);
+   if(name)keys.add('N:'+name);
+  }
+  for(const key of keys)addPunch(key,shift);
+ }
+ const leaveIndex=new Map();
+ for(const item of [...(scheduleData?.leaveRecords||[]),...(leaveData?.leaveRecords||[])]){
+  const key=id(item?.empId||item?.employeeId);
+  if(!key)continue;
+  if(!leaveIndex.has(key))leaveIndex.set(key,[]);
+  leaveIndex.get(key).push(item);
+ }
  const details=[],seen=new Set();let unknownDays=0;
  for(const person of roster){
   const dates=person?.schedule||{};
+  const keys=[id(person.empId||person.id),att(person.attNo||person.attendanceNo),personName(person.name||person.empName)];
+  const candidates=new Set();
+  for(const key of ['I:'+keys[0],'A:'+keys[1],'N:'+keys[2]]){
+   if(key.length<=2)continue;
+   for(const shift of punchIndex.get(key)||[])candidates.add(shift);
+  }
   const workerId=id(person.empId||person.id)||(att(person.attNo||person.attendanceNo)?'ATT:'+att(person.attNo||person.attendanceNo):'')||(personName(person.name)?'NAME:'+personName(person.name):'');
   if(!workerId||workerId==='ATT:'||workerId==='NAME:')continue;
   for(const [date,code] of Object.entries(dates)){
@@ -107,7 +140,7 @@ function analyze(attendanceData,scheduleData,month,options={}){
    const meta=dates.__meta?.[date]||{},identity=workerId+'|'+date;
    if(seen.has(identity))continue;seen.add(identity);
    if(excused(meta))continue;
-   const leave=leaveEvidence(person,date,scheduleData,leaveData);
+   const leave=leaveEvidence(person,date,scheduleData,leaveData,leaveIndex);
    if(leave==='full')continue;
    if(leave==='partial-or-unspecified'){unknownDays++;continue;} // Never label approved leave as missing punches.
    const base=Date.parse(date+'T00:00:00+08:00');
@@ -117,7 +150,7 @@ function analyze(attendanceData,scheduleData,month,options={}){
    if(now<startGrace)continue;
    // Match work-date sessions by actual punch timestamps; the canonical paired
    // dateKey for a 00:00-08:00 late shift may be the following civil date.
-   const matched=punches.filter(shift=>{
+   const matched=[...candidates].filter(shift=>{
     if(!sameEmployee(person,shift,uniqueName))return false;
     const first=at(shift.clockIn?.timeStr),last=at(shift.clockOut?.timeStr);
     const nearFirst=Number.isFinite(first)&&first>=started-2*HOUR&&first<finished;
@@ -231,7 +264,7 @@ function renderDialog(){
  const editable=!!officialEditorUrl();
  const add=$('p79DashEarlyPunchDialog')?.querySelector('[data-early-add]');
  if(add)add.hidden=!editable;
- if(!last||!Array.isArray(last.details)){host.innerHTML='<p>目前無法確認班表出勤待核人數，請重新讀取正式考勤與排班。</p>';return;}
+ if(!last||!Array.isArray(last.details)){host.innerHTML='<p>'+html(last?.reason||'正式考勤、班表或核准請假資料尚未讀齊；不會將資料不足誤判為零筆。')+'</p>';return;}
  if(!last.details.length){host.innerHTML='<p>目前沒有可確認的班表出勤待核紀錄。</p>';return;}
  host.innerHTML='<div class="p79-early-table-scroll"><table><thead><tr><th>日期</th><th>姓名</th><th>工號／考勤號</th><th>組別</th><th>班別</th><th>應出勤時段</th><th>上班卡</th><th>下班卡</th><th>待核原因</th></tr></thead><tbody>'+
   last.details.slice(0,200).map((r,index)=>'<tr><td>'+html(r.date)+'</td><td>'+html(r.name)+'</td><td>'+html(r.empId||r.attNo||'—')+'</td><td>'+html(r.group||'—')+'</td><td>'+html(r.shift)+'</td><td>'+html(r.scheduled)+'</td><td>'+pencilCell(r,index,'IN',editable)+'</td><td>'+pencilCell(r,index,'OUT',editable)+'</td><td class="p79-early-reason">'+html(r.reason)+'</td></tr>').join('')+
@@ -242,12 +275,12 @@ function render(attendanceData,scheduleData,month,options={}){
  last=analyze(attendanceData,scheduleData,month,options);
  const btn=$('p79DashEarlyPunchTrigger'),value=$('p79DashEarlyPunchCount'),hint=$('p79DashEarlyPunchHint');
  if(!btn)return last;
- const mode=last.count===null?'unverified':last.count>0?'pending':last.unknownDays?'unverified':'clear';
+ const mode=options.preview?'unverified':last.count===null?'unverified':last.count>0?'pending':last.unknownDays?'unverified':'clear';
  btn.dataset.alertState=mode;
  if(value)value.textContent=last.count===null||last.count===0&&last.unknownDays?'—':String(last.count);
- if(hint)hint.textContent=last.count===null?'資料待核對 ›':last.count>0?'點擊核對人員 ›':last.unknownDays?'部分日期待核 ›':'目前無漏卡待核 ›';
+ if(hint)hint.textContent=options.preview?'初步 '+(last.count===null?'資料不足':last.count+' 筆')+'，待正式雲端核對 ›':last.count===null?'資料待核對，點擊查看原因 ›':last.count>0?'點擊核對人員 ›':last.unknownDays?'部分日期待核 ›':'目前無漏卡待核 ›';
  btn.setAttribute('aria-label','班表出勤待核：'+(last.count===null?'尚未確認':last.count+' 筆待核')+'，點擊查看明細');
- if($('p79DashEarlyPunchDialog')?.open){status(last.reason||'已核對正式班表、考勤與已核准請假');renderDialog();}
+ if($('p79DashEarlyPunchDialog')?.open){status(options.preview?'目前為快取初步比對，雲端尚未確認。':last.reason||'已核對正式班表、考勤與已核准請假');renderDialog();}
  return last;
 }
 function reset(){
@@ -264,15 +297,27 @@ function bind(recheckCallback){
  bound=true;
  btn.addEventListener('click',async()=>{
   if(dialog.open)return;
-  dialog.showModal();status('正在核對早／中／晚班表、正式考勤及核准請假…');
-  const host=$('p79EarlyPunchRows');if(host)host.textContent='雲端核對中…';
+  dialog.showModal();
+  const host=$('p79EarlyPunchRows');
+  // Never erase a usable read-only snapshot behind a slow cloud request.
+  if(last&&Array.isArray(last.details)){
+   renderDialog();
+   status('先顯示已載入的正式資料；正在背景複核最新考勤與班表，尚未確認之前請依原始考勤管理為準。');
+  }else{
+   renderDialog();
+   status(last?.reason||'正式考勤、班表或請假資料尚未讀齊，正在核對雲端…');
+  }
+  let timer;
   try{
-   await recheck();
+   await Promise.race([
+    recheck(),
+    new Promise((_,reject)=>{timer=root.setTimeout(()=>reject(Error('正式雲端核對逾時，已保留目前資料')),12000);})
+   ]);
   }catch(e){
    if(!dialog.open)return;
-   status('最新雲端核對未完成：'+String(e?.message||e));
-   if(host)host.textContent='請確認連線後重新點選卡片。未驗證資料不會顯示為已漏卡。';
-  }
+   status('最新雲端核對尚未完成：'+String(e?.message||e)+'；畫面保留上次資料，請勿視為最新審核結論。');
+   if(!last?.details&&host)host.textContent=last?.reason||'尚無可確認資料；請檢查正式考勤、班表及請假權限。';
+  }finally{if(timer)root.clearTimeout(timer);}
  });
  $('p79EarlyPunchRows')?.addEventListener('click',event=>{
   const action=event.target.closest?.('[data-early-edit]');

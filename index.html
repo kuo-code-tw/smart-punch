@@ -368,7 +368,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
 @media(max-width:360px){.p79-yard-kpis{grid-template-columns:minmax(0,1fr)}}
 </style>
 <link rel="stylesheet" href="./assets/port79-modern-home.css?v=20261029-admin-v1">
-<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261110-clean-four-v3&auditEditor=20261121-original-management-v3&audit-ui=20261121-original-management-v3">
+<link rel="stylesheet" href="./assets/port79-monthly-dashboard.css?v=20261110-clean-four-v3&auditEditor=20261121-fast-audit-version-v4&audit-ui=20261121-original-management-v3">
 </head>
 <body>
 <!-- v2026.09.27.7.8：五大系統入口 SSO 快速交接版；入口驗證一次後完整傳送 Token／角色／工號／姓名／GAS URL。 -->
@@ -427,6 +427,8 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
       </div>
       <label class="p79-remember-id"><input type="checkbox" id="p79RememberId" checked> 記住我的員工編號（不儲存密碼）</label><div class="login-action-grid"><button id="punchLoginBtn" class="go punch-go" type="button">🕒 進入打卡</button><button id="manageLoginBtn" class="manage-go" type="button">🛡️ 管理登入</button></div><div class="login-action-help">「進入打卡」永遠不使用密碼；「管理登入」才會驗證管理密碼。</div>
       <div id="cloudProbe" style="margin-top:10px;font-size:11px;color:var(--muted);text-align:center">☁️ 雲端待命｜登入與本機資料優先</div>
+      <div id="p79LoginVersionStatus" role="status" aria-live="polite" style="margin-top:9px;padding:9px 11px;background:#eff6ff;border:1px solid #cbdff4;border-radius:10px;color:#24537f;font-size:12px;font-weight:700;line-height:1.6">🔎 登入前自動檢查系統版本…</div>
+      <button type="button" id="p79LoginCheckNow" style="display:block;margin:6px auto 0;padding:5px 10px;background:transparent;color:#1f5fa9;border:1px solid #c7d8ef;border-radius:9px;font-size:11px;cursor:pointer">重新檢查更新</button>
     </div>
 
     <section class="p79-employee-ships" id="p79EmployeeShipSection" aria-label="所有員工可查看的萬海網站船期">
@@ -702,7 +704,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
       <div class="note">所有系統的人員資料與權限統一由「人資管理系統」維護；歷史月份集中由「歷史資料中心」查詢，避免平常切換系統重複下載大量舊資料。</div>
 
       <div class="system-version-footer" aria-label="系統版本資訊">
-        <span>主頁 v2026.10.07.18.30</span>
+        <span id="p79MainVersion">系統版本：正在核對…</span>
         <span class="version-sep">•</span>
         <span id="attendanceVersionFooter">考勤：讀取中...</span>
         <span class="version-sep">•</span>
@@ -732,7 +734,7 @@ const SYSTEM_KEYS=['attendance','workhours','leave','schedule','efficiency','hr'
 let currentSession=null, loginBusy=false;
 const $=id=>document.getElementById(id);
 
-const PORT79_DEPLOY_STATUS_URL='https://raw.githubusercontent.com/kuoyalun/smart-punch/deploy-status/deploy-status.json';
+const PORT79_DEPLOY_STATUS_URL='./port79-version.json';
 // 首頁手動更新模式：部署狀態只在初次進入時檢查一次。
 const PORT79_DEPLOY_MAX_LOCK_MS=10*60*1000;
 let port79DeploymentUpdating=false;
@@ -1830,12 +1832,27 @@ async function probeGasConnection(){
 // 這個請求不取鎖、不讀資料，目的只是降低手機第一次按管理登入遇到 Apps Script 冷啟動的機率。
 setTimeout(()=>{if(navigator.onLine!==false&&!loginBusy&&!String($('account')?.value||'').trim()){fetchTimeout(GAS_URL,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:'action=pingPost',cache:'no-store',redirect:'follow'},5000,'雲端預熱').catch(()=>{})}},2500);
 
-p79StartDeploymentStatusWatch();
+// Version checks now run visibly from the current official GitHub release and build identity.
+// Do not gate employee login on an outdated deployment-status repository.
 restore();
 // v10.19：完整健康檢查仍讓位給登入；輕量 pingPost 已在頁面載入後先做一次 runtime 預熱。
 setTimeout(probeGasConnection,7000);
-// 版本資訊僅初次進入首頁讀取一次，之後完全依手動更新，不再定時或切回視窗刷新。
-setTimeout(refreshSystemVersions,3000);
+// All bundled systems share the same published source version. Reading six
+// entire sub-system HTML pages (including the large attendance page) on login
+// used to make the home screen slow and show misleading mixed version labels.
+// The lightweight public port79-version.json now drives every displayed number.
+window.p79ApplyBuildVersion=function(version){
+ if(!/^V[0-9]{6}\.[0-9]{5}$/.test(String(version||'')))return;
+ const labels={attendance:'考勤',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資'};
+ for(const key of SYSTEM_KEYS){
+  const base=SYSTEM_BASE_PATHS[key];
+  if(base)PATHS[key]=base+'?v='+encodeURIComponent(version.slice(1).replace('.',''));
+  const footer=$(key+'VersionFooter');
+  if(footer){footer.textContent=(labels[key]||key)+'：'+version;footer.classList.add('version-ok');footer.classList.remove('version-fail');}
+ }
+ const t=$('versionCheckTime');
+ if(t)t.textContent=' · 全系統同一發布版本';
+};
 </script>
 
 <div id="port79CalendarModeBox" aria-label="年份顯示方式">
@@ -2103,8 +2120,8 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>
 <script src="./assets/port79-vessel-versions.js?v=20261030-separate-calls-v3"></script>
 <script src="./assets/port79-approved-leave-summary.js?v=20261101-unit-leave-v1"></script>
-<script src="./assets/port79-home-early-punch-alert.js?v=20261111-verified-rest-v1&edit=20261121-original-management-v3"></script>
-<script src="./assets/port79-monthly-dashboard.js?v=20261116-import-ranking-refresh-v1&prior=20261111-overtime-live-and-json-v1&ot=20261112-converted-home-v2&ot=20261112-switch-leave-donut-v1&compact=20261113-single-line-v1&precision=20261113-converted-two-decimals-v1"></script>
+<script src="./assets/port79-home-early-punch-alert.js?v=20261121-fast-audit-version-v4"></script>
+<script src="./assets/port79-monthly-dashboard.js?v=20261121-fast-audit-version-v4&prior=20261111-overtime-live-and-json-v1&ot=20261112-converted-home-v2&ot=20261112-switch-leave-donut-v1&compact=20261113-single-line-v1&precision=20261113-converted-two-decimals-v1"></script>
 <link rel="stylesheet" href="./assets/port79-reference-dashboard.css?v=20261109-home-overtime-name-center-v1&donut=20261112-v1&ot=20261112-switch-leave-donut-v1&compact=20261113-single-line-v1&layout=20261113-equal-attendance-kpi-v4">
 <link rel="stylesheet" href="./assets/port79-gate-home.css?v=20261107-gate-equal-height-v2-six-metrics-visible-v3">
 <script src="./assets/port79-reference-dashboard.js?v=20261111-overtime-no-false-empty-v1&donut=20261112-v1&ot=20261112-converted-home-v2&ot=20261112-switch-leave-donut-v1&precision=20261113-converted-two-decimals-v1"></script>
@@ -2339,6 +2356,7 @@ html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar .p79-tool
 @media(max-width:900px){html body.p79-workspace #p79WorkspaceTopbar #p79WindowsDownloadLink:not([hidden]){font-size:11px!important;padding:6px!important;margin-right:2px}html body.p79-workspace #p79WorkspaceTopbar #p79WindowsDownloadLink small{display:none!important}}
 @media(max-width:650px){.p79-windows-download-slot{width:100%;display:grid;grid-template-columns:1fr;gap:8px}.p79-windows-download-link{justify-content:center}.p79-windows-download-slot .logout{width:100%}}
 </style>
+<script defer src="./assets/port79-login-version-check.js?v=20261121-login-version-check-v1"></script>
 <!-- Compact homepage top controls: visual layout only, original download/login handlers preserved. -->
 <link rel="stylesheet" href="./assets/port79-home-compact-controls.css?v=20261121-v1">
 <script defer src="./assets/port79-home-compact-controls.js?v=20261121-v1"></script>
