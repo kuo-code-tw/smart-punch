@@ -123,7 +123,7 @@ assert(html.includes('id="p79DashEarlyPunchTrigger"'));
 assert(html.includes('id="p79DashEarlyPunchCount"'));
 assert(html.includes('id="p79DashEarlyPunchDialog"'));
 assert(html.includes('assets/port79-home-early-punch-alert.js?v=20261111-verified-rest-v1'));
-assert(html.includes('port79-monthly-dashboard.js?v=20261108-lashing-completion-v1'), 'existing dashboard version test remains compatible');
+assert(html.includes('port79-monthly-dashboard.js?v=20261116-import-ranking-refresh-v1'), 'dashboard version assertion matches current production asset');
 const block=html.slice(html.indexOf('<section class="p79d-section p79d-attendance"'),html.indexOf('<dialog id="p79DashEarlyPunchDialog"'));
 const head=block.slice(0,block.indexOf('<div class="p79d-kpis">'));
 const cards=block.slice(block.indexOf('<div class="p79d-kpis">'));
