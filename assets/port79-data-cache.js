@@ -989,14 +989,19 @@ async function downloadSystem(sys,onProgress){
  throw new Error('未知系統：'+sys);
 }
 let lastAllDownload=null;
-async function downloadAll(onProgress){
- const systems=['attendance','workhours','leave','schedule','efficiency','hr','history'];const result=[];
+async function downloadAll(onProgress,options={}){
+ // Interactive Windows batches show usable independent system data before the
+ // long multi-month attendance scan. The legacy API retains its original order.
+ const fastFirst=options?.quickFirst===true;
+ const systems=fastFirst?['leave','schedule','efficiency','hr','history','attendance','workhours']:
+  ['attendance','workhours','leave','schedule','efficiency','hr','history'];
+ const result=[];
  // Within a short same-login retry, keep the six successful snapshots and fetch
  // only modules that actually failed. A new session/scope or later refresh starts fresh.
  const batchKey=[viewerKey(),token(),gasUrl(),displayScope(),mutationStamp()].join('|');
  const prior=lastAllDownload?.key===batchKey&&Date.now()-lastAllDownload.at<180000&&
              lastAllDownload.result.some(row=>!row.ok)?lastAllDownload.result:null;
- let attendanceSnapshot=null,attendanceError=null,connectionError=null;
+ let attendanceSnapshot=null,attendanceError=null,connectionError=null,consecutiveTransportFailures=0;
  for(let i=0;i<systems.length;i++){
   const sys=systems[i];
   if(prior?.some(row=>row.system===sys&&row.ok)){
@@ -1012,12 +1017,22 @@ async function downloadAll(onProgress){
   }
   onProgress?.(sys,i,systems.length,'loading');
   try{
-   if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`));
+   if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`,{monthCompleted:mi,monthTotal:mt}));
    else if(sys==='workhours'&&attendanceError)throw attendanceError;
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
    else await downloadSystem(sys);
+   consecutiveTransportFailures=0;
    result.push({system:sys,ok:true});onProgress?.(sys,i,systems.length,'done');
-  }catch(e){if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT'].includes(e?.code))connectionError=e;if(sys==='attendance')attendanceError=e;result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e)}
+  }catch(e){
+   // Account/scope changes remain fatal. A single module's transport failure
+   // must not discard already authenticated independent systems. If two
+   // consecutive modules cannot reach GAS, stop to avoid 7 long timeouts.
+   if(['P79_AUTH','P79_SCOPE'].includes(e?.code)||
+      (e?.code==='P79_TRANSPORT'&&(!fastFirst||++consecutiveTransportFailures>=2)))connectionError=e;
+   if(sys==='attendance')attendanceError=e;
+   result.push({system:sys,ok:false,error:String(e?.message||e)});
+   onProgress?.(sys,i,systems.length,'error',e);
+  }
  }
  if(currentSystem()==='attendance'&&attendanceSnapshot)await applyAttendanceSnapshotToPage(attendanceSnapshot,true);
  lastAllDownload={key:batchKey,at:Date.now(),result};
