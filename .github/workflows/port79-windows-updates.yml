@@ -2,10 +2,14 @@ name: Publish verified Windows updates after Pages
 
 on:
   pull_request:
-    paths: ['.github/workflows/port79-windows-updates.yml']
+    paths:
+      - '.github/workflows/port79-windows-updates.yml'
+      - 'desktop-lite/**'
   push:
     branches: [main]
-    paths: ['.github/workflows/port79-windows-updates.yml']
+    paths:
+      - '.github/workflows/port79-windows-updates.yml'
+      - 'desktop-lite/**'
   workflow_run:
     workflows: ['Publish static site to GitHub Pages']
     types: [completed]
@@ -33,32 +37,17 @@ jobs:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
           path: production
           persist-credentials: false
-      - uses: actions/checkout@v4
-        with:
-          # Known Windows code previously used to build the official release.
-          ref: d1b0e4f8d046025016153b96ceced0a28b268520
-          path: windows-source
-          persist-credentials: false
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Assemble production website with pinned native app source
-        shell: pwsh
-        run: |
-          $ErrorActionPreference='Stop'
-          $src=Join-Path $env:GITHUB_WORKSPACE 'windows-source/desktop-lite'
-          $dst=Join-Path $env:GITHUB_WORKSPACE 'production/desktop-lite'
-          if(!(Test-Path (Join-Path $src 'Port79Lite.csproj'))){throw 'Native source missing'}
-          if(Test-Path $dst){throw 'Unexpected desktop source conflict'}
-          Copy-Item -LiteralPath $src -Destination $dst -Recurse
       - name: Verify program and update rollback rules
         shell: pwsh
         working-directory: production
         run: |
-          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs
+          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs
           if($LASTEXITCODE -ne 0){throw 'Windows unit tests failed'}
           & ./desktop-lite/tests/shell-updater-safety.ps1
           if($LASTEXITCODE -ne 0){throw 'Updater preservation tests failed'}
@@ -70,6 +59,14 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'Restore failed'}
           & ./desktop-lite/build-portable.ps1
           if($LASTEXITCODE -ne 0){throw 'Build failed'}
+      - name: Smoke-test native Windows update, window visibility and automatic restart
+        shell: pwsh
+        working-directory: production
+        run: |
+          & ./desktop-lite/tests/native-restart-smoke.ps1
+          # A PowerShell script can complete successfully while LASTEXITCODE
+          # still contains a stale result from a prior native process.
+          if(-not $?){throw 'Windows native restart smoke failed'}
       - name: Reject private data and stale website files
         shell: pwsh
         working-directory: production
