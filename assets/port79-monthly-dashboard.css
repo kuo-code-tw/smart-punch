@@ -243,3 +243,8 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79
   flex-wrap:wrap!important;align-items:flex-start!important;
  }
 }
+
+/* Match the actual attendance management table: purple pencil and yellow missing-punch + */
+#p79Dashboard .p79-early-pencil{border:0;background:transparent;color:#6b5ce7;font-weight:800}
+#p79Dashboard .p79-early-add{display:inline-flex;align-items:center;justify-content:center;width:33px;height:33px;min-width:33px;border:0;border-radius:10px;background:#fff4ca;color:#ad7425;font:700 22px/1 sans-serif;cursor:pointer}
+#p79Dashboard .p79-early-add:hover,#p79Dashboard .p79-early-add:focus-visible{background:#ffeba8;outline:2px solid #e6c46c;outline-offset:2px}

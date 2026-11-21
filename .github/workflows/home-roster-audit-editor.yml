@@ -5,9 +5,12 @@ on:
     paths:
       - 'index.html'
       - 'assets/port79-home-early-punch-alert.js'
+      - 'assets/port79-attendance-audit-handoff.js'
+      - 'attendance/index.html'
       - 'assets/port79-monthly-dashboard.css'
       - 'tests/home-roster-audit-embedded-editor.cjs'
       - 'tests/home-audit-punch-inline-pencil.cjs'
+      - 'tests/attendance-home-audit-handoff.cjs'
       - 'tests/home-early-shift-punch-alert.cjs'
       - '.github/workflows/home-roster-audit-editor.yml'
   push:
@@ -15,9 +18,12 @@ on:
     paths:
       - 'index.html'
       - 'assets/port79-home-early-punch-alert.js'
+      - 'assets/port79-attendance-audit-handoff.js'
+      - 'attendance/index.html'
       - 'assets/port79-monthly-dashboard.css'
       - 'tests/home-roster-audit-embedded-editor.cjs'
       - 'tests/home-audit-punch-inline-pencil.cjs'
+      - 'tests/attendance-home-audit-handoff.cjs'
       - 'tests/home-early-shift-punch-alert.cjs'
       - '.github/workflows/home-roster-audit-editor.yml'
 
@@ -36,6 +42,7 @@ jobs:
         run: |
           node tests/home-roster-audit-embedded-editor.cjs
           node tests/home-audit-punch-inline-pencil.cjs
+          node tests/attendance-home-audit-handoff.cjs
           node tests/windows-download-link.cjs
           node tests/home-early-shift-punch-alert.cjs
           node tests/attendance-editor-opening.cjs
