@@ -17,13 +17,14 @@ function setup({role='admin',token='VALID',pending=false,behavior='success'}={})
   addEventListener(name,cb){listeners[name]=cb;}};
  const sessionStorage={getItem(key){if(key==='port79_user_session')return JSON.stringify({adminRole:role,empId:'TEST'});return null;}};
  const systems=['attendance','workhours','leave','schedule','efficiency','hr','history'];
- const downloadAll=async cb=>{
+ const downloadAll=async (cb,options={})=>{
   calls.push('downloadAll');
   if(behavior==='throw')throw Error('test cloud timeout');
   if(behavior==='hold')await held;
-  return systems.map((sys,i)=>{
-   cb(sys,i,systems.length,'loading');
-   cb(sys,i,systems.length,behavior==='partial'&&i===3?'error':'done',behavior==='partial'&&i===3?new Error('cloud error'):null);
+  const selected=options.historyOnDemand===true?systems.filter(sys=>sys!=='history'):systems;
+  return selected.map((sys,i)=>{
+   cb(sys,i,selected.length,'loading');
+   cb(sys,i,selected.length,behavior==='partial'&&i===3?'error':'done',behavior==='partial'&&i===3?new Error('cloud error'):null);
    return {system:sys,ok:!(behavior==='partial'&&i===3),error:behavior==='partial'&&i===3?'cloud error':undefined};
   });
  };
@@ -33,7 +34,7 @@ function setup({role='admin',token='VALID',pending=false,behavior='success'}={})
  vm.runInContext(portion,context,{timeout:3000});
  return {window,messages,progress,listeners,calls,resolvePending};
 }
-test('Windows tray command triggers real authenticated cloud download and reports 0/7 to 7/7',async()=>{
+test('Windows tray reports real 0/6 to 6/6 basic sync with historical months on demand',async()=>{
  const f=setup();
  assert.equal(f.window.__port79NativeCloudSyncReady,true);
  await f.listeners['port79-desktop-force-sync']();
@@ -42,8 +43,9 @@ test('Windows tray command triggers real authenticated cloud download and report
  assert.equal(f.messages[0].phase,'downloading');
  assert.equal(f.messages[0].completed,0);
  assert.equal(f.messages.at(-1).phase,'complete');
- assert.equal(f.messages.at(-1).completed,7);
- assert.match(f.messages.at(-1).detail,/不含碼頭儲量/);
+ assert.equal(f.messages.at(-1).completed,6);
+ assert.equal(f.messages.at(-1).total,6,'A missing historical catalog must not leave a 6/7 startup');
+ assert.match(f.messages.at(-1).detail,/歷史資料依月份/);
 });
 test('not logged in and punch/employee role are rejected before cloud calls',async()=>{
  for(const params of [{token:''},{role:'employee'}]){
