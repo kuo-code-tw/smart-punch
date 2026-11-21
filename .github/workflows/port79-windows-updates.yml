@@ -75,7 +75,7 @@ jobs:
         shell: pwsh
         working-directory: production
         run: |
-          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs
+          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs tests/windows-release-version-contract.cjs
           if($LASTEXITCODE -ne 0){throw 'Windows unit tests failed'}
           & ./desktop-lite/tests/shell-updater-safety.ps1
           if($LASTEXITCODE -ne 0){throw 'Updater preservation tests failed'}
@@ -107,9 +107,17 @@ jobs:
           try {
             $prefix='79號碼頭_Windows輕量版/'
             $names=@($z.Entries | ForEach-Object { $_.FullName.Replace('\','/') })
-            foreach($required in @('Port79WindowsLite.exe','app/upgrade-windows.ps1','site/smart-punch/index.html','site/smart-punch/assets/port79-cache-worker.html')){
+            foreach($required in @('Port79WindowsLite.exe','app/upgrade-windows.ps1','site/smart-punch/index.html','site/smart-punch/版本資訊.txt','site/smart-punch/assets/port79-cache-worker.html')){
               if($names -notcontains ($prefix+$required)){throw "Missing $required"}
             }
+            # A release is invalid unless its embedded visible version is
+            # exactly the source commit checked out for this ZIP.
+            $versionEntry=$z.Entries | Where-Object { $_.FullName.Replace('\','/') -eq ($prefix+'site/smart-punch/版本資訊.txt') } | Select-Object -First 1
+            if(!$versionEntry){throw 'ZIP missing embedded version identity'}
+            $reader=[IO.StreamReader]::new($versionEntry.Open())
+            try {$versionText=$reader.ReadToEnd()} finally {$reader.Dispose()}
+            $builtSha=(& git rev-parse HEAD).Trim()
+            if(!$versionText.Contains('GitHub Commit: '+$builtSha)){throw 'ZIP site version does not match source commit'}
             foreach($entry in $z.Entries){
               $name=$entry.FullName.Replace('\','/')
               if(!$name.StartsWith($prefix,[StringComparison]::Ordinal) -or $name.Contains('../') -or $name.Contains(':')){throw "Unsafe path: $name"}
