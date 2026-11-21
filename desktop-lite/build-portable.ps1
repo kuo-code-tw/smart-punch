@@ -22,6 +22,14 @@ foreach($folder in $public){
 foreach($f in @('index.html','port79-attendance-core.js')){
  Copy-Item (Join-Path $repo $f) (Join-Path $site $f) -Force
 }
+# This version identity travels WITH the downloaded ZIP and identifies
+# the actually extracted code, rather than a browser's old ZIP filename.
+$commit=((& git -C $repo rev-parse HEAD) | Out-String).Trim()
+if($LASTEXITCODE -ne 0 -or $commit -notmatch '^[a-f0-9]{40}$'){throw 'Cannot identify verified source commit'}
+("79號碼頭 Windows 正式程式版本"+[Environment]::NewLine+
+ "GitHub Commit: "+$commit+[Environment]::NewLine+
+ "此檔案位於下載 ZIP 的 site/smart-punch 資料夾內；核對正式發布的版本編號。") |
+ Set-Content (Join-Path $site '版本資訊.txt') -Encoding UTF8
 $app=Join-Path $target 'app'
 New-Item -ItemType Directory -Force $app | Out-Null
 Copy-Item (Join-Path $PSScriptRoot 'app/login-progress.js') (Join-Path $app 'login-progress.js') -Force

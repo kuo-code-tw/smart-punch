@@ -75,7 +75,7 @@ jobs:
         shell: pwsh
         working-directory: production
         run: |
-          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs
+          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs tests/windows-release-version-contract.cjs
           if($LASTEXITCODE -ne 0){throw 'Windows unit tests failed'}
           & ./desktop-lite/tests/shell-updater-safety.ps1
           if($LASTEXITCODE -ne 0){throw 'Updater preservation tests failed'}
@@ -107,9 +107,17 @@ jobs:
           try {
             $prefix='79號碼頭_Windows輕量版/'
             $names=@($z.Entries | ForEach-Object { $_.FullName.Replace('\','/') })
-            foreach($required in @('Port79WindowsLite.exe','app/upgrade-windows.ps1','site/smart-punch/index.html','site/smart-punch/assets/port79-cache-worker.html')){
+            foreach($required in @('Port79WindowsLite.exe','app/upgrade-windows.ps1','site/smart-punch/index.html','site/smart-punch/版本資訊.txt','site/smart-punch/assets/port79-cache-worker.html')){
               if($names -notcontains ($prefix+$required)){throw "Missing $required"}
             }
+            # A release is invalid unless its embedded visible version is
+            # exactly the source commit checked out for this ZIP.
+            $versionEntry=$z.Entries | Where-Object { $_.FullName.Replace('\','/') -eq ($prefix+'site/smart-punch/版本資訊.txt') } | Select-Object -First 1
+            if(!$versionEntry){throw 'ZIP missing embedded version identity'}
+            $reader=[IO.StreamReader]::new($versionEntry.Open())
+            try {$versionText=$reader.ReadToEnd()} finally {$reader.Dispose()}
+            $builtSha=(& git rev-parse HEAD).Trim()
+            if(!$versionText.Contains('GitHub Commit: '+$builtSha)){throw 'ZIP site version does not match source commit'}
             foreach($entry in $z.Entries){
               $name=$entry.FullName.Replace('\','/')
               if(!$name.StartsWith($prefix,[StringComparison]::Ordinal) -or $name.Contains('../') -or $name.Contains(':')){throw "Unsafe path: $name"}
@@ -163,12 +171,15 @@ jobs:
             exit 0
           fi
           cp 'dist/79號碼頭_Windows輕量資料夾版.zip' dist/Port79-Windows-Lite.zip
+          # Unique asset name makes the release visible to operators and avoids
+          # the browser reusing an older identically-named downloaded ZIP.
+          cp dist/Port79-Windows-Lite.zip "dist/Port79-Windows-Lite-${SITE_SHA:0:12}.zip"
           tag="port79-windows-lite-$(date -u +%Y%m%d)-${SITE_SHA:0:12}"
           if gh release view "$tag" -R "$REPO" >/dev/null 2>&1; then
             echo "Already published $tag; no duplicate release"
             exit 0
           fi
-          gh release create "$tag" dist/Port79-Windows-Lite.zip -R "$REPO" \
+          gh release create "$tag" dist/Port79-Windows-Lite.zip "dist/Port79-Windows-Lite-${SITE_SHA:0:12}.zip" -R "$REPO" \
             --title "79號碼頭 Windows 正式更新 ($tag)" --target "$SITE_SHA" --latest \
             --notes "Verified Windows native package and production site $SITE_SHA. No local-data or private yard backup."
           # Older Windows EXEs check this fixed legacy tag.
