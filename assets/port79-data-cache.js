@@ -794,7 +794,10 @@ function buildUrl(action,params={}){
  }
  u.searchParams.set('_',Date.now());return u.toString();
 }
-async function fetchJson(action,params={},sys=''){
+async function fetchJson(action,params={},sys='',readOptions={}){
+ // Only explicit interactive batches use the short bound; scheduled reads
+ // and business operations retain the original 60-second timeout.
+ const timeoutMs=readOptions?.interactive===true?30000:DOWNLOAD_TIMEOUT_MS;
  const viewer=viewerKey(),credential=token();
  if(!credential)throw Object.assign(new Error('請先由首頁重新登入，再下載資料'),{code:'P79_AUTH'});
  let url=buildUrl(action,params),lastError;
@@ -804,7 +807,7 @@ async function fetchJson(action,params={},sys=''){
  const label=labels[action]||'雲端資料';
  for(let attempt=0;attempt<4;attempt++){
   const c=new AbortController();let timedOut=false,data;
-  const to=setTimeout(()=>{timedOut=true;c.abort()},DOWNLOAD_TIMEOUT_MS);
+  const to=setTimeout(()=>{timedOut=true;c.abort()},timeoutMs);
   try{
    if(viewerKey()!==viewer||token()!==credential)throw Object.assign(new Error('登入狀態已變更，請重新開啟快取中心'),{code:'P79_AUTH'});
    const r=await rawFetch(url,{method:'GET',cache:'no-store',redirect:'follow',signal:c.signal});
@@ -829,7 +832,7 @@ async function fetchJson(action,params={},sys=''){
    }
    if(viewerKey()!==viewer||token()!==credential)throw Object.assign(new Error('登入狀態已變更，未保存其他帳號資料'),{code:'P79_AUTH'});
   }catch(error){
-   if(timedOut||error?.name==='AbortError')error=Object.assign(new Error(label+'：雲端讀取逾時（60 秒），請稍後重試'),{retryable:true,code:'P79_TRANSPORT'});
+   if(timedOut||error?.name==='AbortError')error=Object.assign(new Error(label+'：雲端讀取逾時（'+Math.round(timeoutMs/1000)+' 秒），請稍後重試'),{retryable:true,code:'P79_TRANSPORT'});
    else if(error?.name==='TypeError')error=Object.assign(new Error(label+'：無法連接雲端，請檢查網路'),{retryable:true,code:'P79_TRANSPORT'});
    lastError=error;
    if(!error.retryable||attempt===3||(attempt>=1&&!error.busyRetry))throw error;
@@ -876,10 +879,10 @@ async function applyAttendanceSnapshotToPage(snapshot,showAll=true){
  return null;
 }
 const attendanceDownloads=new Map();
-function downloadAttendanceDatabase(targetSys='attendance',onProgress){
+function downloadAttendanceDatabase(targetSys='attendance',onProgress,readOptions={}){
  const key=viewerKey()+'|'+token()+'|'+gasUrl();
  if(attendanceDownloads.has(key))return attendanceDownloads.get(key);
- const pending=readAttendanceDatabase(targetSys,onProgress).finally(()=>{if(attendanceDownloads.get(key)===pending)attendanceDownloads.delete(key)});
+ const pending=readAttendanceDatabase(targetSys,onProgress,readOptions).finally(()=>{if(attendanceDownloads.get(key)===pending)attendanceDownloads.delete(key)});
  attendanceDownloads.set(key,pending);return pending;
 }
 function verifyAttendanceDownloadContext(expected){
@@ -890,20 +893,20 @@ function verifyAttendanceDownloadContext(expected){
  if(expected.stamp!==mutationStamp())
   throw Object.assign(new Error('考勤下載期間偵測到其他資料修改，已保留原快取並停止儲存舊版本；請重新下載考勤'),{code:'P79_MUTATION'});
 }
-async function readAttendanceDatabase(targetSys='attendance',onProgress){
+async function readAttendanceDatabase(targetSys='attendance',onProgress,readOptions={}){
  const t=token(),viewer=viewerKey(),scope=displayScope(),stamp=mutationStamp();
  const expected={token:t,viewer,scope,stamp};
  if(!t)throw new Error('找不到登入 Token，請重新由首頁登入');
  const previous=await getDisplaySnapshot('attendance').catch(()=>null);
- const before=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
+ const before=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
  onProgress?.('attendance',0,1,'catalog','讀取月份清單');
- const catalog=await fetchJson('getAttendanceMonths',{token:t},'');
+ const catalog=await fetchJson('getAttendanceMonths',{token:t},'',readOptions);
  if(!Array.isArray(catalog?.months))throw new Error('考勤月份清單格式不正確，請重新下載');
  const months=[...new Set((Array.isArray(catalog?.months)?catalog.months:[]).filter(m=>/^\d{4}-\d{2}$/.test(String(m))))].sort();
  if(!months.length)months.push(ymNow());
 
  onProgress?.('attendance',0,months.length+1,'master','讀取員工主檔');
- const master=await fetchJson('getAttendanceEmployeeMaster',{token:t},'');
+ const master=await fetchJson('getAttendanceEmployeeMaster',{token:t},'',readOptions);
  if(!Array.isArray(master?.employees))throw new Error('員工主檔格式不正確，已保留原有快取');
  const employees=master.employees;
  // The catalog alone has no revision. Compare an explicit cloud revision and the
@@ -914,7 +917,7 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress){
     JSON.stringify(old.months)===JSON.stringify(months)&&JSON.stringify(old.employees)===JSON.stringify(employees)&&
     months.every(month=>old.monthStats?.some(m=>m.month===month&&m.ok===true))&&Array.isArray(old.records)){
   verifyAttendanceDownloadContext(expected);
-   const confirmed=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
+   const confirmed=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
   verifyAttendanceDownloadContext(expected);
    if(String(confirmed?.revision||'')===String(before.revision)){
    onProgress?.('attendance',months.length,months.length,'reused','雲端版本未變，重用電腦完整快取');
@@ -935,9 +938,9 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress){
    try{
     verifyAttendanceDownloadContext(expected);
     onProgress?.('attendance',completedMonths,months.length,'month',`正在讀取 ${month}｜已完成 ${completedMonths}/${months.length} 月`);
-    const d=await fetchJson('getAttendanceMonthData',{month,token:t},'');
+    const d=await fetchJson('getAttendanceMonthData',{month,token:t},'',readOptions);
     if(!Array.isArray(d?.records))throw new Error('考勤月份資料格式不正確');
-    const direct=await fetchJson('getAttendanceMainDirect',{month,token:t},'');
+    const direct=await fetchJson('getAttendanceMainDirect',{month,token:t},'',readOptions);
     if(!Array.isArray(direct?.records))throw new Error('考勤主表資料格式不正確');
     verifyAttendanceDownloadContext(expected);
     const rows=direct.records.length?mergeAttendanceRows(d.records.concat(direct.records)):d.records;
@@ -960,7 +963,7 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress){
  if(failedMonths.length)throw new Error('考勤／工時未完整下載：'+failedMonths.map(x=>x.month+'（'+x.error+'）').join('、')+'；已保留原有完整快取，請重試');
  // Do record de-duplication once rather than on every month (quadratic cost).
  const allRecords=mergeAttendanceRows(monthResults.flatMap(x=>x.rows));
- const after=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
+ const after=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
   verifyAttendanceDownloadContext(expected);
  const snapshot={
   sourceRevision:before?.revision&&String(before.revision)===String(after?.revision)?String(before.revision):'',
@@ -974,15 +977,15 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress){
  if(targetSys==='attendance'||targetSys==='workhours')await applyAttendanceSnapshotToPage(snapshot,true);
  return snapshot;
 }
-async function downloadSystem(sys,onProgress){
+async function downloadSystem(sys,onProgress,readOptions={}){
  const t=token(),m=ymNow();
- if(sys==='attendance'||sys==='workhours')return downloadAttendanceDatabase(sys,onProgress);
- if(sys==='leave')return fetchJson('getLeaveData',{token:t},sys);
- if(sys==='schedule')return fetchJson('getScheduleDataSecure',{token:t},sys);
- if(sys==='efficiency')return fetchJson('gcGetData',{token:t,month:m,scope:'month'},sys);
- if(sys==='hr')return fetchJson('hrGetEmployees',{token:t},sys);
+ if(sys==='attendance'||sys==='workhours')return downloadAttendanceDatabase(sys,onProgress,readOptions);
+ if(sys==='leave')return fetchJson('getLeaveData',{token:t},sys,readOptions);
+ if(sys==='schedule')return fetchJson('getScheduleDataSecure',{token:t},sys,readOptions);
+ if(sys==='efficiency')return fetchJson('gcGetData',{token:t,month:m,scope:'month'},sys,readOptions);
+ if(sys==='hr')return fetchJson('hrGetEmployees',{token:t},sys,readOptions);
  if(sys==='history'){
-  const catalog=await fetchJson('getHistoricalDataCatalog',{token:t},sys);
+  const catalog=await fetchJson('getHistoricalDataCatalog',{token:t},sys,readOptions);
   for(const type of ['attendance','schedule','vessel']){try{await fetchJson('historyGetMonthData',{token:t,type,month:m},'')}catch(e){}}
   return catalog;
  }
@@ -996,6 +999,7 @@ async function downloadAll(onProgress,options={}){
  const systems=fastFirst?['leave','schedule','efficiency','hr','history','attendance','workhours']:
   ['attendance','workhours','leave','schedule','efficiency','hr','history'];
  const result=[];
+ const readOptions=fastFirst?{interactive:true}:{};
  // Within a short same-login retry, keep the six successful snapshots and fetch
  // only modules that actually failed. A new session/scope or later refresh starts fresh.
  const batchKey=[viewerKey(),token(),gasUrl(),displayScope(),mutationStamp()].join('|');
@@ -1017,10 +1021,10 @@ async function downloadAll(onProgress,options={}){
   }
   onProgress?.(sys,i,systems.length,'loading');
   try{
-   if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`,{monthCompleted:mi,monthTotal:mt}));
+   if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`,{monthCompleted:mi,monthTotal:mt}),readOptions);
    else if(sys==='workhours'&&attendanceError)throw attendanceError;
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
-   else await downloadSystem(sys);
+   else await downloadSystem(sys,null,readOptions);
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true});onProgress?.(sys,i,systems.length,'done');
   }catch(e){
