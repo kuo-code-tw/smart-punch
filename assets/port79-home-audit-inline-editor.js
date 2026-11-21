@@ -80,7 +80,7 @@ function open({url,row=null,side='',onStatus=()=>{},onSynced=async()=>{}}={}){
  const headline=host.querySelector('.p79-early-inline-head span');
  const instance={
   host,frame,loading,timer:0,observer:null,writing:0,
-  failed:false,synced:false,syncing:false,seenAnyWrite:false,modalOpened:false,requestedGeneric:false,
+  failed:false,synced:false,syncing:false,seenAnyWrite:false,modalOpened:false,requestedGeneric:false,hiddenSince:0,
   status(message){if(current!==instance)return;loading.textContent=String(message);headline.textContent='📝 '+String(message);onStatus(String(message));}
  };
  current=instance;
@@ -143,13 +143,18 @@ function open({url,row=null,side='',onStatus=()=>{},onSynced=async()=>{}}={}){
      instance.observer=new Observer(()=>{
       const still=!!(addModal&&!addModal.classList.contains('hidden'))||
                   !!(editModal&&!editModal.classList.contains('hidden'));
-      if(!still&&!instance.seenAnyWrite)close(true);
+      if(!still&&!instance.seenAnyWrite&&!instance.hiddenSince)instance.hiddenSince=Date.now();
       if(!still&&instance.seenAnyWrite&&instance.writing>0)status('正在等候正式雲端儲存回覆…');
      });
      for(const node of [addModal,editModal])if(node)instance.observer.observe(node,{attributes:true,attributeFilter:['class']});
     }
    }
-  }else if(instance.modalOpened&&!instance.seenAnyWrite){close(true);}
+  }else if(instance.modalOpened&&!instance.seenAnyWrite){
+   if(!instance.hiddenSince)instance.hiddenSince=Date.now();
+   // Original addRecord queues postToCloud in a Promise microtask AFTER it
+   // closes its modal. Do not destroy the iframe before that write begins.
+   if(Date.now()-instance.hiddenSince>1100)close(true);
+  }
   else if(!row&&typeof win.openManualAddModal==='function'&&
           typeof win.getAdminAttendanceEmployees==='function'&&
           win.getAdminAttendanceEmployees().length>0&&!instance.requestedGeneric){

@@ -2,6 +2,9 @@
 const assert=require('node:assert/strict');
 globalThis.location={href:'https://example.test/smart-punch/',origin:'https://example.test'};
 const api=require('../assets/port79-home-audit-inline-editor.js');
+const source=require('node:fs').readFileSync('assets/port79-home-audit-inline-editor.js','utf8');
+assert.match(source,/hiddenSince>1100/,'Original add modal must not be destroyed before its async cloud write starts');
+assert.doesNotMatch(source,/if\(!still&&!instance\.seenAnyWrite\)close\(true\)/,'No synchronous destroy on add-modal close');
 assert.equal(api.validUrl('https://evil.example/attendance/'),null,'Cross-origin attendance is rejected');
 assert.equal(api.validUrl('https://example.test/smart-punch/other/'),null);
 const url=api.validUrl('https://example.test/smart-punch/attendance/?v=123#port79sso=abc');
