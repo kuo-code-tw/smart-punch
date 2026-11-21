@@ -1122,8 +1122,10 @@ async function nativeCloudSyncFromDesktop(){
   nativeCloudSyncBusy=false;
  }
 }
-window.addEventListener('port79-desktop-force-sync',nativeCloudSyncFromDesktop);
-window.__port79NativeCloudSyncReady=true;
+if(typeof window.addEventListener==='function'){
+ window.addEventListener('port79-desktop-force-sync',nativeCloudSyncFromDesktop);
+ window.__port79NativeCloudSyncReady=true;
+}
 
 window.Port79DataCache={getDisplaySnapshot,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 })();
