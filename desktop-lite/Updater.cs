@@ -25,7 +25,16 @@ namespace Port79Lite {
   };
   public sealed class Entry {public string path {get;set;} public string sha {get;set;} public string type {get;set;} }
   public sealed class Tree {public bool truncated {get;set;} public Entry[] tree {get;set;} }
-  public sealed class Manifest {public Entry[] files {get;set;} }
+  public sealed class Manifest {public Entry[] files {get;set;} public string baseBundleVersion {get;set;} }
+  // A staged website update is valid only for the bundle from which it was
+  // downloaded. Otherwise it could downgrade a newly extracted official ZIP.
+  private static string BundleVersion(string site){
+   var path=Path.Combine(site,"版本資訊.txt");
+   if(!File.Exists(path))return "";
+   var text=File.ReadAllText(path);
+   var match=System.Text.RegularExpressions.Regex.Match(text,@"GitHub Commit:\s*([a-fA-F0-9]{40})");
+   return match.Success?match.Groups[1].Value.ToLowerInvariant():"";
+  }
   static readonly JavaScriptSerializer Json=new JavaScriptSerializer{MaxJsonLength=int.MaxValue};
 
   public static bool Allowed(string file) {
@@ -64,6 +73,15 @@ namespace Port79Lite {
    if(!File.Exists(manifestFile))return 0;
    var manifest=Json.Deserialize<Manifest>(File.ReadAllText(manifestFile));
    if(manifest?.files==null||manifest.files.Length>LimitFiles)throw new InvalidDataException("更新清單不完整");
+   // Existing local-data/updates may contain a staged patch from an older
+   // Windows ZIP. Never apply that patch over a newly extracted ZIP.
+   var installedBundle=BundleVersion(site);
+   if(installedBundle.Length>0&&
+      !String.Equals(manifest.baseBundleVersion,installedBundle,StringComparison.OrdinalIgnoreCase)){
+    File.Delete(manifestFile);
+    log("已略過上一版 Windows 所留下的網站待更新檔；保留目前新 ZIP 的畫面與原始資料");
+    return 0;
+   }
    var stage=Path.Combine(updates,"stage");
    // Atomic validation stage: no site files changed until every staged SHA matches the official main tree.
    foreach(var e in manifest.files){
@@ -128,7 +146,7 @@ namespace Port79Lite {
      File.WriteAllBytes(target,bytes);
      log("程式更新已下載 "+(i+1)+"／"+changed.Length+"（僅程式，不是資料庫）");
     }
-    SaveManifest(pending,new Manifest {files=changed});
+    SaveManifest(pending,new Manifest {files=changed,baseBundleVersion=BundleVersion(site)});
     return changed.Length;
    }
   }
