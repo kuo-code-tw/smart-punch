@@ -336,10 +336,7 @@ function bind(recheckCallback){
   dialog.close();
  }));
  dialog.addEventListener('close',()=>root.P79HomeAuditInlineEditor?.close(true));
- dialog.querySelector('[data-early-attendance]')?.addEventListener('click',()=>{
-  dialog.close();
-  if(typeof root.launchSystem==='function')root.launchSystem('attendance');
- });
+
 }
 return {analyze,render,reset,bind};
 });

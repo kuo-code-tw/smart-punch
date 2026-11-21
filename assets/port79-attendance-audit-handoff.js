@@ -67,6 +67,12 @@ async function openOriginal(){
    (p.side==='IN'?p.clockInEvents:p.clockOutEvents):[];
  if(matches.length>1){fail('此班同側有多筆打卡，無法唯一確認要修改哪一筆');return true;}
  if(matches.length===1&&!String(matches[0]?.id||'')){fail('原始紀錄缺少可驗證編號');return true;}
+ // Missing-side form must wait for the original attendance employee roster;
+ // opening it too early would silently fail to select the exact person.
+ if(matches.length===0){
+  const visible=typeof getAdminAttendanceEmployees==='function'?getAdminAttendanceEmployees():null;
+  if(Array.isArray(visible)&&visible.length===0)return false;
+ }
  let source=null;
  if(matches.length===1){
   const ev=matches[0];
