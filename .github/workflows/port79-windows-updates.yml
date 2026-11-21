@@ -5,11 +5,15 @@ on:
     paths:
       - '.github/workflows/port79-windows-updates.yml'
       - 'desktop-lite/**'
+      - 'assets/port79-data-cache.js'
+      - 'tests/native-cloud-download-dispatch.cjs'
   push:
     branches: [main]
     paths:
       - '.github/workflows/port79-windows-updates.yml'
       - 'desktop-lite/**'
+      - 'assets/port79-data-cache.js'
+      - 'tests/native-cloud-download-dispatch.cjs'
   workflow_run:
     workflows: ['Publish static site to GitHub Pages']
     types: [completed]
@@ -47,7 +51,7 @@ jobs:
         shell: pwsh
         working-directory: production
         run: |
-          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs
+          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs tests/native-cloud-download-dispatch.cjs
           if($LASTEXITCODE -ne 0){throw 'Windows unit tests failed'}
           & ./desktop-lite/tests/shell-updater-safety.ps1
           if($LASTEXITCODE -ne 0){throw 'Updater preservation tests failed'}

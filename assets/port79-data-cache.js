@@ -1064,6 +1064,69 @@ async function refreshModal(){
 }
 async function openCenter(){const b=ensureModal();b.classList.add('open');await refreshModal()}
 
+
+/**
+ * Windows tray's "重新同步資料（考勤等七項）" uses this event.
+ * Previously no handler existed, so clicking it silently did nothing.
+ * All data reads still go through the authenticated existing GAS routes.
+ */
+let nativeCloudSyncBusy=false;
+async function nativeCloudSyncFromDesktop(){
+ const total=7;
+ const done=new Set();
+ function status(phase,detail,completed=done.size){
+  const value={
+   kind:'port79-cache-status-v1',phase,
+   title:'雲端資料同步',detail:String(detail||'').slice(0,160),
+   completed:Math.max(0,Math.min(total,completed)),total
+  };
+  try{window.chrome?.webview?.postMessage?.(JSON.stringify(value));}catch(e){}
+  setProgress((phase==='failed'?'❌ ':phase==='partial'?'⚠️ ':phase==='complete'?'✅ ':'☁️ ')+value.detail);
+ }
+ if(nativeCloudSyncBusy){
+  status('stalled','上一次雲端資料同步仍在進行，請查看目前進度。');
+  return;
+ }
+ nativeCloudSyncBusy=true;
+ status('downloading','正在確認管理員登入與七大系統雲端連線…',0);
+ try{
+  let session=null;
+  try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')}catch(_){}
+  const role=String(session?.adminRole||session?.role||'').toLowerCase();
+  if(!session||session.punchOnly||!['admin','superadmin'].includes(role)||!token()){
+   throw new Error('請先以管理員登入，再下載有權限的雲端資料');
+  }
+  if(window.__port79CachedSessionRefreshPending){
+   throw new Error('登入權限正在向雲端確認，請完成後再重新下載');
+  }
+  const result=await downloadAll((sys,index,count,state,error,detail)=>{
+   if(['done','reused','error','skipped'].includes(state))done.add(sys);
+   const label=SYSTEM_LABELS[sys]||sys;
+   const message=detail?label+'｜'+detail:
+    state==='loading'?'正在下載 '+label:
+    state==='reused'?label+' 已沿用經驗證的快取':
+    state==='done'?label+' 已完成':
+    state==='error'||state==='skipped'?label+' 失敗：'+String(error?.message||error||'雲端讀取未完成'):
+    '正在下載 '+label;
+   status('downloading',message);
+  });
+  const success=result.filter(x=>x.ok).length;
+  const failures=result.filter(x=>!x.ok);
+  status(failures.length?(success?'partial':'failed'):'complete',
+   failures.length?'七大系統完成 '+success+'/'+total+'；未完成：'+failures.map(x=>(SYSTEM_LABELS[x.system]||x.system)+' '+x.error).join('；').slice(0,110):
+    '七大系統雲端資料已讀取完成（不含碼頭儲量）；已保留原有快取。',
+   total);
+ }catch(error){
+  status('failed','雲端資料未下載：'+String(error?.message||error),done.size);
+ }finally{
+  nativeCloudSyncBusy=false;
+ }
+}
+if(typeof window.addEventListener==='function'){
+ window.addEventListener('port79-desktop-force-sync',nativeCloudSyncFromDesktop);
+ window.__port79NativeCloudSyncReady=true;
+}
+
 window.Port79DataCache={getDisplaySnapshot,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 })();
 
