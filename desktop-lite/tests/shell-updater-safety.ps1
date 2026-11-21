@@ -16,7 +16,11 @@ New-Item -ItemType Directory -Force (Join-Path $root 'local-data/BrowserProfile'
 $zip=Join-Path $base 'mock-release.zip'
 Compress-Archive -Path $pkg -DestinationPath $zip -Force
 $digest=(Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-& ./desktop-lite/app/upgrade-windows.ps1 -Archive $zip -InstallRoot $root -ParentPid 0 -ExpectedDigest $digest -TestOnly
+$ready=Join-Path $root 'local-data/updates/runner-ready-0.flag'
+& ./desktop-lite/app/upgrade-windows.ps1 -Archive $zip -InstallRoot $root -ParentPid 0 -ExpectedDigest $digest -ReadyFile $ready -TestOnly
+if(!(Test-Path $ready)){throw 'No native updater handoff marker after verified release'}
+if((Get-Content $ready -Raw).Trim() -ne 'ready:0'){throw 'Updater handoff marker content incorrect'}
+Remove-Item $ready -Force
 if((Get-Content (Join-Path $root 'Port79WindowsLite.exe') -Raw).Trim() -ne 'new'){throw 'Executable not updated'}
 if((Get-Content (Join-Path $root 'site/smart-punch/index.html') -Raw).Trim() -ne 'new site'){throw 'Original site not updated'}
 if((Get-Content (Join-Path $root 'local-data/BrowserProfile/keep.dat') -Raw).Trim() -ne 'MY PRIVATE DATA'){throw 'User data was changed'}
@@ -27,9 +31,10 @@ if($exeHash -ne $actualExeHash){throw 'Installed EXE fingerprint missing or stal
 $old=(Get-Content (Join-Path $root 'Port79WindowsLite.exe') -Raw)
 $rejected=$false
 try{
- & ./desktop-lite/app/upgrade-windows.ps1 -Archive $zip -InstallRoot $root -ParentPid 0 -ExpectedDigest ('0'*64) -TestOnly
+ & ./desktop-lite/app/upgrade-windows.ps1 -Archive $zip -InstallRoot $root -ParentPid 0 -ExpectedDigest ('0'*64) -ReadyFile $ready -TestOnly
 }catch{$rejected=$true}
 if(!$rejected){throw 'Wrong SHA must be rejected'}
+if(Test-Path $ready){throw 'Rejected release must not signal updater ready'}
 if((Get-Content (Join-Path $root 'Port79WindowsLite.exe') -Raw) -ne $old){throw 'Wrong SHA changed executable'}
 if((Get-Content (Join-Path $root 'local-data/BrowserProfile/keep.dat') -Raw).Trim() -ne 'MY PRIVATE DATA'){throw 'Reject path damaged user data'}
 Write-Host 'PASS one-click shell update, SHA-256 verification, rollback, unchanged local-data cache'
