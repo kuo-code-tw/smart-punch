@@ -28,7 +28,9 @@ $commit=((& git -C $repo rev-parse HEAD) | Out-String).Trim()
 if($LASTEXITCODE -ne 0 -or $commit -notmatch '^[a-f0-9]{40}$'){throw 'Cannot identify verified source commit'}
 $commitDate=((& git -C $repo log -1 --format=%cs) | Out-String).Trim()
 if($LASTEXITCODE -ne 0 -or $commitDate -notmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'){throw 'Cannot identify release commit date'}
-$version='V'+$commitDate.Replace('-','.')+'-'+$commit.Substring(0,12)
+# Display only decimal digits: YYYYMMDD + decimal value of first 8 SHA hex digits.
+# The full source SHA stays in the manifest for trustworthy update validation.
+$version=$commitDate.Replace('-','')+[Convert]::ToUInt32($commit.Substring(0,8),16).ToString('D10')
 ("79號碼頭 Windows 正式程式版本"+[Environment]::NewLine+
  "版本號: "+$version+[Environment]::NewLine+
  "GitHub Commit: "+$commit+[Environment]::NewLine+
