@@ -53,12 +53,13 @@ namespace Port79Lite {
     if(sha.Length<40)return "";
     sha=sha.Substring(0,40);
     foreach(var c in sha)if(!Uri.IsHexDigit(c))return "";
-    var shortSha=sha.Substring(0,12);
+    var revision=Convert.ToUInt32(sha.Substring(0,8),16).ToString("D10");
     var human=System.Text.RegularExpressions.Regex.Match(text,
-     @"(?m)^版本號:\s*(V\d{4}\.\d{2}\.\d{2}-[a-f0-9]{12})\s*$");
-    if(human.Success&&human.Groups[1].Value.EndsWith(shortSha,StringComparison.OrdinalIgnoreCase))
+     @"(?m)^版本號:\s*(\d{18})\s*$");
+    if(human.Success&&human.Groups[1].Value.EndsWith(revision,StringComparison.Ordinal))
      return human.Groups[1].Value;
-    return "V"+shortSha;
+    // Never expose hexadecimal Git identifiers in the displayed version.
+    return "";
    }catch{return "";}
   }
   // Clear only stale HTTP UI resources on a new ZIP, never cloud data.
@@ -79,7 +80,7 @@ namespace Port79Lite {
   }
   public MainForm(){
    displayVersion=InstalledBundleVersion(root);
-   Text="79號碼頭雲端智慧系統｜"+(displayVersion.Length>0?displayVersion:"V待驗證");
+   Text="79號碼頭雲端智慧系統｜"+(displayVersion.Length>0?displayVersion:"版本待驗證");
    WindowState=FormWindowState.Maximized;
    MinimumSize=new Size(980,640);
    StartPosition=FormStartPosition.CenterScreen;
@@ -125,7 +126,7 @@ namespace Port79Lite {
    SizeChanged+=(s,e)=>PositionCachePanel();
    PositionCachePanel();
    tray=new NotifyIcon{Icon=Icon ?? SystemIcons.Application,Visible=true,
-    Text=SafeStatus("79號碼頭｜"+(displayVersion.Length>0?displayVersion:"V待驗證"),60)};
+    Text=SafeStatus("79號碼頭｜"+(displayVersion.Length>0?displayVersion:"版本待驗證"),60)};
    var menu=new ContextMenuStrip();
    menu.Items.Add("開啟系統",null,(s,e)=>ShowWindow());
    menu.Items.Add("縮小到系統匣",null,(s,e)=>Hide());
@@ -147,7 +148,7 @@ namespace Port79Lite {
    menu.Items.Add(new ToolStripSeparator());
    menu.Items.Add("開啟本機資料夾",null,(s,e)=>OpenLocalData());
    menu.Items.Add("開啟目前程式資料夾",null,(s,e)=>OpenCurrentProgramFolder());
-   menu.Items.Add(new ToolStripMenuItem("目前 Windows 程式包："+(displayVersion.Length>0?displayVersion:"V待驗證")){
+   menu.Items.Add(new ToolStripMenuItem("目前程式版本："+(displayVersion.Length>0?displayVersion:"版本待驗證")){
     Enabled=false,ToolTipText=root
    });
    menu.Items.Add("關閉程式",null,(s,e)=>ExitApp());
@@ -511,7 +512,7 @@ namespace Port79Lite {
    cacheBar.MarqueeAnimationSpeed=animate?25:0;
    cacheStatusMenu.Text=SafeStatus("資料同步："+(String.IsNullOrEmpty(value.detail)?value.title:value.detail),58);
    // Windows notify icons have a limited tooltip length.
-   tray.Text=SafeStatus("79號碼頭｜"+(displayVersion.Length>0?displayVersion:"V待驗證")+"｜"+
+   tray.Text=SafeStatus("79號碼頭｜"+(displayVersion.Length>0?displayVersion:"版本待驗證")+"｜"+
     (showMonths?monthCompleted+"/"+monthTotal+"月":"同步"+completed+"/"+total),60);
    if(phase=="complete"||phase=="partial"||phase=="failed"||phase=="interrupted")Log("download "+phase+" "+completed+"/"+total+" "+SafeStatus(value.detail,120));
   }

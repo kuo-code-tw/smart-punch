@@ -45,7 +45,9 @@
    const match=/^port79-windows-lite-([0-9]{4})([0-9]{2})([0-9]{2})-([a-f0-9]{12})$/.exec(tag);
    if(!match||release.draft===true)throw Error('Unexpected release version');
    const version=match[4];
-   const human='V'+match[1]+'.'+match[2]+'.'+match[3]+'-'+version;
+   // Numeric version is YYYYMMDD plus the same SHA prefix in decimal.
+   // Preserve the full immutable GitHub release tag only for URL validation.
+   const human=match[1]+match[2]+match[3]+Number.parseInt(version.slice(0,8),16).toString().padStart(10,'0');
    const uniqueName='Port79-Windows-Lite-'+version+'.zip';
    const named=Array.isArray(release.assets)?release.assets.find(a=>a?.name===uniqueName):null;
    const stable=Array.isArray(release.assets)?release.assets.find(a=>a?.name==='Port79-Windows-Lite.zip'):null;
@@ -57,7 +59,7 @@
    if(!managerSession())return;
    link.href=expected;
    link.textContent='⬇ 系統下載 '+human;
-   link.title='下載 79號碼頭正式 Windows '+tag+'（SHA-256 已提供驗證）';
+   link.title='下載 79號碼頭正式系統，版本 '+human+'（已核對發布檔案完整性）';
   }catch(_){
    // GitHub API can be rate limited. Its releases/latest redirect still tracks
    // the newest official package, never the mutable 2026-11-20 legacy tag.

@@ -54,7 +54,8 @@ function unit(options={}){
  assert.equal(a.parentNode,s.toolbar,'Link must appear in the management toolbar');
  await new Promise(setImmediate);
  assert.equal(a.href,immutable,'Latest metadata must choose immutable version-stamped ZIP');
- assert.match(a.textContent,/V2026\.11\.21-464f4886cd3c/,'Download shows full V date and exact release hash');
+ const numericVersion='20261121'+Number.parseInt('464f4886',16).toString().padStart(10,'0');
+ assert.equal(a.textContent,'⬇ 系統下載 '+numericVersion,'Only decimal digits in visible version');
  assert.equal(s.requests.length,1,'Only one public release lookup after login');
  assert.match(s.requests[0].url,/api.github.com\/repos\/kuo-code-tw\/smart-punch\/releases\/latest/);
  assert.equal(s.requests[0].init.credentials,'omit','Never attach private login credentials to GitHub');
@@ -82,7 +83,7 @@ function unit(options={}){
  assert(home.includes('id="logoutBtn"'),'Logout remains');
  assert(home.includes('id="loginBox"'),'Login remains');
  assert(home.includes('id="systems"'),'System homepage remains');
- assert(home.includes('assets/port79-windows-download.js?v=20261121-human-v4'));
+ assert(home.includes('assets/port79-windows-download.js?v=20261121-numeric-v5'));
  assert(home.includes('assets/port79-home-compact-controls.css?v=20261121-v1'));
  assert(home.includes('assets/port79-home-compact-controls.js?v=20261121-v1'));
  assert(home.includes('p79-windows-download-link[hidden]{display:none!important}'));
