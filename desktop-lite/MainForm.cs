@@ -392,7 +392,7 @@ namespace Port79Lite {
        "請先儲存任何正在編輯的內容。現在安全重新啟動並套用嗎？",
        "更新系統",MessageBoxButtons.YesNo,MessageBoxIcon.Question);
       if(answer==DialogResult.Yes){
-       ReleaseUpdater.Launch(shell,root,Process.GetCurrentProcess().Id);
+       await ReleaseUpdater.LaunchAsync(shell,root,Process.GetCurrentProcess().Id);
        Log("已啟動單一入口 Windows 系統更新：驗證完成、進入安全重啟");
        ExitApp();
       }
