@@ -7,6 +7,7 @@ on:
       - 'assets/port79-home-early-punch-alert.js'
       - 'assets/port79-monthly-dashboard.css'
       - 'tests/home-roster-audit-embedded-editor.cjs'
+      - 'tests/home-audit-punch-inline-pencil.cjs'
       - 'tests/home-early-shift-punch-alert.cjs'
       - '.github/workflows/home-roster-audit-editor.yml'
   push:
@@ -16,6 +17,7 @@ on:
       - 'assets/port79-home-early-punch-alert.js'
       - 'assets/port79-monthly-dashboard.css'
       - 'tests/home-roster-audit-embedded-editor.cjs'
+      - 'tests/home-audit-punch-inline-pencil.cjs'
       - 'tests/home-early-shift-punch-alert.cjs'
       - '.github/workflows/home-roster-audit-editor.yml'
 
@@ -33,6 +35,8 @@ jobs:
       - name: Confirm edit access, existing official editor and cloud recheck
         run: |
           node tests/home-roster-audit-embedded-editor.cjs
+          node tests/home-audit-punch-inline-pencil.cjs
+          node tests/windows-download-link.cjs
           node tests/home-early-shift-punch-alert.cjs
           node tests/attendance-editor-opening.cjs
           node tests/attendance-manual-picker.cjs
