@@ -14,6 +14,22 @@ on:
   push:
     branches: [main]
     paths:
+      # Rebuild the bundled website immediately when production source changes,
+      # rather than leaving the homepage download one release behind while
+      # waiting for the entire GitHub Pages regression gate to finish.
+      - 'index.html'
+      - 'assets/**'
+      - 'attendance/**'
+      - 'schedule/**'
+      - 'work-hours/**'
+      - 'leave/**'
+      - 'aqc-efficiency/**'
+      - 'hr/**'
+      - 'history-data/**'
+      - 'settings/**'
+      - 'yard-dashboard/**'
+      - 'gate-dashboard/**'
+      - 'gate-import/**'
       - '.github/workflows/port79-windows-updates.yml'
       - 'desktop-lite/**'
       - 'assets/port79-data-cache.js'
