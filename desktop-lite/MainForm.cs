@@ -344,9 +344,24 @@ namespace Port79Lite {
   }
   private async Task ForceDownload(){
    ShowWindow();
-   if(web.CoreWebView2==null)return;
-   // The script rechecks the server-issued manager session before doing any download.
-   await web.CoreWebView2.ExecuteScriptAsync("window.dispatchEvent(new Event('port79-desktop-force-sync'))");
+   try{
+    if(web.CoreWebView2==null)throw new InvalidOperationException("首頁尚未載入完成，請開啟管理首頁後再執行同步");
+    // Require the actual JS handler; previously the event was fired without a
+    // listener and pressing the tray command appeared to do nothing.
+    var dispatched=await web.CoreWebView2.ExecuteScriptAsync(
+     "(function(){"+
+     "if(window.__port79NativeCloudSyncReady!==true||typeof window.Port79DataCache?.downloadAll!=='function')return false;"+
+     "window.dispatchEvent(new Event('port79-desktop-force-sync'));return true;})()");
+    if(!String.Equals(dispatched,"true",StringComparison.OrdinalIgnoreCase))
+     throw new InvalidOperationException("目前網頁尚未載入雲端下載功能，請透過正式系統更新取得新版");
+   }catch(Exception error){
+    Log("manual cloud data sync did not start: "+error.Message);
+    cacheStatusMenu.Text="資料同步狀態：未開始（"+SafeStatus(error.Message,38)+"）";
+    UpdateCacheStatus(new CacheStatusPayload{
+     kind="port79-cache-status-v1",phase="failed",
+     title="雲端資料同步",detail=error.Message,completed=0,total=7
+    });
+   }
   }
   // One user-facing update action for both public website code and the
   // Windows WebView2 shell; the current user profile and backups are untouched.
