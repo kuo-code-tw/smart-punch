@@ -1188,7 +1188,7 @@ let nativeCloudSyncBusy=false;
 async function nativeCloudSyncFromDesktop(){
  const total=7;
  const done=new Set();
- let lastActivity=Date.now(),lastDetail='正在確認雲端連線',lastMonthCompleted=0,lastMonthTotal=0,pulse=null;
+ let lastActivity=Date.now(),lastDetail='正在確認雲端連線',lastMonthCompleted=0,lastMonthTotal=0,pulse=null,fullyCompleted=false;
  function status(phase,detail,completed=done.size,month=null,heartbeat=false){
   if(!heartbeat){
    lastActivity=Date.now();
@@ -1244,6 +1244,7 @@ async function nativeCloudSyncFromDesktop(){
    status('downloading',message,done.size,month);
   },{quickFirst:true});
   const success=result.filter(x=>x.ok).length,failures=result.filter(x=>!x.ok);
+  fullyCompleted=success===total&&!failures.length;
   status(failures.length?(success?'partial':'failed'):'complete',
    failures.length?'已成功 '+success+'/'+total+' 系統；未完成：'+failures.map(x=>(SYSTEM_LABELS[x.system]||x.system)+' '+x.error).join('；').slice(0,105):
     '七大系統已讀取完成（不含碼頭儲量）；已保留原有快取。',
@@ -1253,7 +1254,7 @@ async function nativeCloudSyncFromDesktop(){
  }finally{
   if(pulse!==null&&typeof clearInterval==='function')clearInterval(pulse);
   nativeCloudSyncBusy=false;
-  try{window.__port79CloudWorkerDone?.()}catch(_){}
+  try{window.__port79CloudWorkerDone?.(fullyCompleted)}catch(_){}
  }
 }
 if(typeof window.addEventListener==='function'){
