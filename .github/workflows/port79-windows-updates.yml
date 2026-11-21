@@ -163,12 +163,15 @@ jobs:
             exit 0
           fi
           cp 'dist/79號碼頭_Windows輕量資料夾版.zip' dist/Port79-Windows-Lite.zip
+          # Unique asset name makes the release visible to operators and avoids
+          # the browser reusing an older identically-named downloaded ZIP.
+          cp dist/Port79-Windows-Lite.zip "dist/Port79-Windows-Lite-${SITE_SHA:0:12}.zip"
           tag="port79-windows-lite-$(date -u +%Y%m%d)-${SITE_SHA:0:12}"
           if gh release view "$tag" -R "$REPO" >/dev/null 2>&1; then
             echo "Already published $tag; no duplicate release"
             exit 0
           fi
-          gh release create "$tag" dist/Port79-Windows-Lite.zip -R "$REPO" \
+          gh release create "$tag" dist/Port79-Windows-Lite.zip "dist/Port79-Windows-Lite-${SITE_SHA:0:12}.zip" -R "$REPO" \
             --title "79號碼頭 Windows 正式更新 ($tag)" --target "$SITE_SHA" --latest \
             --notes "Verified Windows native package and production site $SITE_SHA. No local-data or private yard backup."
           # Older Windows EXEs check this fixed legacy tag.
