@@ -192,6 +192,9 @@ namespace Port79Lite {
      else Log("navigation failure: "+e.WebErrorStatus);
      if(e.IsSuccess&&web.Source?.AbsoluteUri.StartsWith(LocalRoot,StringComparison.OrdinalIgnoreCase)==true){
       try{
+       // Before the injected automatic downloader runs, tell it this native
+       // shell owns the separate navigation-safe WebView2 worker.
+       await web.CoreWebView2.ExecuteScriptAsync("window.__port79NativeShellHasBackgroundWorker=true");
        var progress=Path.Combine(root,"app","login-progress.js");
        if(File.Exists(progress)) await web.CoreWebView2.ExecuteScriptAsync(File.ReadAllText(progress));
       }catch(Exception x){Log("progress overlay: "+x.Message);}
@@ -347,6 +350,9 @@ namespace Port79Lite {
      return;
     }
     if(payload.kind!="port79-cache-status-v1")return;
+    // A newly navigated management page may emit "idle" or "waiting";
+    // it must not erase the actual background download progress.
+    if(cloudWorkerJobActive&&sender==web.CoreWebView2)return;
     if(sender==cloudWorker?.CoreWebView2&&
       (payload.phase=="complete"||payload.phase=="partial"||
        payload.phase=="failed"||payload.phase=="interrupted"))
