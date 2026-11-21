@@ -122,6 +122,10 @@ jobs:
             try {$versionText=$reader.ReadToEnd()} finally {$reader.Dispose()}
             $builtSha=(& git rev-parse HEAD).Trim()
             if(!$versionText.Contains('GitHub Commit: '+$builtSha)){throw 'ZIP site version does not match source commit'}
+            $commitDate=(& git log -1 --format=%cs).Trim()
+            $humanVersion='V'+$commitDate.Replace('-','.')+'-'+$builtSha.Substring(0,12)
+            if(!$versionText.Contains('版本號: '+$humanVersion)){throw 'ZIP human V version does not match commit and date'}
+            Write-Host ('WINDOWS PACKAGE VERIFIED: '+$humanVersion)
             foreach($entry in $z.Entries){
               $name=$entry.FullName.Replace('\','/')
               if(!$name.StartsWith($prefix,[StringComparison]::Ordinal) -or $name.Contains('../') -or $name.Contains(':')){throw "Unsafe path: $name"}
