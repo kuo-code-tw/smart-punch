@@ -1095,8 +1095,14 @@ async function downloadAll(onProgress,options={}){
  // long multi-month attendance scan. The legacy API retains its original order.
  const fastFirst=options?.quickFirst===true;
  const resumeExisting=fastFirst&&options?.resumeExisting===true;
- const systems=fastFirst?['leave','schedule','efficiency','hr','history','attendance','workhours']:
-  ['attendance','workhours','leave','schedule','efficiency','hr','history'];
+ // Windows does not require a historical catalog to open the management
+ // dashboard. History is read on demand for the selected month by the
+ // dedicated history-data page, preserving every existing historical cache.
+ // Never count optional/unrequested history as a failed 7th system.
+ const historyOnDemand=options?.historyOnDemand===true;
+ const systems=(fastFirst?['leave','schedule','efficiency','hr','history','attendance','workhours']:
+  ['attendance','workhours','leave','schedule','efficiency','hr','history'])
+  .filter(sys=>!historyOnDemand||sys!=='history');
  const result=[];
  const readOptions=fastFirst?{interactive:true,...(resumeExisting?{resumeExisting:true}:{})}:{};
  const batchViewer=viewerKey(),batchToken=token(),batchScope=displayScope(),batchGas=gasUrl(),batchStamp=mutationStamp();
@@ -1224,13 +1230,17 @@ async function openCenter(){const b=ensureModal();b.classList.add('open');await 
 
 
 /**
- * Windows tray's "重新同步資料（考勤等七項）" uses this event.
+ * Windows tray's "重新同步六項基本資料（歷史按月）" uses this event.
  * Previously no handler existed, so clicking it silently did nothing.
  * All data reads still go through the authenticated existing GAS routes.
  */
 let nativeCloudSyncBusy=false;
 async function nativeCloudSyncFromDesktop(){
- const total=7;
+ // Historical month contents are never required at startup. The history
+ // center fetches selected months itself; failure of an unrelated catalog
+ // must not block Windows program updates or basic attendance data.
+ const historyOnDemand=true;
+ const total=historyOnDemand?6:7;
  const done=new Set();
  let lastActivity=Date.now(),lastDetail='正在確認雲端連線',lastMonthCompleted=0,lastMonthTotal=0,pulse=null,fullyCompleted=false;
  function status(phase,detail,completed=done.size,month=null,heartbeat=false){
@@ -1256,7 +1266,7 @@ async function nativeCloudSyncFromDesktop(){
   return;
  }
  nativeCloudSyncBusy=true;
- status('downloading','正在確認管理員登入與七大系統雲端連線…',0);
+ status('downloading','正在核對六項基本資料；歷史資料請到歷史中心選月份讀取…',0);
  // A large attendance database can require two cloud reads for each month.
  // Send a truthful waiting heartbeat; do not fabricate completion progress.
  if(typeof setInterval==='function')pulse=setInterval(()=>{
@@ -1286,12 +1296,12 @@ async function nativeCloudSyncFromDesktop(){
     state==='error'||state==='skipped'?label+' 未完成：'+String(error?.message||error||'雲端讀取未完成'):
     '正在下載 '+label;
    status('downloading',message,done.size,month);
-  },{quickFirst:true,resumeExisting:window.__port79WorkerResumeOnly===true});
+  },{quickFirst:true,resumeExisting:window.__port79WorkerResumeOnly===true,historyOnDemand});
   const success=result.filter(x=>x.ok).length,failures=result.filter(x=>!x.ok);
   fullyCompleted=success===total&&!failures.length;
   status(failures.length?(success?'partial':'failed'):'complete',
    failures.length?'已成功 '+success+'/'+total+' 系統；未完成：'+failures.map(x=>(SYSTEM_LABELS[x.system]||x.system)+' '+x.error).join('；').slice(0,105):
-    '七大系統已讀取完成（不含碼頭儲量）；已保留原有快取。',
+    '六項基本資料已完成／沿用本機快取；歷史資料依月份在歷史中心讀取（未重抓）。',
    success);
  }catch(error){
   status('failed','雲端資料未下載：'+String(error?.message||error),done.size);
