@@ -10,7 +10,16 @@
 (function(){
  'use strict';
  var allowed=/^(?:port79_[A-Za-z0-9_-]+|aqc_[A-Za-z0-9_-]+|admin_session|gasUrl|GAS_URL)$/;
- var running=false, lastAccount='';
+ var running=false, lastAccount='', lastSyncKey='';
+ function writeAutoSyncState(changes){
+  if(!lastSyncKey)return;
+  try{
+   var key='p79-windows-last-download-v1';
+   var all=JSON.parse(localStorage.getItem(key)||'{}');
+   all[lastSyncKey]=Object.assign({},all[lastSyncKey]||{},changes);
+   localStorage.setItem(key,JSON.stringify(all));
+  }catch(ignore){}
+ }
  window.port79StartCloudSync=function(data){
   if(running||!data||typeof data!=='object'||!data.storage||
      typeof window.Port79DataCache?.downloadAll!=='function')return false;
@@ -39,9 +48,16 @@
   }catch(e){return false}
   running=true;
   lastAccount=auth;
-  // Only the download handler signals completion; navigation in the visible
-  // WebView2 cannot reset this worker or start a second copy of the job.
-  window.__port79CloudWorkerDone=function(){running=false;};
+  var s=JSON.parse(user);
+  lastSyncKey=String(s.empId||'').toUpperCase()+'@'+s.adminRole+'|'+
+   JSON.stringify([s.systemPermissions||{},s.dataScope||{},s.dataScopeJobs||{}]);
+  writeAutoSyncState({attempt:Date.now()});
+  // Automatic login downloads and manual downloads share the same worker.
+  // On success, persist completion for the next homepage / app restart.
+  window.__port79CloudWorkerDone=function(success){
+   if(success===true)writeAutoSyncState({completed:Date.now()});
+   running=false;
+  };
   window.dispatchEvent(new Event('port79-desktop-force-sync'));
   return true;
  };
