@@ -38,8 +38,26 @@ namespace Port79Lite {
   private bool cacheInProgress=false;
   private bool probedImportFrames=false;
 
+  // The visible title confirms which Windows ZIP was actually extracted
+  // and started. It cannot be spoofed by a stale browser download filename.
+  private static string InstalledBundleVersion(string appRoot){
+   try{
+    var path=Path.Combine(appRoot,"site","smart-punch","版本資訊.txt");
+    if(!File.Exists(path))return "";
+    var text=File.ReadAllText(path);
+    var marker="GitHub Commit: ";
+    var i=text.IndexOf(marker,StringComparison.Ordinal);
+    if(i<0)return "";
+    var sha=text.Substring(i+marker.Length).Trim();
+    if(sha.Length<40)return "";
+    sha=sha.Substring(0,40);
+    foreach(var c in sha)if(!Uri.IsHexDigit(c))return "";
+    return sha.Substring(0,12);
+   }catch{return "";}
+  }
   public MainForm(){
-   Text="79號碼頭雲端智慧系統";
+   var bundle=InstalledBundleVersion(root);
+   Text="79號碼頭雲端智慧系統"+(bundle.Length>0?"（Windows 包 v"+bundle+"）":"（Windows 版本待核）");
    WindowState=FormWindowState.Maximized;
    MinimumSize=new Size(980,640);
    StartPosition=FormStartPosition.CenterScreen;
