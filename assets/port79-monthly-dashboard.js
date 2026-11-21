@@ -926,6 +926,8 @@ async function load(forceCloud=false){
    if(item.status!=='fulfilled')return names[index]+'：'+String(item.reason?.message||item.reason||'無法讀取').slice(0,180);
    const d=item.value;
    const valid=index===0?Array.isArray(d?.records):index===1?Array.isArray(d?.schedules):Array.isArray(d?.leaveRecords);
+   if(index===1&&d?.p79HomeScheduleSource==='history-fallback')
+    return '正式班表：即時來源尚未核對，只有歷史備援快照，不會將舊班表認定為最新待核';
    return valid?'':names[index]+'：正式資料格式不完整';
   }).filter(Boolean);
   if(errors.length){
