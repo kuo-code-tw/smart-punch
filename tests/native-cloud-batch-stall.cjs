@@ -44,7 +44,7 @@ test('interactive Windows batch completes quick independent systems before long 
  const f=suite();const res=await f.run({quickFirst:true});
  assert.deepEqual(f.calls,['leave','schedule','efficiency','hr','history','attendance']);
  assert.equal(res.length,7);assert(res.every(x=>x.ok));
- assert.deepEqual(res.map(x=>x.system),['leave','schedule','efficiency','hr','history','attendance','workhours']);
+ assert.deepEqual(Array.from(res,x=>x.system),['leave','schedule','efficiency','hr','history','attendance','workhours']);
  assert.deepEqual(f.writes,['workhours']);
  assert(f.timeouts.every(x=>x===30),'manual batch uses bounded 30-second cloud request');
  const m=f.progress.find(x=>x.sys==='attendance'&&x.state==='detail');
@@ -88,7 +88,7 @@ test('Windows and homepage report real month counts and do not count failures as
  assert.match(js,/status\('stalled',lastDetail/);
  assert.match(js,/monthCompleted:Math\.max\(0,Math\.min\(240,lastMonthCompleted\)\)/);
  assert.match(js,/\{quickFirst:true\}/);
- assert.match(native,/monthCompleted=Math\.max\(0,Math\.Min\(240,data\.monthCompleted\)\)/);
- assert.match(native,/monthTotal=Math\.max\(0,Math\.Min\(240,data\.monthTotal\)\)/);
+ assert.match(native,/monthCompleted=Math\.Max\(0,Math\.Min\(240,data\.monthCompleted\)\)/);
+ assert.match(native,/monthTotal=Math\.Max\(0,Math\.Min\(240,data\.monthTotal\)\)/);
  assert.match(compact,/count\+'\/'\+total\+\(monthTotal\?/);
 });
