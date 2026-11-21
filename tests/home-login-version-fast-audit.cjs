@@ -40,5 +40,5 @@ assert.match(audit,/punchIndex=new Map\(\)/,'large-company audit indexed by work
 assert.match(audit,/leaveIndex=new Map\(\)/);
 assert.match(audit,/renderDialog\(\);\s*status\('先顯示已載入的正式資料/,'show existing rows before cloud');
 assert.match(audit,/12[0]{3}/,'slow cloud gets visible timeout');
-assert.match(win,/20261121-fast-audit-version-v4/);
+assert.match(win,/20261121-inplace-v1/);
 console.log('PASS homepage login checks current build + release, Windows identity consistency, fast cached audit and cloud-first safety');
