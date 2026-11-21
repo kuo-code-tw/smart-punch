@@ -46,6 +46,8 @@
    sessionStorage.setItem('port79_user_token',data.token);
    sessionStorage.setItem('port79_gas_url',data.gas);
   }catch(e){return false}
+  // Resume only for startup; explicit manual sync can revalidate cloud data.
+  window.__port79WorkerResumeOnly=data.resumeOnly===true;
   running=true;
   lastAccount=auth;
   var s=JSON.parse(user);
