@@ -28,7 +28,9 @@ function merge(account,cloud){
  cloud.forEach(row=>rows.set(row.date,row));
  if(rows.size)g.localStorage.setItem(key,JSON.stringify({
   rows:[...rows.values()].sort((a,b)=>a.date.localeCompare(b.date)),
-  fileName:prior?.fileName||'雲端同步',
+  fileName:prior?.fileName||'正式雲端儲量資料庫',
+  cloudSyncedAt:new Date().toISOString(),
+  cloudSource:'authenticated-gas',
   updatedAt:new Date().toISOString()
  }));
 }
