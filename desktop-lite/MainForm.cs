@@ -32,6 +32,8 @@ namespace Port79Lite {
   private readonly System.Windows.Forms.Timer cacheDismissTimer;
   private bool exit=false;
   private bool updateBusy=false;
+  private bool manualUpdateQueued=false;
+  private readonly Label updateNotice;
   // Only restart in the background when the user has not begun working.
   private bool userInteractedSinceLaunch=false;
   private bool initiated=false;
@@ -87,6 +89,19 @@ namespace Port79Lite {
    Icon=System.Drawing.Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
    web=new WebView2{Dock=DockStyle.Fill};
    Controls.Add(web);
+   // A manual tray update must have an immediate, visible response even when
+   // another startup version check is already running.
+   updateNotice=new Label {
+    Width=460,Height=56,Visible=false,BorderStyle=BorderStyle.FixedSingle,
+    BackColor=Color.FromArgb(255,248,224),ForeColor=Color.FromArgb(91,61,20),
+    Anchor=AnchorStyles.Top|AnchorStyles.Right,
+    Padding=new Padding(12,6,12,6),TextAlign=ContentAlignment.MiddleLeft,
+    AutoEllipsis=true,Font=new Font("Microsoft JhengHei",9,FontStyle.Bold),
+    Cursor=Cursors.Hand
+   };
+   updateNotice.Click+=(s,e)=>updateNotice.Visible=false;
+   Controls.Add(updateNotice);
+   updateNotice.BringToFront();
    // Tiny icon and slim progress at the upper-right; no full-width strip.
    cachePanel=new Panel {
     Width=222,Height=52,BackColor=Color.FromArgb(246,251,255),
@@ -121,6 +136,7 @@ namespace Port79Lite {
    cacheTooltip.SetToolTip(cachePanel,"本機資料下載進度");
    cacheTooltip.SetToolTip(cacheTitle,"本機資料下載進度");
    cachePanel.BringToFront();
+   updateNotice.BringToFront();
    cacheDismissTimer=new System.Windows.Forms.Timer { Interval=6000 };
    cacheDismissTimer.Tick+=(s,e)=>{cacheDismissTimer.Stop();cachePanel.Visible=false;};
    SizeChanged+=(s,e)=>PositionCachePanel();
@@ -165,6 +181,7 @@ namespace Port79Lite {
   }
   private void PositionCachePanel(){
    cachePanel.Location=new Point(Math.Max(8,ClientSize.Width-cachePanel.Width-12),8);
+   updateNotice.Location=new Point(Math.Max(8,ClientSize.Width-updateNotice.Width-12),70);
   }
   private void ShowWindow(){Show();WindowState=FormWindowState.Maximized;Activate();}
   private void ExitApp(){exit=true;tray.Visible=false;Close();}
@@ -565,9 +582,29 @@ namespace Port79Lite {
    }
   }
 
+  // Visible native WinForms feedback: independent of the web page and any
+  // Windows notification settings, so clicking tray update cannot be silent.
+  private void UpdateStatus(string message,bool visible=false){
+   systemUpdateStatusMenu.Text=SafeStatus("更新系統："+message,100);
+   systemUpdateStatusMenu.ToolTipText=SafeStatus(message,220);
+   if(visible){
+    ShowWindow();
+    updateNotice.Text="🔄 系統更新｜"+SafeStatus(message,160)+"  （點擊可關閉提示）";
+    updateNotice.Visible=true;
+    updateNotice.BringToFront();
+   }
+  }
+
   private async Task CheckUpdates(bool manual=false){
-   if(updateBusy)return;
-   updateBusy=true;checkUpdatesMenu.Enabled=false;
+   if(updateBusy){
+    if(manual){
+     manualUpdateQueued=true;
+     UpdateStatus("背景版本檢查尚未完成；已記下你的手動更新要求，完成後會接著檢查。",true);
+    }
+    return;
+   }
+   updateBusy=true;
+   if(manual)UpdateStatus("正在查詢最新正式網站與 Windows 程式版本；請看此處的檢查結果…",true);
    int stagedSite=0;
    bool websitePending=false;
    string siteFailure=null,shellFailure=null;
@@ -575,7 +612,7 @@ namespace Port79Lite {
    try{
     var site=Path.Combine(root,"site","smart-punch");
     var pending=Path.Combine(DataRoot,"updates","pending.json");
-    systemUpdateStatusMenu.Text="更新系統：正在比對正式版本…";
+    UpdateStatus("正在比對正式版本與本機程式…",manual);
     try{
      websitePending=File.Exists(pending);
      if(!websitePending){
@@ -589,22 +626,34 @@ namespace Port79Lite {
     // Never make an explicit second ZIP download step mandatory for the user.
     // A release is verified in the app, and kept staged until a safe restart.
     try{
+     UpdateStatus(websitePending?"網站更新檔已驗證，繼續核對 Windows 主程式…":"正在核對最新 Windows 主程式及下載檔…",manual);
      shell=await ReleaseUpdater.PrepareAsync(root,DataRoot,Log);
     }catch(Exception e){
      shellFailure=e.Message;
      Log("Windows shell auto update deferred: "+e.Message);
     }
-    // Explicit menu action already requests restart; do not ask again.
-    // Background checks restart only before user input and when sync is idle.
+    // A manual click intentionally requests an update. If cloud sync is active,
+    // ask before interrupting it; already saved local-data is never deleted.
+    // No pending patch means no restart is needed.
     bool restartSafe=!cloudWorkerJobActive&&!cacheInProgress&&
      (manual||!userInteractedSinceLaunch);
+    if((shell!=null||websitePending)&&manual&&!restartSafe){
+     var pendingType=shell!=null?"Windows 主程式及網站":"網站畫面";
+     var answer=MessageBox.Show(this,
+      "已找到並驗證新版"+pendingType+"，但目前仍有雲端資料同步。\n\n"+
+      "選「是」：中止尚未完成的背景同步，立即套用新版並重新啟動。已儲存的 local-data 快取保留；尚未儲存的表單可能遺失。\n\n"+
+      "選「否」：保留目前工作，更新檔保存在本機，稍後再按「檢查並更新系統」。",
+      "79號碼頭｜新版已準備完成",MessageBoxButtons.YesNo,
+      MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2);
+     if(answer==DialogResult.Yes)restartSafe=true;
+    }
     if(shell!=null){
      if(!restartSafe){
-      systemUpdateStatusMenu.Text="更新系統：新版已下載；工作或同步中，待下次安全啟動套用";
-      Log("Windows update staged; restart deferred because the user or cloud sync is active");
+      UpdateStatus("Windows 新版已下載；同步進行中，等待下次手動套用。",manual);
+      Log("Windows update staged; restart deferred until next explicit manual choice");
       return;
      }
-     systemUpdateStatusMenu.Text="更新系統：Windows 新版已驗證，準備自動重啟";
+     UpdateStatus("Windows 新版已驗證，正在啟動更新工具；系統會自動重新開啟。",manual);
      await ReleaseUpdater.LaunchAsync(shell,root,Process.GetCurrentProcess().Id);
      Log("Windows updater accepted handoff; old app closing for automatic restart");
      ExitApp();
@@ -612,26 +661,47 @@ namespace Port79Lite {
     }
     if(websitePending){
      if(!restartSafe){
-      systemUpdateStatusMenu.Text="更新系統：網站新版已下載；工作或同步中，待下次安全啟動套用";
-      Log("Website update staged; restart deferred because the user or cloud sync is active");
+      UpdateStatus("網站新版已下載；同步進行中，等待下次手動套用。",manual);
+      Log("Website update staged; restart deferred until next explicit manual choice");
       return;
      }
-     systemUpdateStatusMenu.Text="更新系統：網站新版已驗證，正在自動重啟";
+     UpdateStatus("網站新版已驗證，正在重新啟動程式並套用畫面。",manual);
      Log("Website update verified; restart to apply staged site without a prompt");
      exit=true;Application.Restart();Close();
      return;
     }
     if(siteFailure!=null||shellFailure!=null){
-     systemUpdateStatusMenu.Text="更新系統：部分檢查失敗，原版保留（詳見更新紀錄）";
+     var detail="網站："+(siteFailure??"已完成檢查")+"；Windows："+(shellFailure??"已完成檢查");
+     UpdateStatus("更新檢查未完成，原有程式與本機資料保持不變。",manual);
      Log("Update check incomplete. Website: "+siteFailure+"; Windows: "+shellFailure);
+     if(manual)MessageBox.Show(this,
+      "未能完整檢查正式更新，因此沒有關閉程式。\n\n"+
+      SafeStatus(detail,600)+"\n\n"+
+      "更新紀錄：開啟本機資料夾 → logs → windows-lite.log",
+      "79號碼頭｜檢查更新未完成",MessageBoxButtons.OK,MessageBoxIcon.Warning);
      return;
     }
-    systemUpdateStatusMenu.Text="更新系統：已是目前正式版本";
+    UpdateStatus("已是目前正式版本，沒有需要套用的更新，因此不必關閉視窗。",manual);
+    if(manual)MessageBox.Show(this,
+     "已完成正式網站及 Windows 程式的版本檢查。\n\n"+
+     "目前已是最新版，沒有需要下載或套用的檔案，因此程式不會自動關閉。",
+     "79號碼頭｜已是最新版",MessageBoxButtons.OK,MessageBoxIcon.Information);
    }catch(Exception e){
     Log("unified system update error: "+e.Message);
-    systemUpdateStatusMenu.Text="更新系統：執行失敗，原資料保留（詳見更新紀錄）";
+    UpdateStatus("更新執行失敗；現有程式與本機資料已保留。",manual);
+    if(manual)MessageBox.Show(this,
+     "無法套用新版，為安全起見已保留目前程式。\n\n"+
+     SafeStatus(e.Message,450)+"\n\n"+
+     "更新紀錄：開啟本機資料夾 → logs → windows-lite.log",
+     "79號碼頭｜更新未完成",MessageBoxButtons.OK,MessageBoxIcon.Error);
    }finally{
-    updateBusy=false;checkUpdatesMenu.Enabled=true;
+    updateBusy=false;
+    // Keep the manual tray item actionable while an automatic check is
+    // running; do not silently discard a click on a disabled menu item.
+    if(manualUpdateQueued&&!exit&&!IsDisposed&&!Disposing){
+     manualUpdateQueued=false;
+     BeginInvoke(new Action(()=>{if(!exit) _=CheckUpdates(true);}));
+    }
    }
   }
  }
