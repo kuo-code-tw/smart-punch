@@ -83,6 +83,8 @@ test('expired manager login blocks all subsequent cloud reads',async()=>{
 });
 test('Windows and homepage report real month counts and do not count failures as completed',()=>{
  assert.match(js,/const timeoutMs=readOptions\?\.interactive===true\?30000:DOWNLOAD_TIMEOUT_MS/);
+ assert.match(js,/fetchJson\('historyGetMonthData',\{token:t,type,month:m\},'',readOptions\)/);
+ assert.match(js,/if\(\['P79_AUTH','P79_SCOPE','P79_TRANSPORT'\]\.includes\(e\?\.code\)\)throw e/);
  assert.match(js,/done\.add\(sys\)/);
  assert.match(js,/if\(state==='done'\|\|state==='reused'\)done\.add\(sys\)/);
  assert.match(js,/status\('stalled',lastDetail/);
