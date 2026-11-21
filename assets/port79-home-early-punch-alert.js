@@ -212,6 +212,10 @@ async function focusOriginalAttendanceEditor(frame,person,side,generation,attemp
   status('這個時段有多筆打卡，無法唯一確認。請在下方正式考勤表選擇要修改的那一筆。');
   return;
  }
+ if(matches.length===1&&!String(matches[0].id||'')){
+  status('已有打卡時間，但缺少可核對的原始紀錄編號；請在下方考勤表選取紀錄，禁止當成缺卡重複新增。');
+  return;
+ }
  const hasTarget=matches.length===1&&!!String(matches[0].id||'');
  const action=hasTarget?'edit':'add';
  const counts=typeof child.p79AttendanceRecordCounts==='function'?child.p79AttendanceRecordCounts():null;
@@ -249,7 +253,7 @@ async function focusOriginalAttendanceEditor(frame,person,side,generation,attemp
   if(generation!==editorGeneration)return;
   const modal=doc.getElementById(action==='edit'?'editRecordModal':'addRecordModal');
   if(modal&&!modal.classList.contains('hidden')){
-   status('已開啟 '+html(person.name)+' 的'+(side==='IN'?'上班卡':'下班卡')+
+   status('已開啟 '+person.name+' 的'+(side==='IN'?'上班卡':'下班卡')+
     '時間'+(action==='edit'?'修改':'補登')+'表單。請調整日期、時間並在正式考勤表單儲存。');
   }else{
    status('正式考勤未確認這筆紀錄或人員，請在下方考勤頁查核後再修改；不會自動寫入。');
