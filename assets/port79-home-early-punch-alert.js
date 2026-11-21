@@ -188,7 +188,7 @@ function pencilCell(record,index,side,editable){
  return '<span class="p79-early-time-edit"><span>'+html(time||'—')+'</span>'+
   '<button type="button" class="p79-early-pencil" data-early-edit="'+index+
   '" data-early-side="'+side+'" title="'+(time?'修改':'補登')+label+
-  '" aria-label="'+html(record.name)+' '+html(record.date)+' '+(time?'修改':'補登')+label+'時間">✎</button></span>';
+  '" aria-label="'+html(record.name)+' '+html(record.date)+' '+(time?'修改':'補登')+label+'時間">✏️</button></span>';
 }
 function dayAfter(date){
  const dt=new Date(date+'T00:00:00Z');
@@ -277,7 +277,10 @@ function showEditor(record=null,side=''){
  editor.hidden=false;
  $('p79DashEarlyPunchDialog')?.classList.add('p79-early-editing');
  const generation=++editorGeneration;
- frame.onload=()=>{if(record&&typed)void focusOriginalAttendanceEditor(frame,record,typed,generation);};
+ frame.onload=()=>{
+  frame.onload=null; // A later navigation inside attendance must not reopen the edit modal.
+  if(record&&typed)void focusOriginalAttendanceEditor(frame,record,typed,generation);
+ };
  // Assign the verified SSO URL only on user action, never in HTML source.
  frame.src=url;
  status(record&&typed
