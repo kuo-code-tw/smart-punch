@@ -1253,6 +1253,7 @@ async function nativeCloudSyncFromDesktop(){
  }finally{
   if(pulse!==null&&typeof clearInterval==='function')clearInterval(pulse);
   nativeCloudSyncBusy=false;
+  try{window.__port79CloudWorkerDone?.()}catch(_){}
  }
 }
 if(typeof window.addEventListener==='function'){
