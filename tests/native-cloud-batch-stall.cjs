@@ -12,13 +12,14 @@ assert(first>0&&end>first);
 const code=js.slice(first,end);
 const systems=['attendance','workhours','leave','schedule','efficiency','hr','history'];
 function suite({failure={}, attendanceMonths=10}={}){
- const calls=[], progress=[],writes=[];
+ const calls=[], progress=[],writes=[],timeouts=[];
  const context={
   token:()=> 'T',viewerKey:()=> 'ADMIN@admin',gasUrl:()=> 'https://script.google.com/macros/s/TEST/exec',
   displayScope:()=> 'ADMIN',mutationStamp:()=>0,
   currentSystem:()=> 'home',
   Date,Set,JSON,Number,Object,Array,console,
-  downloadAttendanceDatabase:async(_sys,onProgress)=>{
+  downloadAttendanceDatabase:async(_sys,onProgress,opts)=>{
+   timeouts.push(opts?.interactive===true?30:60);
    calls.push('attendance');
    onProgress('attendance',2,attendanceMonths,'monthDone','已完成兩個月');
    if(failure.attendance)throw failure.attendance;
@@ -26,7 +27,8 @@ function suite({failure={}, attendanceMonths=10}={}){
   },
   saveSystemSnapshot:async(sys,data)=>{writes.push(sys);return data;},
   applyAttendanceSnapshotToPage:async()=>{},
-  downloadSystem:async sys=>{
+  downloadSystem:async (sys,_progress,opts)=>{
+   timeouts.push(opts?.interactive===true?30:60);
    calls.push(sys);
    if(failure[sys])throw failure[sys];
    return {ok:true};
@@ -35,7 +37,7 @@ function suite({failure={}, attendanceMonths=10}={}){
  };
  vm.createContext(context);
  vm.runInContext(code,context,{timeout:3000});
- return {context,calls,progress,writes,run:options=>context.downloadAll((sys,index,total,state,error,detail,meta)=>
+ return {context,calls,progress,writes,timeouts,run:options=>context.downloadAll((sys,index,total,state,error,detail,meta)=>
    progress.push({sys,index,total,state,error:error?.message||'',detail,meta}),options)};
 }
 test('interactive Windows batch completes quick independent systems before long attendance scan',async()=>{
@@ -44,12 +46,14 @@ test('interactive Windows batch completes quick independent systems before long 
  assert.equal(res.length,7);assert(res.every(x=>x.ok));
  assert.deepEqual(res.map(x=>x.system),['leave','schedule','efficiency','hr','history','attendance','workhours']);
  assert.deepEqual(f.writes,['workhours']);
+ assert(f.timeouts.every(x=>x===30),'manual batch uses bounded 30-second cloud request');
  const m=f.progress.find(x=>x.sys==='attendance'&&x.state==='detail');
  assert.equal(m.meta.monthCompleted,2);assert.equal(m.meta.monthTotal,10);
 });
 test('legacy downloadAll remains attendance-first for existing business workflows',async()=>{
  const f=suite();const res=await f.run();
  assert.deepEqual(f.calls.slice(0,1),['attendance']);
+ assert(f.timeouts.every(x=>x===60),'legacy cloud requests retain 60-second bound');
  assert.equal(res.length,7);
 });
 test('one isolated network error does not discard five successful independent systems',async()=>{
@@ -78,6 +82,7 @@ test('expired manager login blocks all subsequent cloud reads',async()=>{
  assert(res.slice(1).every(x=>x.skipped));
 });
 test('Windows and homepage report real month counts and do not count failures as completed',()=>{
+ assert.match(js,/const timeoutMs=readOptions\?\.interactive===true\?30000:DOWNLOAD_TIMEOUT_MS/);
  assert.match(js,/done\.add\(sys\)/);
  assert.match(js,/if\(state==='done'\|\|state==='reused'\)done\.add\(sys\)/);
  assert.match(js,/status\('stalled',lastDetail/);
