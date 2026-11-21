@@ -909,6 +909,32 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  const master=await fetchJson('getAttendanceEmployeeMaster',{token:t},'',readOptions);
  if(!Array.isArray(master?.employees))throw new Error('員工主檔格式不正確，已保留原有快取');
  const employees=master.employees;
+ // Incomplete month downloads were previously lost on page navigation.
+ // Persist each verified month only under the same account/scope/endpoint
+ // and a stable server revision. A changed revision invalidates all chunks.
+ const cloudRevision=String(before?.revision||'');
+ const monthCheckpointSignature=cloudRevision?JSON.stringify([
+  cloudRevision,String(catalog.revision||''),String(master.revision||''),months,employees
+ ]):'';
+ const checkpointMaxAgeMs=24*60*60*1000;
+ async function checkpointMonth(month){
+  if(!monthCheckpointSignature)return null;
+  const row=await get(systemKey('attendance')+'|checkpoint|'+month).catch(()=>null);
+  if(!row||!currentViewerRow(row)||row.kind!=='system'||row.system!=='attendance'||
+     row.displayScope!==scope||row.cacheEndpoint!==gasUrl()||
+     row.savedAt<stamp||row.savedAt>Date.now()+60000||
+     Date.now()-row.savedAt>checkpointMaxAgeMs||
+     row.data?.signature!==monthCheckpointSignature||
+     !Array.isArray(row.data?.rows)||row.data?.month!==month)return null;
+  return row.data.rows;
+ }
+ async function storeMonthCheckpoint(month,rows){
+  if(!monthCheckpointSignature)return;
+  verifyAttendanceDownloadContext(expected);
+  const data={ok:true,month,rows,signature:monthCheckpointSignature};
+  await put({key:systemKey('attendance')+'|checkpoint|'+month,
+   kind:'system',system:'attendance',savedAt:Date.now(),size:safeSize(data),data});
+ }
  // The catalog alone has no revision. Compare an explicit cloud revision and the
  // authenticated scoped master, never a timestamp or another viewer's folder.
  const old=previous?.data;
@@ -937,6 +963,15 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
    const i=nextMonth++,month=months[i];
    try{
     verifyAttendanceDownloadContext(expected);
+    const resumed=await checkpointMonth(month);
+    if(resumed){
+     verifyAttendanceDownloadContext(expected);
+     monthResults[i]={month,rows:resumed,ok:true,reused:true};
+     completedMonths++;
+     onProgress?.('attendance',completedMonths,months.length,'monthDone',
+      `沿用已完成的 ${month} 快取｜${completedMonths}/${months.length} 月`);
+     continue;
+    }
     onProgress?.('attendance',completedMonths,months.length,'month',`正在讀取 ${month}｜已完成 ${completedMonths}/${months.length} 月`);
     const d=await fetchJson('getAttendanceMonthData',{month,token:t},'',readOptions);
     if(!Array.isArray(d?.records))throw new Error('考勤月份資料格式不正確');
@@ -945,6 +980,7 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
     verifyAttendanceDownloadContext(expected);
     const rows=direct.records.length?mergeAttendanceRows(d.records.concat(direct.records)):d.records;
     monthResults[i]={month,rows,ok:true};
+    await storeMonthCheckpoint(month,rows);
    }catch(e){
     if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT','P79_MUTATION'].includes(e?.code)){
      fatal=fatal||e;return;
@@ -964,7 +1000,9 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  // Do record de-duplication once rather than on every month (quadratic cost).
  const allRecords=mergeAttendanceRows(monthResults.flatMap(x=>x.rows));
  const after=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
-  verifyAttendanceDownloadContext(expected);
+ verifyAttendanceDownloadContext(expected);
+ if(cloudRevision&&String(after?.revision||'')!==cloudRevision)
+  throw Object.assign(new Error('雲端考勤版本在下載期間變更，保留舊快取；下次核對新版本後補下載'),{code:'P79_MUTATION'});
  const snapshot={
   sourceRevision:before?.revision&&String(before.revision)===String(after?.revision)?String(before.revision):'',
   ok:true,action:'port79AttendanceFullCache',fullDatabase:true,
