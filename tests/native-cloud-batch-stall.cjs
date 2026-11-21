@@ -92,7 +92,7 @@ test('Windows and homepage report real month counts and do not count failures as
  assert.match(js,/if\(state==='done'\|\|state==='reused'\)done\.add\(sys\)/);
  assert.match(js,/status\('stalled',lastDetail/);
  assert.match(js,/monthCompleted:Math\.max\(0,Math\.min\(240,lastMonthCompleted\)\)/);
- assert.match(js,/\{quickFirst:true,resumeExisting:window\.__port79WorkerResumeOnly===true\}/);
+ assert.match(js,/\{quickFirst:true,resumeExisting:window\.__port79WorkerResumeOnly===true,historyOnDemand\}/);
  assert.match(native,/monthCompleted=Math\.Max\(0,Math\.Min\(240,data\.monthCompleted\)\)/);
  assert.match(native,/monthTotal=Math\.Max\(0,Math\.Min\(240,data\.monthTotal\)\)/);
  assert.match(compact,/count\+'\/'\+total\+\(monthTotal\?/);
