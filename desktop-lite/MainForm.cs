@@ -276,7 +276,9 @@ namespace Port79Lite {
      title=SafeStatus(data.title,90),
      detail=SafeStatus(data.detail,170),
      completed=Math.Max(0,Math.Min(7,data.completed)),
-     total=Math.Max(1,Math.Min(7,data.total))
+     total=Math.Max(1,Math.Min(7,data.total)),
+     monthCompleted=Math.Max(0,Math.Min(240,data.monthCompleted)),
+     monthTotal=Math.Max(0,Math.Min(240,data.monthTotal))
     };
     var encoded=new JavaScriptSerializer().Serialize(item);
     var javascript="(function(){"+
@@ -333,7 +335,7 @@ namespace Port79Lite {
     else cacheBar.Value=completed;
    }
    cacheBar.MarqueeAnimationSpeed=animate?25:0;
-   cacheStatusMenu.Text=SafeStatus("資料同步狀態："+value.title,55);
+   cacheStatusMenu.Text=SafeStatus("資料同步："+(String.IsNullOrEmpty(value.detail)?value.title:value.detail),58);
    // Windows notify icons have a limited tooltip length.
    tray.Text=SafeStatus("79號碼頭｜"+(showMonths?monthCompleted+"/"+monthTotal+"月":"系統"+completed+"/"+total)+"｜"+value.title,60);
    if(phase=="complete"||phase=="partial"||phase=="failed"||phase=="interrupted")Log("download "+phase+" "+completed+"/"+total+" "+SafeStatus(value.detail,120));

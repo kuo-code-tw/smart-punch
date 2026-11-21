@@ -5,6 +5,8 @@ on:
       - 'assets/port79-data-cache.js'
       - 'tests/cache-download-transport.cjs'
       - 'tests/native-cloud-download-dispatch.cjs'
+      - 'tests/native-cloud-batch-stall.cjs'
+      - 'assets/port79-home-compact-controls.js'
       - 'desktop-lite/MainForm.cs'
       - 'yard-dashboard/**'
       - 'tests/yard-home-donuts.cjs'
@@ -23,7 +25,7 @@ jobs:
       - name: Exercise retry and 7-system partial resume
         run: |
           node tests/cache-download-transport.cjs
-          node --test tests/native-cloud-download-dispatch.cjs
+          node --test tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs
       - name: Verify native cache isolation and source behavior
         run: |
           node tests/device-folder-cache.cjs

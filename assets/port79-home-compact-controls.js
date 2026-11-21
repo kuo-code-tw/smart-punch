@@ -69,7 +69,10 @@
    partial:'⚠ 未完成',failed:'⚠ 失敗',interrupted:'⏸ 已中斷'
   };
   item.querySelector('.p79-compact-progress-label').textContent=names[phase];
-  item.querySelector('.p79-compact-progress-count').textContent=count+'/'+total;
+  const monthTotal=Math.max(0,Math.min(240,Number(info.monthTotal)||0));
+  const monthDone=Math.max(0,Math.min(monthTotal,Number(info.monthCompleted)||0));
+  item.querySelector('.p79-compact-progress-count').textContent=
+   count+'/'+total+(monthTotal?' · '+monthDone+'/'+monthTotal+'月':'');
   item.querySelector('.p79-compact-progress-fill').style.width=(count/total*100)+'%';
   item.title=String(info.title||names[phase])+'｜'+String(info.detail||'').slice(0,170);
   item.hidden=dismissed;
