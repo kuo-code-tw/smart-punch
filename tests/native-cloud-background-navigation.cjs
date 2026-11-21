@@ -175,3 +175,51 @@ test('worker JS and C# integration remain private and do not add fake cloud tota
  assert.match(native,/cloudWorkerJobActive=false/);
  assert.match(native,/source\.Host\.Equals\(Host/);
 });
+
+test('automatic Windows login sync runs in worker and remains active after pagehide',async()=>{
+ const script=fs.readFileSync('desktop-lite/app/login-progress.js','utf8');
+ const store=new Map();
+ function page(){
+  const messages=[],callbacks={},events={},api={downloadAll:async()=>{throw Error('Old page-scoped download must not run');},
+   getFolderSyncStatus:async()=>({state:'idle'})};
+  const window={
+   __port79NativeShellHasBackgroundWorker:true,
+   __port79NativeCloudWorkerReady:true,
+   Port79DataCache:api,
+   chrome:{webview:{postMessage(msg){messages.push(JSON.parse(msg));}}},
+   addEventListener(name,cb){events[name]=cb;},
+   dispatchEvent(){}
+  };
+  const document={body:{},getElementById(id){
+   if(id==='systems')return {classList:{contains:name=>name==='show'}};
+   return null;
+  }};
+  const sessionStorage={getItem(key){
+   if(key==='port79_user_session')return JSON.stringify({
+    empId:'USER',adminRole:'admin',systemPermissions:{attendance:'manage'},dataScope:{}});
+   if(key==='port79_user_token')return 'TOKEN';
+   return null;
+  }};
+  const localStorage={getItem:key=>store.get(key)||null,setItem:(key,value)=>store.set(key,value)};
+  const context={window,document,sessionStorage,localStorage,navigator:{onLine:true},
+   Date,JSON,Number,String,Object,Array,Error,console,
+   Event:class{constructor(type){this.type=type}},
+   setInterval:fn=>{callbacks.poll=fn;return 42;},
+   setTimeout:fn=>{callbacks.initial=fn;return 43;},
+   clearInterval(){},clearTimeout(){}};
+  vm.createContext(context);
+  vm.runInContext(script,context);
+  return {messages,callbacks,events,async initial(){callbacks.initial();await new Promise(resolve=>setImmediate(resolve));}};
+ }
+ const first=page();
+ await first.initial();
+ assert.equal(first.messages.filter(x=>x.kind==='port79-cache-command-v1').length,1);
+ assert.equal(first.messages.filter(x=>x.phase==='interrupted').length,0);
+ first.events.pagehide();
+ assert.equal(first.messages.filter(x=>x.phase==='interrupted').length,0,
+  'Switching a visible page must not report that independent background download stopped');
+ const second=page();
+ await second.initial();
+ assert.equal(second.messages.filter(x=>x.kind==='port79-cache-command-v1').length,0,
+  'New homepage uses persistent attempt status and does not restart a second scan');
+});
