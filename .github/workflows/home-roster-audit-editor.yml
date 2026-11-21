@@ -16,6 +16,7 @@ on:
       - 'tests/home-inline-attendance-bridge.cjs'
       - 'tests/attendance-home-audit-handoff.cjs'
       - 'tests/home-early-shift-punch-alert.cjs'
+      - 'tests/home-punch-priority-deadline.cjs'
       - 'tests/home-login-version-fast-audit.cjs'
       - '.github/workflows/home-roster-audit-editor.yml'
   push:
@@ -34,6 +35,7 @@ on:
       - 'tests/home-inline-attendance-bridge.cjs'
       - 'tests/attendance-home-audit-handoff.cjs'
       - 'tests/home-early-shift-punch-alert.cjs'
+      - 'tests/home-punch-priority-deadline.cjs'
       - 'tests/home-login-version-fast-audit.cjs'
       - '.github/workflows/home-roster-audit-editor.yml'
 
@@ -56,6 +58,7 @@ jobs:
           node tests/attendance-home-audit-handoff.cjs
           node tests/windows-download-link.cjs
           node tests/home-early-shift-punch-alert.cjs
+          node tests/home-punch-priority-deadline.cjs
           node tests/home-login-version-fast-audit.cjs
           node tests/attendance-editor-opening.cjs
           node tests/attendance-manual-picker.cjs
