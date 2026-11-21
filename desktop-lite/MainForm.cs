@@ -55,6 +55,22 @@ namespace Port79Lite {
     return sha.Substring(0,12);
    }catch{return "";}
   }
+  // Clear only stale HTTP UI resources on a new ZIP, never cloud data.
+  private async Task InvalidateStaleProgramHttpCache(bool siteChanged){
+   var version=InstalledBundleVersion(root);
+   var marker=Path.Combine(DataRoot,"updates","webview-program-http-cache-version.txt");
+   if(!siteChanged&&version.Length>0&&File.Exists(marker)&&
+      String.Equals(File.ReadAllText(marker).Trim(),version,StringComparison.OrdinalIgnoreCase))return;
+   await web.CoreWebView2.Profile.ClearBrowsingDataAsync(CoreWebView2BrowsingDataKinds.DiskCache);
+   if(version.Length>0){
+    Directory.CreateDirectory(Path.GetDirectoryName(marker));
+    File.WriteAllText(marker,version);
+   }
+   Log("Cleared WebView2 HTTP DiskCache only; kept IndexedDB, login and local-data");
+  }
+  private void OpenCurrentProgramFolder(){
+   try{Process.Start(new ProcessStartInfo("explorer.exe","\""+root+"\""){UseShellExecute=true});}catch{}
+  }
   public MainForm(){
    var bundle=InstalledBundleVersion(root);
    Text="79號碼頭雲端智慧系統"+(bundle.Length>0?"（Windows 包 v"+bundle+"）":"（Windows 版本待核）");
@@ -123,6 +139,10 @@ namespace Port79Lite {
    menu.Items.Add(cacheStatusMenu);
    menu.Items.Add(new ToolStripSeparator());
    menu.Items.Add("開啟本機資料夾",null,(s,e)=>OpenLocalData());
+   menu.Items.Add("開啟目前程式資料夾",null,(s,e)=>OpenCurrentProgramFolder());
+   menu.Items.Add(new ToolStripMenuItem("目前 Windows 程式包："+(bundle.Length>0?"v"+bundle:"版本待核")){
+    Enabled=false,ToolTipText=root
+   });
    menu.Items.Add("關閉程式",null,(s,e)=>ExitApp());
    tray.ContextMenuStrip=menu;
    tray.DoubleClick+=(s,e)=>ShowWindow();
@@ -155,17 +175,24 @@ namespace Port79Lite {
     if(!File.Exists(Path.Combine(site,"index.html")))throw new FileNotFoundException("找不到原網站 index.html。請保留整個 ZIP 資料夾。");
     Directory.CreateDirectory(Path.Combine(DataRoot,"BrowserProfile"));
     Directory.CreateDirectory(Path.Combine(DataRoot,"updates"));
-    // Stage files never overwrite the browser profile or cloud data.
-    // A corrupt/incomplete staged download must never block the saved local system.
+    // Only apply staged patches created for THIS bundle, never old ZIPs.
+    int appliedSiteFiles=0;
     try {
-     var applied=Updater.ApplyIfVerified(site,DataRoot,Log);
-     if(applied>0)systemUpdateStatusMenu.Text="系統檔案：已套用 "+applied+" 項新版";
+     appliedSiteFiles=Updater.ApplyIfVerified(site,DataRoot,Log);
+     if(appliedSiteFiles>0)systemUpdateStatusMenu.Text="系統檔案：已套用 "+appliedSiteFiles+" 項新版";
     }catch(Exception error){
      Log("staged system update rejected, preserved existing site: "+error.Message);
      systemUpdateStatusMenu.Text="系統檔案：更新未完成，原檔保留";
     }
     var env=await CoreWebView2Environment.CreateAsync(null,Path.Combine(DataRoot,"BrowserProfile"));
     await web.EnsureCoreWebView2Async(env);
+    // An old BrowserProfile may contain old HTML/CSS/JS even when the ZIP is
+    // new. Preserve IndexedDB and login; clear only HTTP cache after upgrades.
+    try{await InvalidateStaleProgramHttpCache(appliedSiteFiles>0);}
+    catch(Exception error){
+     Log("WebView2 program HTTP cache invalidation failed: "+error.Message);
+     systemUpdateStatusMenu.Text="版本畫面快取更新未完成；資料保留，詳見更新紀錄";
+    }
     web.CoreWebView2.SetVirtualHostNameToFolderMapping(Host,Path.Combine(root,"site"),CoreWebView2HostResourceAccessKind.DenyCors);
     web.CoreWebView2.Settings.IsWebMessageEnabled=true;
     web.CoreWebView2.WebMessageReceived+=OnCacheMessage;
@@ -232,7 +259,10 @@ namespace Port79Lite {
       }
      }
     };
-    web.CoreWebView2.Navigate(LocalRoot+"index.html");
+    // Fresh document URL, same virtual origin and same retained profile.
+    var startupVersion=InstalledBundleVersion(root);
+    web.CoreWebView2.Navigate(LocalRoot+"index.html?windowsBundle="+
+     Uri.EscapeDataString(startupVersion.Length>0?startupVersion:"legacy"));
     // The second WebView2 stays at its own fixed same-origin worker URL.
     // Navigating the visible WebView cannot terminate its fetch or IndexedDB.
     _=InitializeCloudWorker(env);
