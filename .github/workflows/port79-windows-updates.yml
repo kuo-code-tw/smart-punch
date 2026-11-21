@@ -184,7 +184,12 @@ jobs:
           # Unique asset name makes the release visible to operators and avoids
           # the browser reusing an older identically-named downloaded ZIP.
           cp dist/Port79-Windows-Lite.zip "dist/Port79-Windows-Lite-${SITE_SHA:0:12}.zip"
-          tag="port79-windows-lite-$(date -u +%Y%m%d)-${SITE_SHA:0:12}"
+          # Read the build date from the exact ZIP, not the UTC release clock.
+          # Otherwise login, downloaded ZIP and Windows title can display
+          # different V dates for the same commit around midnight.
+          manifest="$(unzip -p dist/Port79-Windows-Lite.zip '*/site/smart-punch/port79-version.json')"
+          source_day="$(printf '%s' "$manifest" | python3 -c "import json,sys,re;m=json.load(sys.stdin);v=m['version'];c=m['commit'];assert re.fullmatch(r'V[0-9]{6}\.[0-9]{5}',v);assert c=='$SITE_SHA';print('20'+v[1:7])")"
+          tag="port79-windows-lite-${source_day}-${SITE_SHA:0:12}"
           if gh release view "$tag" -R "$REPO" >/dev/null 2>&1; then
             echo "Already published $tag; no duplicate release"
             exit 0
