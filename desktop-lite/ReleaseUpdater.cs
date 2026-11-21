@@ -15,11 +15,13 @@ namespace Port79Lite {
  // Read-only GitHub release updater for the Windows shell itself. Business
  // records, cookies, IndexedDB, and cloud credentials are never uploaded.
  public static class ReleaseUpdater {
-  const string Api="https://api.github.com/repos/kuo-code-tw/smart-punch/releases/tags/port79-windows-lite-20261120";
-  const string Url="https://github.com/kuo-code-tw/smart-punch/releases/download/port79-windows-lite-20261120/Port79-Windows-Lite.zip";
+  // Resolve the immutable newest release. The mutable 2026-11-20 legacy tag
+  // can be cached and must never decide which executable is current.
+  const string Api="https://api.github.com/repos/kuo-code-tw/smart-punch/releases/latest";
+  const string ReleaseDownloadBase="https://github.com/kuo-code-tw/smart-punch/releases/download/";
   const long Limit=30L*1024*1024;
   public sealed class GitAsset {public string name {get;set;} public string browser_download_url {get;set;} public string digest {get;set;} public long size {get;set;} }
-  public sealed class GitRelease {public bool draft {get;set;} public GitAsset[] assets {get;set;} }
+  public sealed class GitRelease {public bool draft {get;set;} public string tag_name {get;set;} public GitAsset[] assets {get;set;} }
   public sealed class Prepared {public string Zip {get;set;} public string Digest {get;set;} public string Runner {get;set;} }
   static readonly JavaScriptSerializer Json=new JavaScriptSerializer {MaxJsonLength=1000000};
   static bool HashValid(string text){return text?.Length==64&&text.All(x=>(x>='0'&&x<='9')||(x>='a'&&x<='f'));}
@@ -31,10 +33,15 @@ namespace Port79Lite {
    using(var client=new HttpClient {Timeout=TimeSpan.FromSeconds(60)}){
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Port79-WindowsLite-Updater/1.0");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-    var release=Json.Deserialize<GitRelease>(await client.GetStringAsync(Api).ConfigureAwait(true));
-    if(release==null||release.draft)throw new InvalidDataException("未取得正式 Windows 發布資訊");
+    // An uncached metadata request avoids stale release JSON after publishing.
+    var release=Json.Deserialize<GitRelease>(await client.GetStringAsync(
+     Api+"?checked="+DateTimeOffset.UtcNow.ToUnixTimeSeconds()).ConfigureAwait(true));
+    if(release==null||release.draft||!System.Text.RegularExpressions.Regex.IsMatch(
+     release.tag_name??"", @"^port79-windows-lite-[0-9]{8}-[a-f0-9]{12}$"))
+     throw new InvalidDataException("未取得可驗證的最新正式 Windows 發布資訊");
+    var url=ReleaseDownloadBase+release.tag_name+"/Port79-Windows-Lite.zip";
     var asset=release.assets?.SingleOrDefault(x=>x?.name=="Port79-Windows-Lite.zip");
-    if(asset==null||asset.browser_download_url!=Url||asset.size<=0||asset.size>Limit||
+    if(asset==null||asset.browser_download_url!=url||asset.size<=0||asset.size>Limit||
       asset.digest==null||!asset.digest.StartsWith("sha256:",StringComparison.Ordinal))
       throw new InvalidDataException("Windows 發布檔缺少有效 SHA-256 或來源不符合預期");
     var digest=asset.digest.Substring(7).ToLowerInvariant();
@@ -65,7 +72,7 @@ namespace Port79Lite {
     }
     if(bytes==null){
      log("首次自動下載正式 Windows 更新檔，無須使用者自行取得 ZIP…");
-     bytes=await client.GetByteArrayAsync(Url).ConfigureAwait(true);
+     bytes=await client.GetByteArrayAsync(url).ConfigureAwait(true);
      if(bytes.Length>Limit||bytes.LongLength!=asset.size||Sha256(bytes)!=digest)
       throw new InvalidDataException("下載內容與 GitHub 正式發布 SHA-256 不一致；已取消更新");
      File.WriteAllBytes(zip,bytes);
