@@ -229,26 +229,28 @@ function dayAfter(date){
  if(!Number.isFinite(dt.getTime()))return date;
  return new Date(dt.getTime()+DAY).toISOString().slice(0,10);
 }
-/* Use the exact original attendance-management screen and its official cloud writer. */
+/* Keep the operator in this exact pending-duty dialog. The child form is
+ * the original attendance management editor and remains its only cloud writer. */
 function showEditor(record=null,side=''){
- const candidate=officialEditorUrl();
- if(!candidate){status('此帳號沒有正式考勤管理權限，不能新增或修正考勤。');return false;}
- const url=new URL(candidate,root.location.href);
- url.searchParams.set('entry','manage');
- const typed=side==='IN'||side==='OUT'?side:'';
- try{
-  if(record&&typed){
-   root.sessionStorage.setItem('port79_attendance_audit_handoff_v1',JSON.stringify({
-    source:'home-early-audit',createdAt:Date.now(),side:typed,
-    date:record.date,shift:record.shift,empId:record.empId,
-    attNo:record.attNo,name:record.name,
-    clockInEvents:record.clockInEvents,clockOutEvents:record.clockOutEvents
-   }));
-  }else root.sessionStorage.removeItem('port79_attendance_audit_handoff_v1');
- }catch(error){status('無法記錄指定打卡位置，請直接在考勤管理原始列表選取紀錄。');}
- // Same-tab navigation works on browser and Windows WebView2. No broken iframe.
- root.location.href=url.href;
- return true;
+ const url=officialEditorUrl();
+ if(!url){status('此帳號沒有正式考勤管理權限，無法直接修改或補卡。');return false;}
+ const bridge=root.P79HomeAuditInlineEditor;
+ if(!bridge?.open){status('原本考勤編輯表單尚未載入，未修改資料。');return false;}
+ return bridge.open({
+  url,row:record,side,onStatus:status,
+  onSynced:async()=>{
+   // Only refresh from formal cloud data after the ORIGINAL attendance
+   // writer confirms success. Both the card and the detail table re-render.
+   await recheck();
+   root.dispatchEvent?.(new CustomEvent('p79-home-import-complete',{detail:{kinds:['attendance']}}));
+   // The full dashboard refresh is scheduled AFTER the original edit modal
+   // closes; it must not tear down a still-active cloud write.
+   root.setTimeout?.(()=>{
+    if(root.document.getElementById('systems')?.classList.contains('show'))
+     root.document.getElementById('p79DashRefresh')?.click();
+   },1100);
+  }
+ });
 }
 async function recheck(){
  if(typeof refresh!=='function')throw Error('目前無法重新核對資料');
@@ -284,6 +286,7 @@ function render(attendanceData,scheduleData,month,options={}){
  return last;
 }
 function reset(){
+ root.P79HomeAuditInlineEditor?.close();
  last=null;
  const btn=$('p79DashEarlyPunchTrigger');
  if(btn)btn.dataset.alertState='unverified';
@@ -327,7 +330,12 @@ function bind(recheckCallback){
   showEditor(last.details[position],String(action.dataset.earlySide||''));
  });
  dialog.querySelector('[data-early-add]')?.addEventListener('click',()=>showEditor());
- dialog.querySelectorAll('[data-early-close]').forEach(button=>button.addEventListener('click',()=>dialog.close()));
+ dialog.querySelectorAll('[data-early-close]').forEach(button=>button.addEventListener('click',()=>{
+  if(root.P79HomeAuditInlineEditor?.isWriting?.()){status('正式考勤雲端同步中，請確認完成後再關閉。');return;}
+  root.P79HomeAuditInlineEditor?.close(true);
+  dialog.close();
+ }));
+ dialog.addEventListener('close',()=>root.P79HomeAuditInlineEditor?.close(true));
  dialog.querySelector('[data-early-attendance]')?.addEventListener('click',()=>{
   dialog.close();
   if(typeof root.launchSystem==='function')root.launchSystem('attendance');

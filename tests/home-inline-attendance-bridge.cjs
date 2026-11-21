@@ -1,0 +1,23 @@
+'use strict';
+const assert=require('node:assert/strict');
+globalThis.location={href:'https://example.test/smart-punch/',origin:'https://example.test'};
+const api=require('../assets/port79-home-audit-inline-editor.js');
+assert.equal(api.validUrl('https://evil.example/attendance/'),null,'Cross-origin attendance is rejected');
+assert.equal(api.validUrl('https://example.test/smart-punch/other/'),null);
+const url=api.validUrl('https://example.test/smart-punch/attendance/?v=123#port79sso=abc');
+assert.equal(url.searchParams.get('entry'),'manage');
+assert.equal(url.searchParams.get('homeInline'),'1');
+assert.equal(url.hash,'#port79sso=abc');
+const row={date:'2026-11-20',shift:'早',empId:'E1',attNo:'001',name:'測試甲',
+ clockInEvents:[{id:'R1',timeStr:'2026/11/20 07:36:00'}],clockOutEvents:[]};
+const one=api.prepare(row,'OUT',1000);
+assert.equal(one.source,'home-early-audit');
+assert.equal(one.clockInEvents[0].id,'R1');
+assert.equal(one.clockOutEvents.length,0);
+assert.equal(one.createdAt,1000);
+assert.equal(api.prepare(row,'X'),null);
+assert.throws(()=>api.prepare({...row,clockOutEvents:[{id:'R2'},{id:'R3'}]},'OUT'));
+assert.throws(()=>api.prepare({...row,clockInEvents:[{timeStr:'2026/11/20 07:36'}]},'OUT'));
+assert.throws(()=>api.prepare({...row,clockOutEvents:[{timeStr:'2026/11/20 16:00'}]},'OUT'));
+assert.throws(()=>api.prepare({...row,date:'2026-11-44'},'OUT'),/date|日期/);
+console.log('PASS inline original attendance bridge: strict SSO origin, one row, locked pair, refusal on ambiguous events');

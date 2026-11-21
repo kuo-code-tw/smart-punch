@@ -2,13 +2,13 @@
 const assert=require('node:assert/strict');
 globalThis.P79AttendanceV6=require('../attendance/v6-engine.js');
 globalThis.location={href:'https://example.test/smart-punch/',origin:'https://example.test'};
-let saved={};
-globalThis.sessionStorage={getItem:k=>saved[k]||null,setItem:(k,v)=>saved[k]=v,removeItem:k=>delete saved[k]};
 globalThis.p79AuditAttendanceEditorUrl=()=> 'https://example.test/smart-punch/attendance/?v=1#port79sso=test';
+const bridgeCalls=[];
+globalThis.P79HomeAuditInlineEditor={open:args=>{bridgeCalls.push(args);return true},close:()=>{},isWriting:()=>false};
 const listeners=new Map(),nodes=new Map();
 function node(id){
  if(nodes.has(id))return nodes.get(id);
- const n={id,hidden:false,textContent:'',innerHTML:'',dataset:{},
+ const n={id,hidden:false,textContent:'',innerHTML:'',dataset:{},classList:{contains:()=>true},
  setAttribute(){},addEventListener:(name,fn)=>listeners.set(id+':'+name,fn),
  insertAdjacentHTML(_,value){this.innerHTML+=value;}};
  nodes.set(id,n);return n;
@@ -31,23 +31,22 @@ assert.match(node('p79EarlyPunchRows').innerHTML,/class="p79-early-pencil"/);
 assert.match(node('p79EarlyPunchRows').innerHTML,/class="p79-early-add"/);
 audit.bind(async()=>({attendance,schedule:{schedules:[p]},leaveData:{leaveRecords:[]},month:'2026-11'}));
 function click(side){
- globalThis.location.href='https://example.test/smart-punch/';
+ const before=globalThis.location.href;
  listeners.get('p79EarlyPunchRows:click')({target:{closest:()=>({dataset:{earlyEdit:'0',earlySide:side}})}});
- const url=new URL(globalThis.location.href);
- assert.equal(url.pathname,'/smart-punch/attendance/');
- assert.equal(url.searchParams.get('entry'),'manage');
- assert.equal(url.hash,'#port79sso=test');
- return JSON.parse(saved.port79_attendance_audit_handoff_v1);
+ assert.equal(globalThis.location.href,before,'Audit detail must never navigate away');
+ const args=bridgeCalls.at(-1);
+ assert.match(args.url,/\/attendance\/\?v=1#port79sso=test/);
+ assert.equal(args.row.name,'測試甲');
+ assert.equal(args.side,side);
+ return args;
 }
 const edit=click('IN');
-assert.equal(edit.side,'IN');
-assert.equal(edit.clockInEvents[0].id,'R1');
+assert.equal(edit.row.clockInEvents[0].id,'R1');
 const add=click('OUT');
-assert.equal(add.side,'OUT');
-assert.equal(add.clockInEvents[0].id,'R1');
+assert.equal(add.row.clockInEvents[0].id,'R1');
+assert.equal(bridgeCalls.length,2);
 globalThis.p79AuditAttendanceEditorUrl=()=> '';
-globalThis.location.href='https://example.test/smart-punch/';
 audit.render(attendance,{schedules:[p]},'2026-11',
  {leaveData:{leaveRecords:[]},now:Date.parse('2026-11-20T17:02:00+08:00')});
 assert.doesNotMatch(node('p79EarlyPunchRows').innerHTML,/p79-early-pencil|p79-early-add/);
-console.log('PASS audit native navigation: existing pencil, yellow missing-side add, exact identity transfer, same origin and permission guard');
+console.log('PASS pending-duty inline: purple pencil/yellow plus, same dialog, original form bridge and permission guard');

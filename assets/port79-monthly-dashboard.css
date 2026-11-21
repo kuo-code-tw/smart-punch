@@ -248,3 +248,42 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79
 #p79Dashboard .p79-early-pencil{border:0;background:transparent;color:#6b5ce7;font-weight:800}
 #p79Dashboard .p79-early-add{display:inline-flex;align-items:center;justify-content:center;width:33px;height:33px;min-width:33px;border:0;border-radius:10px;background:#fff4ca;color:#ad7425;font:700 22px/1 sans-serif;cursor:pointer}
 #p79Dashboard .p79-early-add:hover,#p79Dashboard .p79-early-add:focus-visible{background:#ffeba8;outline:2px solid #e6c46c;outline-offset:2px}
+
+/* Home pending-punch editor: only the ORIGINAL attendance modal appears.
+   The underlying attendance page is never shown as a gray iframe canvas. */
+#p79Dashboard #p79EarlyInlineEditor{
+ position:fixed!important;inset:0!important;z-index:2147483500!important;
+ display:flex!important;flex-direction:column!important;
+ background:rgba(13,29,50,.24)!important;box-sizing:border-box!important;
+ border:0!important;max-width:none!important;max-height:none!important;
+ margin:0!important;padding:0!important;
+}
+#p79Dashboard #p79EarlyInlineEditor .p79-early-inline-head{
+ z-index:3;position:relative;display:flex;align-items:center;justify-content:space-between;
+ gap:12px;padding:10px 15px;background:#eff6ff;border-bottom:1px solid #cbd5e1;
+ color:#25436c;font:700 13px/1.5 "Microsoft JhengHei",sans-serif;
+ box-shadow:0 2px 12px rgba(0,0,0,.08)
+}
+#p79Dashboard #p79EarlyInlineEditor .p79-early-inline-head span{
+ min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+#p79Dashboard #p79EarlyInlineEditor [data-early-inline-close]{
+ flex:none;border:1px solid #b9cae3;border-radius:9px;background:#fff;
+ padding:7px 11px;color:#285591;font-weight:700;cursor:pointer
+}
+#p79Dashboard #p79EarlyInlineEditor .p79-early-inline-loading{
+ margin:auto;max-width:min(90vw,510px);padding:18px 22px;border:1px solid #c7daf3;
+ border-radius:16px;background:#fff;color:#31537b;font-weight:700;
+ text-align:center;line-height:1.7;box-shadow:0 12px 30px rgba(15,23,42,.12)
+}
+#p79Dashboard #p79EarlyInlineEditor iframe{
+ position:relative!important;flex:1 1 auto!important;min-height:0!important;
+ display:block;width:100%!important;height:100%!important;max-width:100%!important;
+ border:0!important;outline:0!important;background:transparent!important
+}
+#p79Dashboard #p79EarlyInlineEditor iframe[hidden],
+#p79Dashboard #p79EarlyInlineEditor .p79-early-inline-loading[hidden]{display:none!important}
+@media(max-width:650px){
+ #p79Dashboard #p79EarlyInlineEditor .p79-early-inline-head{padding:8px;font-size:11px}
+ #p79Dashboard #p79EarlyInlineEditor [data-early-inline-close]{padding:7px;font-size:11px}
+}
