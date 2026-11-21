@@ -3,6 +3,7 @@
  [Parameter(Mandatory=$true)][string]$InstallRoot,
  [Parameter(Mandatory=$true)][int]$ParentPid,
  [Parameter(Mandatory=$true)][string]$ExpectedDigest,
+ [string]$ReadyFile='',
  [switch]$TestOnly
 )
 $ErrorActionPreference='Stop'
@@ -29,6 +30,16 @@ try{
  if(!(Test-Path $Archive -PathType Leaf)){throw 'Missing downloaded ZIP'}
  $hash=(Get-FileHash -Path $Archive -Algorithm SHA256).Hash.ToLowerInvariant()
  if($hash -ne $ExpectedDigest){throw 'Release SHA-256 validation failed before extraction'}
+ # Handshake is written only after the script starts, logs, and validates the
+ # official archive. The running app must not quit until it sees this marker.
+ if($ReadyFile){
+  $expectedReady=Join-Path $updates ("runner-ready-$ParentPid.flag")
+  if(![String]::Equals([IO.Path]::GetFullPath($ReadyFile),[IO.Path]::GetFullPath($expectedReady),[StringComparison]::OrdinalIgnoreCase)){
+   throw 'Updater handshake path rejected'
+  }
+  [IO.File]::WriteAllText($expectedReady,("ready:$ParentPid"))
+  Write-Log ('UPDATER_READY parent='+$ParentPid)
+ }
  if($ParentPid -gt 0){
   $deadline=(Get-Date).AddSeconds(75)
   while((Get-Process -Id $ParentPid -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline){
@@ -106,7 +117,9 @@ public static class Port79NativeWindow {
    $child.Refresh()
    if($child.HasExited){throw ('Windows program exited before opening its main window, exit code '+$child.ExitCode)}
    $handle=$child.MainWindowHandle
-   if($handle -ne [IntPtr]::Zero){
+   # Do not activate a GDI+ helper window that happens to belong to the EXE.
+   $title=[string]$child.MainWindowTitle
+   if($handle -ne [IntPtr]::Zero -and $title.Contains('79號碼頭雲端智慧系統')){
     [void][Port79NativeWindow]::ShowWindowAsync($handle,9)
     [void][Port79NativeWindow]::SetForegroundWindow($handle)
     if([Port79NativeWindow]::IsWindowVisible($handle)){$visible=$true;break}
