@@ -376,7 +376,10 @@ namespace Port79Lite {
     if(payload.kind=="port79-cache-command-v1"){
      // A manager clicking the existing cloud-download button may start
      // background sync from any locally hosted application page.
-     if(payload.action=="download-all"&&sender==web.CoreWebView2)_=ForceDownload();
+     if(sender==web.CoreWebView2){
+      if(payload.action=="download-all")_=ForceDownload();
+      else if(payload.action=="download-resume")_=ForceDownload(true);
+     }
      return;
     }
     if(payload.kind!="port79-cache-status-v1")return;
@@ -388,6 +391,13 @@ namespace Port79Lite {
        payload.phase=="failed"||payload.phase=="interrupted"))
      cloudWorkerJobActive=false;
     UpdateCacheStatus(payload);
+    // An optional history catalog timeout must not strand a verified Windows
+    // update behind an apparently perpetual cloud download. Retry applying
+    // staged code only after background sync finishes and before human edits.
+    if(sender==cloudWorker?.CoreWebView2&&!cloudWorkerJobActive&&
+       !userInteractedSinceLaunch&&!updateBusy&&
+       (payload.phase=="complete"||payload.phase=="partial"||payload.phase=="failed"))
+     _=CheckUpdates(false);
     // UI-only relay for the compact homepage indicator beside History status.
     // Do not read or change employee records, credentials or download behavior.
     _=DisplayInlineCacheProgress(payload);
@@ -471,7 +481,7 @@ namespace Port79Lite {
    if(!Uri.TryCreate(address,UriKind.Absolute,out var u)||u.Scheme!="https")return;
    try{Process.Start(new ProcessStartInfo(u.AbsoluteUri){UseShellExecute=true});}catch{}
   }
-  private async Task ForceDownload(){
+  private async Task ForceDownload(bool resumeOnly=false){
    ShowWindow();
    if(cloudWorkerJobActive){
     cachePanel.Visible=true;cachePanel.BringToFront();
@@ -489,14 +499,21 @@ namespace Port79Lite {
     string current=await web.CoreWebView2.ExecuteScriptAsync(CaptureCloudSessionScript);
     if(String.IsNullOrWhiteSpace(current)||current=="null")
      throw new InvalidOperationException("找不到管理員登入狀態，請重新登入");
+    // Pass only a local mode flag; no credential or employee payload is logged.
+    // Manager-triggered "重新同步資料" stays a cloud refresh, whereas
+    // automatic login resumes already verified browser-profile snapshots.
+    var payload=new JavaScriptSerializer().Deserialize<System.Collections.Generic.Dictionary<string,object>>(current);
+    if(payload==null)throw new InvalidOperationException("無法解析登入狀態");
+    payload["resumeOnly"]=resumeOnly;
+    var verifiedSession=new JavaScriptSerializer().Serialize(payload);
     cloudWorkerJobActive=true;
     string started=await cloudWorker.CoreWebView2.ExecuteScriptAsync(
-     "window.port79StartCloudSync("+current+")");
+     "window.port79StartCloudSync("+verifiedSession+")");
     if(!String.Equals(started,"true",StringComparison.OrdinalIgnoreCase))
      throw new InvalidOperationException("背景同步未能開始：請確認管理員權限、登入 Token 及雲端網址");
     UpdateCacheStatus(new CacheStatusPayload{
      kind="port79-cache-status-v1",phase="downloading",title="背景雲端同步",
-     detail="背景下載已開始；可以繼續切換各大系統工作",
+     detail=resumeOnly?"正在恢復原本的本機快取；只補抓尚未下載的資料":"管理員已要求重新核對雲端；已完成資料仍可沿用短期快取",
      completed=0,total=7
     });
    }catch(Exception error){

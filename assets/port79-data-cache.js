@@ -798,6 +798,10 @@ async function fetchJson(action,params={},sys='',readOptions={}){
  // Only explicit interactive batches use the short bound; scheduled reads
  // and business operations retain the original 60-second timeout.
  const timeoutMs=readOptions?.interactive===true?30000:DOWNLOAD_TIMEOUT_MS;
+ // Startup must not hold the whole desktop session on a slow historical
+ // catalog. A real failure is still reported as incomplete, never success.
+ const boundedTimeoutMs=action==='getHistoricalDataCatalog'&&readOptions?.resumeExisting===true?
+  12000:timeoutMs;
  const viewer=viewerKey(),credential=token();
  if(!credential)throw Object.assign(new Error('請先由首頁重新登入，再下載資料'),{code:'P79_AUTH'});
  let url=buildUrl(action,params),lastError;
@@ -807,7 +811,7 @@ async function fetchJson(action,params={},sys='',readOptions={}){
  const label=labels[action]||'雲端資料';
  for(let attempt=0;attempt<4;attempt++){
   const c=new AbortController();let timedOut=false,data;
-  const to=setTimeout(()=>{timedOut=true;c.abort()},timeoutMs);
+  const to=setTimeout(()=>{timedOut=true;c.abort()},boundedTimeoutMs);
   try{
    if(viewerKey()!==viewer||token()!==credential)throw Object.assign(new Error('登入狀態已變更，請重新開啟快取中心'),{code:'P79_AUTH'});
    const r=await rawFetch(url,{method:'GET',cache:'no-store',redirect:'follow',signal:c.signal});
@@ -832,7 +836,7 @@ async function fetchJson(action,params={},sys='',readOptions={}){
    }
    if(viewerKey()!==viewer||token()!==credential)throw Object.assign(new Error('登入狀態已變更，未保存其他帳號資料'),{code:'P79_AUTH'});
   }catch(error){
-   if(timedOut||error?.name==='AbortError')error=Object.assign(new Error(label+'：雲端讀取逾時（'+Math.round(timeoutMs/1000)+' 秒），請稍後重試'),{retryable:true,code:'P79_TRANSPORT'});
+   if(timedOut||error?.name==='AbortError')error=Object.assign(new Error(label+'：雲端讀取逾時（'+Math.round(boundedTimeoutMs/1000)+' 秒），請稍後重試'),{retryable:true,code:'P79_TRANSPORT'});
    else if(error?.name==='TypeError')error=Object.assign(new Error(label+'：無法連接雲端，請檢查網路'),{retryable:true,code:'P79_TRANSPORT'});
    lastError=error;
    if(!error.retryable||attempt===3||(attempt>=1&&!error.busyRetry))throw error;
@@ -1033,13 +1037,18 @@ async function downloadSystem(sys,onProgress,readOptions={}){
  if(sys==='efficiency')return fetchJson('gcGetData',{token:t,month:m,scope:'month'},sys,readOptions);
  if(sys==='hr')return fetchJson('hrGetEmployees',{token:t},sys,readOptions);
  if(sys==='history'){
+  // The seven-system startup is a catalog sync, not a bulk download of every
+  // historical category. Existing month snapshots remain intact and the
+  // History page fetches a requested month when opened. In particular,
+  // one slow vessel month may not turn a valid catalog into endless 6/7.
   const catalog=await fetchJson('getHistoricalDataCatalog',{token:t},sys,readOptions);
-  for(const type of ['attendance','schedule','vessel']){
-   try{await fetchJson('historyGetMonthData',{token:t,type,month:m},'',readOptions)}
-   catch(e){
-    // A temporarily unavailable historical month is optional, but session
-    // expiry or transport failure must not be silently marked successful.
-    if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT'].includes(e?.code))throw e;
+  if(!catalog||catalog.ok!==true)throw new Error('歷史月份目錄尚未取得');
+  if(readOptions?.prefetchHistoricalMonths===true){
+   for(const type of ['attendance','schedule','vessel']){
+    try{await fetchJson('historyGetMonthData',{token:t,type,month:m},'',readOptions)}
+    catch(e){
+     if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT'].includes(e?.code))throw e;
+    }
    }
   }
   return catalog;
@@ -1049,6 +1058,27 @@ async function downloadSystem(sys,onProgress,readOptions={}){
 // Successfully downloaded independent systems are persisted in IndexedDB, not
 // just in lastAllDownload's page-local three-minute memory.
 const SYSTEM_REUSE_MAX_AGE_MS=30*60*1000;
+// Automatic app startup must resume verified IndexedDB data instead of
+// downloading all seven systems again every 30 minutes. This is a bounded
+// offline-first resume (24 h), not a claim that the cloud is unchanged;
+// the explicit tray/cloud-center refresh still performs live cloud reads.
+const SYSTEM_AUTO_RESUME_MAX_AGE_MS=24*60*60*1000;
+async function startupCachedSystem(sys,scopeAtStart){
+ if(!['attendance','workhours','leave','schedule','efficiency','hr','history'].includes(sys))return null;
+ const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
+ if(!snapshot||snapshot.data?.ok!==true||snapshot.kind!=='system'||snapshot.system!==sys||
+    snapshot.displayScope!==scopeAtStart||!Number.isFinite(Number(snapshot.savedAt)))return null;
+ if(Date.now()-Number(snapshot.savedAt)>SYSTEM_AUTO_RESUME_MAX_AGE_MS)return null;
+ if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
+ if(sys==='schedule'&&snapshot.scope?.month&&snapshot.scope.month!==ymNow())return null;
+ if(sys==='attendance'||sys==='workhours'){
+  const data=snapshot.data;
+  if(!data.fullDatabase||!Array.isArray(data.months)||!Array.isArray(data.monthStats)||
+     data.monthStats.length!==data.months.length||data.monthStats.some(x=>x.ok!==true))return null;
+ }
+ return snapshot;
+}
+
 async function reusableSystemDownload(sys,scopeAtStart){
  if(!['leave','schedule','efficiency','hr','history'].includes(sys))return null;
  const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
@@ -1064,10 +1094,11 @@ async function downloadAll(onProgress,options={}){
  // Interactive Windows batches show usable independent system data before the
  // long multi-month attendance scan. The legacy API retains its original order.
  const fastFirst=options?.quickFirst===true;
+ const resumeExisting=fastFirst&&options?.resumeExisting===true;
  const systems=fastFirst?['leave','schedule','efficiency','hr','history','attendance','workhours']:
   ['attendance','workhours','leave','schedule','efficiency','hr','history'];
  const result=[];
- const readOptions=fastFirst?{interactive:true}:{};
+ const readOptions=fastFirst?{interactive:true,...(resumeExisting?{resumeExisting:true}:{})}:{};
  const batchViewer=viewerKey(),batchToken=token(),batchScope=displayScope(),batchGas=gasUrl(),batchStamp=mutationStamp();
  // Within a short same-login retry, keep the six successful snapshots and fetch
  // only modules that actually failed. A new session/scope or later refresh starts fresh.
@@ -1083,16 +1114,19 @@ async function downloadAll(onProgress,options={}){
    onProgress?.(sys,i,systems.length,'reused',null,'此系統先前已完成，沿用快取');
    continue;
   }
-  // Resume verified independent systems after navigation and app restart.
-  // A cache is valid only for this account, permission scope, endpoint and
-  // mutation generation; older snapshots are refreshed, not called current.
-  if(fastFirst&&await reusableSystemDownload(sys,batchScope)){
+  // Startup resumes exact-viewer, exact-scope stored snapshots within 24 h.
+  // Manual refresh deliberately does NOT use this long reuse window.
+  // In both modes a snapshot failing permission, endpoint or edit checks is
+  // reloaded, never silently presented as a verified latest cloud response.
+  if(fastFirst&&await (resumeExisting?startupCachedSystem(sys,batchScope):reusableSystemDownload(sys,batchScope))){
    if(batchViewer!==viewerKey()||batchToken!==token()||
       batchScope!==displayScope()||batchGas!==gasUrl()||batchStamp!==mutationStamp())
     throw Object.assign(new Error('登入或管理權限已變更，停止沿用快取'),{code:'P79_SCOPE'});
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true,reused:true});
-   onProgress?.(sys,i,systems.length,'reused',null,'沿用本機已完成的雲端快取（30 分鐘內）');
+   onProgress?.(sys,i,systems.length,'reused',null,resumeExisting?
+    '沿用已保存本機資料（24 小時內）；未重抓，雲端最新狀態可手動重新核對':
+    '沿用本機已完成的雲端快取（30 分鐘內）');
    continue;
   }
   // Treat remaining untouched modules as skipped after an identity/scope/transport failure.
@@ -1252,7 +1286,7 @@ async function nativeCloudSyncFromDesktop(){
     state==='error'||state==='skipped'?label+' 未完成：'+String(error?.message||error||'雲端讀取未完成'):
     '正在下載 '+label;
    status('downloading',message,done.size,month);
-  },{quickFirst:true});
+  },{quickFirst:true,resumeExisting:window.__port79WorkerResumeOnly===true});
   const success=result.filter(x=>x.ok).length,failures=result.filter(x=>!x.ok);
   fullyCompleted=success===total&&!failures.length;
   status(failures.length?(success?'partial':'failed'):'complete',

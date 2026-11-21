@@ -139,9 +139,9 @@
      throw new Error('Windows 背景同步橋接尚未載入');
     save(key,{attempt:now});
     window.chrome.webview.postMessage(JSON.stringify({
-     kind:'port79-cache-command-v1',action:'download-all'
+     kind:'port79-cache-command-v1',action:'download-resume'
     }));
-    nativeProgress('waiting','背景雲端同步已啟動','可以切換考勤、排班、請假等工作；已完成快取不會重複下載。',0);
+    nativeProgress('waiting','正在沿用本機快取','優先沿用本機已下載資料；只有缺少或逾期項目才讀雲端。可繼續操作。',0);
    }catch(error){
     save(key,{attempt:0});
     nativeProgress('failed','背景同步沒有開始',String(error?.message||error),0);

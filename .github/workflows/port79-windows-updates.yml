@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/port79-windows-updates.yml'
       - 'desktop-lite/**'
+      - 'tests/windows-cache-incremental-resume.cjs'
       - 'assets/port79-data-cache.js'
       - 'tests/native-cloud-download-dispatch.cjs'
       - 'tests/native-cloud-batch-stall.cjs'
@@ -32,6 +33,7 @@ on:
       - 'gate-import/**'
       - '.github/workflows/port79-windows-updates.yml'
       - 'desktop-lite/**'
+      - 'tests/windows-cache-incremental-resume.cjs'
       - 'assets/port79-data-cache.js'
       - 'tests/native-cloud-download-dispatch.cjs'
       - 'tests/native-cloud-batch-stall.cjs'
@@ -75,7 +77,7 @@ jobs:
         shell: pwsh
         working-directory: production
         run: |
-          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs tests/windows-release-version-contract.cjs
+          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs tests/windows-release-version-contract.cjs tests/windows-cache-incremental-resume.cjs
           if($LASTEXITCODE -ne 0){throw 'Windows unit tests failed'}
           & ./desktop-lite/tests/shell-updater-safety.ps1
           if($LASTEXITCODE -ne 0){throw 'Updater preservation tests failed'}
