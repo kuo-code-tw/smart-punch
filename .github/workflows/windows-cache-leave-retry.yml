@@ -4,6 +4,8 @@ on:
     paths:
       - 'assets/port79-data-cache.js'
       - 'tests/cache-download-transport.cjs'
+      - 'tests/native-cloud-download-dispatch.cjs'
+      - 'desktop-lite/MainForm.cs'
       - 'yard-dashboard/**'
       - 'tests/yard-home-donuts.cjs'
       - '.github/workflows/windows-cache-leave-retry.yml'
@@ -19,7 +21,9 @@ jobs:
       - name: Validate JavaScript syntax
         run: node --check assets/port79-data-cache.js
       - name: Exercise retry and 7-system partial resume
-        run: node tests/cache-download-transport.cjs
+        run: |
+          node tests/cache-download-transport.cjs
+          node --test tests/native-cloud-download-dispatch.cjs
       - name: Verify native cache isolation and source behavior
         run: |
           node tests/device-folder-cache.cjs
