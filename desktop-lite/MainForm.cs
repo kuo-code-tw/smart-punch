@@ -544,9 +544,7 @@ namespace Port79Lite {
      }
      systemUpdateStatusMenu.Text="更新系統：網站新版已驗證，正在自動重啟";
      Log("Website update verified; restart to apply staged site without a prompt");
-     exit=true;
-     Application.Restart();
-     Close();
+     exit=true;Application.Restart();Close();
      return;
     }
     if(siteFailure!=null||shellFailure!=null){
