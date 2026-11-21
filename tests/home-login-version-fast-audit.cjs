@@ -40,7 +40,9 @@ assert.doesNotMatch(home,/\bp79StartDeploymentStatusWatch\(\);/,'old one-shot le
 assert.match(login,/window|globalThis/);
 assert.match(login,/setInterval/,'recheck while login is on screen');
 assert.match(login,/credentials:'omit'/,'only public version info is requested');
-assert.match(login,/仍可正常登入/,'temporary GitHub failure must not block employee login');
+assert.match(login,/Promise\.allSettled/,'temporary GitHub failure is isolated');
+assert.equal(versionModule.compactStatus(true,'V261121.34805',null,'','20:41'),
+ '🔎 V261121.34805｜更新待核｜20:41','Cannot claim current when release source failed');
 assert.match(dashboard,/previewHomeMonth\('attendance',ym,token\)/,'reuse verified IndexedDB snapshot only');
 assert.match(dashboard,/Port79DataCache\?\.getHistoryPreview/);
 assert.match(dashboard,/preview:true/);
