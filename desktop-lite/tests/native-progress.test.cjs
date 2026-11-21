@@ -208,7 +208,9 @@ test('Windows app has one unmistakable update entry and a dedicated 79 icon',()=
  const build=fs.readFileSync(path.join(__dirname,'../build-portable.ps1'),'utf8');
  const generator=fs.readFileSync(path.join(__dirname,'../generate-icon.ps1'),'utf8');
  assert.match(nativeSource,/檢查並更新系統（程式及畫面）/);
- assert.match(nativeSource,/重新同步資料（考勤等七項）/);
+ assert.match(nativeSource,/V待驗證/,'Missing manifest must be labeled unverified, not silently old');
+ assert.match(nativeSource,/版本號:/,'Installed ZIP version must be read from exact human manifest');
+ assert.match(nativeSource,/重新核對六項基本資料（歷史按月）/);
  assert.match(nativeSource,/關閉程式/);
  assert.doesNotMatch(nativeSource,/真正結束程式/);
  assert.doesNotMatch(nativeSource,/更新 Windows 主程式（選用）/);
