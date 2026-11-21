@@ -59,6 +59,12 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'Restore failed'}
           & ./desktop-lite/build-portable.ps1
           if($LASTEXITCODE -ne 0){throw 'Build failed'}
+      - name: Smoke-test native Windows update, window visibility and automatic restart
+        shell: pwsh
+        working-directory: production
+        run: |
+          & ./desktop-lite/tests/native-restart-smoke.ps1
+          if($LASTEXITCODE -ne 0){throw 'Windows native restart smoke failed'}
       - name: Reject private data and stale website files
         shell: pwsh
         working-directory: production
