@@ -34,6 +34,16 @@ function write(message){
  const el=$('p79LoginVersionStatus');
  if(el)el.textContent=message;
 }
+function compactStatus(native,localVersion,web,release,time){
+ const version=localVersion||'版本待核';
+ let state='更新待核';
+ if(native){
+  if(release&&localVersion)state=release===localVersion?'已是最新版':'有新版';
+ }else if(web&&localVersion){
+  state=web.version===localVersion?'已是最新版':'有新版';
+ }
+ return '🔎 '+version+'｜'+state+'｜'+time;
+}
 function isNative(){
  try{return new URL(root.location.href).searchParams.has('windowsBundle');}
  catch(_){return false;}
@@ -41,7 +51,7 @@ function isNative(){
 async function check(force=false){
  if(busy||!force&&Date.now()-lastChecked<60000)return;
  busy=true;lastChecked=Date.now();
- write('🔎 正在檢查網站與 Windows 正式版本…（不影響登入）');
+ write('🔎 正在檢查更新…');
  const [localResult,webResult,releaseResult]=await Promise.allSettled([
   read(LOCAL),read(WEB),read(LATEST)
  ]);
@@ -58,25 +68,17 @@ async function check(force=false){
   root.p79ApplyBuildVersion(localVersion);
  const label=$('p79MainVersion');
  if(label)label.textContent=(native?'Windows 本機版：':'網頁版：')+(localVersion||'版本尚未驗證');
- const parts=[];
- if(native){
-  parts.push('本機：'+(localVersion||'未取得版本'));
-  if(web)parts.push('網站：'+web.version);
-  if(release)parts.push('Windows 最新發布：'+release);
-  if(release&&localVersion&&release!==localVersion)
-   parts.push('已偵測到不同版本；Windows 會檢查更新，安裝完成後版本才會一致');
-  else if(release&&localVersion===release)parts.push('Windows 已符合最新正式發布版');
- }else{
-  parts.push('目前網站：'+(localVersion||'尚未驗證'));
-  if(web&&local&&web.commit!==local.commit)
-   parts.push('網站有新版本可重新載入');
-  if(release)parts.push('Windows 下載版：'+release);
-  if(web&&release&&web.version!==release)
-   parts.push('網頁及 Windows 發布時間不同，版本號可能暫時不一樣');
- }
- if(!local&&!web&&!release)parts.push('更新來源暫時無法連線，仍可正常登入');
  const time=new Intl.DateTimeFormat('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Taipei'}).format(new Date());
- write('🔎 '+parts.join('｜')+'｜檢查 '+time);
+ const brief=compactStatus(native,localVersion,web,release,time);
+ const details=[
+  (native?'本機':'目前網站')+'：'+(localVersion||'未驗證'),
+  '線上網站：'+(web?.version||'未核對'),
+  'Windows 最新發布：'+(release||'未核對'),
+  '檢查時間：'+time
+ ].join('｜');
+ const field=$('p79LoginVersionStatus');
+ if(field)field.title=details;
+ write(brief);
  busy=false;
  return {local,web,release};
 }
@@ -94,5 +96,5 @@ function init(){
 }
 if(root.document?.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});
 else init();
-if(typeof module==='object'&&module.exports)module.exports={normalized,releaseVersion,check};
+if(typeof module==='object'&&module.exports)module.exports={normalized,releaseVersion,compactStatus,check};
 })(typeof window!=='undefined'?window:globalThis);
