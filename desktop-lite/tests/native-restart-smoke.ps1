@@ -14,9 +14,9 @@ try{
   & ./desktop-lite/app/upgrade-windows.ps1 -Archive $archive -InstallRoot $root -ParentPid 0 -ExpectedDigest $digest -ReadyFile $ready
   if(!(Test-Path $log)){throw 'Updater did not create a log'}
   $lines=Get-Content -LiteralPath $log
-  if($lines -notmatch 'UPDATER_READY parent=0'){throw 'Updater did not acknowledge verified handoff'}
-  if($lines -notmatch 'WINDOW_VISIBLE_CONFIRMED'){throw 'Updated app did not prove visible main window'}
-  if($lines -notmatch 'AUTO_RESTART_SUCCESS'){throw 'Updated native program did not restart'}
+  if(-not ($lines -match 'UPDATER_READY parent=0')){throw 'Updater did not acknowledge verified handoff'}
+  if(-not ($lines -match 'WINDOW_VISIBLE_CONFIRMED')){throw 'Updated app did not prove visible main window'}
+  if(-not ($lines -match 'AUTO_RESTART_SUCCESS')){throw 'Updated native program did not restart'}
   $marker=Join-Path $root 'local-data/updates/installed-shell-sha256.txt'
   if(!(Test-Path $marker) -or (Get-Content -LiteralPath $marker -Raw).Trim() -ne $digest){
     throw 'Updater did not record verified release digest'
