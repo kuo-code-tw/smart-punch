@@ -177,7 +177,7 @@ test('one Update System menu handles both website and native shell without separ
  assert.doesNotMatch(nativeSource,/ToolStripMenuItem\("更新 Windows 主程式/,'No separate manual shell update menu');
  assert.match(nativeSource,/await Updater\.StageFromOfficialAsync/,'Updates only changed public site files');
  assert.match(nativeSource,/await ReleaseUpdater\.PrepareAsync/,'Checks native shell in same action');
- assert.match(nativeSource,/ReleaseUpdater\.Launch\(shell,root,Process\.GetCurrentProcess\(\)\.Id\)/);
+ assert.match(nativeSource,/await ReleaseUpdater\.LaunchAsync\(shell,root,Process\.GetCurrentProcess\(\)\.Id\)/);
  assert.match(nativeSource,/Application\.Restart\(\)/,'Site-only update can apply without downloading another ZIP');
  assert.match(nativeSource,/exit=true;Application\.Restart\(\);Close\(\);/,'Restart must bypass normal hide-to-tray close guard');
  assert.match(nativeSource,/Interval=300000/,'Automatic checks stay enabled');
@@ -191,7 +191,7 @@ test('system file restart and verified Windows updater reopen the app automatica
  const updater=fs.readFileSync(path.join(__dirname,'../app/upgrade-windows.ps1'),'utf8');
  assert.match(nativeSource,/exit=true;Application\.Restart\(\);Close\(\);/,'Site-file update restarts the Windows app');
  assert.match(nativeSource,/Shown\+=async\(s,e\)=>\{[\s\S]*?ShowWindow\(\);/,'Reopened app must show its main window');
- assert.match(nativeSource,/ReleaseUpdater\.Launch\(shell,root,Process\.GetCurrentProcess\(\)\.Id\)/,'Native update launches helper before shutdown');
+ assert.match(nativeSource,/await ReleaseUpdater\.LaunchAsync\(shell,root,Process\.GetCurrentProcess\(\)\.Id\)/,'Native update launches helper before shutdown');
  assert.match(updater,/AUTO_RESTART_SUCCESS pid=/,'Updater logs verified automatic reopening');
  assert.match(updater,/WINDOW_VISIBLE_CONFIRMED pid=/,'Update success requires visible native main window');
  assert.match(updater,/Port79NativeWindow/,'Updater checks Windows native window visibility');
