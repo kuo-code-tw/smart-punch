@@ -1706,7 +1706,10 @@ function renderHomeYardSummary(session){
    $('p79HomeYardEmptyCapTop').textContent=fmt(emptyCap);
   $('p79HomeYardHeavyPct').textContent=(Number(latest.heavyTotal)/heavyCap*100).toFixed(2)+'%';
   $('p79HomeYardEmptyPct').textContent=(Number(latest.emptyTotal)/emptyCap*100).toFixed(2)+'%';
-  note.textContent='資料日期 '+latest.date+'｜來源 '+String(saved.fileName||'先前匯入 Excel')+'｜20 呎=1 TEU、40／45 呎=2 TEU；45呎須有獨立場存資料（換算值）；Excel 原始 TEU 不變。重櫃／空櫃／冷凍櫃的容許櫃數與 TEU 由管理員設定；冷凍櫃為內含分類、不重複加總；僅存於此瀏覽器。';
+  const todayTW=new Date().toLocaleDateString('sv-SE',{timeZone:'Asia/Taipei'});
+  const isHistorical=latest.date<todayTW;
+  const dataSource=saved.cloudSyncedAt?'正式雲端資料庫（已同步至此電腦）':String(saved.fileName||'此電腦先前匯入 Excel');
+  note.textContent='資料日期 '+latest.date+(isHistorical?'｜歷史資料（不是今日即時場存）':'｜今日場存')+'｜來源 '+dataSource+'｜20 呎=1 TEU、40／45 呎=2 TEU；Excel 原始 TEU 不變。容許櫃數須由管理員設定，冷凍櫃是內含分類，不重複加總。';
  }catch(error){note.textContent='本機儲位資料暫時無法讀取，請進入碼頭儲量管理確認 Excel 與容量設定。';}
 }
 async function refreshHomeYardCloud(session){
@@ -1730,6 +1733,10 @@ async function refreshHomeYardCloud(session){
   renderHomeYardSummary(currentSession);
  }catch(error){
   console.warn('雲端儲量讀取未完成',String(error?.message||error));
+  const note=$('p79HomeYardSource');
+  if(note&&/尚未在本瀏覽器匯入|本機儲位資料暫時無法讀取/.test(note.textContent)){
+   note.textContent='正式雲端已有歷史儲量；首頁登入授權讀取服務尚未連線，因此暫時無法顯示。請由系統管理員完成雲端服務部署，不需要重新匯入 Excel。';
+  }
  }
 }
 window.addEventListener('p79-home-import-complete',event=>{
