@@ -1089,21 +1089,39 @@ let nativeCloudSyncBusy=false;
 async function nativeCloudSyncFromDesktop(){
  const total=7;
  const done=new Set();
- function status(phase,detail,completed=done.size){
+ let lastActivity=Date.now(),lastDetail='正在確認雲端連線',lastMonthCompleted=0,lastMonthTotal=0,pulse=null;
+ function status(phase,detail,completed=done.size,month=null,heartbeat=false){
+  if(!heartbeat){
+   lastActivity=Date.now();
+   lastDetail=String(detail||'');
+   lastMonthCompleted=Number.isFinite(Number(month?.monthCompleted))?Math.max(0,Number(month.monthCompleted)):0;
+   lastMonthTotal=Number.isFinite(Number(month?.monthTotal))?Math.max(0,Number(month.monthTotal)):0;
+  }
   const value={
    kind:'port79-cache-status-v1',phase,
-   title:'雲端資料同步',detail:String(detail||'').slice(0,160),
-   completed:Math.max(0,Math.min(total,completed)),total
+   title:phase==='stalled'?'雲端回應較慢':'雲端資料同步',
+   detail:String(detail||'').slice(0,160),
+   completed:Math.max(0,Math.min(total,completed)),total,
+   monthCompleted:Math.max(0,Math.min(240,lastMonthCompleted)),
+   monthTotal:Math.max(0,Math.min(240,lastMonthTotal))
   };
   try{window.chrome?.webview?.postMessage?.(JSON.stringify(value));}catch(e){}
   setProgress((phase==='failed'?'❌ ':phase==='partial'?'⚠️ ':phase==='complete'?'✅ ':'☁️ ')+value.detail);
  }
  if(nativeCloudSyncBusy){
-  status('stalled','上一次雲端資料同步仍在進行，請查看目前進度。');
+  status('stalled','下載正在進行中，請查看目前系統與月份進度；不會重複啟動。',done.size,null,true);
   return;
  }
  nativeCloudSyncBusy=true;
  status('downloading','正在確認管理員登入與七大系統雲端連線…',0);
+ // A large attendance database can require two cloud reads for each month.
+ // Send a truthful waiting heartbeat; do not fabricate completion progress.
+ if(typeof setInterval==='function')pulse=setInterval(()=>{
+  const elapsed=Date.now()-lastActivity;
+  if(elapsed>=12000){
+   status('stalled',lastDetail+'｜等待雲端回應 '+Math.round(elapsed/1000)+' 秒；如逾時會顯示原因並繼續安全處理。',done.size,null,true);
+  }
+ },10000);
  try{
   let session=null;
   try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')}catch(_){}
@@ -1114,26 +1132,27 @@ async function nativeCloudSyncFromDesktop(){
   if(window.__port79CachedSessionRefreshPending){
    throw new Error('登入權限正在向雲端確認，請完成後再重新下載');
   }
-  const result=await downloadAll((sys,index,count,state,error,detail)=>{
-   if(['done','reused','error','skipped'].includes(state))done.add(sys);
+  const result=await downloadAll((sys,index,count,state,error,detail,month)=>{
+   // Progress is a count of successful systems, NOT attempted/skipped ones.
+   if(state==='done'||state==='reused')done.add(sys);
    const label=SYSTEM_LABELS[sys]||sys;
    const message=detail?label+'｜'+detail:
     state==='loading'?'正在下載 '+label:
     state==='reused'?label+' 已沿用經驗證的快取':
     state==='done'?label+' 已完成':
-    state==='error'||state==='skipped'?label+' 失敗：'+String(error?.message||error||'雲端讀取未完成'):
+    state==='error'||state==='skipped'?label+' 未完成：'+String(error?.message||error||'雲端讀取未完成'):
     '正在下載 '+label;
-   status('downloading',message);
-  });
-  const success=result.filter(x=>x.ok).length;
-  const failures=result.filter(x=>!x.ok);
+   status('downloading',message,done.size,month);
+  },{quickFirst:true});
+  const success=result.filter(x=>x.ok).length,failures=result.filter(x=>!x.ok);
   status(failures.length?(success?'partial':'failed'):'complete',
-   failures.length?'七大系統完成 '+success+'/'+total+'；未完成：'+failures.map(x=>(SYSTEM_LABELS[x.system]||x.system)+' '+x.error).join('；').slice(0,110):
-    '七大系統雲端資料已讀取完成（不含碼頭儲量）；已保留原有快取。',
-   total);
+   failures.length?'已成功 '+success+'/'+total+' 系統；未完成：'+failures.map(x=>(SYSTEM_LABELS[x.system]||x.system)+' '+x.error).join('；').slice(0,105):
+    '七大系統已讀取完成（不含碼頭儲量）；已保留原有快取。',
+   success);
  }catch(error){
   status('failed','雲端資料未下載：'+String(error?.message||error),done.size);
  }finally{
+  if(pulse!==null&&typeof clearInterval==='function')clearInterval(pulse);
   nativeCloudSyncBusy=false;
  }
 }
