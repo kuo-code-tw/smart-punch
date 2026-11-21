@@ -1069,7 +1069,17 @@ function ensureModal(){
    if(act==='persist'){setProgress(await retainDeviceData());await refreshModal()}
    if(act==='clear'){if(confirm('確定清除此瀏覽器的七大系統本機快取？')){await clear();setProgress('已清除瀏覽器快取；硬碟資料夾檔案仍保留，啟用時可重新讀取。');await refreshModal()}}
    if(act==='current'){const sys=currentSystem();setProgress(`正在下載 ${SYSTEM_LABELS[sys]}…`);const snap=await downloadSystem(sys,(s,i,total,state,label)=>setProgress(`⬇️ ${label||SYSTEM_LABELS[sys]} ${i}/${total}`));setProgress(sys==='attendance'||sys==='workhours'?`✅ ${SYSTEM_LABELS[sys]}完整資料已載入｜考勤 ${Number(snap?.recordCount||0)} 筆｜員工主檔 ${Number(snap?.employeeCount||0)} 人`:`✅ ${SYSTEM_LABELS[sys]} 快取完成。`);await refreshModal()}
-   if(act==='all'){const res=await downloadAll((sys,i,total,state,err,detail)=>{setProgress(detail?`⬇️ ${SYSTEM_LABELS[sys]}｜${detail}`:`${state==='error'?'⚠️':'⬇️'} ${i+1}/${total} ${SYSTEM_LABELS[sys]} ${state==='loading'?'下載中…':state==='done'?'完成':state==='reused'?'沿用成功快取':state==='detail'?'整理中…':'失敗'}`)},{quickFirst:true});const ok=res.filter(x=>x.ok).length;const bad=res.filter(x=>!x.ok);setProgress(`完成：${ok}/7 個系統${bad.length?'；未完成：'+bad.map(x=>SYSTEM_LABELS[x.system]+'：'+x.error).join('；'):''}`);await refreshModal()}
+   if(act==='all'){
+   // Windows has a separate same-origin WebView2 worker that continues across
+   // page navigation; keep the existing modal as the single download entry.
+   if(window.__port79NativeCloudWorkerReady===true&&window.chrome?.webview?.postMessage){
+    window.chrome.webview.postMessage(JSON.stringify({
+     kind:'port79-cache-command-v1',action:'download-all'
+    }));
+    setProgress('已交由 Windows 背景同步；可切換考勤、排班等頁面，原本進度會繼續顯示。');
+    return;
+   }
+   const res=await downloadAll((sys,i,total,state,err,detail)=>{setProgress(detail?`⬇️ ${SYSTEM_LABELS[sys]}｜${detail}`:`${state==='error'?'⚠️':'⬇️'} ${i+1}/${total} ${SYSTEM_LABELS[sys]} ${state==='loading'?'下載中…':state==='done'?'完成':state==='reused'?'沿用成功快取':state==='detail'?'整理中…':'失敗'}`)},{quickFirst:true});const ok=res.filter(x=>x.ok).length;const bad=res.filter(x=>!x.ok);setProgress(`完成：${ok}/7 個系統${bad.length?'；未完成：'+bad.map(x=>SYSTEM_LABELS[x.system]+'：'+x.error).join('；'):''}`);await refreshModal()}
   }catch(err){setProgress(err?.name==='AbortError'?'已取消選擇，原有快取保持不變。':'❌ '+String(err?.message||err))}finally{buttons.forEach(x=>x.disabled=false)}});
  return b;
 }
