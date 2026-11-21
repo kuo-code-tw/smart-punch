@@ -37,6 +37,7 @@ namespace Port79Lite {
   private bool initiated=false;
   private bool cacheInProgress=false;
   private bool probedImportFrames=false;
+  private readonly string displayVersion;
 
   // The visible title confirms which Windows ZIP was actually extracted
   // and started. It cannot be spoofed by a stale browser download filename.
@@ -52,7 +53,12 @@ namespace Port79Lite {
     if(sha.Length<40)return "";
     sha=sha.Substring(0,40);
     foreach(var c in sha)if(!Uri.IsHexDigit(c))return "";
-    return sha.Substring(0,12);
+    var shortSha=sha.Substring(0,12);
+    var human=System.Text.RegularExpressions.Regex.Match(text,
+     @"(?m)^版本號:\s*(V\d{4}\.\d{2}\.\d{2}-[a-f0-9]{12})\s*$");
+    if(human.Success&&human.Groups[1].Value.EndsWith(shortSha,StringComparison.OrdinalIgnoreCase))
+     return human.Groups[1].Value;
+    return "V"+shortSha;
    }catch{return "";}
   }
   // Clear only stale HTTP UI resources on a new ZIP, never cloud data.
@@ -72,8 +78,8 @@ namespace Port79Lite {
    try{Process.Start(new ProcessStartInfo("explorer.exe","\""+root+"\""){UseShellExecute=true});}catch{}
   }
   public MainForm(){
-   var bundle=InstalledBundleVersion(root);
-   Text="79號碼頭雲端智慧系統"+(bundle.Length>0?"（Windows 包 v"+bundle+"）":"（Windows 版本待核）");
+   displayVersion=InstalledBundleVersion(root);
+   Text="79號碼頭雲端智慧系統｜"+(displayVersion.Length>0?displayVersion:"V待驗證");
    WindowState=FormWindowState.Maximized;
    MinimumSize=new Size(980,640);
    StartPosition=FormStartPosition.CenterScreen;
@@ -118,7 +124,8 @@ namespace Port79Lite {
    cacheDismissTimer.Tick+=(s,e)=>{cacheDismissTimer.Stop();cachePanel.Visible=false;};
    SizeChanged+=(s,e)=>PositionCachePanel();
    PositionCachePanel();
-   tray=new NotifyIcon{Icon=Icon ?? SystemIcons.Application,Visible=true,Text="79號碼頭雲端智慧系統"};
+   tray=new NotifyIcon{Icon=Icon ?? SystemIcons.Application,Visible=true,
+    Text=SafeStatus("79號碼頭｜"+(displayVersion.Length>0?displayVersion:"V待驗證"),60)};
    var menu=new ContextMenuStrip();
    menu.Items.Add("開啟系統",null,(s,e)=>ShowWindow());
    menu.Items.Add("縮小到系統匣",null,(s,e)=>Hide());
@@ -129,8 +136,8 @@ namespace Port79Lite {
     ToolTipText="只更新正式發布後有變更的程式與畫面；Windows 主程式更新由系統內部處理。保留本機資料，不用自行下載 ZIP。"
    };
    menu.Items.Add(checkUpdatesMenu);
-   var syncDataMenu=new ToolStripMenuItem("重新同步資料（考勤等七項）",null,async(s,e)=>await ForceDownload()){
-    ToolTipText="僅重新讀取考勤、工時、請假、排班、效率、人資、歷史等資料，不會更新 Windows 程式或碼頭儲量 Excel。"
+   var syncDataMenu=new ToolStripMenuItem("重新核對六項基本資料（歷史按月）",null,async(s,e)=>await ForceDownload()){
+    ToolTipText="核對考勤、工時、請假、排班、效率、人資；歷史資料到歷史中心選月份讀取，本機快取保留。"
    };
    menu.Items.Add(syncDataMenu);
    systemUpdateStatusMenu=new ToolStripMenuItem("系統更新狀態：啟動後自動檢查"){Enabled=false};
@@ -140,7 +147,7 @@ namespace Port79Lite {
    menu.Items.Add(new ToolStripSeparator());
    menu.Items.Add("開啟本機資料夾",null,(s,e)=>OpenLocalData());
    menu.Items.Add("開啟目前程式資料夾",null,(s,e)=>OpenCurrentProgramFolder());
-   menu.Items.Add(new ToolStripMenuItem("目前 Windows 程式包："+(bundle.Length>0?"v"+bundle:"版本待核")){
+   menu.Items.Add(new ToolStripMenuItem("目前 Windows 程式包："+(displayVersion.Length>0?displayVersion:"V待驗證")){
     Enabled=false,ToolTipText=root
    });
    menu.Items.Add("關閉程式",null,(s,e)=>ExitApp());
@@ -476,7 +483,7 @@ namespace Port79Lite {
    lastCacheStatus=value;
    var phase=value.phase??"";
    if(phase!="idle"&&phase!="waiting"&&phase!="downloading"&&phase!="stalled"&&phase!="interrupted"&&phase!="complete"&&phase!="partial"&&phase!="failed"&&phase!="cached")return;
-   int total=phase=="idle"?7:Math.Max(1,Math.Min(7,value.total));
+   int total=phase=="idle"?6:Math.Max(1,Math.Min(7,value.total));
    int completed=Math.Max(0,Math.Min(total,value.completed));
    cacheTitle.Text="☁ "+SafeStatus(value.title,90);
    cacheDetail.Text=SafeStatus(value.detail,180);
@@ -504,7 +511,8 @@ namespace Port79Lite {
    cacheBar.MarqueeAnimationSpeed=animate?25:0;
    cacheStatusMenu.Text=SafeStatus("資料同步："+(String.IsNullOrEmpty(value.detail)?value.title:value.detail),58);
    // Windows notify icons have a limited tooltip length.
-   tray.Text=SafeStatus("79號碼頭｜"+(showMonths?monthCompleted+"/"+monthTotal+"月":"系統"+completed+"/"+total)+"｜"+value.title,60);
+   tray.Text=SafeStatus("79號碼頭｜"+(displayVersion.Length>0?displayVersion:"V待驗證")+"｜"+
+    (showMonths?monthCompleted+"/"+monthTotal+"月":"同步"+completed+"/"+total),60);
    if(phase=="complete"||phase=="partial"||phase=="failed"||phase=="interrupted")Log("download "+phase+" "+completed+"/"+total+" "+SafeStatus(value.detail,120));
   }
   private static void OpenSafeExternal(string address){
@@ -543,8 +551,8 @@ namespace Port79Lite {
      throw new InvalidOperationException("背景同步未能開始：請確認管理員權限、登入 Token 及雲端網址");
     UpdateCacheStatus(new CacheStatusPayload{
      kind="port79-cache-status-v1",phase="downloading",title="背景雲端同步",
-     detail=resumeOnly?"正在恢復原本的本機快取；只補抓尚未下載的資料":"管理員已要求重新核對雲端；已完成資料仍可沿用短期快取",
-     completed=0,total=7
+     detail=resumeOnly?"正在恢復六項基本資料本機快取；歷史月份按需讀取":"重新核對六項基本資料；歷史資料按需讀取，原快取保留",
+     completed=0,total=6
     });
    }catch(Exception error){
     cloudWorkerJobActive=false;
