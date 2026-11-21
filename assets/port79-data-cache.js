@@ -986,7 +986,14 @@ async function downloadSystem(sys,onProgress,readOptions={}){
  if(sys==='hr')return fetchJson('hrGetEmployees',{token:t},sys,readOptions);
  if(sys==='history'){
   const catalog=await fetchJson('getHistoricalDataCatalog',{token:t},sys,readOptions);
-  for(const type of ['attendance','schedule','vessel']){try{await fetchJson('historyGetMonthData',{token:t,type,month:m},'')}catch(e){}}
+  for(const type of ['attendance','schedule','vessel']){
+   try{await fetchJson('historyGetMonthData',{token:t,type,month:m},'',readOptions)}
+   catch(e){
+    // A temporarily unavailable historical month is optional, but session
+    // expiry or transport failure must not be silently marked successful.
+    if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT'].includes(e?.code))throw e;
+   }
+  }
   return catalog;
  }
  throw new Error('未知系統：'+sys);
@@ -1009,6 +1016,7 @@ async function downloadAll(onProgress,options={}){
  for(let i=0;i<systems.length;i++){
   const sys=systems[i];
   if(prior?.some(row=>row.system===sys&&row.ok)){
+   consecutiveTransportFailures=0;
    result.push({system:sys,ok:true,reused:true});
    onProgress?.(sys,i,systems.length,'reused');
    continue;
