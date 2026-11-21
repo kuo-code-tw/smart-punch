@@ -73,8 +73,9 @@ test('partial and thrown cloud errors display immediately',async()=>{
  }
 });
 test('C# caller must prove listener exists and report errors to existing progress UI',()=>{
- assert.match(native,/__port79NativeCloudSyncReady!==true/);
- assert.match(native,/window\.dispatchEvent\(new Event\('port79-desktop-force-sync'\)\)/);
+ assert.match(native,/cloudWorkerReady/);
+ assert.match(native,/await cloudWorker\.CoreWebView2\.ExecuteScriptAsync/);
+ assert.match(native,/window\.port79StartCloudSync\(/);
  assert.match(native,/UpdateCacheStatus\(new CacheStatusPayload\{/);
- assert.match(native,/if\(!String\.Equals\(dispatched,"true"/);
+ assert.match(native,/if\(!String\.Equals\(started,"true"/);
 });
