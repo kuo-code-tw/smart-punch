@@ -37,7 +37,7 @@ function unit(){
  s.change('admin',true,false,'');assert(a.hidden,'Missing token hides download button');
  s.change('admin',true);assert(!a.hidden,'Logged in admin sees download button');
  assert.equal(a.parentNode,s.toolbar,'Windows download must be moved into visible management toolbar');
- assert.match(a.href,/^https:\/\/github\.com\/kuo-code-tw\/smart-punch\/releases\/download\/port79-windows-lite-20261120\/Port79-Windows-Lite\.zip$/);
+ assert.equal(a.href,'https://github.com/kuo-code-tw/smart-punch/releases/latest/download/Port79-Windows-Lite.zip','Website always resolves the latest verified version');
  let prevented=false;s.listeners.get('link:click')({preventDefault(){prevented=true}});assert(!prevented,'Approved manager can click link');
  s.change('superadmin',true);assert(!a.hidden,'Logged in superadmin sees download button');
  const compact={querySelector:()=>null,insertBefore(element){element.parentNode=this;}};
@@ -53,7 +53,7 @@ assert(home.includes('id="p79WindowsDownloadLink"'),'Original authenticated sess
 assert(home.includes('id="logoutBtn"'),'Original logout button must remain');
 assert(home.includes('id="loginBox"'),'Original login box must remain');
 assert(home.includes('id="systems"'),'Original system page remains');
-assert(home.includes('assets/port79-windows-download.js?v=20261121-history-inline-v1'));
+assert(home.includes('assets/port79-windows-download.js?v=20261121-latest-release-v2'));
 assert(home.includes('assets/port79-home-compact-controls.css?v=20261121-v1'));
 assert(home.includes('assets/port79-home-compact-controls.js?v=20261121-v1'));
 assert(home.includes('p79-windows-download-link[hidden]{display:none!important}'));
