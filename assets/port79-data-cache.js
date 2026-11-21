@@ -998,6 +998,19 @@ async function downloadSystem(sys,onProgress,readOptions={}){
  }
  throw new Error('未知系統：'+sys);
 }
+// Successfully downloaded independent systems are persisted in IndexedDB, not
+// just in lastAllDownload's page-local three-minute memory.
+const SYSTEM_REUSE_MAX_AGE_MS=30*60*1000;
+async function reusableSystemDownload(sys,scopeAtStart){
+ if(!['leave','schedule','efficiency','hr','history'].includes(sys))return null;
+ const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
+ if(!snapshot||snapshot.data?.ok!==true||snapshot.displayScope!==scopeAtStart)return null;
+ if(Date.now()-Number(snapshot.savedAt)>SYSTEM_REUSE_MAX_AGE_MS)return null;
+ if(snapshot.system!==sys||snapshot.kind!=='system')return null;
+ // The current month is part of scoped, mutable efficiency results.
+ if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
+ return snapshot;
+}
 let lastAllDownload=null;
 async function downloadAll(onProgress,options={}){
  // Interactive Windows batches show usable independent system data before the
@@ -1007,6 +1020,7 @@ async function downloadAll(onProgress,options={}){
   ['attendance','workhours','leave','schedule','efficiency','hr','history'];
  const result=[];
  const readOptions=fastFirst?{interactive:true}:{};
+ const batchViewer=viewerKey(),batchToken=token(),batchScope=displayScope(),batchGas=gasUrl(),batchStamp=mutationStamp();
  // Within a short same-login retry, keep the six successful snapshots and fetch
  // only modules that actually failed. A new session/scope or later refresh starts fresh.
  const batchKey=[viewerKey(),token(),gasUrl(),displayScope(),mutationStamp()].join('|');
@@ -1018,7 +1032,19 @@ async function downloadAll(onProgress,options={}){
   if(prior?.some(row=>row.system===sys&&row.ok)){
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true,reused:true});
-   onProgress?.(sys,i,systems.length,'reused');
+   onProgress?.(sys,i,systems.length,'reused',null,'此系統先前已完成，沿用快取');
+   continue;
+  }
+  // Resume verified independent systems after navigation and app restart.
+  // A cache is valid only for this account, permission scope, endpoint and
+  // mutation generation; older snapshots are refreshed, not called current.
+  if(fastFirst&&await reusableSystemDownload(sys,batchScope)){
+   if(batchViewer!==viewerKey()||batchToken!==token()||
+      batchScope!==displayScope()||batchGas!==gasUrl()||batchStamp!==mutationStamp())
+    throw Object.assign(new Error('登入或管理權限已變更，停止沿用快取'),{code:'P79_SCOPE'});
+   consecutiveTransportFailures=0;
+   result.push({system:sys,ok:true,reused:true});
+   onProgress?.(sys,i,systems.length,'reused',null,'沿用本機已完成的雲端快取（30 分鐘內）');
    continue;
   }
   // Treat remaining untouched modules as skipped after an identity/scope/transport failure.
@@ -1032,7 +1058,20 @@ async function downloadAll(onProgress,options={}){
    if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`,{monthCompleted:mi,monthTotal:mt}),readOptions);
    else if(sys==='workhours'&&attendanceError)throw attendanceError;
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
-   else await downloadSystem(sys,null,readOptions);
+   else{
+    const payload=await downloadSystem(sys,null,readOptions);
+    if(fastFirst&&['leave','schedule','efficiency','hr','history'].includes(sys)&&payload?.ok===true){
+     if(batchViewer!==viewerKey()||batchToken!==token()||batchScope!==displayScope()||
+        batchGas!==gasUrl()||batchStamp!==mutationStamp())
+      throw Object.assign(new Error('登入權限變更，拒絕保存舊帳號資料'),{code:'P79_SCOPE'});
+     await saveSystemSnapshot(sys,payload);
+     // Efficiency is month-scoped; do not reuse it after the month changes.
+     if(sys==='efficiency'){
+      const row=await getSystemSnapshot(sys);
+      if(row){row.month=ymNow();await put(row);}
+     }
+    }
+   }
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true});onProgress?.(sys,i,systems.length,'done');
   }catch(e){
