@@ -17,7 +17,7 @@ assert(native.indexOf('await InvalidateStaleProgramHttpCache(')<native.indexOf('
  'Clear HTTP cache before navigating visible page');
 assert(native.includes('index.html?windowsBundle='),'Bundled homepage uses versioned URL');
 assert(native.includes('開啟目前程式資料夾'),'Allow users to distinguish a new ZIP from an old desktop shortcut');
-assert(native.includes('目前 Windows 程式包：'),'Show actual running ZIP version');
+assert(native.includes('目前程式版本：'),'Show the actual running numeric-only ZIP version');
 assert(updater.includes('baseBundleVersion=BundleVersion(site)'),'Staged patches are tied to original bundle');
 assert(updater.includes('!String.Equals(manifest.baseBundleVersion,installedBundle'),
  'Previously downloaded older website code cannot overwrite freshly extracted ZIP');
