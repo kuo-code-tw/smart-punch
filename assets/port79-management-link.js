@@ -71,7 +71,17 @@ function attach(options){
  let channel=null;try{if(typeof global.BroadcastChannel==='function')channel=new global.BroadcastChannel(KEY);}catch(_){}
  if(channel)channel.onmessage=e=>handle(e.data);
  const publish=event=>{if(disposed||!event)return;if(options.receiveOwn===true)handle(event);else invalidate();try{localStorage.setItem(KEY,JSON.stringify(event));}catch(_){};try{channel?.postMessage(event);}catch(_){};};
- const storage=e=>{if(e.key===KEY&&e.newValue)try{handle(JSON.parse(e.newValue));}catch(_){};};
+ const storage=e=>{
+  if(e.key===KEY&&e.newValue)try{handle(JSON.parse(e.newValue));}catch(_){}
+  // Confirmed ordinary punches use the attendance outbox's own ACK notice.
+  // Convert that notice into read-only invalidation for all dependent pages.
+  if(e.key==='port79_attendance_sync_notice_v1'&&e.newValue)try{
+   const notice=JSON.parse(e.newValue),at=Number(notice.at);
+   if(!Number.isFinite(at)||at<=0||Math.abs(Date.now()-at)>120000)return;
+   handle({v:1,id:'punch-'+String(at)+'-'+String(notice.id||'').slice(0,90),
+    at,topics:['attendance']});
+  }catch(_){}
+ };
  global.addEventListener('storage',storage);listeners.push(()=>global.removeEventListener('storage',storage));listeners.push(()=>channel?.close());
  function requestAction(input,init){
   const method=String(init?.method||(typeof input==='object'?input.method:'GET')||'GET').toUpperCase();if(method==='GET')return '';
@@ -125,7 +135,15 @@ g.P79ManagementAdapterFactory={makeAdapter};
 (function(){const path=location.pathname;const sys=path.includes('/attendance/')?'attendance-admin':path.includes('/work-hours/')?'workhours':path.includes('/aqc-efficiency/')?'efficiency':path.includes('/history-data/')?'history':path.includes('/schedule/')?'schedule':path.includes('/leave/')?'leave':path.includes('/hr/')?'hr':'';const registers={"attendance-admin":function(){(function(g){'use strict';
 g.P79ManagementContext={system:'attendance',identity:()=>currentPort79SsoToken(),gas:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),canRead:()=>canReadAdminCloudData()&&!document.getElementById('viewAdmin')?.classList.contains('hidden'),hasPendingChanges:()=>!!window.p79V5GetStatus?.().pending,
 scope:()=>({month:getRequestedAttendanceCloudMonth()}),readFresh:async read=>{const month=getRequestedAttendanceCloudMonth();const [d,roster]=await Promise.all([read('getAttendanceEmployeeMaster'),read('getScheduleDataSecure',{month})]);if(!Array.isArray(d.employees)||!Array.isArray(roster.leaveRecords)||!Array.isArray(roster.schedules))throw Error('管理資料不完整');return {ok:true,confirmedFresh:true,data:d,roster,month};},
-applySnapshot:async s=>{employees=mergeCloudEmployees(s.data.employees.map(normalizeEmployeeIdentifiers));leaveRecords=s.roster.leaveRecords;schedules=(schedules||[]).filter(r=>String(r.month||'')!==s.month).concat(s.roster.schedules);initDropdowns();renderAdminEmployeeTable();p79RenderOnlyVisibleAttendanceView();return true;}}
+applySnapshot:async(s,topics)=>{const token=currentPort79SsoToken(),month=s.month;employees=mergeCloudEmployees(s.data.employees.map(normalizeEmployeeIdentifiers));leaveRecords=s.roster.leaveRecords;schedules=(schedules||[]).filter(r=>String(r.month||'')!==month).concat(s.roster.schedules);initDropdowns();renderAdminEmployeeTable();p79RenderOnlyVisibleAttendanceView();
+ // Automatic manager notifications use the existing attendance month-sync
+ // owner. The manual full-refresh runner already performs this step itself.
+ if(Array.isArray(topics)&&topics.length){
+  if(typeof p79StartupAttendanceCurrentMonthSync!=='function'||
+     await p79StartupAttendanceCurrentMonthSync(false)!==true)return false;
+  if(currentPort79SsoToken()!==token||getRequestedAttendanceCloudMonth()!==month)return false;
+ }
+ return true;}}
 ;
 })(window);
 },"leave":function(){(function(g){'use strict';
@@ -263,7 +281,7 @@ let stopped=false,suspended=false,binding=null,timer=null,bootTimer=null,success
 const activeReads=new Set();
 // Attendance retains its dedicated refresh owner. Work-hours may refresh a confirmed
 // selected-month snapshot only when the adapter verifies no form or local write is pending.
-const manualOnly=context.system==='attendance';
+const manualOnly=context.system==='attendance'; // keep the existing single manual control; confirmed notifications may still auto-read
 const topicNames={people:'人員',organization:'部門職稱',permissions:'權限',leave:'請假',cover:'代班',schedule:'班表',overtime:'加班',attendance:'考勤',efficiency:'效率',history:'歷史資料'};
 function roleAllowed(){if(g.P79ManagementTestMode!==true&&g.P79ManagementOptimizationMode!==true)return false;try{const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');return s?.punchOnly!==true&&['admin','superadmin'].includes(String(s?.adminRole||s?.role||'').toLowerCase())}catch(_){return false;}}
 function openForm(){
@@ -309,8 +327,13 @@ function notify(state){
   successTimer=setTimeout(()=>{successTimer=null;if(!stopped&&!suspended&&!pendingState?.pending.length&&bar)bar.style.display='none';},3500);
   return;
  }
- b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜'+editingMessage():manualOnly?'｜請按上方「重新整理」核對':'｜準備同步');
- if(manualOnly)return;
+ b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜'+editingMessage():'｜準備自動核對');
+ if(manualOnly){
+  if(state.pending.length&&!state.running&&state.generation!==lastFailedGeneration&&!editing()&&document.visibilityState==='visible'){
+   clearTimeout(timer);timer=setTimeout(()=>void synchronize(),650);
+  }else if(state.pending.length&&!state.running&&state.generation!==lastFailedGeneration)scheduleReadIdleResume();
+  return;
+ }
  b.querySelector('button').disabled=state.running;
  if(state.pending.length&&!state.running&&state.generation!==lastFailedGeneration&&!editing()&&document.visibilityState==='visible'){
   clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);
@@ -337,21 +360,21 @@ function boot(){
  if(!context.canRead()){if(++attempts<30)bootTimer=setTimeout(boot,1000);return;}
  const adapter=factory.makeAdapter(context.system,{...context,isFormOpen:openForm,identity:()=>context.identity()+'|'+readScope()+'|'+viewRevision,readFresh:topics=>context.readFresh(readFresh,topics)});
  const backend=new URL(context.gas(),location.href);
- binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!manualOnly&&!editing()&&binding?.engine.status().generation!==lastFailedGeneration});
+ binding=api.attach({receiveOwn:g.P79ManagementTestMode===true,system:context.system,isManager:()=>roleAllowed()&&adapter.isManager(),isEditing:adapter.isEditing,refresh:adapter.refresh,notify,gasOrigin:backend.origin,gasPath:backend.pathname,channelKey:g.P79ManagementTestMode?'p79-management-test-v1':'p79-management-revision-v1',makeId:()=>context.system+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),autoRefreshSafe:()=>!editing()&&binding?.engine.status().generation!==lastFailedGeneration});
  g.P79ManagementPageBridge={binding,adapter,readFresh,synchronize};if(g.P79ManagementTestMode){const state=document.getElementById('p79StageState');if(state)state.textContent='管理員已驗證｜共用介面已接入｜驗收版 20261017.8';const controls=document.getElementById('p79StageControls');if(controls&&!document.getElementById('p79StagePeopleSignal')){const button=document.createElement('button');button.id='p79StagePeopleSignal';button.type='button';button.textContent='測試人資更新通知';button.onclick=()=>{const event={v:1,id:'people-stage-'+Date.now()+'-'+Math.random(),at:Date.now(),topics:['people','organization','permissions']};binding.engine.receive(event);binding.publish(event);if(state)state.textContent='人資測試通知已送出（沒有寫入正式資料）';};controls.appendChild(button);}}
 }
 const resume=(event)=>{if(stopped||suspended)return;
  // Normal clicks/focus events must never invent a cross-system mutation.
  // A real return from a long-hidden tab may check remote-device changes once.
  if(event?.type==='visibilitychange'&&document.visibilityState==='hidden'){hiddenAt=Date.now();return;}
- if(binding&&['leave','schedule','workhours'].includes(context.system)&&
+ if(binding&&['leave','schedule','workhours','history'].includes(context.system)&&
     event?.type==='visibilitychange'&&document.visibilityState==='visible'&&hiddenAt>0&&
     Date.now()-hiddenAt>=120000&&Date.now()-lastFocusCheck>=300000){
   lastFocusCheck=Date.now();
   binding.engine.receive({v:1,id:context.system+'-return-'+lastFocusCheck,at:lastFocusCheck,topics:['leave','cover','schedule','overtime']});
  }
  if(event?.type==='visibilitychange'&&document.visibilityState==='visible')hiddenAt=0;
- if(manualOnly){if(!binding)boot();return;}
+ if(manualOnly&&!binding){boot();return;}
  if(binding&&pendingState?.pending.length&&editing()){
   if(bar)bar.querySelector('[data-label]').textContent=editingMessage();
   if(binding.engine.status().generation!==lastFailedGeneration)scheduleReadIdleResume();return;
