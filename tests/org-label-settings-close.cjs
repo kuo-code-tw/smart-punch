@@ -8,14 +8,18 @@ for(const file of files.slice(0,2)){
 const html=fs.readFileSync(files[0],'utf8');
 function setup(){const nodes={btnSaveSystemSettings:{innerHTML:'儲存',disabled:false},cfgCompanyName:{value:'公司'},cfgLocationName:{value:'碼頭'},cfgLat:{value:'22.555526'},cfgLng:{value:'120.337733'},cfgRadius:{value:'100'},cfgGasUrl:{value:'https://example.invalid'},cfgAdminIds:{value:''}};let closed=0;
  const empty=()=>Array.from({length:5},()=>({name:'',lat:null,lng:null,radius:100}));
- const c={JSON,Number,String,TextEncoder,p79SystemSettingsSaveBusy:false,document:{getElementById:id=>nodes[id]},requireAdminAction:()=>true,canOpenAdminTab:t=>t==='records',switchAdminTab:()=>closed++,switchView:()=>closed++,showToast(){},p79SettingsSaveFeedback(){},sysConfig:{companyName:'公司',extraLocations:empty()},defaultConfig:{companyName:'公司'},getActiveGasUrl:()=> 'https://example.invalid',normalizeGasWebAppUrl:s=>s,isValidGasWebAppUrl:()=>true,normalizeExtraLocations:x=>x?.length?x:empty(),normalizeAdminIds:x=>x,saveConfig(){},applySysConfigUI(){},postToCloud:async()=>({ok:true})};vm.createContext(c);for(const name of ['closeSystemSettings','saveSystemSettings'])vm.runInContext(fn(html,name),c);return{c,nodes,closed:()=>closed};}
+ const c={JSON,Number,String,TextEncoder,p79SystemSettingsSaveBusy:false,document:{getElementById:id=>nodes[id]},requireAdminAction:()=>true,canOpenAdminTab:t=>t==='records',switchAdminTab:()=>closed++,switchView:()=>closed++,showToast(){},p79SettingsSaveFeedback(){},sysConfig:{companyName:'公司',extraLocations:empty()},defaultConfig:{companyName:'公司'},getActiveGasUrl:()=> 'https://example.invalid',normalizeGasWebAppUrl:s=>s,isValidGasWebAppUrl:()=>true,normalizeExtraLocations:x=>x?.length?x:empty(),normalizeAdminIds:x=>x,saveConfig(){},applySysConfigUI(){},
+ cloudDirectWriteBusy:0,removeQueuedCloudOperation(){},setCloudSyncStatus(){},
+ p79IsAbortLikeError:()=>false,setTimeout:fn=>{fn();return 0;},
+ performCloudRequest:async()=>({ok:true}),
+ p79ReadBackSavedGpsConfig:async()=>c.__readback!==false};vm.createContext(c);for(const name of ['closeSystemSettings','saveSystemSettings'])vm.runInContext(fn(html,name),c);return{c,nodes,closed:()=>closed};}
 (async()=>{
  let q=setup();await q.c.saveSystemSettings();assert.equal(q.closed(),1);assert(!q.c.p79SystemSettingsSaveBusy);assert(!q.nodes.btnSaveSystemSettings.disabled);
- q=setup();q.c.postToCloud=async()=>({ok:false,error:'busy'});assert.equal((await q.c.saveSystemSettings()).ok,false);assert.equal(q.closed(),0);
- q=setup();q.c.postToCloud=async()=>({ok:true,localOnly:true});await q.c.saveSystemSettings();assert.equal(q.closed(),0);
- q=setup();q.c.postToCloud=async()=>({ok:true,config:{extraLocations:[{name:'different'}]}});await q.c.saveSystemSettings();assert.equal(q.closed(),0);
+ q=setup();q.c.performCloudRequest=async()=>({ok:false,error:'busy'});q.c.__readback=false;assert.equal((await q.c.saveSystemSettings()).ok,false);assert.equal(q.closed(),0);
+ q=setup();q.c.performCloudRequest=async()=>({ok:true,localOnly:true});q.c.__readback=false;await q.c.saveSystemSettings();assert.equal(q.closed(),0,'local-only ACK cannot confirm authoritative GPS geofence');
+ q=setup();q.c.performCloudRequest=async()=>({ok:true,config:{extraLocations:[{name:'different'}]}});q.c.__readback=false;await q.c.saveSystemSettings();assert.equal(q.closed(),0,'cloud ACK cannot override mismatched verified GPS readback');
  q=setup();q.nodes.cfgLat.value='invalid';await q.c.saveSystemSettings();assert.equal(q.closed(),0);
- q=setup();let resolve;q.c.postToCloud=()=>new Promise(r=>resolve=r);const pending=q.c.saveSystemSettings();q.c.closeSystemSettings();assert.equal(q.closed(),0);resolve({ok:true});await pending;assert.equal(q.closed(),1);
+ q=setup();let resolve;q.c.performCloudRequest=()=>new Promise(r=>resolve=r);const pending=q.c.saveSystemSettings();q.c.closeSystemSettings();assert.equal(q.closed(),0);resolve({ok:true});await pending;assert.equal(q.closed(),1);
  q=setup();q.c.closeSystemSettings();assert.equal(q.closed(),1);
  assert.equal((html.match(/onclick="closeSystemSettings\(\)"/g)||[]).length,2);
  const schedule=fs.readFileSync(files[2],'utf8'),quick=schedule.slice(schedule.indexOf('<section id="p79ScheduleQuickBar"'),schedule.indexOf('<!-- 圖片二：'));
