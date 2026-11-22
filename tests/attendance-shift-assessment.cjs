@@ -30,7 +30,18 @@ console.log(JSON.stringify({passed,failed:0}));
 
 const inverted=[{empId:'E1',clockIn:{empId:'E1',timeStr:'2026/10/09 23:36'}},{empId:'E1',clockOut:{empId:'E1',timeStr:'2026/10/09 07:48'}}];
 const marked=c.p79MarkAttendanceDateConflicts(inverted);
-assert(marked.every(r=>c.p79AttendanceRowAssessment(r).status==='補卡日期待核對'));
+// An old, reversed punch pair is a real missing-punch exception, not an
+// indefinitely pending same-day correction. Only a recent lone check-in may
+// remain pending while the 24-hour matching window is open.
+assert(marked.every(r=>r.dateConflict===true));
+assert(marked.every(r=>{
+ const result=c.p79AttendanceRowAssessment(r);
+ return result.kind==='ABNORMAL'
+  && ['缺少簽到','缺少簽退'].includes(result.status)
+  && result.reasons.some(reason=>reason.includes('同日有逆序打卡'));
+}));
+assert.equal(c.p79AttendanceRowAssessment(marked[0],c.getAttendanceTimestamp(inverted[0].clockIn)+60*1000).status,'補卡日期待核對');
+assert.equal(c.p79AttendanceRowAssessment(marked[1],c.getAttendanceTimestamp(inverted[0].clockIn)+60*1000).status,'缺少簽到');
 assert(!inverted.some(r=>r.dateConflict),'source records must not mutate');
 assert.equal(marked[1].clockOut.timeStr,'2026/10/09 07:48');
 const unrelated=[inverted[0],{empId:'E2',clockOut:{empId:'E2',timeStr:'2026/10/09 07:48'}}];assert(!c.p79MarkAttendanceDateConflicts(unrelated).some(r=>r.dateConflict));
