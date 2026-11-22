@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('work-hours/index.html','utf8');
 const start=html.indexOf('        function p79OvertimeDisplaySummary(rows,officialSummary){');
-const end=html.indexOf('        function renderOvertimeStats() {',start);
+const end=html.indexOf('\n        }',start)+10;
 assert(start>=0&&end>start,'displayed overtime aggregation helper exists');
 const c={Map,Set,Number,String,Array,Math};vm.createContext(c);
 vm.runInContext(html.slice(start,end),c);
@@ -37,6 +37,6 @@ assert.equal(mixed.totals.converted,12.70);
 assert.equal(mixed.totals.missing,2);
 assert(html.includes('>加班時數（未換算）</div>')&&html.includes('>換算加班時數</div>'),'card wording no longer implies missing IDs mean zero work');
 assert(html.includes("'待換算（'+totals.missing+'筆）'"),'missing conversions show pending rather than false 0');
-assert(html.includes('p79OvertimeDisplaySummary(jobTitleRows,p79BuildOvertimeJobTitleSummary(jobTitleRows,staff))'));
+assert(html.includes('p79OvertimeDisplaySummary(completedJobRows,p79BuildOvertimeJobTitleSummary(completedJobRows,staff))'));
 for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
 console.log('PASS displayed 11-month 8h29 in raw totals, conversion missing rather than fake 0, role sums and filtered rows; October declarations unchanged');

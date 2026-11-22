@@ -3,7 +3,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const page=fs.readFileSync('leave/index.html','utf8');
 const daily=fs.readFileSync('assets/port79-leave-daily-simple.js','utf8');
 const a=page.indexOf('function p79LaunchLeaveOvertimeAfterSave(){');
-const b=page.indexOf('\nasync function p79OpenLeaveOvertimeHandoff(){',a);
+const b=page.indexOf('\nasync function p79OpenLeaveOvertimeHandoff(autoContinue=false){',a);
 assert(a>=0&&b>a,'auto-open helper exists');
 const code=page.slice(a,b);
 const statuses=[],handoff={entries:[{empId:'E2',leaveId:'L1',date:'2026-11-06'}]},calls=[];
