@@ -8,12 +8,13 @@ const requirements={
   'schedule/index.html':['匯入排班','匯出排班','匯出排班名冊'],
   'leave/index.html':['匯入請假可休天數','匯出請假可休天數'],
   'hr/index.html':['匯入人資名冊','匯出人資名冊'],
-  'aqc-efficiency/index.html':['匯入船舶資料','匯出船舶資料','匯入船舶月報'],
+  'aqc-efficiency/index.html':['匯入船舶資料','匯出船舶資料'],
   'history-data/index.html':['匯入考勤歷史核對','匯出考勤歷史']
 };
 for(const [path,expected] of Object.entries(requirements)){
   const html=fs.readFileSync(path,'utf8');
   for(const label of expected)assert(html.includes(label),path+' 缺少：'+label);
+  if(path==='aqc-efficiency/index.html')assert(/id="excelImport"[^>]*multiple[^>]*onchange="importExcelFiles\(this\.files\)/.test(html),'船舶資料匯入仍支援一次上傳多份 WORKING REPORT／月報 Excel');
   const displayLabels=[...html.matchAll(/<(?:button|label|a)\b[^>]*>([\s\S]{0,450}?)<\/(?:button|label|a)>/gi)]
     .map(m=>m[1].replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim())
     .filter(x=>/匯入|匯出|excel/i.test(x));
