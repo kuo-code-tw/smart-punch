@@ -45,7 +45,8 @@
     const items = collectMissingPunches({ rows, confirmedIds, nowMs, parseTime, formatTime });
     const existing = doc?.getElementById?.('p79MissingPunchNoticeDialog');
     if (!items.length) {
-      if (existing && existing.dataset.employee === employee) existing.remove();
+      // Identity may have changed; never leave another employee's notice visible.
+      if (existing) existing.remove();
       showing = '';
       return { shown: false, items };
     }
