@@ -1,15 +1,14 @@
 'use strict';
-// Generate a candidate GAS patch only. Never deploy or write attendance from this script.
+// Generate a GAS candidate patch for isolated deployment only; no cloud writes.
 const fs=require('node:fs');
-
-function replaceOnce(text,needle,replacement){
+const path=require('node:path');
+function replaceOnce(text,needle,replacement) {
   const at=text.indexOf(needle);
   if(at<0||text.indexOf(needle,at+needle.length)>=0)
     throw Error('Unexpected GAS source layout: '+needle.slice(0,85));
   return text.slice(0,at)+replacement+text.slice(at+needle.length);
 }
-
-function apply(source){
+function apply(source) {
   if(!source.includes('function p79CheckDuplicatePunchGuard_(')||
      !source.includes('function p79RepairStalePunchGuard_(')||
      !source.includes('function fixtureEndMarker_('))
@@ -18,11 +17,20 @@ function apply(source){
     throw Error('Stale-open candidate already applied');
   const before="  if (normalizeText_(state.type) === type) {\n    const label";
   const after=
-    "  // A *confirmed* old, unclosed IN is an exception, not a lifetime login ban.\n"+
-    "  // Never manufacture a sign-out, and never waive the same-day duplicate guard.\n"+
+    "  // A confirmed old unclosed IN must not become a lifetime punch ban.\n"+
+    "  // Do not manufacture a sign-out or waive today's duplicate guard.\n"+
     "  if (type === 'IN' && normalizeText_(state.type) === 'IN' && ss) {\n"+
     "    const recovery=p79AllowNextShiftAfterOldOpenIn_(ss,record,state);\n"+
     "    if (recovery.ok) return recovery;\n"+
     "  }\n\n"+before;
   let result=replaceOnce(source,before,after);
-  const helper=String.raw
+  const helper=fs.readFileSync(path.join(__dirname,'../backend/punch-stale-open-candidate.gs'),'utf8').trim();
+  result=replaceOnce(result,'\nfunction fixtureEndMarker_() {}','\n'+helper+'\n\nfunction fixtureEndMarker_() {}');
+  return result;
+}
+module.exports={apply};
+if(require.main===module) {
+  const [input,output]=process.argv.slice(2);
+  if(!input||!output)throw Error('Usage: node apply-gas-stale-open-checkin.cjs <isolated-input.gs> <candidate-output.gs>');
+  fs.writeFileSync(output,apply(fs.readFileSync(input,'utf8')));
+}
