@@ -24,6 +24,7 @@ const ctx={console,Number,String,Array,Set,Map,Math,Date,
  p79OvertimeCalculationCache:null,p79WorkOvertimeMonths:new Map(),p79MonthlyRestDraftsByMonth:new Map(),
  p79OvertimePlannedDisplayedRows:[],p79PlannedBulkSelected:new Set(),p79PlannedBulkBusy:false,records:[],currentEmp:{empId:'ADMIN'},
  p79ResolvePlannedOvertimePeriod:()=>null,
+ p79OvertimeCoverDateWarning:()=>null,
  // Dedicated unit/month filtering uses fixture departments; batch controls and
  // master-roster resolution are tested in their own regressions.
  p79OvertimeUnitForRow:row=>row.dept,
