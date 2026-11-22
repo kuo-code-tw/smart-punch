@@ -28,7 +28,7 @@ const dialog={
  showModal(){if(this.open)throw Error('already open');this.open=true;showCount++;},
  close(){if(!this.open)throw Error('already closed');this.open=false;closeCount++;}
 };
-const ctx={document:{getElementById:id=>id==='p79OvertimePlannedDialog'?dialog:id==='p79OvertimePlannedToggle'?button:null}};
+const ctx={p79PlannedBulkBusy:false,p79PlannedBulkSelected:new Set(),document:{getElementById:id=>id==='p79OvertimePlannedDialog'?dialog:id==='p79OvertimePlannedToggle'?button:null}};
 vm.createContext(ctx);vm.runInContext(code,ctx);
 ctx.p79ToggleOvertimePlanned();
 assert.equal(dialog.open,true,'toolbar opens centered native modal');
