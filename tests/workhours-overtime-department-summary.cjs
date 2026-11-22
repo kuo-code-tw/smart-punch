@@ -60,7 +60,7 @@ assert(html.includes("if(!p79WorkOvertimeOfficialReport(meta.overtimeReport,meta
 for(const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
 const displayStart=html.indexOf('const pendingPunchOvertime='),displayEnd=html.indexOf('const clockInCell =',displayStart);
 assert(displayStart>=0&&displayEnd>displayStart,'pending overtime display must be computed for each visible row');
-const pendingLabel=new Function('row','formatDurationMinutes',html.slice(displayStart,displayEnd)+';return pendingPunchOvertime;');
+const pendingLabel=new Function('row','formatDurationMinutes','history',html.slice(displayStart,displayEnd)+';return pendingPunchOvertime;');
 const duration=n=>Math.floor(n/60)+' 小時 '+n%60+' 分';
 const pending={reportVerified:false,planned:false,timeCheckRequired:false,overtimeMinutes:149,specialOvertimeMinutes:0};
 assert.match(pendingLabel(pending,duration),/打卡估算加班 2 小時 29 分（尚未申報，不計正式合計）/);
