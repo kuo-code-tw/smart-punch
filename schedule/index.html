@@ -7588,25 +7588,36 @@ async function p79SaveScheduleOvertimeDraft(draft){
         }}
       });return p79ScheduleRestEvidenceClient;
     }
+    // Cross-tab storage events are not fired in the tab that performed the
+    // official write. Check the notice again on focus/resume (BFCache) too.
+    let p79LastAttendanceNotice='';
+    function p79ScheduleApplyAttendanceNotice(raw) {
+      if(!raw||raw===p79LastAttendanceNotice)return false;
+      try {
+        const notice=JSON.parse(raw),at=Number(notice?.at),now=Date.now();
+        if(!Number.isFinite(at)||at<=0||at>now+10000||now-at>120000)return false;
+        const month=currentScheduleMonthKey();
+        if(!currentPort79SsoToken()||!/^\d{4}-\d{2}$/.test(month)||!employees.length)return false;
+        p79LastAttendanceNotice=raw;
+        // Invalidate cached official punch reads, including the adjacent
+        // month needed to attach a night-shift clock-out to its workday.
+        void p79ScheduleRestClient().invalidate(month);
+        return true;
+      }catch(error){console.warn('考勤異動自動核對通知無效',error);return false;}
+    }
     function p79RefreshScheduleRestEvidence() {
       const month=currentScheduleMonthKey();
       if(!currentPort79SsoToken()||!/^\d{4}-\d{2}$/.test(month)||!employees.length)return;
-      // 出勤核對獨立於班表同步；編輯鎖或尚未儲存的班表不應阻止晚班結束後核對。
+      // The same-window attendance editor may have written while this page
+      // was hidden. Regular refreshIfStale has a 60s audit freshness guard.
+      let notice='';
+      try{notice=localStorage.getItem('port79_attendance_sync_notice_v1')||'';}catch(error){}
+      if(p79ScheduleApplyAttendanceNotice(notice))return;
       return p79ScheduleRestClient().refreshIfStale(month);
     }
-    // A successful official attendance write in another tab sends this same-origin
-    // notice. Check the full active-month roster automatically; do not alter the
-    // original saved shifts or require a manual reconciliation button.
     window.addEventListener('storage',event=>{
-      if(event.key!=='port79_attendance_sync_notice_v1'||!event.newValue)return;
-      try{
-        const notice=JSON.parse(event.newValue),at=Number(notice?.at);
-        if(!Number.isFinite(at)||at<=0||Math.abs(Date.now()-at)>120000)return;
-        const month=currentScheduleMonthKey();
-        if(!currentPort79SsoToken()||!/^\d{4}-\d{2}$/.test(month)||!employees.length)return;
-        // Also clear cached adjacent-month reads for cross-midnight shifts.
-        void p79ScheduleRestClient().invalidate(month);
-      }catch(error){console.warn('考勤異動自動核對通知無效',error);}
+      if(event.key==='port79_attendance_sync_notice_v1'&&event.newValue)
+        p79ScheduleApplyAttendanceNotice(event.newValue);
     });
     function p79ScheduleRestBalance(emp,month,allocated=null) {
       const leaveDates=p79ScheduleRestLeaveDates(month,emp.id);
