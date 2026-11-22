@@ -61,7 +61,7 @@ function p79OrgComparePeople(a,b){
   if(left===right)continue;
   if(!left)return 1; // 未設定的歸屬放在已設定的同層項目之後
   if(!right)return -1;
-  const order=left.localeCompare(right,'zh-Hant',{numeric:true});
+  const order=left.localeCompare(right,'zh-TW-u-co-zhuyin',{numeric:true});
   if(order)return order;
  }
  return String(a?.empId||'').localeCompare(String(b?.empId||''),'zh-Hant',{numeric:true});
