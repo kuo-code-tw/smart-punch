@@ -2,7 +2,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const month='2026-10',date=n=>month+'-'+String(n).padStart(2,'0');
 const html=fs.readFileSync('schedule/index.html','utf8');
-const from=html.indexOf('    function p79ScheduleRestCountCells(');
+const from=html.indexOf('    function p79ScheduleSpecialSummaryColumns(');
 const to=html.indexOf('    function p79RefreshScheduleRestCounts(',from);
 assert(from>=0&&to>from,'official roster summary renderer must be present');
 let ledger={quota:{例:4,休:5,國:2},remaining:{例:0,休:1,國:1},reported:{例:0,休:0,國:0},reserved:{例:0,休:0,國:0},ledger:[]};
@@ -12,7 +12,8 @@ const ctx={
  p79ScheduleRestBalance:()=>ledger,p79ScheduleTyphoonDays:()=>[],
  scheduleEscapeHtml:x=>String(x||'')
 };
-vm.createContext(ctx);vm.runInContext(html.slice(from,to),ctx);
+vm.createContext(ctx);Object.assign(ctx,{window:ctx,employees:[],monthlyScheduleData:{},monthlyScheduleMeta:{},p79TyphoonDates:()=>[]});
+vm.runInContext(html.slice(from,to),ctx);
 const selected={例:[date(1),date(2),date(3),date(4)],休:[date(5),date(6),date(7)],國:[date(10),date(25)]};
 const render=(person=0,typhoon=[])=>ctx.p79ScheduleRestCountCells({id:'E'+person,name:person===1?'胡毓麒':'測試員工'+person},month,{},typhoon,[],selected);
 const span=(html,category)=>html.match(new RegExp('data-rest-category="'+category+'"[^>]*><span>([^<]+)<\/span>'))?.[1];

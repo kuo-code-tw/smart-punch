@@ -8029,7 +8029,6 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const categoryDates=[...new Set([...shownDates,...reportedDates,...ledgerReportDates,...formalMetaDates])]
           .filter(day=>day.startsWith(month+'-')&&!protectedTyphoonSet.has(day)).sort();
         const extraReportedDates=categoryDates.filter(day=>!shownDates.includes(day));
-        const displayDates=categoryDates.map(day=>day.slice(-2));
         const limit=Number.isFinite(ledger?.quota?.[category])?ledger.quota[category]:quota[category];
         // Do not count stale saved/report labels as national leave when quota=0.
         // Retain those original reports and expose the discrepancy in the tooltip.
@@ -8038,16 +8037,18 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const verified=Number.isFinite(ledger?.remaining?.[category]);
         // Counter and remainder share the actual date cells for this one render.
         // Official reports on OTHER dates consume quota once without double counting.
-        const rest=Math.max(0,limit-count),extra=Math.max(0,count-limit);
+        const rest=Math.max(0,limit-count);
         const officialRemaining=verified?Math.max(0,ledger.remaining[category]):null;
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
-        // Numbers only: actual allocated days / still available days.
-        const invalidNote=invalidNationalCount?
-          ' title="'+scheduleEscapeHtml('本月國定假日額度0；仍有'+invalidNationalCount+'筆歷史國假標記或正式申報須管理員核對。原始報單未修改。')+'"':'';
-        // Keep each quota cell at the original one-line height. Genuine
-        // over-quota days stay in the numeric count and manager audit, without
-        // a second-row "超休" label or a taller calendar row.
-        return '<td data-rest-category="'+category+'"'+invalidNote+
+        const details=[];
+        if(invalidNationalCount)
+          details.push('本月國定假日額度0；仍有'+invalidNationalCount+'筆歷史國假標記或正式申報須管理員核對。原始報單未修改。');
+        if(extraReportedDates.length)
+          details.push('正式已報 '+extraReportedDates.length+' 天｜雲端已確認'+category+'加班：'+extraReportedDates.join('、'));
+        if(!verified)details.push('雲端申報額度待核');
+        else if(officialRemaining!==rest)details.push('班格與正式帳本差異須核對：正式剩餘 '+officialRemaining+' 天');
+        const title=details.length?' title="'+scheduleEscapeHtml(details.join('；'))+'"':'';
+        return '<td data-rest-category="'+category+'"'+title+
           ' class="p79-rest-count-compact text-center font-bold border-r text-xs '+color+
           '"><span>'+count+'/'+rest+'</span></td>';
       }).join('');
