@@ -28,12 +28,45 @@ const client=ctx.window.P79ScheduleRestEvidence.create({
  assert.equal(evidence.actualShifts['E1|2026-10-25'],'中','Sunday cross-midnight OUT yields Sunday work shift');
  assert.equal(evidence.actualShifts['E2|2026-10-24'],undefined,'lone punch never auto-assigns a shift');
  assert.equal(ctx.window.P79RestAttendance.state({attendanceEvidence:evidence},'E1','2026-10-24'),'worked');
- assert(html.includes("const shiftVal=noPunchRest?'休':actualShift||((verifiedRestAttendance||pairedWork&&rosterShift==='待排班')?'已出勤':rosterShift);"),'complete paired short work displays 已出勤');
- assert(html.includes("visibleRestKind:(ctx.typhoonDays.has(dayStr)||rosterShift==='颱')?''")&&
-  html.includes(':p79VisibleRestKind(shownShift,visibleSubstituteLabel)};')&&
-  html.includes("return /^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';"),
-  'actual early/middle/night display is not classified as used 例休國');
- assert(html.includes('punchShifts?.[String(emp.id).trim().toUpperCase()+\'|\'+date]'),'summary skips proven work as taken rest');
+ const display = html.slice(html.indexOf('    function p79ScheduleDisplayDay('),
+   html.indexOf('    // On-demand full staff check'));
+ Object.assign(ctx, {
+  monthlyScheduleData: Object.fromEntries(schedule.map(row => [row.empId, row.schedule])),
+  monthlyScheduleMeta: {},
+  p79EmployeeDateEligible: () => true,
+  approvedLeaveForEmployee: () => null,
+  p79LeaveCoverOnDay: () => [],
+  p79ScheduleHasVerifiedPunch: (id, day, source) => source.days?.[id+'|'+day]?.state === 'worked',
+  p79ScheduleNoPunchRest: () => false,
+  scheduleTaipeiTodayKey: () => '2026-10-27',
+  p79CoverageShift: () => '',
+  p79SubstituteShiftLabel: () => '',
+  p79ScheduleSpecialNoPunchCode: () => '',
+ });
+ const restKind = html.slice(html.indexOf('    function p79VisibleRestKind('),
+   html.indexOf('    function p79ScheduleDisplayDay('));
+ vm.runInContext(restKind + display, ctx);
+ const context = {
+  automaticRestMeta: {}, restBalance: {}, typhoonDays: new Set(), electionDays: new Set(),
+  attendanceSnapshot: {attendanceEvidence: evidence}, attendanceEvidence: evidence,
+ };
+ for (const [person, day, code] of [
+  [people[0], '2026-10-24', '早'],
+  [people[0], '2026-10-25', '中'],
+  [people[1], '2026-10-24', '打卡待核'],
+ ]) {
+  const cell = ctx.p79ScheduleDisplayDay(person, day, context);
+  assert.equal(cell.visibleCode, code, person.id+' '+day);
+  assert.equal(cell.visibleRestKind, '', 'attendance must exclude the date from visible rest counts');
+  assert.equal(ctx.monthlyScheduleData[person.id][day], '休', 'display must preserve the stored roster');
+ }
+ const noShiftEvidence = {...evidence, actualShifts: {}};
+ const shortWork = ctx.p79ScheduleDisplayDay(people[0], '2026-10-24',
+  {...context, attendanceEvidence: noShiftEvidence, attendanceSnapshot: {attendanceEvidence: noShiftEvidence}});
+ assert.equal(shortWork.visibleCode, '已出勤', 'paired attendance with no inferred shift');
+ const unverified = ctx.p79ScheduleDisplayDay(people[1], '2026-10-24',
+  {...context, attendanceEvidence: {complete: false}, attendanceSnapshot: {}});
+ assert.equal(unverified.visibleCode, '休', 'unfinished attendance reads must preserve the roster display');
  assert(html.includes('allowUnmarked:true'),'legacy incorrect roster fixed automatically, not by manual button');
  assert(!html.includes('補卡後修正排班'),'manual button removed');
  assert(!html.includes('p79RecheckCorrectedAttendance'),'manual workflow removed');
