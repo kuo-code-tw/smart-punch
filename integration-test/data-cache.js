@@ -117,14 +117,39 @@ function validDownloadGasUrl(value){try{const u=new URL(String(value||'').trim()
 function ymNow(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
 function openDb(){
  if(dbPromise)return dbPromise;
- dbPromise=new Promise((resolve,reject)=>{
-  const r=indexedDB.open(DB_NAME,DB_VERSION);
-  r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:'key'});if(!db.objectStoreNames.contains(SETTINGS))db.createObjectStore(SETTINGS,{keyPath:'key'})};
-  r.onblocked=()=>{setProgress('請關閉其他舊版系統分頁，再重新開啟。')};
-  r.onsuccess=()=>{const db=r.result;db.onversionchange=()=>{try{db.close()}catch(e){}dbPromise=null};resolve(db)};
-  r.onerror=()=>{dbPromise=null;reject(r.error)};
+ let request;
+ try{request=indexedDB.open(DB_NAME,DB_VERSION)}catch(error){return Promise.reject(error)}
+ let timedOut=false;
+ const pending=new Promise((resolve,reject)=>{
+  const deadline=setTimeout(()=>{
+   timedOut=true;
+   if(dbPromise===pending)dbPromise=null;
+   reject(new Error('本機快取資料庫開啟逾時'));
+  },4000);
+  request.onupgradeneeded=()=>{
+   const db=request.result;
+   if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:'key'});
+   if(!db.objectStoreNames.contains(SETTINGS))db.createObjectStore(SETTINGS,{keyPath:'key'});
+  };
+  request.onblocked=()=>{if(!timedOut)setProgress('請關閉其他舊版系統分頁，再重新開啟。')};
+  request.onsuccess=()=>{
+   clearTimeout(deadline);
+   const db=request.result;
+   if(timedOut){db.close();return}
+   db.onversionchange=()=>{
+    try{db.close()}catch(_){}
+    if(dbPromise===pending)dbPromise=null;
+   };
+   resolve(db);
+  };
+  request.onerror=()=>{
+   clearTimeout(deadline);
+   if(dbPromise===pending)dbPromise=null;
+   reject(request.error);
+  };
  });
- return dbPromise;
+ dbPromise=pending;
+ return pending;
 }
 function displayScope(){
  try{const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');
@@ -794,7 +819,14 @@ function buildUrl(action,params={}){
  }
  u.searchParams.set('_',Date.now());return u.toString();
 }
-async function fetchJson(action,params={},sys=''){
+async function fetchJson(action,params={},sys='',readOptions={}){
+ // Only explicit interactive batches use the short bound; scheduled reads
+ // and business operations retain the original 60-second timeout.
+ const timeoutMs=readOptions?.interactive===true?30000:DOWNLOAD_TIMEOUT_MS;
+ // Startup must not hold the whole desktop session on a slow historical
+ // catalog. A real failure is still reported as incomplete, never success.
+ const boundedTimeoutMs=action==='getHistoricalDataCatalog'&&readOptions?.resumeExisting===true?
+  12000:timeoutMs;
  const viewer=viewerKey(),credential=token();
  if(!credential)throw Object.assign(new Error('請先由首頁重新登入，再下載資料'),{code:'P79_AUTH'});
  let url=buildUrl(action,params),lastError;
@@ -802,9 +834,9 @@ async function fetchJson(action,params={},sys=''){
  if(!validDownloadGasUrl(primary.toString()))throw new Error('雲端網址設定不正確，請由首頁重新進入系統');
  const labels={getAttendanceMonths:'考勤月份清單',getAttendanceEmployeeMaster:'員工主檔',getAttendanceMonthData:'考勤月份資料',getAttendanceMainDirect:'考勤主表',getLeaveData:'請假',getScheduleDataSecure:'排班',gcGetData:'效率',hrGetEmployees:'人資',getHistoricalDataCatalog:'歷史資料',historyGetMonthData:'歷史月份資料'};
  const label=labels[action]||'雲端資料';
- for(let attempt=0;attempt<2;attempt++){
+ for(let attempt=0;attempt<4;attempt++){
   const c=new AbortController();let timedOut=false,data;
-  const to=setTimeout(()=>{timedOut=true;c.abort()},DOWNLOAD_TIMEOUT_MS);
+  const to=setTimeout(()=>{timedOut=true;c.abort()},boundedTimeoutMs);
   try{
    if(viewerKey()!==viewer||token()!==credential)throw Object.assign(new Error('登入狀態已變更，請重新開啟快取中心'),{code:'P79_AUTH'});
    const r=await rawFetch(url,{method:'GET',cache:'no-store',redirect:'follow',signal:c.signal});
@@ -815,14 +847,24 @@ async function fetchJson(action,params={},sys=''){
    if(data.ok===false||data.retryable){
     const message=String(data.error||'雲端暫時無法讀取');
     const auth=/請.*登入|登入.*(?:逾時|過期|不存在|失效|重新)|(?:token|憑證).*(?:失效|過期|不存在)/i.test(message);
-    throw Object.assign(new Error(label+'：'+message),{code:auth?'P79_AUTH':'P79_CLOUD',retryable:!auth&&data.retryable===true});
+    // A transient server lock may be returned without retryable:true by older deployments.
+    // GET requests are read-only and safe to retry; never retry auth/permission failures.
+    const busyRead=/雲端目前正在(?:更新|處理)|資料(?:更新中|處理中)|cloud (?:busy|updating)/i.test(message);
+    const permission=/沒有.*權限|無權|禁止|拒絕|未授權|permission denied/i.test(message);
+    const delay=Number(data.retryAfterMs);
+    throw Object.assign(new Error(label+'：'+message),{
+     code:auth?'P79_AUTH':'P79_CLOUD',
+     retryable:!auth&&!permission&&(data.retryable===true||busyRead),
+     busyRetry:!auth&&!permission&&busyRead,
+     retryAfterMs:Number.isFinite(delay)&&delay>0?Math.min(5000,Math.max(500,delay)):0
+    });
    }
    if(viewerKey()!==viewer||token()!==credential)throw Object.assign(new Error('登入狀態已變更，未保存其他帳號資料'),{code:'P79_AUTH'});
   }catch(error){
-   if(timedOut||error?.name==='AbortError')error=Object.assign(new Error(label+'：雲端讀取逾時（60 秒），請稍後重試'),{retryable:true,code:'P79_TRANSPORT'});
+   if(timedOut||error?.name==='AbortError')error=Object.assign(new Error(label+'：雲端讀取逾時（'+Math.round(boundedTimeoutMs/1000)+' 秒），請稍後重試'),{retryable:true,code:'P79_TRANSPORT'});
    else if(error?.name==='TypeError')error=Object.assign(new Error(label+'：無法連接雲端，請檢查網路'),{retryable:true,code:'P79_TRANSPORT'});
    lastError=error;
-   if(attempt===1||!error.retryable)throw error;
+   if(!error.retryable||attempt===3||(attempt>=1&&!error.busyRetry))throw error;
    // Only safe reads are retried. A retired deployment may recover through the
    // same official /exec URL used by the system entrance; never change access.
    const next=new URL(url);
@@ -830,7 +872,11 @@ async function fetchJson(action,params={},sys=''){
     next.protocol=canonical.protocol;next.host=canonical.host;next.pathname=canonical.pathname;
    }
    next.searchParams.set('_',String(Date.now()+attempt+1));url=next.toString();
-   setProgress(label+'連線未完成，正在重試一次…');
+   if(error.busyRetry){
+    const waitMs=error.retryAfterMs||[750,1500,2500][attempt];
+    setProgress(label+'：雲端更新中，等待後自動重試（'+(attempt+2)+'/4），已成功的本機資料不會清除…');
+    await new Promise(resolve=>setTimeout(resolve,waitMs));
+   }else setProgress(label+'連線未完成，正在重試一次…');
    continue;
   }finally{clearTimeout(to)}
   readVersions.set(action,(readVersions.get(action)||0)+1);
@@ -862,27 +908,69 @@ async function applyAttendanceSnapshotToPage(snapshot,showAll=true){
  return null;
 }
 const attendanceDownloads=new Map();
-function downloadAttendanceDatabase(targetSys='attendance',onProgress){
+function downloadAttendanceDatabase(targetSys='attendance',onProgress,readOptions={}){
  const key=viewerKey()+'|'+token()+'|'+gasUrl();
  if(attendanceDownloads.has(key))return attendanceDownloads.get(key);
- const pending=readAttendanceDatabase(targetSys,onProgress).finally(()=>{if(attendanceDownloads.get(key)===pending)attendanceDownloads.delete(key)});
+ const pending=readAttendanceDatabase(targetSys,onProgress,readOptions).finally(()=>{if(attendanceDownloads.get(key)===pending)attendanceDownloads.delete(key)});
  attendanceDownloads.set(key,pending);return pending;
 }
-async function readAttendanceDatabase(targetSys='attendance',onProgress){
+function verifyAttendanceDownloadContext(expected){
+ if(expected.token!==token()||expected.viewer!==viewerKey())
+  throw Object.assign(new Error('登入帳號或憑證確實已變更；未保存舊帳號的考勤資料，請重新登入'),{code:'P79_AUTH'});
+ if(expected.scope!==displayScope())
+  throw Object.assign(new Error('管理權限範圍在下載期間已更新；為避免不同範圍資料混用，請重新核對後再下載'),{code:'P79_SCOPE'});
+ if(expected.stamp!==mutationStamp())
+  throw Object.assign(new Error('考勤下載期間偵測到其他資料修改，已保留原快取並停止儲存舊版本；請重新下載考勤'),{code:'P79_MUTATION'});
+}
+async function readAttendanceDatabase(targetSys='attendance',onProgress,readOptions={}){
  const t=token(),viewer=viewerKey(),scope=displayScope(),stamp=mutationStamp();
+ const expected={token:t,viewer,scope,stamp};
  if(!t)throw new Error('找不到登入 Token，請重新由首頁登入');
  const previous=await getDisplaySnapshot('attendance').catch(()=>null);
- const before=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
+ const before=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
  onProgress?.('attendance',0,1,'catalog','讀取月份清單');
- const catalog=await fetchJson('getAttendanceMonths',{token:t},'');
+ const catalog=await fetchJson('getAttendanceMonths',{token:t},'',readOptions);
  if(!Array.isArray(catalog?.months))throw new Error('考勤月份清單格式不正確，請重新下載');
  const months=[...new Set((Array.isArray(catalog?.months)?catalog.months:[]).filter(m=>/^\d{4}-\d{2}$/.test(String(m))))].sort();
  if(!months.length)months.push(ymNow());
 
  onProgress?.('attendance',0,months.length+1,'master','讀取員工主檔');
- const master=await fetchJson('getAttendanceEmployeeMaster',{token:t},'');
+ const master=await fetchJson('getAttendanceEmployeeMaster',{token:t},'',readOptions);
  if(!Array.isArray(master?.employees))throw new Error('員工主檔格式不正確，已保留原有快取');
  const employees=master.employees;
+ // Incomplete month downloads were previously lost on page navigation.
+ // Persist each verified month only under the same account/scope/endpoint
+ // and a stable server revision. A changed revision invalidates all chunks.
+ const cloudRevision=String(before?.revision||'');
+ const monthCheckpointSignature=cloudRevision?JSON.stringify([
+  cloudRevision,String(catalog.revision||''),String(master.revision||''),months,employees
+ ]):'';
+ const checkpointMaxAgeMs=24*60*60*1000;
+ async function checkpointMonth(month){
+  if(!monthCheckpointSignature)return null;
+  const row=await get(systemKey('attendance')+'|checkpoint|'+month).catch(()=>null);
+  if(!row||!currentViewerRow(row)||row.kind!=='system'||row.system!=='attendance'||
+     row.displayScope!==scope||row.cacheEndpoint!==gasUrl()||
+     row.savedAt<stamp||row.savedAt>Date.now()+60000||
+     Date.now()-row.savedAt>checkpointMaxAgeMs||
+     row.data?.signature!==monthCheckpointSignature||
+     !Array.isArray(row.data?.rows)||row.data?.month!==month)return null;
+  return row.data.rows;
+ }
+ async function storeMonthCheckpoint(month,rows){
+  if(!monthCheckpointSignature)return;
+  verifyAttendanceDownloadContext(expected);
+  const data={ok:true,month,rows,signature:monthCheckpointSignature};
+  // Checkpoints are a best-effort acceleration, never a prerequisite for
+  // valid business data. Browser/test contexts without IndexedDB must still
+  // finish a correct full download rather than fail each historical month.
+  try{
+   await put({key:systemKey('attendance')+'|checkpoint|'+month,
+    kind:'system',system:'attendance',savedAt:Date.now(),size:safeSize(data),data});
+  }catch(error){
+   console.warn('考勤月份快取暫時無法保存；繼續正常下載',String(error?.message||error));
+  }
+ }
  // The catalog alone has no revision. Compare an explicit cloud revision and the
  // authenticated scoped master, never a timestamp or another viewer's folder.
  const old=previous?.data;
@@ -890,9 +978,9 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress){
     previous.cacheEndpoint===gasUrl()&&previous.displayScope===scope&&
     JSON.stringify(old.months)===JSON.stringify(months)&&JSON.stringify(old.employees)===JSON.stringify(employees)&&
     months.every(month=>old.monthStats?.some(m=>m.month===month&&m.ok===true))&&Array.isArray(old.records)){
-   if(t!==token()||viewer!==viewerKey()||scope!==displayScope()||stamp!==mutationStamp())throw Object.assign(new Error('登入狀態已變更，未套用舊帳號資料'),{code:'P79_AUTH'});
-   const confirmed=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
-   if(t!==token()||viewer!==viewerKey()||scope!==displayScope()||stamp!==mutationStamp())throw Object.assign(new Error('登入或本機資料已變更，請重新核對'),{code:'P79_AUTH'});
+  verifyAttendanceDownloadContext(expected);
+   const confirmed=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
+  verifyAttendanceDownloadContext(expected);
    if(String(confirmed?.revision||'')===String(before.revision)){
    onProgress?.('attendance',months.length,months.length,'reused','雲端版本未變，重用電腦完整快取');
    if(targetSys==='attendance'||targetSys==='workhours')await applyAttendanceSnapshotToPage(old,true);
@@ -900,28 +988,60 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress){
    }
  }
 
- let allRecords=[];const monthStats=[];
- for(let i=0;i<months.length;i++){
-  const month=months[i];
-  onProgress?.('attendance',i+1,months.length,'month',`讀取 ${month}`);
-  try{
-   const d=await fetchJson('getAttendanceMonthData',{month,token:t},'');
-   if(!Array.isArray(d?.records))throw new Error('考勤月份資料格式不正確');
-   let rows=d.records;
-   const direct=await fetchJson('getAttendanceMainDirect',{month,token:t},'');
-   if(!Array.isArray(direct?.records))throw new Error('考勤主表資料格式不正確');
-   if(direct.records.length)rows=mergeAttendanceRows(rows.concat(direct.records));
-   allRecords=mergeAttendanceRows(allRecords.concat(rows));
-   monthStats.push({month,count:rows.length,ok:true});
-  }catch(e){
-   if(['P79_AUTH','P79_TRANSPORT'].includes(e?.code))throw e;
-   monthStats.push({month,count:0,ok:false,error:String(e?.message||e)});
+ // Native Windows: two bounded read-only workers; browser: existing sequential behavior.
+ // Each worker makes at most one GAS request at a time and stores no full snapshot
+ // until all months and the final account/version checks succeed.
+ const workerCount=window.chrome?.webview?.postMessage?2:1;
+ const monthResults=new Array(months.length);
+ let nextMonth=0,completedMonths=0,fatal=null;
+ async function worker(){
+  while(nextMonth<months.length&&!fatal){
+   const i=nextMonth++,month=months[i];
+   try{
+    verifyAttendanceDownloadContext(expected);
+    const resumed=await checkpointMonth(month);
+    if(resumed){
+     verifyAttendanceDownloadContext(expected);
+     monthResults[i]={month,rows:resumed,ok:true,reused:true};
+     completedMonths++;
+     onProgress?.('attendance',completedMonths,months.length,'monthDone',
+      `沿用已完成的 ${month} 快取｜${completedMonths}/${months.length} 月`);
+     continue;
+    }
+    onProgress?.('attendance',completedMonths,months.length,'month',`正在讀取 ${month}｜已完成 ${completedMonths}/${months.length} 月`);
+    const d=await fetchJson('getAttendanceMonthData',{month,token:t},'',readOptions);
+    if(!Array.isArray(d?.records))throw new Error('考勤月份資料格式不正確');
+    const direct=await fetchJson('getAttendanceMainDirect',{month,token:t},'',readOptions);
+    if(!Array.isArray(direct?.records))throw new Error('考勤主表資料格式不正確');
+    verifyAttendanceDownloadContext(expected);
+    const rows=direct.records.length?mergeAttendanceRows(d.records.concat(direct.records)):d.records;
+    monthResults[i]={month,rows,ok:true};
+    await storeMonthCheckpoint(month,rows);
+   }catch(e){
+    if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT','P79_MUTATION'].includes(e?.code)){
+     fatal=fatal||e;return;
+    }
+    monthResults[i]={month,rows:[],ok:false,error:String(e?.message||e)};
+   }
+   completedMonths++;
+   onProgress?.('attendance',completedMonths,months.length,'monthDone',`已完成 ${month}｜${completedMonths}/${months.length} 月`);
   }
  }
+ await Promise.all(Array.from({length:Math.min(workerCount,months.length)},()=>worker()));
+ if(fatal)throw fatal;
+ verifyAttendanceDownloadContext(expected);
+ const monthStats=monthResults.map(x=>({month:x.month,count:x.rows.length,ok:x.ok,...(x.ok?{}:{error:x.error})}));
  const failedMonths=monthStats.filter(x=>!x.ok);
  if(failedMonths.length)throw new Error('考勤／工時未完整下載：'+failedMonths.map(x=>x.month+'（'+x.error+'）').join('、')+'；已保留原有完整快取，請重試');
- const after=await fetchJson('getSyncMeta',{token:t},'').catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
- if(t!==token()||viewer!==viewerKey()||scope!==displayScope()||stamp!==mutationStamp())throw Object.assign(new Error('登入狀態已變更，未保存舊帳號資料'),{code:'P79_AUTH'});
+ // Do record de-duplication once rather than on every month (quadratic cost).
+ const allRecords=mergeAttendanceRows(monthResults.flatMap(x=>x.rows));
+ const after=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
+ verifyAttendanceDownloadContext(expected);
+ // A revision may change while a full download is running. Preserve the
+ // original completed-data behavior, but mark sourceRevision='' below so it
+ // can NEVER be reused as an unchanged cloud revision on the next visit.
+ if(cloudRevision&&String(after?.revision||'')!==cloudRevision)
+  console.warn('雲端考勤版本於讀取期間變更，完整快取將在下次重新核對');
  const snapshot={
   sourceRevision:before?.revision&&String(before.revision)===String(after?.revision)?String(before.revision):'',
   ok:true,action:'port79AttendanceFullCache',fullDatabase:true,
@@ -934,35 +1054,152 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress){
  if(targetSys==='attendance'||targetSys==='workhours')await applyAttendanceSnapshotToPage(snapshot,true);
  return snapshot;
 }
-async function downloadSystem(sys,onProgress){
+async function downloadSystem(sys,onProgress,readOptions={}){
  const t=token(),m=ymNow();
- if(sys==='attendance'||sys==='workhours')return downloadAttendanceDatabase(sys,onProgress);
- if(sys==='leave')return fetchJson('getLeaveData',{token:t},sys);
- if(sys==='schedule')return fetchJson('getScheduleDataSecure',{token:t},sys);
- if(sys==='efficiency')return fetchJson('gcGetData',{token:t,month:m,scope:'month'},sys);
- if(sys==='hr')return fetchJson('hrGetEmployees',{token:t},sys);
+ if(sys==='attendance'||sys==='workhours')return downloadAttendanceDatabase(sys,onProgress,readOptions);
+ if(sys==='leave')return fetchJson('getLeaveData',{token:t},sys,readOptions);
+ if(sys==='schedule')return fetchJson('getScheduleDataSecure',{token:t},sys,readOptions);
+ if(sys==='efficiency')return fetchJson('gcGetData',{token:t,month:m,scope:'month'},sys,readOptions);
+ if(sys==='hr')return fetchJson('hrGetEmployees',{token:t},sys,readOptions);
  if(sys==='history'){
-  const catalog=await fetchJson('getHistoricalDataCatalog',{token:t},sys);
-  for(const type of ['attendance','schedule','vessel']){try{await fetchJson('historyGetMonthData',{token:t,type,month:m},'')}catch(e){}}
+  // The seven-system startup is a catalog sync, not a bulk download of every
+  // historical category. Existing month snapshots remain intact and the
+  // History page fetches a requested month when opened. In particular,
+  // one slow vessel month may not turn a valid catalog into endless 6/7.
+  const catalog=await fetchJson('getHistoricalDataCatalog',{token:t},sys,readOptions);
+  if(!catalog||catalog.ok!==true)throw new Error('歷史月份目錄尚未取得');
+  if(readOptions?.prefetchHistoricalMonths===true){
+   for(const type of ['attendance','schedule','vessel']){
+    try{await fetchJson('historyGetMonthData',{token:t,type,month:m},'',readOptions)}
+    catch(e){
+     if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT'].includes(e?.code))throw e;
+    }
+   }
+  }
   return catalog;
  }
  throw new Error('未知系統：'+sys);
 }
-async function downloadAll(onProgress){
- const systems=['attendance','workhours','leave','schedule','efficiency','hr','history'];const result=[];
- let attendanceSnapshot=null,attendanceError=null,connectionError=null;
+// Successfully downloaded independent systems are persisted in IndexedDB, not
+// just in lastAllDownload's page-local three-minute memory.
+const SYSTEM_REUSE_MAX_AGE_MS=30*60*1000;
+// Automatic app startup must resume verified IndexedDB data instead of
+// downloading all seven systems again every 30 minutes. This is a bounded
+// offline-first resume (24 h), not a claim that the cloud is unchanged;
+// the explicit tray/cloud-center refresh still performs live cloud reads.
+const SYSTEM_AUTO_RESUME_MAX_AGE_MS=24*60*60*1000;
+async function startupCachedSystem(sys,scopeAtStart){
+ if(!['attendance','workhours','leave','schedule','efficiency','hr','history'].includes(sys))return null;
+ const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
+ if(!snapshot||snapshot.data?.ok!==true||snapshot.kind!=='system'||snapshot.system!==sys||
+    snapshot.displayScope!==scopeAtStart||!Number.isFinite(Number(snapshot.savedAt)))return null;
+ if(Date.now()-Number(snapshot.savedAt)>SYSTEM_AUTO_RESUME_MAX_AGE_MS)return null;
+ if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
+ if(sys==='schedule'&&snapshot.scope?.month&&snapshot.scope.month!==ymNow())return null;
+ if(sys==='attendance'||sys==='workhours'){
+  const data=snapshot.data;
+  if(!data.fullDatabase||!Array.isArray(data.months)||!Array.isArray(data.monthStats)||
+     data.monthStats.length!==data.months.length||data.monthStats.some(x=>x.ok!==true))return null;
+ }
+ return snapshot;
+}
+
+async function reusableSystemDownload(sys,scopeAtStart){
+ if(!['leave','schedule','efficiency','hr','history'].includes(sys))return null;
+ const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
+ if(!snapshot||snapshot.data?.ok!==true||snapshot.displayScope!==scopeAtStart)return null;
+ if(Date.now()-Number(snapshot.savedAt)>SYSTEM_REUSE_MAX_AGE_MS)return null;
+ if(snapshot.system!==sys||snapshot.kind!=='system')return null;
+ // The current month is part of scoped, mutable efficiency results.
+ if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
+ return snapshot;
+}
+let lastAllDownload=null;
+async function downloadAll(onProgress,options={}){
+ // Interactive Windows batches show usable independent system data before the
+ // long multi-month attendance scan. The legacy API retains its original order.
+ const fastFirst=options?.quickFirst===true;
+ const resumeExisting=fastFirst&&options?.resumeExisting===true;
+ // Windows does not require a historical catalog to open the management
+ // dashboard. History is read on demand for the selected month by the
+ // dedicated history-data page, preserving every existing historical cache.
+ // Never count optional/unrequested history as a failed 7th system.
+ const historyOnDemand=options?.historyOnDemand===true;
+ const systems=(fastFirst?['leave','schedule','efficiency','hr','history','attendance','workhours']:
+  ['attendance','workhours','leave','schedule','efficiency','hr','history'])
+  .filter(sys=>!historyOnDemand||sys!=='history');
+ const result=[];
+ const readOptions=fastFirst?{interactive:true,...(resumeExisting?{resumeExisting:true}:{})}:{};
+ const batchViewer=viewerKey(),batchToken=token(),batchScope=displayScope(),batchGas=gasUrl(),batchStamp=mutationStamp();
+ // Within a short same-login retry, keep the six successful snapshots and fetch
+ // only modules that actually failed. A new session/scope or later refresh starts fresh.
+ const batchKey=[viewerKey(),token(),gasUrl(),displayScope(),mutationStamp()].join('|');
+ const prior=lastAllDownload?.key===batchKey&&Date.now()-lastAllDownload.at<180000&&
+             lastAllDownload.result.some(row=>!row.ok)?lastAllDownload.result:null;
+ let attendanceSnapshot=null,attendanceError=null,connectionError=null,consecutiveTransportFailures=0;
  for(let i=0;i<systems.length;i++){
-  const sys=systems[i];onProgress?.(sys,i,systems.length,'loading');
+  const sys=systems[i];
+  if(prior?.some(row=>row.system===sys&&row.ok)){
+   consecutiveTransportFailures=0;
+   result.push({system:sys,ok:true,reused:true});
+   onProgress?.(sys,i,systems.length,'reused',null,'此系統先前已完成，沿用快取');
+   continue;
+  }
+  // Startup resumes exact-viewer, exact-scope stored snapshots within 24 h.
+  // Manual refresh deliberately does NOT use this long reuse window.
+  // In both modes a snapshot failing permission, endpoint or edit checks is
+  // reloaded, never silently presented as a verified latest cloud response.
+  if(fastFirst&&await (resumeExisting?startupCachedSystem(sys,batchScope):reusableSystemDownload(sys,batchScope))){
+   if(batchViewer!==viewerKey()||batchToken!==token()||
+      batchScope!==displayScope()||batchGas!==gasUrl()||batchStamp!==mutationStamp())
+    throw Object.assign(new Error('登入或管理權限已變更，停止沿用快取'),{code:'P79_SCOPE'});
+   consecutiveTransportFailures=0;
+   result.push({system:sys,ok:true,reused:true});
+   onProgress?.(sys,i,systems.length,'reused',null,resumeExisting?
+    '沿用已保存本機資料（24 小時內）；未重抓，雲端最新狀態可手動重新核對':
+    '沿用本機已完成的雲端快取（30 分鐘內）');
+   continue;
+  }
+  // Treat remaining untouched modules as skipped after an identity/scope/transport failure.
+  if(connectionError){
+   result.push({system:sys,ok:false,skipped:true,error:'前一項雲端讀取中斷，尚未下載；原因：'+String(connectionError.message||connectionError)});
+   onProgress?.(sys,i,systems.length,'skipped',connectionError);
+   continue;
+  }
+  onProgress?.(sys,i,systems.length,'loading');
   try{
-   if(connectionError)throw connectionError;
-   if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`));
+   if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`,{monthCompleted:mi,monthTotal:mt}),readOptions);
    else if(sys==='workhours'&&attendanceError)throw attendanceError;
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
-   else await downloadSystem(sys);
+   else{
+    const payload=await downloadSystem(sys,null,readOptions);
+    if(fastFirst&&['leave','schedule','efficiency','hr','history'].includes(sys)&&payload?.ok===true){
+     if(batchViewer!==viewerKey()||batchToken!==token()||batchScope!==displayScope()||
+        batchGas!==gasUrl()||batchStamp!==mutationStamp())
+      throw Object.assign(new Error('登入權限變更，拒絕保存舊帳號資料'),{code:'P79_SCOPE'});
+     await saveSystemSnapshot(sys,payload);
+     // Efficiency is month-scoped; do not reuse it after the month changes.
+     if(sys==='efficiency'){
+      const row=await getSystemSnapshot(sys);
+      if(row){row.month=ymNow();await put(row);}
+     }
+    }
+   }
+   consecutiveTransportFailures=0;
    result.push({system:sys,ok:true});onProgress?.(sys,i,systems.length,'done');
-  }catch(e){if(['P79_AUTH','P79_TRANSPORT'].includes(e?.code))connectionError=e;if(sys==='attendance')attendanceError=e;result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e)}
+  }catch(e){
+   // Account/scope changes remain fatal. A single module's transport failure
+   // must not discard already authenticated independent systems. If two
+   // consecutive modules cannot reach GAS, stop to avoid 7 long timeouts.
+   if(['P79_AUTH','P79_SCOPE'].includes(e?.code)||
+      (e?.code==='P79_TRANSPORT'&&(!fastFirst||++consecutiveTransportFailures>=2)))connectionError=e;
+   if(sys==='attendance')attendanceError=e;
+   result.push({system:sys,ok:false,error:String(e?.message||e)});
+   onProgress?.(sys,i,systems.length,'error',e);
+  }
  }
  if(currentSystem()==='attendance'&&attendanceSnapshot)await applyAttendanceSnapshotToPage(attendanceSnapshot,true);
+ lastAllDownload={key:batchKey,at:Date.now(),result};
  return result;
 }
 
@@ -975,7 +1212,7 @@ function ensureStyle(){if(document.getElementById('p79CacheStyle'))return;const 
 `;document.head.appendChild(s)}
 function ensureModal(){
  ensureStyle();let b=document.getElementById('p79CacheBackdrop');if(b)return b;
- b=document.createElement('div');b.id='p79CacheBackdrop';b.innerHTML=`<div id="p79CacheModal" role="dialog" aria-modal="true"><div class="p79-cache-head"><div><div class="p79-cache-title">☁️ 79號碼頭雲端資料庫</div><div class="p79-cache-sub">本機加速讀取，修改仍透過各系統同步雲端。</div></div><button class="p79-cache-close" type="button">✕</button></div><div id="p79DeviceStatus" class="p79-cache-note" role="status"></div><div class="p79-cache-actions"><button class="p79-cache-btn" data-cache-action="folder">選擇電腦資料夾</button><button class="p79-cache-btn" data-cache-action="reconnect">重新授權資料夾</button><button class="p79-cache-btn" data-cache-action="disconnect">停用資料夾</button><button class="p79-cache-btn" data-cache-action="persist">保留手機／瀏覽器資料</button></div><div class="p79-cache-note">電腦：請先建立並選擇「79號碼頭雲端資料庫」資料夾。手機：按「保留手機／瀏覽器資料」，也可將系統加入主畫面。清除網站資料後，電腦檔案仍保留，但需重新選擇資料夾。資料夾快取不會自行覆寫雲端；請以各系統的儲存／同步狀態確認上傳結果。</div><div id="p79CacheRows" class="p79-cache-grid"></div><div class="p79-cache-actions"><button class="p79-cache-btn primary" data-cache-action="current">下載目前系統完整資料</button><button class="p79-cache-btn all" data-cache-action="all">下載七大系統快取</button><button class="p79-cache-btn danger" data-cache-action="clear">清除本機快取</button></div><div id="p79CacheProgress" class="p79-cache-note">選取資料夾後會先找回目前帳號已有的快取，不必再次下載。同一帳號重新登入會重用既有檔案；首次使用的新帳號需下載其權限範圍內的資料。考勤／工時下載前會核對版本，資料未變時重用完整快取。</div></div>`;
+ b=document.createElement('div');b.id='p79CacheBackdrop';b.innerHTML=`<div id="p79CacheModal" role="dialog" aria-modal="true"><div class="p79-cache-head"><div><div class="p79-cache-title">☁️ 79號碼頭雲端資料庫</div><div class="p79-cache-sub">本機加速讀取，修改仍透過各系統同步雲端。</div></div><button class="p79-cache-close" type="button">✕</button></div><div id="p79DeviceStatus" class="p79-cache-note" role="status"></div><div class="p79-cache-actions"><button class="p79-cache-btn" data-cache-action="folder">選擇電腦資料夾</button><button class="p79-cache-btn" data-cache-action="reconnect">重新授權資料夾</button><button class="p79-cache-btn" data-cache-action="disconnect">停用資料夾</button><button class="p79-cache-btn" data-cache-action="persist">保留手機／瀏覽器資料</button></div><div class="p79-cache-note">電腦：請先建立並選擇「79號碼頭雲端資料庫」資料夾。手機：按「保留手機／瀏覽器資料」，也可將系統加入主畫面。清除網站資料後，電腦檔案仍保留，但需重新選擇資料夾。資料夾快取不會自行覆寫雲端；請以各系統的儲存／同步狀態確認上傳結果。</div><div id="p79CacheRows" class="p79-cache-grid"></div><div class="p79-cache-actions"><button class="p79-cache-btn primary" data-cache-action="current">下載目前系統完整資料</button><button class="p79-cache-btn all" data-cache-action="all">下載六項基本資料（歷史按月）</button><button class="p79-cache-btn danger" data-cache-action="clear">清除本機快取</button></div><div class="p79-cache-note">注意：上述六項基本資料下載不包含「碼頭儲量」；歷史月份請到歷史資料中心按月讀取。Yard Excel 數據仍是各瀏覽器獨立的帳號本機資料，Windows 版本不能藉由此下載動作取得網頁版的儲量。系統不會以零或假數字代替缺失數據。</div><div id="p79CacheProgress" class="p79-cache-note">選取資料夾後會先找回目前帳號已有的快取，不必再次下載。同一帳號重新登入會重用既有檔案；首次使用的新帳號需下載其權限範圍內的資料。考勤／工時下載前會核對版本，資料未變時重用完整快取。</div></div>`;
  document.body.appendChild(b);b.querySelector('.p79-cache-close').onclick=()=>b.classList.remove('open');b.addEventListener('click',e=>{if(e.target===b)b.classList.remove('open')});
  b.addEventListener('click',async e=>{const btn=e.target.closest('[data-cache-action]');if(!btn)return;const act=btn.dataset.cacheAction;const buttons=[...b.querySelectorAll('[data-cache-action]')];buttons.forEach(x=>x.disabled=true);try{
    if(act==='folder'){setProgress(await connectFolder());await refreshModal()}
@@ -983,8 +1220,18 @@ function ensureModal(){
    if(act==='disconnect'){setProgress(await disconnectFolder());await refreshModal()}
    if(act==='persist'){setProgress(await retainDeviceData());await refreshModal()}
    if(act==='clear'){if(confirm('確定清除此瀏覽器的七大系統本機快取？')){await clear();setProgress('已清除瀏覽器快取；硬碟資料夾檔案仍保留，啟用時可重新讀取。');await refreshModal()}}
-   if(act==='current'){const sys=currentSystem();setProgress(`正在下載 ${SYSTEM_LABELS[sys]}…`);const snap=await downloadSystem(sys,(s,i,total,state,label)=>setProgress(`⬇️ ${label||SYSTEM_LABELS[sys]} ${i}/${total}`));setProgress(sys==='attendance'||sys==='workhours'?`✅ ${SYSTEM_LABELS[sys]}完整資料已載入｜考勤 ${Number(snap?.recordCount||0)} 筆｜員工主檔 ${Number(snap?.employeeCount||0)} 人`:`✅ ${SYSTEM_LABELS[sys]} 快取完成。`);await refreshModal()}
-   if(act==='all'){const res=await downloadAll((sys,i,total,state,err,detail)=>{setProgress(detail?`⬇️ ${SYSTEM_LABELS[sys]}｜${detail}`:`${state==='error'?'⚠️':'⬇️'} ${i+1}/${total} ${SYSTEM_LABELS[sys]} ${state==='loading'?'下載中…':state==='done'?'完成':state==='detail'?'整理中…':'失敗'}`)});const ok=res.filter(x=>x.ok).length;const bad=res.filter(x=>!x.ok);setProgress(`完成：${ok}/7 個系統${bad.length?'；未完成：'+bad.map(x=>SYSTEM_LABELS[x.system]+'：'+x.error).join('；'):''}`);await refreshModal()}
+   if(act==='current'){const sys=currentSystem();if(sys==='history'){setProgress('歷史資料請在歷史資料中心選擇月份並按「讀取月份」，已有的歷史快取不會重新下載。');return;}setProgress(`正在下載 ${SYSTEM_LABELS[sys]}…`);const snap=await downloadSystem(sys,(s,i,total,state,label)=>setProgress(`⬇️ ${label||SYSTEM_LABELS[sys]} ${i}/${total}`));setProgress(sys==='attendance'||sys==='workhours'?`✅ ${SYSTEM_LABELS[sys]}完整資料已載入｜考勤 ${Number(snap?.recordCount||0)} 筆｜員工主檔 ${Number(snap?.employeeCount||0)} 人`:`✅ ${SYSTEM_LABELS[sys]} 快取完成。`);await refreshModal()}
+   if(act==='all'){
+   // Windows has a separate same-origin WebView2 worker that continues across
+   // page navigation; keep the existing modal as the single download entry.
+   if(window.chrome?.webview?.postMessage){
+    window.chrome.webview.postMessage(JSON.stringify({
+     kind:'port79-cache-command-v1',action:'download-all'
+    }));
+    setProgress('已交由 Windows 背景同步；可切換考勤、排班等頁面，原本進度會繼續顯示。');
+    return;
+   }
+   const res=await downloadAll((sys,i,total,state,err,detail)=>{setProgress(detail?`⬇️ ${SYSTEM_LABELS[sys]}｜${detail}`:`${state==='error'?'⚠️':'⬇️'} ${i+1}/${total} ${SYSTEM_LABELS[sys]} ${state==='loading'?'下載中…':state==='done'?'完成':state==='reused'?'沿用成功快取':state==='detail'?'整理中…':'失敗'}`)},{quickFirst:true,historyOnDemand:true});const ok=res.filter(x=>x.ok).length;const bad=res.filter(x=>!x.ok);setProgress(`完成：${ok}/${res.length} 項基本資料；歷史月份按需讀取${bad.length?'；未完成：'+bad.map(x=>SYSTEM_LABELS[x.system]+'：'+x.error).join('；'):''}`);await refreshModal()}
   }catch(err){setProgress(err?.name==='AbortError'?'已取消選擇，原有快取保持不變。':'❌ '+String(err?.message||err))}finally{buttons.forEach(x=>x.disabled=false)}});
  return b;
 }
@@ -1005,6 +1252,94 @@ async function refreshModal(){
  const rows=document.getElementById('p79CacheRows');if(!rows)return;const data=(await Promise.all(Object.keys(SYSTEM_LABELS).map(sys=>getSystemSnapshot(sys).catch(()=>null)))).filter(Boolean);const v=viewerKey();rows.innerHTML=Object.keys(SYSTEM_LABELS).map(sys=>{const r=data.filter(x=>x.key===v+'|system|'+sys).sort((a,b)=>b.savedAt-a.savedAt)[0];return `<div class="p79-cache-row" data-cache-system="${sys}"><b>${SYSTEM_LABELS[sys]}</b><div class="p79-cache-meta">最後快取：${fmtTime(r?.savedAt)}<br>大小：${r?fmtBytes(r.size):'--'}<br>保存範圍：${cacheCoverage(r)}</div><div class="p79-cache-state">${r?'✓ 已有本機快取':'○ 尚未下載'}</div></div>`}).join('')
 }
 async function openCenter(){const b=ensureModal();b.classList.add('open');await refreshModal()}
+
+
+/**
+ * Windows tray's "重新同步六項基本資料（歷史按月）" uses this event.
+ * Previously no handler existed, so clicking it silently did nothing.
+ * All data reads still go through the authenticated existing GAS routes.
+ */
+let nativeCloudSyncBusy=false;
+async function nativeCloudSyncFromDesktop(){
+ // Historical month contents are never required at startup. The history
+ // center fetches selected months itself; failure of an unrelated catalog
+ // must not block Windows program updates or basic attendance data.
+ const historyOnDemand=true;
+ const total=historyOnDemand?6:7;
+ const done=new Set();
+ let lastActivity=Date.now(),lastDetail='正在確認雲端連線',lastMonthCompleted=0,lastMonthTotal=0,pulse=null,fullyCompleted=false;
+ function status(phase,detail,completed=done.size,month=null,heartbeat=false){
+  if(!heartbeat){
+   lastActivity=Date.now();
+   lastDetail=String(detail||'');
+   lastMonthCompleted=Number.isFinite(Number(month?.monthCompleted))?Math.max(0,Number(month.monthCompleted)):0;
+   lastMonthTotal=Number.isFinite(Number(month?.monthTotal))?Math.max(0,Number(month.monthTotal)):0;
+  }
+  const value={
+   kind:'port79-cache-status-v1',phase,
+   title:phase==='stalled'?'雲端回應較慢':'雲端資料同步',
+   detail:String(detail||'').slice(0,160),
+   completed:Math.max(0,Math.min(total,completed)),total,
+   monthCompleted:Math.max(0,Math.min(240,lastMonthCompleted)),
+   monthTotal:Math.max(0,Math.min(240,lastMonthTotal))
+  };
+  try{window.chrome?.webview?.postMessage?.(JSON.stringify(value));}catch(e){}
+  setProgress((phase==='failed'?'❌ ':phase==='partial'?'⚠️ ':phase==='complete'?'✅ ':'☁️ ')+value.detail);
+ }
+ if(nativeCloudSyncBusy){
+  status('stalled','下載正在進行中，請查看目前系統與月份進度；不會重複啟動。',done.size,null,true);
+  return;
+ }
+ nativeCloudSyncBusy=true;
+ status('downloading','正在核對六項基本資料；歷史資料請到歷史中心選月份讀取…',0);
+ // A large attendance database can require two cloud reads for each month.
+ // Send a truthful waiting heartbeat; do not fabricate completion progress.
+ if(typeof setInterval==='function')pulse=setInterval(()=>{
+  const elapsed=Date.now()-lastActivity;
+  if(elapsed>=12000){
+   status('stalled',lastDetail+'｜等待雲端回應 '+Math.round(elapsed/1000)+' 秒；如逾時會顯示原因並繼續安全處理。',done.size,null,true);
+  }
+ },10000);
+ try{
+  let session=null;
+  try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null')}catch(_){}
+  const role=String(session?.adminRole||session?.role||'').toLowerCase();
+  if(!session||session.punchOnly||!['admin','superadmin'].includes(role)||!token()){
+   throw new Error('請先以管理員登入，再下載有權限的雲端資料');
+  }
+  if(window.__port79CachedSessionRefreshPending){
+   throw new Error('登入權限正在向雲端確認，請完成後再重新下載');
+  }
+  const result=await downloadAll((sys,index,count,state,error,detail,month)=>{
+   // Progress is a count of successful systems, NOT attempted/skipped ones.
+   if(state==='done'||state==='reused')done.add(sys);
+   const label=SYSTEM_LABELS[sys]||sys;
+   const message=detail?label+'｜'+detail:
+    state==='loading'?'正在下載 '+label:
+    state==='reused'?label+' 已沿用經驗證的快取':
+    state==='done'?label+' 已完成':
+    state==='error'||state==='skipped'?label+' 未完成：'+String(error?.message||error||'雲端讀取未完成'):
+    '正在下載 '+label;
+   status('downloading',message,done.size,month);
+  },{quickFirst:true,resumeExisting:window.__port79WorkerResumeOnly===true,historyOnDemand});
+  const success=result.filter(x=>x.ok).length,failures=result.filter(x=>!x.ok);
+  fullyCompleted=success===total&&!failures.length;
+  status(failures.length?(success?'partial':'failed'):'complete',
+   failures.length?'已成功 '+success+'/'+total+' 系統；未完成：'+failures.map(x=>(SYSTEM_LABELS[x.system]||x.system)+' '+x.error).join('；').slice(0,105):
+    '六項基本資料已完成／沿用本機快取；歷史資料依月份在歷史中心讀取（未重抓）。',
+   success);
+ }catch(error){
+  status('failed','雲端資料未下載：'+String(error?.message||error),done.size);
+ }finally{
+  if(pulse!==null&&typeof clearInterval==='function')clearInterval(pulse);
+  nativeCloudSyncBusy=false;
+  try{window.__port79CloudWorkerDone?.(fullyCompleted)}catch(_){}
+ }
+}
+if(typeof window.addEventListener==='function'){
+ window.addEventListener('port79-desktop-force-sync',nativeCloudSyncFromDesktop);
+ window.__port79NativeCloudSyncReady=true;
+}
 
 window.Port79DataCache={getDisplaySnapshot,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 })();
