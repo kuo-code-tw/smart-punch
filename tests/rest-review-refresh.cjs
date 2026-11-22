@@ -36,6 +36,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
  state.restEvidenceRevision='rev-after';c.p79RefreshVisibleOvertimeEvidence();assert.equal(calls.length,1,'unchanged cloud revision must not refresh');
  c.lastAttendanceCloudRevision='rev-next';editing=true;c.p79RefreshVisibleOvertimeEvidence();assert.equal(calls.length,1,'in-progress editing blocks background refresh');editing=false;
  state.restEvidencePending=true;c.p79RefreshVisibleOvertimeEvidence();assert.equal(calls.length,1);state.restEvidencePending=false;visible=false;c.p79RefreshVisibleOvertimeEvidence();assert.equal(calls.length,1);visible=true;token='B';c.p79RefreshVisibleOvertimeEvidence();assert.equal(calls.length,1);
- assert(html.includes('value="review"'));assert(html.includes('🔴 疑似多報｜整班無卡，請核對後刪除'));assert(html.includes("source==='review' ? row.overtimeReport?.attendanceState==='rest'"));
+ assert(html.includes('value="review"'));assert(!html.includes('🔴 疑似多報｜整班無卡，請核對後刪除'),'a missing punch is not proof of a false report or authorization to delete');
+assert(html.includes("const completedRows=rows.filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))"),'review remains tied to confirmed attendance and saved reports');assert(html.includes("source==='review' ? row.overtimeReport?.attendanceState==='rest'"));
  console.log('PASS overnight end refresh, fresh-read throttle, supplemented cards, visible overtime refresh, pending/account guards and review filter wiring');
 })().catch(e=>{console.error(e);process.exit(1)});
