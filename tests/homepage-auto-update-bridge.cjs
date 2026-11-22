@@ -14,6 +14,11 @@ assert.match(login,/root\.sessionStorage\?\.getItem\(STORED_BUILD\)/);
 assert.match(login,/if\(!force&&homepageBusy\(\)\)return false/);
 assert.doesNotMatch(login,/localStorage\.clear\(\)|indexedDB\.deleteDatabase/);
 
+assert.match(login,/正在下載並更新79號碼頭電腦版/,'Desktop update status names the Port79 app');
+assert.doesNotMatch(login,/正在下載並更新 Windows 系統/,'Never imply a Microsoft Windows OS update');
+assert.match(login,/79號碼頭網頁版有更新/,'Web update should have a separate label');
+assert.match(home,/id="deployStatusTitle">79號碼頭網頁版更新中/);
+
 const api=require('../assets/port79-login-version-check.js');
 const sha1='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const sha2='bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
