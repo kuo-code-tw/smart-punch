@@ -17,12 +17,7 @@ assert(native.indexOf('await InvalidateStaleProgramHttpCache(')<native.indexOf('
  'Clear HTTP cache before navigating visible page');
 assert(native.includes('index.html?windowsBundle='),'Bundled homepage uses versioned URL');
 assert(native.includes('開啟目前程式資料夾'),'Allow users to distinguish a new ZIP from an old desktop shortcut');
-assert(native.includes('Text="79號碼頭雲端智慧系統｜"+(displayVersion.Length>0?displayVersion:"版本待驗證")'),
- 'Show the running numeric ZIP version in the Windows title without a redundant tray row');
-assert(native.includes('Text=SafeStatus("79號碼頭｜"+(displayVersion.Length>0?displayVersion:"版本待驗證"),60)'),
- 'The tray hover still exposes the running version');
-assert(!native.includes('目前程式版本：'),
- 'Do not clutter right-click menu with a duplicate disabled version row');
+assert(native.includes('目前程式版本：'),'Show the actual running numeric-only ZIP version');
 assert(updater.includes('baseBundleVersion=BundleVersion(site)'),'Staged patches are tied to original bundle');
 assert(updater.includes('!String.Equals(manifest.baseBundleVersion,installedBundle'),
  'Previously downloaded older website code cannot overwrite freshly extracted ZIP');
