@@ -478,6 +478,14 @@ namespace Port79Lite {
      }
      return;
     }
+    // Homepage update uses the existing verified Windows/site updater, not
+    // a browser download or an untrusted update URL.
+    if(payload.kind=="port79-system-update-command-v1"){
+     if(sender==web.CoreWebView2 &&
+        source.AbsolutePath.Equals("/smart-punch/index.html",StringComparison.OrdinalIgnoreCase) &&
+        payload.action=="install")_ = CheckUpdates(true);
+     return;
+    }
     if(payload.kind=="port79-cache-command-v1"){
      // A manager clicking the existing cloud-download button may start
      // background sync from any locally hosted application page.
@@ -632,11 +640,23 @@ namespace Port79Lite {
    }
   }
 
+  // Reflect actual native update phases inside the existing homepage status.
+  // This is display-only; the verified updater still owns all file writes.
+  private async void NotifyHomeUpdateStatus(string message){
+   try{
+    if(web.CoreWebView2==null||web.Source==null||
+       !web.Source.AbsolutePath.Equals("/smart-punch/index.html",StringComparison.OrdinalIgnoreCase))return;
+    var detail=new JavaScriptSerializer().Serialize(new {message=SafeStatus(message,160)});
+    await web.CoreWebView2.ExecuteScriptAsync(
+      "window.dispatchEvent(new CustomEvent('port79-system-update-status',{detail:"+detail+"}));");
+   }catch(Exception error){Log("homepage update status unavailable: "+error.Message);}
+  }
   // Visible native WinForms feedback: independent of the web page and any
   // Windows notification settings, so clicking tray update cannot be silent.
   private void UpdateStatus(string message,bool visible=false){
    systemUpdateStatusMenu.Text=SafeStatus("更新系統："+message,100);
    systemUpdateStatusMenu.ToolTipText=SafeStatus(message,220);
+   NotifyHomeUpdateStatus(message);
    if(visible){
     ShowWindow();
     updateNotice.Text="🔄 系統更新｜"+SafeStatus(message,160)+"  （點擊可關閉提示）";
