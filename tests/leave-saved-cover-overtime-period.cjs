@@ -45,8 +45,9 @@ assert.equal(show({...before,position:'full'}).label,'延20-08','unknown extensi
 assert(html.includes('const period=p79LeaveSavedOvertimePeriod(report);'),'actual saved cover dialog must use formatter');
 assert(html.includes("period.originalCode?'原申報代碼 '"),'traceable cloud code displayed separately');
 assert(html.includes('period.warning||'), 'mismatched reports require explicit warning');
-assert(html.includes('const report=employeeRow.schedule?.__meta?.[entry.date]?.overtimeReport;'),
- 'dialog must read authenticated cloud report before formatting');
+assert(html.includes('const meta=employeeRow.schedule?.__meta?.[entry.date]||{},report=meta.overtimeReport;'),
+ 'dialog must read the authenticated employee/date cloud metadata before formatting');
+assert(html.includes("if(!employeeRow)throw Error('雲端找不到這位代班人員的班表')"),'unknown cloud employee cannot be reported as an existing leave-cover filing');
 assert(html.includes("cell.textContent=(report.planned===true?'已儲存預排｜':'已正式申報｜')"),
  'planned and formal identity must be preserved');
 for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))
