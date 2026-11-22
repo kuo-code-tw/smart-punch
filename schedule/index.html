@@ -7590,7 +7590,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     // Cross-tab storage events are not fired in the tab that performed the
     // official write. Check the notice again on focus/resume (BFCache) too.
-    let p79LastAttendanceNotice='';
+    let p79LastAttendanceNotice='',p79AttendanceNoticeRefreshTimer=null;
     function p79ScheduleApplyAttendanceNotice(raw) {
       if(!raw||raw===p79LastAttendanceNotice)return false;
       try {
@@ -7599,9 +7599,16 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const month=currentScheduleMonthKey();
         if(!currentPort79SsoToken()||!/^\d{4}-\d{2}$/.test(month)||!employees.length)return false;
         p79LastAttendanceNotice=raw;
-        // Invalidate cached official punch reads, including the adjacent
-        // month needed to attach a night-shift clock-out to its workday.
-        void p79ScheduleRestClient().invalidate(month);
+        // Batch imports can confirm many punches in quick succession. Check
+        // the official month after the last notice, not once per individual ACK.
+        if(p79AttendanceNoticeRefreshTimer!==null)clearTimeout(p79AttendanceNoticeRefreshTimer);
+        p79AttendanceNoticeRefreshTimer=setTimeout(()=>{
+          p79AttendanceNoticeRefreshTimer=null;
+          const currentMonth=currentScheduleMonthKey();
+          if(!currentPort79SsoToken()||!/^\d{4}-\d{2}$/.test(currentMonth)||!employees.length)return;
+          // Force fresh official attendance for all staff and adjacent months.
+          void p79ScheduleRestClient().invalidate(currentMonth);
+        },650);
         return true;
       }catch(error){console.warn('考勤異動自動核對通知無效',error);return false;}
     }
