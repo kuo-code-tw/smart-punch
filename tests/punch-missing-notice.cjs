@@ -87,6 +87,11 @@ test('identity changes replace old dialog without displaying another employee re
   assert.equal(other.shown,true);
   assert.equal(doc.getElementById('p79MissingPunchNoticeDialog').dataset.employee,'FIXTURE-E2');
 });
+test('switching to a clean employee account removes the previous notice',()=>{
+  const result=api.showFromOfficial(params({empId:'FIXTURE-E3',rows:[],confirmedIds:[],nowMs:now+172800000}));
+  assert.equal(result.shown,false);
+  assert.equal(doc.getElementById('p79MissingPunchNoticeDialog'),null);
+});
 test('read errors/invalid month never fabricate an alert',()=>{
   const x=api.showFromOfficial(params({month:'invalid'}));
   assert.equal(x.shown,false);
