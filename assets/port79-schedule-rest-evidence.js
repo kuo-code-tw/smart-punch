@@ -346,7 +346,17 @@ function create(ctx){
    return changed||!s.evidence.complete||now()-s.evidence.checkedAt>=60000?
      refresh(month):Promise.resolve(s.evidence);
  }
- return{refresh,status,refreshIfStale};
+ // A confirmed official attendance write in another tab must bypass both
+ // the 30-second per-month read cache and the 60-second freshness guard.
+ // In-flight reads from before invalidation cannot replace the new audit.
+ function invalidate(month){
+   const token=ctx.token();if(!token)return Promise.resolve(null);
+   for(const key of reads.keys())if(key.startsWith(token+'|'))reads.delete(key);
+   // Keep the last verified snapshot visible while rechecking whenever safe.
+   if(states.get(month)?.pending)states.delete(month);
+   return refresh(month);
+ }
+ return{refresh,status,refreshIfStale,invalidate};
 }
 g.P79ScheduleRestEvidence={create,detectNightSplitRest};
 })(window);
