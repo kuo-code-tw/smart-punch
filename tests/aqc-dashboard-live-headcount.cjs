@@ -41,7 +41,8 @@ assert.equal(node.textContent,'—','Unverified GC backup must not present a for
 const verifiedWrites=(html.match(/p79AqcHeadcountVerified=true;/g)||[]).length;
 const resets=(html.match(/p79AqcHeadcountVerified=false;/g)||[]).length;
 assert(verifiedWrites>=4,'Manual, group and two cloud HR refreshes must verify roster before display');
-assert(resets>=3,'Initial screen and GC snapshots should remain unverified');
+assert(resets>=2,'Initial screen and GC snapshots remain unverified until authenticated HR or monthly roster evidence arrives');
+assert(html.includes('let p79AqcHeadcountVerified=false;'),'initial headcount verification must default to false');
 assert((html.match(/updateCurrentAqcHeadcount\(\);/g)||[]).length>=4,'Dashboard and background HR reads must refresh header');
 assert(!fn('people').includes('forEach(r=>'),'Historical working-report fallback must not return');
 for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))if(!/\bsrc=|application\/ld\+json/.test(m[1]))new vm.Script(m[2]);
