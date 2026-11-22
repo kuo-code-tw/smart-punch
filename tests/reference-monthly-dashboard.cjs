@@ -4,7 +4,9 @@ const vessels=report.analyzeVessels({shipMasters:[{workingNo:'A',totalMoves:100,
 assert.equal(vessels.workHours,5,'valid job hours include details with no employee');assert.equal(vessels.vessels[0].hours,5);assert.equal(vessels.vessels[0].date,'2026-10-02');assert.equal(vessels.people[0].dept,'甲班');assert.equal(vessels.timedRows,2);assert.equal(vessels.detailCount,3);
 const r={id:'OT1',declaredHours:8};const overtime=report.analyzeOvertime({schedules:[{schedule:{__meta:{'2026-10-01':{overtimeReport:r},'2026-10-02':{overtimeReport:{id:'OT2',declaredHours:4,revoked:true}},'2026-09-30':{overtimeReport:{id:'OT3',declaredHours:12}}}}},{schedule:{__meta:{'2026-10-01':{overtimeReport:r},'2026-10-03':{overtimeReport:{id:'OT4',rule:{declaredHours:6}}}}}}]},'2026-10');
 assert.equal(overtime.month,'2026-10');assert.equal(overtime.hours,14);assert.equal(overtime.count,2);
-assert.deepEqual(overtime.rows,[{title:'未設定職稱',hours:14,count:2}],'unique active reports group under job title');
+assert.equal(overtime.rows.length,1,'only one distinct role grouping');
+assert.equal(overtime.rows[0].title,'未設定職稱');assert.equal(overtime.rows[0].hours,14);assert.equal(overtime.rows[0].count,2);
+assert.equal(overtime.rows[0].officialCount,2,'two real active cloud reports');assert.equal(overtime.rows[0].missingConversion,2,'unknown conversions remain flagged rather than invented');
 assert.equal(overtime.declaredSubmittedHours,14,'preserve actual declared hours separately from conversion');
 assert.equal(overtime.missingConversion,2,'unknown stored conversions are not invented');
 assert.equal(overtime.convertedHours,0,'no verified converted value may be claimed for missing data');
