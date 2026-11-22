@@ -42,7 +42,7 @@ assert(work.includes('if(pairs.length!==1)throw Error('),'server requires comple
 assert(work.includes('originalStart!==pair.start||originalEnd!==pair.end'),'server checks original timestamps versus latest cloud');
 assert(work.includes("matched?.suggested?.code!==draft.rule.code"),'server re-checks rule against latest real punch');
 assert(work.includes('expectedRevision:cloud.revision'),'save remains revision guarded');
-assert(report.includes('verifyPlannedReviewSelection(rows[Number(select.value)])'),'form validates before save');
+assert(report.includes('verifyPlannedReviewSelection(chosen);'),'selected planned period is revalidated against the real punch before cloud save');
 assert(report.includes("expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||'')"),'form sends optimistic baseline for same original report');
 for(const m of work.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
 new vm.Script(report);
