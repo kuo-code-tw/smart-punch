@@ -11,7 +11,7 @@ function replaceOnce(text,needle,replacement) {
 function verifySourceCompatibility(source) {
   const text=String(source||'');
   // This candidate targets the V100 guard shape, not the older one-argument GAS.
-  const m=text.match(/(?:^|\\n)\\s*function\\s+p79CheckDuplicatePunchGuard_\\s*\\(([^)]*)\\)\\s*\\{/);
+  const m=text.match(/(?:^|\n)\s*function\s+p79CheckDuplicatePunchGuard_\s*\(([^)]*)\)\s*\{/);
   if(!m) throw Error('Expected V100 guard source: duplicate guard declaration missing');
   const params=m[1].split(',').map(v=>v.trim()).filter(Boolean);
   if(params.length!==2||params[0]!=='record'||params[1]!=='ss')
