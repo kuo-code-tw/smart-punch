@@ -117,14 +117,39 @@ function validDownloadGasUrl(value){try{const u=new URL(String(value||'').trim()
 function ymNow(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
 function openDb(){
  if(dbPromise)return dbPromise;
- dbPromise=new Promise((resolve,reject)=>{
-  const r=indexedDB.open(DB_NAME,DB_VERSION);
-  r.onupgradeneeded=()=>{const db=r.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:'key'});if(!db.objectStoreNames.contains(SETTINGS))db.createObjectStore(SETTINGS,{keyPath:'key'})};
-  r.onblocked=()=>{setProgress('請關閉其他舊版系統分頁，再重新開啟。')};
-  r.onsuccess=()=>{const db=r.result;db.onversionchange=()=>{try{db.close()}catch(e){}dbPromise=null};resolve(db)};
-  r.onerror=()=>{dbPromise=null;reject(r.error)};
+ let request;
+ try{request=indexedDB.open(DB_NAME,DB_VERSION)}catch(error){return Promise.reject(error)}
+ let timedOut=false;
+ const pending=new Promise((resolve,reject)=>{
+  const deadline=setTimeout(()=>{
+   timedOut=true;
+   if(dbPromise===pending)dbPromise=null;
+   reject(new Error('本機快取資料庫開啟逾時'));
+  },4000);
+  request.onupgradeneeded=()=>{
+   const db=request.result;
+   if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:'key'});
+   if(!db.objectStoreNames.contains(SETTINGS))db.createObjectStore(SETTINGS,{keyPath:'key'});
+  };
+  request.onblocked=()=>{if(!timedOut)setProgress('請關閉其他舊版系統分頁，再重新開啟。')};
+  request.onsuccess=()=>{
+   clearTimeout(deadline);
+   const db=request.result;
+   if(timedOut){db.close();return}
+   db.onversionchange=()=>{
+    try{db.close()}catch(_){}
+    if(dbPromise===pending)dbPromise=null;
+   };
+   resolve(db);
+  };
+  request.onerror=()=>{
+   clearTimeout(deadline);
+   if(dbPromise===pending)dbPromise=null;
+   reject(request.error);
+  };
  });
- return dbPromise;
+ dbPromise=pending;
+ return pending;
 }
 function displayScope(){
  try{const s=JSON.parse(sessionStorage.getItem('port79_user_session')||sessionStorage.getItem('admin_session')||'null');
