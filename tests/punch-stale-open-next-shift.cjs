@@ -14,13 +14,13 @@ function fn(source,name) {
 }
 function make({source=candidate,rows,archive=[],now='2026/11/22 07:42',
   old='2026/11/19 15:41',incomingStatus='上班簽到',deleted=false,
-  newer=false,badRead=false,missingSheet=false,month='2026-11'}={}) {
+  newer=false,badRead=false,missingSheet=false,monthlyRows={},unreadableMonth}={}) {
   const initial={id:'OLD-IN',empId:'FIXTURE-E1',attNo:'001',
     type:'IN',status:'上班簽到',timeStr:old};
   const next={id:'NEW-IN',empId:'FIXTURE-E1',attNo:'001',
     status:incomingStatus,timeStr:now};
   const records=rows===undefined?[{...initial}]:rows;
-  const main={name:'main'},historical={name:'historical'};
+  const main={name:'main'};
   const ss={getSheetByName:()=>missingSheet?null:main};
   let repairs=0,writes=0;
   const context={
@@ -39,12 +39,17 @@ function make({source=candidate,rows,archive=[],now='2026/11/22 07:42',
     getDeletedRecordIds_:()=>deleted?{'OLD-IN':true}:{},
     readRecords_:sheet=>{
       if(badRead)throw Error('read unavailable');
-      return sheet===main?records:archive;
+      return sheet===main?records:sheet.rows;
     },
     SHEET_RECORDS:'考勤紀錄',
-    attendanceMonthKeyFromTimeStr_:()=>month,
+    attendanceMonthKeyFromTimeStr_:value=>value.slice(0,7).replace('/','-'),
     attendanceCurrentMonthKey_:()=> '2026-11',
-    getAttendanceMonthlySheet_:()=>historical
+    getAttendanceMonthlySheet_:(_ss,key,create)=>{
+      assert.equal(create,false);
+      if(key===unreadableMonth) throw Error('monthly ledger unavailable');
+      const rows=monthlyRows[key] ?? (key===old.slice(0,7).replace('/','-')?archive:null);
+      return rows && {rows};
+    }
   };
   vm.createContext(context);
   if(source.includes('function p79AllowNextShiftAfterOldOpenIn_('))
@@ -101,11 +106,23 @@ test('read failures and stale in-memory guard cannot authorize a punch',()=>{
 });
 test('previous-month official archive can prove old IN',()=>{
   const old={id:'OLD-IN',empId:'FIXTURE-E1',status:'上班簽到',timeStr:'2026/10/30 15:41'};
-  const t=make({old:'2026/10/30 15:41',rows:[],archive:[old],month:'2026-10'});
+  const t=make({old:'2026/10/30 15:41',rows:[],archive:[old]});
   assert.equal(t.check().ok,true);
 });
 test('patch rejects repeated application and unexpected GAS source',()=>{
   assert.throws(()=>require('../scripts/apply-gas-stale-open-checkin.cjs').apply(candidate),/already applied/);
   assert.throws(()=>require('../scripts/apply-gas-stale-open-checkin.cjs').apply('wrong version'),/Expected V100/);
+});
+test('current-month annual ledger provides proof and blocks newer punches',()=>{
+  const old={id:'OLD-IN',empId:'FIXTURE-E1',status:'上班簽到',timeStr:'2026/11/19 15:41'};
+  const newer={...old,id:'NEWER-OUT',status:'下班簽退',timeStr:'2026/11/20 01:00'};
+  assert.equal(make({rows:[],monthlyRows:{'2026-11':[old]}}).check().ok,true);
+  assert.equal(make({rows:[old],monthlyRows:{'2026-11':[old,newer]}}).check().ok,false);
+  assert.equal(make({rows:[old],unreadableMonth:'2026-11'}).check().ok,false);
+});
+test('later punches in intervening months and across years block recovery',()=>{
+  const old='2025/12/30 15:41';
+  const newer={id:'NEWER-OUT',empId:'FIXTURE-E1',status:'下班簽退',timeStr:'2026/01/01 00:30'};
+  assert.equal(make({old,monthlyRows:{'2026-01':[newer]}}).check().ok,false);
 });
 console.log(JSON.stringify({passed,failed:0,scope:'synthetic Node VM; not deployed; no GAS or real attendance writes'}));

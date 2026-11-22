@@ -22,10 +22,20 @@ function p79AllowNextShiftAfterOldOpenIn_(ss, record, state) {
     const main=ss.getSheetByName(SHEET_RECORDS);
     if (!main) return blocked;
     const sheets=[main];
-    const oldMonth=attendanceMonthKeyFromTimeStr_(state.timeStr);
-    if (oldMonth && oldMonth!==attendanceCurrentMonthKey_()) {
-      const archive=getAttendanceMonthlySheet_(ss,oldMonth,false);
-      if (archive && sheets.indexOf(archive)<0) sheets.push(archive);
+    const monthKeys=[
+      attendanceMonthKeyFromTimeStr_(state.timeStr),
+      attendanceMonthKeyFromTimeStr_(record.timeStr),
+      attendanceCurrentMonthKey_()
+    ];
+    if (monthKeys.some(key=>!/^\d{4}-(0[1-9]|1[0-2])$/.test(key))) return blocked;
+    const monthIndex=key=>Number(key.slice(0,4))*12+Number(key.slice(5))-1;
+    const [firstMonth,punchMonth,currentMonth]=monthKeys.map(monthIndex);
+    // The annual ledger has a separate sheet for every month, including today.
+    for (let index=firstMonth; index<=Math.max(punchMonth,currentMonth); index++) {
+      const key=String(Math.floor(index/12)).padStart(4,'0')+'-'+
+        String(index%12+1).padStart(2,'0');
+      const monthly=getAttendanceMonthlySheet_(ss,key,false);
+      if (monthly && !sheets.includes(monthly)) sheets.push(monthly);
     }
     const channel=p79PunchGuardChannel_(record.status);
     const seen=new Set();
