@@ -70,7 +70,7 @@ assert.equal(pendingLabel({...pending,reportVerified:true},duration),'','verifie
 assert.equal(pendingLabel({...pending,timeCheckRequired:true},duration),'','unverified punches must not become overtime estimates');
 assert.equal(pendingLabel({...pending,planned:true},duration),'','future planned shift must not show a completed estimate');
 assert.match(pendingLabel({...pending,specialOvertimeMinutes:120},duration),/加班出勤 2 小時 29 分/,'ordinary work evidence remains separate from special-day notice');
-assert(html.includes('特殊日出勤 '+ 'formatDurationMinutes(row.specialOvertimeMinutes)'),'special-day indication remains separately labeled');
+assert(html.includes("'特殊日出勤 '+formatDurationMinutes(row.specialOvertimeMinutes)"),'special-day indication remains separately labeled');
 assert(html.includes("row.specialReportMinutes===null?'班別待核對｜特殊日出勤 '+formatDurationMinutes(row.specialOvertimeMinutes)"),'special day overlap is shown as pending attendance, not a certified declaration');
 assert(html.includes('const pendingEstimateCount=rows.filter('),'count pending estimated overtime');
 console.log('PASS all-employee job-title burden sharing, including non-reporters and a zero-overtime title: 4/8 actuals, decimal conversion, unknown/mismatched values, deduplication, per-person averages, invalid and revoked/preview exclusions');
