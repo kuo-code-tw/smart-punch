@@ -29,7 +29,7 @@ const slice=(src,start,end)=>{const a=src.indexOf(start),b=src.indexOf(end,a);as
  assert.equal(calls.length,1);assert.equal(calls[0].opts.forceCloud,true,'the active month bypasses stale historical preview');
  await ctx.fetchMonth(month,session);assert.equal(calls.length,1,'fresh data is reused within bounded TTL');
  assert(ctx.fetchedAt.get(month)>Date.now()-3000,'cloud success timestamps the new data');
- assert(html.includes('port79-data-cache.js?v=20261120-windows-leave-retry-v1'),'home page must use the current cache loader revision');
+ assert(html.includes('port79-data-cache.js?v=20261121-history-on-demand-v2'),'home page must use the current cache loader revision');
  assert(html.includes('port79-efficiency-week-month-pager.js?v=20261108-source-freshness-v1'));
  console.log('PASS home chart stale cached months, live cloud bypass, source timestamps, two-minute history TTL and asset cache busting');
 })().catch(error=>{console.error(error);process.exitCode=1});
