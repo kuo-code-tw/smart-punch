@@ -35,7 +35,10 @@ function p79AllowNextShiftAfterOldOpenIn_(ss, record, state) {
       const key=String(Math.floor(index/12)).padStart(4,'0')+'-'+
         String(index%12+1).padStart(2,'0');
       const monthly=getAttendanceMonthlySheet_(ss,key,false);
-      if (monthly && !sheets.includes(monthly)) sheets.push(monthly);
+      // A missing month is unknown evidence, not proof of zero newer punches.
+      // This also stops if an annual book is missing or redirected unexpectedly.
+      if (!monthly) return blocked;
+      if (!sheets.includes(monthly)) sheets.push(monthly);
     }
     const channel=p79PunchGuardChannel_(record.status);
     const seen=new Set();
