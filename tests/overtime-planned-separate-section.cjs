@@ -24,6 +24,10 @@ const ctx={console,Number,String,Array,Set,Map,Math,Date,
  p79OvertimeCalculationCache:null,p79WorkOvertimeMonths:new Map(),p79MonthlyRestDraftsByMonth:new Map(),
  p79OvertimePlannedDisplayedRows:[],records:[],currentEmp:{empId:'ADMIN'},
  p79ResolvePlannedOvertimePeriod:()=>null,
+ // Dedicated unit/month filtering uses fixture departments; batch controls and
+ // master-roster resolution are tested in their own regressions.
+ p79OvertimeUnitForRow:row=>row.dept,
+ p79PlannedBulkCandidate:()=>null,p79RefreshPlannedBulkControls:()=>{},
  canPerformAdminAction:()=>true,
  formatEditableAttendanceTimeCell:(rec,type,can)=>can?'編輯'+(type==='IN'?'上班':'下班')+'時間 '+rec.timeStr:rec.timeStr,
  document:{getElementById:x=>nodes[x]||null},
