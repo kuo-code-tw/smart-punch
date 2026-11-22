@@ -69,11 +69,15 @@ vm.createContext(ctx);vm.runInContext(html.slice(versionStart,versionEnd),ctx);
     p79WorkOvertimeLoadQueue:Promise.resolve(),p79WorkOvertimeNextLane:0,p79WorkOvertimeRenderTimer:null,
     p79OvertimeCalculationCache:{},lastAttendanceCloudRevision:revision,window:{},
     renderOvertimeStats:()=>{},
-    fetch:async()=>{refreshes++;return{ok:true,json:async()=>({ok:true,schedules:[],leaveCoverAssignments:[],revision})}}};
+    // Overnight accounting also fetches November. Count October's own revision reads,
+    // and independently allow the adjacent month rather than treating it as a duplicate.
+    fetch:async(url)=>{if(url.includes('month=2026-10'))refreshes++;return{ok:true,json:async()=>({ok:true,schedules:[],leaveCoverAssignments:[],revision})}}};
  vm.createContext(fixtures);vm.runInContext(fn('p79LoadWorkOvertimeMonths'),fixtures);
  fixtures.p79LoadWorkOvertimeMonths([]);
  await fixtures.p79WorkOvertimeMonths.get('2026-10').promise;
- assert.equal(refreshes,1,'first read should load');
+ await fixtures.p79WorkOvertimeMonths.get('2026-11').promise;
+ assert.equal(fixtures.p79WorkOvertimeMonths.get('2026-11').ready,true,'next-month overnight accounting data also loads');
+ assert.equal(refreshes,1,'first read should load the selected month once');
  fixtures.p79WorkOvertimeMonths.get('2026-10').at=Date.now()-3600000;
  fixtures.p79LoadWorkOvertimeMonths([]);
  assert.equal(refreshes,1,'unchanged cloud revision should not refetch due to time');
@@ -93,12 +97,12 @@ vm.createContext(ctx);vm.runInContext(html.slice(versionStart,versionEnd),ctx);
  // Editing can start after a fetch begins; its eventual response must not replace the last safe snapshot.
  const verifiedState=fixtures.p79WorkOvertimeMonths.get('2026-10');
  let resolveHeld;revision='r4';fixtures.lastAttendanceCloudRevision='r4';
- fixtures.fetch=async()=>{refreshes++;await new Promise(resolve=>{resolveHeld=resolve});return{ok:true,json:async()=>({ok:true,schedules:[],revision:'r4'})}};
+ fixtures.fetch=async(url)=>{if(!url.includes('month=2026-10'))return{ok:true,json:async()=>({ok:true,schedules:[],revision:'r4'})};refreshes++;await new Promise(resolve=>{resolveHeld=resolve});return{ok:true,json:async()=>({ok:true,schedules:[],revision:'r4'})}};
  fixtures.p79LoadWorkOvertimeMonths([]);
  const heldState=fixtures.p79WorkOvertimeMonths.get('2026-10');
  editing=true;resolveHeld();await heldState.promise;
  assert.equal(fixtures.p79WorkOvertimeMonths.get('2026-10'),verifiedState,'edit started in flight should restore last verified snapshot');
- editing=false;fixtures.fetch=async()=>{refreshes++;return{ok:true,json:async()=>({ok:true,schedules:[],revision:'r4'})}};
+ editing=false;fixtures.fetch=async(url)=>{if(url.includes('month=2026-10'))refreshes++;return{ok:true,json:async()=>({ok:true,schedules:[],revision:'r4'})}};
  fixtures.p79LoadWorkOvertimeMonths([]);
  await fixtures.p79WorkOvertimeMonths.get('2026-10').promise;
  assert.equal(refreshes,5,'deferred in-flight revision can be fetched after editor closes');
