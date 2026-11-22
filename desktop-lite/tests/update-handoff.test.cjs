@@ -16,6 +16,15 @@ assert.match(native,/app","Port79Updater\.exe"/,'New installs contain native hel
 assert.match(native,/new ProcessStartInfo\(launch\)/,'Run the native helper instead of PowerShell');
 assert.doesNotMatch(native,/new ProcessStartInfo\("powershell\.exe"\)/);
 assert.match(native,/native-update-launch-error\.txt/,'Show an actual native launch error');
+assert.match(native,/void HandoffAudit\(string root,string message\)/,'Parent must diagnose helper process exits before native logging');
+assert.match(native,/windows-update-handoff\.txt/,'Keep durable parent-side handoff diagnostics under local-data logs');
+assert.match(native,/HANDOFF_NO_READY exit=/,'Record exit code even when there is no native updater log');
+assert.match(native,/HANDOFF_PROCESS_START_FAILED/,'Record process start exceptions safely');
+assert.match(native,/HANDOFF_READY_ACKNOWLEDGED/,'Record verified transfer completion');
+assert.match(native,/原因尚未確認/,'Do not guess antivirus or permissions without device evidence');
+assert.match(main,/https:\/\/github\.com\/kuo-code-tw\/smart-punch\/releases\/latest/,'Offer an official immutable-release recovery source');
+assert.match(main,/不要用舊版程式檔覆蓋新版/,'Tell operators to preserve local-data, not old program files');
+
 assert.match(native,/runner-ready-/);
 assert.match(native,/accepted=!process\.HasExited/);
 assert.match(native,/if\(!accepted\)/);

@@ -798,8 +798,12 @@ namespace Port79Lite {
     Log("unified system update error: "+e.Message);
     UpdateStatus("更新執行失敗；現有程式與本機資料已保留。",manual);
     if(manual)MessageBox.Show(this,
-     "無法套用新版，為安全起見已保留目前程式。\n\n"+
-     SafeStatus(e.Message,450)+"\n\n"+
+     "無法套用新版，為安全起見已保留目前程式及本機資料。\n\n"+
+     SafeStatus(e.Message,550)+"\n\n"+
+     (e.Message.Contains("更新工具未完成接手")||e.Message.Contains("原生更新未能啟動")
+      ?"如果更新工具無法啟動：請真正結束電腦版，從 GitHub 官方 Releases 下載完整 ZIP，解壓縮到新資料夾；將舊版 local-data 複製到新版，不要用舊版程式檔覆蓋新版。\n"+
+       "官方下載：https://github.com/kuo-code-tw/smart-punch/releases/latest\n"+
+       "診斷紀錄：local-data\\logs\\windows-update-handoff.txt\n\n":"")+
      "更新紀錄：開啟本機資料夾 → logs → windows-lite.log",
      "79號碼頭電腦版｜更新未完成",MessageBoxButtons.OK,MessageBoxIcon.Error);
    }finally{

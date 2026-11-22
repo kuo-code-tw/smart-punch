@@ -125,6 +125,17 @@ namespace Port79Lite {
     return new Prepared{Zip=zip,Digest=digest,Helper=helper};
    }
   }
+  // Write parent-side diagnostics even if the native EXE cannot start Main().
+  // Diagnostics are best-effort and must never interrupt a verified update.
+  private static void HandoffAudit(string root,string message){
+   try{
+    var dir=Path.Combine(root,"local-data","logs");
+    Directory.CreateDirectory(dir);
+    var path=Path.Combine(dir,"windows-update-handoff.txt");
+    if(File.Exists(path)&&new FileInfo(path).Length>256*1024)File.Delete(path);
+    File.AppendAllText(path,DateTime.Now.ToString("o")+" "+message+Environment.NewLine,Encoding.UTF8);
+   }catch{}
+  }
   static string Quote(string s){
    if(String.IsNullOrEmpty(s)||s.IndexOf('"')>=0||s.IndexOf('\n')>=0||s.IndexOf('\r')>=0)throw new InvalidDataException("Windows 更新路徑含有不合法字元");
    return "\""+s+"\"";
@@ -146,6 +157,7 @@ namespace Port79Lite {
    // app/Port79Updater.exe file while installing an updated helper version.
    var launch=Path.Combine(updateDir,
     "native-launch-"+parentPid+"-"+Guid.NewGuid().ToString("N")+".exe");
+   HandoffAudit(root,"HANDOFF_BEGIN helper="+p.Helper+" launch="+launch);
    File.Copy(p.Helper,launch,false);
    var psi=new ProcessStartInfo(launch){
     Arguments="--archive "+Quote(p.Zip)+" --install-root "+Quote(root)+
@@ -157,7 +169,12 @@ namespace Port79Lite {
    bool accepted=false;
    int? exitCode=null;
    try{
-    process=Process.Start(psi);
+    try{process=Process.Start(psi);}
+    catch(Exception startError){
+     HandoffAudit(root,"HANDOFF_PROCESS_START_FAILED type="+startError.GetType().Name+
+      " code="+startError.HResult+" message="+startError.Message);
+     throw;
+    }
     if(process==null)throw new InvalidOperationException(
      "無法啟動 Windows 原生更新器；目前程式與本機資料均未變更。");
     var deadline=DateTime.UtcNow.AddSeconds(30);
@@ -176,15 +193,19 @@ namespace Port79Lite {
      if(process.HasExited)exitCode=process.ExitCode;
      var reason=File.Exists(fail)?File.ReadAllText(fail).Trim():"";
      var log=Path.Combine(root,"local-data","logs","windows-upgrade.txt");
+     HandoffAudit(root,"HANDOFF_NO_READY exit="+(exitCode.HasValue?exitCode.Value.ToString():"timeout")+
+      " nativeReason="+(String.IsNullOrEmpty(reason)?"none":reason)+
+      " helperLogExists="+File.Exists(log));
      if(String.IsNullOrEmpty(reason))
       reason="原生更新器沒有回覆接手訊號"+(exitCode.HasValue?"（結束代碼 "+exitCode.Value+"）":"（啟動逾時）");
      throw new InvalidOperationException(
-      "79號碼頭電腦版更新未能啟動，原有程式已保留。\n"+
+      "79號碼頭電腦版更新工具未完成接手，原有程式與本機資料已保留。\n"+
       reason+"\n"+
-      "請查看更新紀錄：local-data\\logs\\windows-upgrade.txt"+
-      (File.Exists(log)?"":"（沒有產生紀錄，可能被安全軟體限制執行）"));
+      "請查看診斷紀錄：local-data\\logs\\windows-update-handoff.txt；原生紀錄：local-data\\logs\\windows-upgrade.txt"+
+      (File.Exists(log)?"":"（沒有原生紀錄；更新工具可能在開始執行前就結束，原因尚未確認）"));
     }
    }finally{
+    if(accepted)HandoffAudit(root,"HANDOFF_READY_ACKNOWLEDGED parent="+parentPid);
     try{if(File.Exists(ready))File.Delete(ready);}catch{}
     if(process!=null)process.Dispose();
     // Do not delete the in-use helper; cleanup of old launcher copies occurs
