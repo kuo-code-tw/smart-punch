@@ -60,7 +60,7 @@ c.renderRouteData();
 assert(fake.routeCardsGrid.innerHTML.includes('ABC'));
 assert(fake.routeCardsGrid.innerHTML.includes('FOC'));
 assert(fake.routeCardsGrid.innerHTML.includes('p79-route-card'));
-assert(fake.routeCardsGrid.innerHTML.includes('中文名稱待補'));
+assert(fake.routeCardsGrid.innerHTML.includes('中文名稱查詢中'));
 assert(fake.routeSummaryTableBody.innerHTML.includes('中文名稱待補'));
 assert(fake.routeSummaryTableBody.innerHTML.includes('日本關東－泰國航線'));
 assert(!fake.routeCardsGrid.innerHTML.includes('<script>'));
