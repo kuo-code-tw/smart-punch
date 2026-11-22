@@ -143,7 +143,7 @@ assert(css.includes('repeat(4,minmax(190px,1fr))'),'narrow screens stay in one s
 assert(js.includes('root.P79HomeEarlyPunchAlert?.render('),'homepage renders from its official data');
 assert(js.includes('P79ScheduleRestEvidence.create('),'home uses same rest audit');
 assert(js.includes("requestOfficialAttendanceAudit('getAttendanceMonthRaw'"),'home verifies independent raw punches');
-assert(html.includes('port79-schedule-rest-evidence.js?v=20261111-home-rest-proof-v1'),'home loads shared audit');
+assert(html.includes('port79-schedule-rest-evidence.js?v=20261122-attendance-deep-audit-v2'),'home loads shared audit');
 assert(js.includes('root.P79HomeEarlyPunchAlert?.bind(async()=>'),'card opens fresh official comparison');
 assert(js.includes('requestApprovedLeave(token)'),'homepage and dialog use the official getLeaveData source');
 assert(js.includes('leaveSnapshot=data'),'monthly card waits for approved leave before verification');
