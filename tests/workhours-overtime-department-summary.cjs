@@ -51,7 +51,8 @@ assert(html.includes('<summary id="p79OvertimeJobTitleSummaryTitle"'),'job-title
 assert(html.includes('點擊展開／收合'),'job-title fold must explain the interaction');
 assert(html.includes('id="p79OvertimeJobTitleRows"'),'job-title table must be visible');
 assert(html.includes('>總人數</th>')&&html.includes('>請假天數</th>'),'job-title population and approved leave days columns must appear');
-assert(html.includes("p79BuildOvertimeJobTitleSummary(jobTitleRows,staff)"),'job-title aggregation must include all jobs, even when one employee is filtered');
+assert(html.includes("p79BuildOvertimeJobTitleSummary(completedJobRows,staff)"),'job-title aggregation includes all authorized jobs but excludes unconfirmed saved plans');
+assert(html.includes('const completedJobRows=jobTitleRows.filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))'),'pending plans cannot inflate official title averages');
 assert(html.includes("let rows=jobTitleRows.filter("),'personal daily-row filtering must not restrict title-wide distribution');
 assert(html.includes('id="p79OvertimeJobTitleNotice"'),'abnormal report notice must be visible');
 assert(html.includes('換算加班時數</div><div id="overtimeTotalHours"'),'converted total card must use official conversions');
