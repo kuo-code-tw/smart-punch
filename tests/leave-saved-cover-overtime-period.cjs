@@ -48,8 +48,8 @@ assert(html.includes('period.warning||'), 'mismatched reports require explicit w
 assert(html.includes('const meta=employeeRow.schedule?.__meta?.[entry.date]||{},report=meta.overtimeReport;'),
  'dialog must read the authenticated employee/date cloud metadata before formatting');
 assert(html.includes("if(!employeeRow)throw Error('雲端找不到這位代班人員的班表')"),'unknown cloud employee cannot be reported as an existing leave-cover filing');
-assert(html.includes("cell.textContent=(report.planned===true?'已儲存預排｜':'已正式申報｜')"),
- 'planned and formal identity must be preserved');
+assert(html.includes("if(report.planned===true){")&&html.includes("cell.textContent='已預排（尚未正式申報）｜'")&&html.includes("report.planned===false&&String(report.id||'').trim()")&&html.includes("cell.textContent='已正式申報｜'"),
+ 'show planned, saved formal and unverified reports as distinct states');
 for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))
  if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);
 console.log('PASS leave saved overtime: 20-08 full-work code yields verified 延20-24 actual 4h, original cloud code retained, no incorrect auto-fix, night shifts and immutable reports');
