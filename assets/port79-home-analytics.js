@@ -31,12 +31,30 @@ function parseBundleRemark(text){
     .toUpperCase()
     .replace(/[’′]/g,"'")
     .replace(/\u00A0/g,' ')
+    // Recognize the same explicit BN/FR or BN/FL pair across supplier
+    // formats (fullwidth slash, ×, equals, commas and colon).
+    .replace(/[／∕⁄]/g,'/')
+    .replace(/[×＊]/g,'*')
+    // Comma-separated FULL pairs (1BN/4FR,1BN/4FR) must stay separate;
+    // only a comma between an explicit BN group and its FR/FL value is a slash.
+    .replace(/(\d+(?:\.\d+)?\s*BN)\s*[,，＋+]\s*(?=\d+(?:\.\d+)?\s*(?:FR|FL))/g,'$1/')
+    .replace(/[：:=]/g,'/')
+    .replace(/\b(BN|FR|FL)\s*\/\s*(?=\d)/g,'$1')
     .replace(/[ \t]+/g,' ')
     .trim();
 
   const items=[];
   const seenOccurrence=new Set();
+  const usedRanges=[];
   const pushItem=(size,bn,fl,unit,raw,key)=>{
+    // Alternate regexes can overlap one source span, especially with two
+    // adjacent pairs (1BN/4FR/1BN/4FR). Count each text span once.
+    const sourcePosition=String(key||'').match(/^[A-Z0-9]+:(\d+):/);
+    if(sourcePosition){
+      const from=Number(sourcePosition[1]),to=from+String(raw||'').length;
+      if(usedRanges.some(([a,b])=>from<b&&to>a))return;
+      usedRanges.push([from,to]);
+    }
     bn=num(bn);fl=num(fl);
     if(!(bn>=0&&fl>=0))return;
 
@@ -66,14 +84,14 @@ function parseBundleRemark(text){
   };
 
   // 格式 1：2BN/7FR、5BN/20FL（舊有格式）
-  const normal=/(?:^|[^0-9])(?:(20|40|45)\s*'?\s*\*?\s*)?(\d+(?:\.\d+)?)\s*BN\s*\/\s*(\d+(?:\.\d+)?)\s*(FR|FL)/gi;
+  const normal=/(?:^|[^0-9])(?:(20|40|45)\s*'?\s*\*?\s*)?(\d+(?:\.\d+)?)\s*BN\s*(?:\/|\s+)\s*(\d+(?:\.\d+)?)\s*(FR|FL)/gi;
   let m;
   while((m=normal.exec(s))){
     pushItem(m[1],m[2],m[3],m[4],m[0],`N:${m.index}:${m[0]}`);
   }
 
   // 格式 2：7FR/2BN、20FL/5BN（WAN HAI 272 N229 實際使用格式）
-  const reverse=/(?:^|[^0-9])(?:(20|40|45)\s*'?\s*\*?\s*)?(\d+(?:\.\d+)?)\s*(FR|FL)\s*\/\s*(\d+(?:\.\d+)?)\s*BN/gi;
+  const reverse=/(?:^|[^0-9])(?:(20|40|45)\s*'?\s*\*?\s*)?(\d+(?:\.\d+)?)\s*(FR|FL)\s*(?:\/|\s+)\s*(\d+(?:\.\d+)?)\s*BN/gi;
   while((m=reverse.exec(s))){
     pushItem(m[1],m[4],m[2],m[3],m[0],`R:${m.index}:${m[0]}`);
   }
@@ -100,6 +118,22 @@ function parseBundleRemark(text){
   while((m=labelFirstReverse.exec(s))){
     pushItem('',m[3],m[2],m[1],m[0],`LFR:${m.index}:${m[0]}`);
   }
+
+  // Mix of value-first and label-first notation: BN2/7FR, 2BN/FL7,
+  // FR7/2BN and 7FR/BN2. Both group and container evidence are mandatory.
+  const mixed=[
+    {re:/\bBN\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(FR|FL)/gi,read:m=>[m[1],m[2],m[3]]},
+    {re:/(?:^|[^0-9])(\d+(?:\.\d+)?)\s*BN\s*\/\s*(FR|FL)\s*(\d+(?:\.\d+)?)/gi,read:m=>[m[1],m[3],m[2]]},
+    {re:/\b(FR|FL)\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*BN/gi,read:m=>[m[3],m[2],m[1]]},
+    {re:/(?:^|[^0-9])(\d+(?:\.\d+)?)\s*(FR|FL)\s*\/\s*BN\s*(\d+(?:\.\d+)?)/gi,read:m=>[m[3],m[1],m[2]]}
+  ];
+  mixed.forEach(({re,read},i)=>{
+    let found;
+    while((found=re.exec(s))){
+      const [bn,fl,unit]=read(found);
+      pushItem('',bn,fl,unit,found[0],'M'+i+':'+found.index+':'+found[0]);
+    }
+  });
 
   const deduct=items.reduce((a,x)=>a+num(x.deduct),0);
   const fl=items.reduce((a,x)=>a+num(x.fl),0);
@@ -136,7 +170,13 @@ function applyBundleDeductionToWorkingReport(discValue,loadValue,remarkText){
     // 因此扣在與 FL 最接近的一側，避免任意拆分。
     const dDiff=Math.abs(rawDisc-info.fl);
     const lDiff=Math.abs(rawLoad-info.fl);
-    if(dDiff<=lDiff)disc=Math.max(0,rawDisc-deduction);
+    // Merged personnel intervals can have all Bundle remarks on DISC while
+    // LOAD is a small unrelated interval (WAN HAI 278: DISC 100, LOAD 8,
+    // 11BN/44FR => deduct 33). Never pick a side that cannot cover the
+    // deduction if the other side can.
+    if(rawDisc>=deduction && rawLoad<deduction)disc=rawDisc-deduction;
+    else if(rawLoad>=deduction && rawDisc<deduction)load=rawLoad-deduction;
+    else if(dDiff<=lDiff)disc=Math.max(0,rawDisc-deduction);
     else load=Math.max(0,rawLoad-deduction);
   }
 
@@ -220,6 +260,55 @@ function effectiveBundleRecord(r){
     && Math.abs(currentDeduct-existingDeduct)<=0.01
     && (existingInfo.length>0 || existingBn>0 || existingFl>0);
 
+  // Legacy cloud rows sometimes persisted BN as bundleDeduct instead of FR-BN.
+  // An existing partial deduction is not proof of correctness if original
+  // structured Bundle evidence says to deduct more (e.g. 13BN/51FR => 38).
+  const structuredTotals=existingInfo.reduce((sum,item)=>{
+    const bn=num(item?.bn),fl=num(item?.fl);
+    return bn>=0&&fl>=bn&&fl>0?sum+fl-bn:sum;
+  },0);
+  const scalarDeduct=existingBn>0&&existingFl>=existingBn
+    ?existingFl-existingBn:0;
+  const evidencedDeduct=Math.max(structuredTotals,scalarDeduct);
+  // If original source rows already produced a correct DISC/LOAD split,
+  // preserve it. Re-selecting a side from merged BN/FR remarks can move a
+  // valid LOAD deduction to DISC and silently corrupt per-person metrics.
+  const fullDeduct=Math.max(existingDeduct,evidencedDeduct,num(parsed.deduct));
+  if(hasRawDisc&&hasRawLoad&&fullDeduct>0 &&
+      currentDisc<=rawDisc&&currentLoad<=rawLoad &&
+      Math.abs(currentDeduct-fullDeduct)<=0.01){
+    return {
+      detected:true,remark:remark||canonicalBundleRemark(existingInfo),
+      rawDisc,rawLoad,disc:currentDisc,load:currentLoad,
+      bundleDeduct:fullDeduct,
+      bundleBn:existingBn||num(parsed.bn),
+      bundleFl:existingFl||num(parsed.fl),
+      bundleInfo:existingInfo.length?existingInfo:(parsed.items||[])
+    };
+  }
+  const originalGrossIsProven=hasRawDisc&&hasRawLoad&&
+    rawSum>=currentSum&&rawSum>=evidencedDeduct&&
+    (Math.abs(currentDeduct-existingDeduct)<=0.01 ||
+      Math.abs(currentDeduct-evidencedDeduct)<=0.01);
+  if(!parsed.items.length && evidencedDeduct>existingDeduct+0.01 &&
+      originalGrossIsProven && (existingInfo.length>0||existingBn>0)){
+    const proofRemark=canonicalBundleRemark(existingInfo)||
+      (existingFl>0?String(existingBn)+'BN/'+String(existingFl)+'FR':'');
+    if(proofRemark){
+      const repaired=applyBundleDeductionToWorkingReport(rawDisc,rawLoad,proofRemark);
+      // No invented distribution: the known gross must cover the exact deduction.
+      if(Math.abs(rawSum-num(repaired.disc)-num(repaired.load)-evidencedDeduct)<=0.01){
+        return {
+          detected:true,remark:proofRemark,rawDisc,rawLoad,
+          disc:num(repaired.disc),load:num(repaired.load),
+          bundleDeduct:evidencedDeduct,
+          bundleBn:existingBn||num(repaired.bundleInfo?.bn),
+          bundleFl:existingFl||num(repaired.bundleInfo?.fl),
+          bundleInfo:existingInfo.length?existingInfo:(repaired.bundleInfo?.items||[])
+        };
+      }
+    }
+  }
   if(structuralBundleIsStronger){
     return {
       detected:true,
@@ -304,7 +393,6 @@ function effectiveBundleRecord(r){
     bundleInfo:[]
   };
 }
-// Read-only vessel snapshot aggregation. Counts use dated detail rows; billing uses completed jobs.
 function vesselAggregate(data,{today,month}){
  const num=v=>{const n=Number(v);return Number.isFinite(n)&&n>=0&&n<1e8?n:0;};
  const iso=v=>{const m=String(v||'').match(/^(20\d{2})[-/](\d{1,2})[-/](\d{1,2})/);return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:'';};
