@@ -7765,9 +7765,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // Only a completed attendance audit that found an actual missing pair
       // may display 打卡待核; a verified no-punch day still becomes 休.
       const scheduledRest=['休','例','國','颱','年','特','事','病','公','喪','離','離職'].includes(rosterShift);
-      const regularRest=['休','例','國'].includes(rosterShift);
+      const attendanceKey=String(emp.id).trim().toUpperCase()+'|'+dayStr;
+      const restDayPunch=['休','例','國'].includes(rosterShift)&&
+        ctx.attendanceEvidence?.pendingPunchDetails?.[attendanceKey]?.length>0;
       const evidenceReady=ctx.attendanceEvidence?.complete===true;
-      const punchPending=(!scheduledRest||regularRest)&&evidenceReady&&attendanceState==='missing'&&
+      const punchPending=(!scheduledRest||restDayPunch)&&evidenceReady&&attendanceState==='missing'&&
         dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
       const attendanceUnverified=!scheduledRest&&!evidenceReady&&
         dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
