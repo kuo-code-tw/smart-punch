@@ -8597,6 +8597,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const yearMonth = String(document.getElementById('month-picker')?.value || '').trim();
         if (!/^\d{4}-\d{2}$/.test(yearMonth)) throw new Error('目前排班月份格式不正確');
         if(input.dataset.importMonth!==yearMonth)throw new Error('排班月份已變更，請重新選擇職稱與匯入檔案');
+        if(!canManageSchedule()||!scheduleCanEditNow())throw new Error('排班編輯權已變更，請重新取得編輯權後再匯入');
+        // This month is also blocked by saveScheduleMonthToCloud. Reject the
+        // import before changing any local shift, personnel setting or draft.
+        if(yearMonth==='2026-10')throw new Error('2026年10月班表正在修復核對，已暫停匯入，以保護原有班別。');
         const [year, month] = yearMonth.split('-').map(Number);
         const totalDays = getDaysInMonth(year, month);
 
