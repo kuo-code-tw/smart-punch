@@ -32,7 +32,7 @@
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261117-active-roster-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1&noWork=20261106"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
-<script src="../assets/port79-schedule-rest-evidence.js?v=20261109-month-to-date-no-card-v1"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261122-attendance-save-invalidation-v1"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261112-title-visibility-v1"></script>
 <script id="p79-default-light-v20261001">
 (function(){
@@ -7594,6 +7594,20 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // 出勤核對獨立於班表同步；編輯鎖或尚未儲存的班表不應阻止晚班結束後核對。
       return p79ScheduleRestClient().refreshIfStale(month);
     }
+    // A successful official attendance write in another tab sends this same-origin
+    // notice. Check the full active-month roster automatically; do not alter the
+    // original saved shifts or require a manual reconciliation button.
+    window.addEventListener('storage',event=>{
+      if(event.key!=='port79_attendance_sync_notice_v1'||!event.newValue)return;
+      try{
+        const notice=JSON.parse(event.newValue),at=Number(notice?.at);
+        if(!Number.isFinite(at)||at<=0||Math.abs(Date.now()-at)>120000)return;
+        const month=currentScheduleMonthKey();
+        if(!currentPort79SsoToken()||!/^\d{4}-\d{2}$/.test(month)||!employees.length)return;
+        // Also clear cached adjacent-month reads for cross-midnight shifts.
+        void p79ScheduleRestClient().invalidate(month);
+      }catch(error){console.warn('考勤異動自動核對通知無效',error);}
+    });
     function p79ScheduleRestBalance(emp,month,allocated=null) {
       const leaveDates=p79ScheduleRestLeaveDates(month,emp.id);
       return window.P79ScheduleRestSummary.summary(emp,monthlyScheduleData[emp.id]||{},allocated||p79AutomaticRestMetadata(emp.id,month),month,{leaveDates,leaveCoverAssignments,attendanceEvidence:p79ScheduleRestClient().status(month).evidence},p79EmploymentStartDate(emp));
