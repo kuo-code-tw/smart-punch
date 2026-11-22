@@ -20,14 +20,14 @@ for(const other of [{...damaged,attNo:'other'},{...damaged,status:'OUT'},{...dam
 const core=fs.readFileSync('assets/port79-attendance-core.js','utf8');
 const ds=core.indexOf('function mergeDeltaEvent(event){'),de=core.indexOf('\nasync function pollDelta(',ds);
 Object.assign(c,{records:[full],confirmCloudRecord:()=>{},pendingForId:()=>false});vm.runInContext(core.slice(ds,de),c);
-assert.equal(c.mergeDeltaEvent({kind:'upsert',record:damaged}),true);assert.equal(c.records[0].timeStr,full.timeStr);
+assert.equal(c.mergeDeltaEvent({kind:'upsert',record:damaged}),false,'ignored incomplete cloud event must not repaint');assert.equal(c.records[0].timeStr,full.timeStr);
 c.mergeDeltaEvent({kind:'upsert',record:midnight});assert.equal(c.records[0].timeStr,midnight.timeStr);
 const engine=require('../attendance/v6-engine.js');
 assert.equal(engine.normalizeTime('2026/10/10'),'2026/10/10');
 let rows=engine.buildShifts([damaged,{...full,id:'out',status:'OUT',timeStr:'2026/10/11 07:51'}]);
 assert.equal(rows.length,2);assert(rows.some(r=>r.timePrecisionIssue&&r.clockIn.timeStr==='2026/10/10'));assert(!rows.some(r=>r.clockIn&&r.clockOut));
 rows=engine.buildShifts([full,{...full,id:'out',status:'OUT',timeStr:'2026/10/11 07:51'}]);assert.equal(rows.length,1);assert(rows[0].clockIn&&rows[0].clockOut);
-rows=engine.buildShifts([{...full,timeStr:'2026/10/11 00:00'},{...full,id:'out',status:'OUT',timeStr:'2026/10/11 07:51'}]);assert.equal(rows.length,1);assert.equal(rows[0].dateKey,'2026-10-11');
+rows=engine.buildShifts([{...full,timeStr:'2026/10/11 00:00'},{...full,id:'out',status:'OUT',timeStr:'2026/10/11 07:51'}]);assert.equal(rows.length,1);assert.equal(rows[0].dateKey,'2026-10-10','completed shift wholly before 08:00 uses the prior work date');assert.equal(rows[0].actualDateKey,'2026-10-11','actual punch date is preserved');
 for(const bad of ['2026/02/30 07:51','2026/10/10 25:00'])assert(engine.buildShifts([{...full,timeStr:bad}])[0].timePrecisionIssue);
 console.log('PASS precise source preserved through month/canonical/delta merges and repeated pulls; newer genuine midnight edit, cross-day pairing and damaged-row visibility; no cloud writes');
 
