@@ -6,7 +6,7 @@ const c={window:null,document:d,MutationObserver:class{observe(){}},Intl,Date,Nu
 const api=c.P79ReferenceDashboard;
 api.attendance({today:'2026-10-30',todayCount:3,todayOnDuty:2,punchIn:4,recordCount:8,peopleCount:4,weeklyPeople:[2,3,4,5,6]},'2026-10');
 a.match(el('p79DashAttendanceBars').innerHTML,/正在讀取正式加班申報與職稱資料/);
-a.match(el('p79DashAttendanceChartTitle').innerHTML,/本月各職稱加班時數統計/);
+a.match(el('p79DashAttendanceChartTitle').innerHTML,/本月員工職稱加班時數統計（實際）/);
 a.equal(el('p79DashChartPage').textContent,'第1頁／共2頁');
 a(el('p79DashChartPrevious').disabled&&!el('p79DashChartNext').disabled);
 api.setOvertimeReport({month:'2026-10',rows:[{title:'AQC',hours:3.5,count:2},{title:'指揮手',hours:1.25,count:1},{title:'駕駛',hours:0,count:0}]});
