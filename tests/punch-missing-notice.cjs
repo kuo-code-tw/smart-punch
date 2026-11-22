@@ -99,6 +99,8 @@ test('notice is only called after successful cloud-confirmed read; no write acti
   const month=html.lastIndexOf('p79MobileOfficial.rows=matched;',entry);
   assert(entry>0&&read>0&&month>read);
   assert.match(html,/src="\.\.\/assets\/port79-punch-missing-notice\.js/);
+  assert(html.includes('window.p79PunchInProgress!==true && window.P79MissingPunchNotice'),
+    'historical alert must not interrupt an active punch attempt');
   assert(!source.includes('performCloudRequest'));
   assert(!source.includes('fetch('));
 });
