@@ -8045,6 +8045,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           details.push('本月國定假日額度0；仍有'+invalidNationalCount+'筆歷史國假標記或正式申報須管理員核對。原始報單未修改。');
         if(extraReportedDates.length)
           details.push('正式已報 '+extraReportedDates.length+' 天｜雲端已確認'+category+'加班：'+extraReportedDates.join('、'));
+        if(category==='國'&&nationalDuplicates)details.push(nationalDuplicates+' 筆已移至「颱」統計');
         if(!verified)details.push('雲端申報額度待核');
         else if(officialRemaining!==rest)details.push('班格與正式帳本差異須核對：正式剩餘 '+officialRemaining+' 天');
         const title=details.length?' title="'+scheduleEscapeHtml(details.join('；'))+'"':'';
