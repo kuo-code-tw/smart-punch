@@ -53,6 +53,7 @@ const css=fs.readFileSync(path.join(__dirname,'../assets/port79-personnel-dispat
 for(const id of ['dispatchGroupRoster','dispatchRosterSelection','dispatchUnassigned','dispatchGenerateButton','dispatchBody'])
  assert.match(html,new RegExp('id="'+id+'"'));
 assert.match(js,/data-dispatch-select=/);
-assert.match(js,/suggestionResult=optimizeGroups/);
+assert.match(js,/const result=optimizeGroups\(latest,/,'one-click recommendation invokes the real optimizer');
+assert.match(js,/suggestionResult=result;[\s\S]{0,80}plan=result\.plan/,'auto-apply is a preview, not a formal roster write');
 assert.ok(css.includes('.p79d-roster-grid'));
 console.log('PASS complete A-D roster, selected-only optimization, exact small-group optimum, seeded large-group improvement, locks, headcount preservation, and no formal roster mutation');
