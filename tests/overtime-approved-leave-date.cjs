@@ -19,7 +19,7 @@ assert.deepEqual(list([{empId:'E',status:'已核准',startDate:'2026-02-30',endD
 assert.doesNotThrow(()=>api.validateLeaveLinkedOvertimeDate('2026-10-20','AN1150017',list(records,'AN1150017')));
 assert.throws(()=>api.validateLeaveLinkedOvertimeDate('2026-10-26','AN1150017',list(records,'AN1150017')),/不符/,'the exact screenshot defect must be rejected before POST');
 assert.throws(()=>api.validateLeaveLinkedOvertimeDate('2026-10-26','AN1150017',[]),/無法核對/,'missing official leave must block linked filing');
-assert.throws(()=>api.validateLeaveLinkedOvertimeDate('2026-10-26','AN1150017',[],'2026-10-20'),/不可變更/,'handoff date must be locked');
+assert.throws(()=>api.validateLeaveLinkedOvertimeDate('2026-10-26','AN1150017',[],'2026-10-20'),/兩者不可混用/,'handoff date must be locked without confusing actual work and leave accounting days');
 assert.doesNotThrow(()=>api.validateLeaveLinkedOvertimeDate('2026-10-20','AN1150017',[],'2026-10-20'));
 assert.doesNotThrow(()=>api.validateLeaveLinkedOvertimeDate('2026-10-26','',[]),'standalone overtime may still be filed on selected date');
 assert(js.includes('approvedDates.length===1')&&js.includes('dateInput.value=approvedDates[0]'),'single approved leave must fill its actual date');
