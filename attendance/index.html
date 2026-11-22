@@ -2451,6 +2451,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
     </div>
 
     <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+    <script src="../assets/port79-punch-missing-notice.js?v=20261122-readonly"></script>
 
     <script>
         // BUILD: 2026-09-24 22:35 NO-MANUALPAIR-IDENTIFIER
@@ -10405,6 +10406,21 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     status:String(latest?.status||''),verifiedAt:Date.now()
                 };
                 if(latest?.id!=null)window.p79ConfirmMobilePunchCloudRecord?.(latest.id);
+                // Show only cloud-confirmed, employee-owned historical punch gaps.
+                // The notice is informational and never changes the IN/OUT guard.
+                try {
+                    if (p79IsPunchEntryMode() && window.P79MissingPunchNotice) {
+                        const regular=matched.filter(r=>
+                            getPunchChannel(r.status)==='REGULAR' && !!getPunchTypeFromStatus(r.status));
+                        const daily=buildDailyAttendanceRows(regular);
+                        window.P79MissingPunchNotice.showFromOfficial({
+                            empId,month,rows:daily,confirmedIds:regular.map(r=>r.id),
+                            parseTime:getAttendanceTimestamp,formatTime:formatDateTime
+                        });
+                    }
+                } catch (noticeError) {
+                    console.warn('員工漏卡提醒未能顯示，但不影響正式打卡狀態判斷',noticeError);
+                }
                 try{updateHomeClockInButtonState();}catch(e){}
                 return true;
             })();
