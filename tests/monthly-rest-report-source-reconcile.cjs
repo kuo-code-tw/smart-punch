@@ -1,7 +1,7 @@
 'use strict';
 const fs=require('node:fs'),vm=require('node:vm'),a=require('node:assert/strict');
 const html=fs.readFileSync('schedule/index.html','utf8');
-const i=html.indexOf('    function p79ScheduleRestCountCells('),j=html.indexOf('    function p79RefreshScheduleRestCounts(',i);
+const i=html.indexOf('    function p79ScheduleSpecialSummaryColumns('),j=html.indexOf('    function p79RefreshScheduleRestCounts(',i);
 a(i>0&&j>i,'roster counter function required');
 const month='2026-10',day=d=>month+'-'+String(d).padStart(2,'0');
 const cloudConfirmed=html.indexOf('p79ConfirmScheduleSource(data,requestMonth,requestStartedAt,requestViewer,token);');
@@ -21,7 +21,8 @@ const c={
   P79ScheduleRestSummary:{confirmedDates:()=>confirmed}
 };
 Object.defineProperty(c,'port79ScheduleDirty',{get:()=>dirty});c.window=c;
-vm.createContext(c);vm.runInContext(html.slice(i,j),c);
+vm.createContext(c);Object.assign(c,{employees:[],monthlyScheduleData:{},p79TyphoonDates:()=>[]});
+vm.runInContext(html.slice(i,j),c);
 const shown={例:[day(2),day(9),day(16),day(23)],休:[day(5),day(11),day(22)],國:[day(6),day(24)]};
 const render=(id='E1',typhoon=[])=>c.p79ScheduleRestCountCells({id},month,null,typhoon,[],shown);
 const value=(id,category)=>render(id).match(new RegExp('data-rest-category="'+category+'"[^>]*><span>([^<]+)</span>'))?.[1];

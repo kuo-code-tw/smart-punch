@@ -63,7 +63,9 @@ for(const name of ['p79ScheduleHasVerifiedPunch','p79VisibleRestKind','p79Schedu
  }
  const unpaired=c.p79ScheduleDisplayDay(people[2],day(11));
  assert.equal(unpaired.verifiedRestAttendance,false);
- assert.equal(unpaired.shownShift,'例','one IN cannot overwrite original rest category');
+ assert.equal(unpaired.rosterShift,'休','one IN cannot overwrite original rest category');
+ assert.equal(unpaired.shownShift,'打卡待核','a single IN linked to the work date needs review');
+ assert.equal(unpaired.visibleRestKind,'','a pending punch is excluded from visible rest counts');
  const attendancePairs=[
   {empId:'E1',date:day(11),start:ts(recs[0]),end:ts(recs[1])},
   {empId:'E2',date:day(27),start:ts(recs[2]),end:ts(recs[3])}

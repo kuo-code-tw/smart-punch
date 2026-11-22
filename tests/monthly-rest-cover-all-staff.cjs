@@ -66,10 +66,22 @@ for(const scenario of ['revoked','excluded','idless','notOwnRest','typhoon','pur
   assert.equal(b.reported.休,0,scenario+' must not be treated as a valid own-rest category');
  if(['typhoon','pureCover'].includes(scenario))assert(cls.exempt,scenario+' exemption preserved');
 }
-const g2={window:null};g2.window=g2;vm.createContext(g2);
+class ApplicationDate extends Date{
+ constructor(...args){super(...(args.length?args:['2026-10-25T12:00:00+08:00']));}
+}
+const g2={window:null,Date:ApplicationDate,Intl};g2.window=g2;vm.createContext(g2);
 vm.runInContext(fs.readFileSync('assets/port79-overtime-application.js','utf8'),g2);
-const app=fs.readFileSync('assets/port79-overtime-application.js','utf8');
-assert(app.includes("report.planned===true&&date>=today()"),'Past reported dates should not remain in the future-only application list');
+const past='2026-10-22',future='2026-10-26',appEmployee={empId:'E1',name:'測試員'};
+const reports=Object.fromEntries([past,future].map(date=>[date,{overtimeReport:{
+ id:date,planned:true,category:'休',overtimeStart:'08',overtimeEnd:'16',convertedHours:8
+}}]));
+const appRows=mode=>g2.P79OvertimeApplication.collect(
+ [{schedules:[{empId:'E1',schedule:{__meta:reports}}]}],[appEmployee],[past,future],'',[],mode
+).rows;
+assert.equal(appRows('planned').length,1);
+assert.equal(appRows('planned')[0].date,future,'only future work remains in the planned list');
+assert.equal(appRows('actual').length,1);
+assert.equal(appRows('actual')[0].date,past,'past filed report remains visible with its original ID');
 const hours=fs.readFileSync('work-hours/index.html','utf8');
 assert(hours.includes("planned:meta.overtimeReport.planned===true&&date>=todayTaipei"),
  'Past 10/22 stored report cannot still be displayed as a future-only planned claim');

@@ -2,7 +2,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const month='2026-10',day=n=>month+'-'+String(n).padStart(2,'0');
 const html=fs.readFileSync('schedule/index.html','utf8');
-const start=html.indexOf('    function p79ScheduleRestCountCells(');
+const start=html.indexOf('    function p79ScheduleSpecialSummaryColumns(');
 const end=html.indexOf('    function p79RefreshScheduleRestCounts(',start);
 assert(start>=0&&end>start,'production rest summary renderer exists');
 const c={window:null,Set,Map,JSON,Number,String,
@@ -12,6 +12,7 @@ const c={window:null,Set,Map,JSON,Number,String,
  p79ScheduleTyphoonDays:()=>[],scheduleEscapeHtml:x=>String(x||'')};
 c.window=c;vm.createContext(c);
 vm.runInContext(fs.readFileSync('assets/port79-schedule-rest-summary.js','utf8'),c);
+Object.assign(c,{employees:[],monthlyScheduleData:{},monthlyScheduleMeta:{},p79TyphoonDates:()=>[]});
 vm.runInContext(html.slice(start,end),c);
 const selected={例:[],休:[day(5),day(11),day(22)],國:[day(6),day(24)]};
 const spans=(s,category)=>s.match(new RegExp('data-rest-category="'+category+'"[^>]*><span>([^<]+)</span>'))?.[1];

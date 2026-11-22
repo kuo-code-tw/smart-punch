@@ -66,7 +66,10 @@ test('the targeted patcher preserves unrelated live code and refuses unknown/alr
 test('native workhours and the shared editor verify receipts before updating rows or closing',()=>{
  const html=read('work-hours/index.html');
  assert(html.includes('window.P79Overtime?.verifySavedReport?.(draft,result);'));
- const source=read('assets/port79-overtime-report.js');assert(source.indexOf('verifySavedReport(draft,result);',source.indexOf('const result=await global.p79OvertimeContext.saveReport'))<source.indexOf('sessionStorage.removeItem(KEY);el.querySelector'));
+ const source=read('assets/port79-overtime-report.js');const verifiedAt=source.indexOf('verifySavedReport(draft,result);');
+ const cleanedAt=source.indexOf('sessionStorage.removeItem(KEY);',verifiedAt);
+ const closedAt=source.indexOf('closeConfirmedReportDialog(el);',cleanedAt);
+ assert(verifiedAt>source.indexOf('awaitOvertimeSaveConfirmation(global.p79OvertimeContext.saveReport(draft))')&&cleanedAt>verifiedAt&&closedAt>cleanedAt,'only cloud-verified original receipts can clear draft and close original editor');
  assert(read('hr/index.html').includes('p79AvailableJobScopes(),...Object.values(selectedJobs)'));
 });
 console.log(JSON.stringify({passed,scope:'Synthetic client/server rules, literal job scopes, JSON roundtrip and receipt checks; no employee edits'}));

@@ -35,12 +35,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install ZIP verification test dependency
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund jszip@3.10.1
       - name: Run all integration tests and report every failure
         run: |
           failed=0
           for test_file in tests/*.cjs; do
             echo "::group::${test_file}"
-            if timeout --signal=TERM --kill-after=5s 30s node "$test_file"; then
+            limit=30s
+            # The synthetic benchmark repeats the historical 18,000-row implementation.
+            if [[ "$test_file" == tests/vessel-speed.cjs ]]; then limit=120s; fi
+            if timeout --signal=TERM --kill-after=5s "$limit" node "$test_file"; then
               :
             else
               echo "::error file=${test_file}::Integration regression failed"

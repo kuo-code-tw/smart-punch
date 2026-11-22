@@ -54,7 +54,7 @@ const recs=[
  {...mkRecord('rFallback','001','2026-11-03','07:00','08:00',99,99),source:'gc-driver-efficiency'},
  mkRecord('rOct','099','2026-10-04','09:00','10:00',20,50)
 ];
-const ids=['terminalDashboardRoot','terminalMonth','terminalKpi','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalDataStatus','terminalWarnings','terminalMonthCaption'];
+const ids=['terminalDashboardRoot','terminalMonth','terminalKpi','terminalWharfBody','terminalDayBody','terminalShiftBody','terminalStopBody','terminalStopCategoryKpis','terminalStopDetailBody','terminalStopDetailCaption','terminalDataStatus','terminalWarnings','terminalMonthCaption','terminalReasonFilter'];
 const elements=Object.fromEntries(ids.map(id=>[id,{dataset:{},value:id==='terminalMonth'?'2026-11':'',innerHTML:'',textContent:''}]));
 elements.terminalMonth.dataset.p79Year='2026';
 const ctx={window:{},document:{getElementById:id=>elements[id]},console:{warn(){}},

@@ -1,18 +1,23 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
 (async()=>{
- let now=Date.parse('2026-10-22T07:59:00+08:00'),token='A',reads=0,records=[];
+ let now=Date.parse('2026-10-22T07:59:00+08:00'),token='A',reads=0;
+ // Absence requires corroborating nonempty official AND original-punch feeds.
+ // A different employee's authenticated record makes the month verifiable,
+ // without inventing any punch for TEST on the audited night shift.
+ const unrelated={id:'OTHER-PUNCH',empId:'OTHER',timeStr:'2026/10/20 08:00',time:Date.parse('2026-10-20T08:00:00+08:00')};
+ let records=[unrelated];
  const c={window:null,Date,Intl};c.window=c;vm.createContext(c);
  for(const name of ['rest-attendance','schedule-rest-evidence'])vm.runInContext(fs.readFileSync('assets/port79-'+name+'.js','utf8'),c);
- const client=c.P79ScheduleRestEvidence.create({token:()=>token,now:()=>now,employees:()=>[{id:'TEST'}],schedules:()=>[{empId:'TEST',schedule:{'2026-10-21':'晚'}}],leaveDates:()=>[],timestamp:r=>r.time,buildShifts:r=>r,read:async month=>{reads++;return {ok:true,month,records:month==='2026-10'?records:[]}}});
+ const client=c.P79ScheduleRestEvidence.create({token:()=>token,now:()=>now,employees:()=>[{id:'TEST'}],schedules:()=>[{empId:'TEST',schedule:{'2026-10-21':'晚'}}],leaveDates:()=>[],timestamp:r=>r.time,buildShifts:r=>r,read:async month=>{reads++;return {ok:true,month,records:month==='2026-10'?records:[],absenceReferenceRecords:month==='2026-10'?[unrelated]:[]}}});
  await client.refreshIfStale('2026-10');assert.equal(client.status('2026-10').evidence.days['TEST|2026-10-21'].state,'open');assert.equal(reads,2);
  await client.refreshIfStale('2026-10');assert.equal(reads,2,'focus events reuse current evidence');
  now+=61000;await client.refreshIfStale('2026-10');assert.equal(reads,4);assert.equal(client.status('2026-10').evidence.days['TEST|2026-10-21'].state,'rest','overnight completes without roster change');
- records=[{id:'PAIR',empId:'TEST',time:Date.parse('2026-10-21T23:50:00+08:00'),clockIn:{time:Date.parse('2026-10-21T23:50:00+08:00')},clockOut:{time:Date.parse('2026-10-22T07:50:00+08:00')}}];now+=61000;await client.refreshIfStale('2026-10');assert.equal(client.status('2026-10').evidence.days['TEST|2026-10-21'].state,'worked','newly supplemented cross-day cards clear rest');
+ records=[unrelated,{id:'PAIR',empId:'TEST',time:Date.parse('2026-10-21T23:50:00+08:00'),clockIn:{time:Date.parse('2026-10-21T23:50:00+08:00')},clockOut:{time:Date.parse('2026-10-22T07:50:00+08:00')}}];now+=61000;await client.refreshIfStale('2026-10');assert.equal(client.status('2026-10').evidence.days['TEST|2026-10-21'].state,'worked','newly supplemented cross-day cards clear rest');
  // Exercise a delayed official refresh rather than only immediate fixture responses.
  let release,failRefresh=false,held=false;
  const stable=c.P79ScheduleRestEvidence.create({token:()=>token,now:()=>now,employees:()=>[{id:'TEST'}],schedules:()=>[{empId:'TEST',schedule:{'2026-10-21':'晚'}}],leaveDates:()=>[],timestamp:r=>r.time,buildShifts:r=>r,read:async month=>{
   if(held&&month==='2026-10')await new Promise(resolve=>{release=resolve});
-  if(failRefresh)throw Error('official read failed');return {ok:true,month,records:[]};
+  if(failRefresh)throw Error('official read failed');return {ok:true,month,records:month==='2026-10'?[unrelated]:[],absenceReferenceRecords:month==='2026-10'?[unrelated]:[]};
  }});
  await stable.refresh('2026-10');const verified=stable.status('2026-10').evidence;
  assert.equal(verified.days['TEST|2026-10-21'].state,'rest');
@@ -31,6 +36,7 @@ const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
  state.restEvidenceRevision='rev-after';c.p79RefreshVisibleOvertimeEvidence();assert.equal(calls.length,1,'unchanged cloud revision must not refresh');
  c.lastAttendanceCloudRevision='rev-next';editing=true;c.p79RefreshVisibleOvertimeEvidence();assert.equal(calls.length,1,'in-progress editing blocks background refresh');editing=false;
  state.restEvidencePending=true;c.p79RefreshVisibleOvertimeEvidence();assert.equal(calls.length,1);state.restEvidencePending=false;visible=false;c.p79RefreshVisibleOvertimeEvidence();assert.equal(calls.length,1);visible=true;token='B';c.p79RefreshVisibleOvertimeEvidence();assert.equal(calls.length,1);
- assert(html.includes('value="review"'));assert(html.includes('🔴 疑似多報｜整班無卡，請核對後刪除'));assert(html.includes("source==='review' ? row.overtimeReport?.attendanceState==='rest'"));
+ assert(html.includes('value="review"'));assert(!html.includes('🔴 疑似多報｜整班無卡，請核對後刪除'),'a missing punch is not proof of a false report or authorization to delete');
+assert(html.includes("const completedRows=rows.filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))"),'review remains tied to confirmed attendance and saved reports');assert(html.includes("source==='review' ? row.overtimeReport?.attendanceState==='rest'"));
  console.log('PASS overnight end refresh, fresh-read throttle, supplemented cards, visible overtime refresh, pending/account guards and review filter wiring');
 })().catch(e=>{console.error(e);process.exit(1)});

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html data-p79-design="vessel" lang="zh-TW">
 <head><script src="../assets/port79-official-calendar.js?v=20261023-1"></script><script>window.P79ManagementOptimizationMode=true;</script>
-<script src="../assets/port79-special-overtime.js?v=20261023-date-editor"></script><script src="../assets/port79-special-days-editor.js?v=20261027-cloud-v60"></script><script src="../assets/port79-typhoon-leave-sync.js?v=20261025-1"></script>
+<script src="../assets/port79-special-overtime.js?v=20261122-attendance-confirmed-cross-system-v1"></script><script src="../assets/port79-special-days-editor.js?v=20261027-cloud-v60"></script><script src="../assets/port79-typhoon-leave-sync.js?v=20261025-1"></script>
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <script src="../assets/port79-overtime-report.js?v=20261108-config-authority-v2&recovery=20261113-r3"></script>
 <!-- PORT79 Schedule V10.31 AUTO-EDIT-LEASE：管理者進入頁面自動取得編輯租約，無需手動鎖定或解鎖；保留多人寫入防覆蓋保護。 -->
@@ -32,7 +32,7 @@
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261117-active-roster-v1&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1&noWork=20261106"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
-<script src="../assets/port79-schedule-rest-evidence.js?v=20261109-month-to-date-no-card-v1"></script>
+<script src="../assets/port79-schedule-rest-evidence.js?v=20261122-attendance-deep-audit-v2"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261112-title-visibility-v1"></script>
 <script id="p79-default-light-v20261001">
 (function(){
@@ -7588,12 +7588,44 @@ async function p79SaveScheduleOvertimeDraft(draft){
         }}
       });return p79ScheduleRestEvidenceClient;
     }
+    // Cross-tab storage events are not fired in the tab that performed the
+    // official write. Check the notice again on focus/resume (BFCache) too.
+    let p79LastAttendanceNotice='',p79AttendanceNoticeRefreshTimer=null;
+    function p79ScheduleApplyAttendanceNotice(raw) {
+      if(!raw||raw===p79LastAttendanceNotice)return false;
+      try {
+        const notice=JSON.parse(raw),at=Number(notice?.at),now=Date.now();
+        if(!Number.isFinite(at)||at<=0||at>now+10000||now-at>120000)return false;
+        const month=currentScheduleMonthKey();
+        if(!currentPort79SsoToken()||!/^\d{4}-\d{2}$/.test(month)||!employees.length)return false;
+        p79LastAttendanceNotice=raw;
+        // Batch imports can confirm many punches in quick succession. Check
+        // the official month after the last notice, not once per individual ACK.
+        if(p79AttendanceNoticeRefreshTimer!==null)clearTimeout(p79AttendanceNoticeRefreshTimer);
+        p79AttendanceNoticeRefreshTimer=setTimeout(()=>{
+          p79AttendanceNoticeRefreshTimer=null;
+          const currentMonth=currentScheduleMonthKey();
+          if(!currentPort79SsoToken()||!/^\d{4}-\d{2}$/.test(currentMonth)||!employees.length)return;
+          // Force fresh official attendance for all staff and adjacent months.
+          void p79ScheduleRestClient().invalidate(currentMonth);
+        },650);
+        return true;
+      }catch(error){console.warn('考勤異動自動核對通知無效',error);return false;}
+    }
     function p79RefreshScheduleRestEvidence() {
       const month=currentScheduleMonthKey();
       if(!currentPort79SsoToken()||!/^\d{4}-\d{2}$/.test(month)||!employees.length)return;
-      // 出勤核對獨立於班表同步；編輯鎖或尚未儲存的班表不應阻止晚班結束後核對。
+      // The same-window attendance editor may have written while this page
+      // was hidden. Regular refreshIfStale has a 60s audit freshness guard.
+      let notice='';
+      try{notice=localStorage.getItem('port79_attendance_sync_notice_v1')||'';}catch(error){}
+      if(p79ScheduleApplyAttendanceNotice(notice))return;
       return p79ScheduleRestClient().refreshIfStale(month);
     }
+    window.addEventListener('storage',event=>{
+      if(event.key==='port79_attendance_sync_notice_v1'&&event.newValue)
+        p79ScheduleApplyAttendanceNotice(event.newValue);
+    });
     function p79ScheduleRestBalance(emp,month,allocated=null) {
       const leaveDates=p79ScheduleRestLeaveDates(month,emp.id);
       return window.P79ScheduleRestSummary.summary(emp,monthlyScheduleData[emp.id]||{},allocated||p79AutomaticRestMetadata(emp.id,month),month,{leaveDates,leaveCoverAssignments,attendanceEvidence:p79ScheduleRestClient().status(month).evidence},p79EmploymentStartDate(emp));
@@ -7765,14 +7797,16 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // Only a completed attendance audit that found an actual missing pair
       // may display 打卡待核; a verified no-punch day still becomes 休.
       const scheduledRest=['休','例','國','颱','年','特','事','病','公','喪','離','離職'].includes(rosterShift);
+      const attendanceKey=String(emp.id).trim().toUpperCase()+'|'+dayStr;
+      const restDayPunch=['休','例','國'].includes(rosterShift)&&
+        ctx.attendanceEvidence?.pendingPunchDetails?.[attendanceKey]?.length>0;
       const evidenceReady=ctx.attendanceEvidence?.complete===true;
-      const punchPending=!scheduledRest&&evidenceReady&&attendanceState==='missing'&&
+      const punchPending=(!scheduledRest||restDayPunch)&&evidenceReady&&attendanceState==='missing'&&
         dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
       const attendanceUnverified=!scheduledRest&&!evidenceReady&&
         dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
       const shiftVal=noPunchRest?'休':actualShift||
         (verifiedRestAttendance||pairedWork&&rosterShift==='待排班'||pairedWork&&['休','例','國'].includes(rosterShift)?'已出勤':
-        scheduledRest?rosterShift:
         punchPending?'打卡待核':rosterShift);
       // Prefer the checked monthly ledger; if it is not ready yet, retain the
       // shared automatic allocation instead of resetting a valid 國 to 休.
@@ -8029,7 +8063,6 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const categoryDates=[...new Set([...shownDates,...reportedDates,...ledgerReportDates,...formalMetaDates])]
           .filter(day=>day.startsWith(month+'-')&&!protectedTyphoonSet.has(day)).sort();
         const extraReportedDates=categoryDates.filter(day=>!shownDates.includes(day));
-        const displayDates=categoryDates.map(day=>day.slice(-2));
         const limit=Number.isFinite(ledger?.quota?.[category])?ledger.quota[category]:quota[category];
         // Do not count stale saved/report labels as national leave when quota=0.
         // Retain those original reports and expose the discrepancy in the tooltip.
@@ -8038,16 +8071,19 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const verified=Number.isFinite(ledger?.remaining?.[category]);
         // Counter and remainder share the actual date cells for this one render.
         // Official reports on OTHER dates consume quota once without double counting.
-        const rest=Math.max(0,limit-count),extra=Math.max(0,count-limit);
+        const rest=Math.max(0,limit-count);
         const officialRemaining=verified?Math.max(0,ledger.remaining[category]):null;
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
-        // Numbers only: actual allocated days / still available days.
-        const invalidNote=invalidNationalCount?
-          ' title="'+scheduleEscapeHtml('本月國定假日額度0；仍有'+invalidNationalCount+'筆歷史國假標記或正式申報須管理員核對。原始報單未修改。')+'"':'';
-        // Keep each quota cell at the original one-line height. Genuine
-        // over-quota days stay in the numeric count and manager audit, without
-        // a second-row "超休" label or a taller calendar row.
-        return '<td data-rest-category="'+category+'"'+invalidNote+
+        const details=[];
+        if(invalidNationalCount)
+          details.push('本月國定假日額度0；仍有'+invalidNationalCount+'筆歷史國假標記或正式申報須管理員核對。原始報單未修改。');
+        if(extraReportedDates.length)
+          details.push('正式已報 '+extraReportedDates.length+' 天｜雲端已確認'+category+'加班：'+extraReportedDates.join('、'));
+        if(category==='國'&&nationalDuplicates)details.push(nationalDuplicates+' 筆已移至「颱」統計');
+        if(!verified)details.push('雲端申報額度待核');
+        else if(officialRemaining!==rest)details.push('班格與正式帳本差異須核對：正式剩餘 '+officialRemaining+' 天');
+        const title=details.length?' title="'+scheduleEscapeHtml(details.join('；'))+'"':'';
+        return '<td data-rest-category="'+category+'"'+title+
           ' class="p79-rest-count-compact text-center font-bold border-r text-xs '+color+
           '"><span>'+count+'/'+rest+'</span></td>';
       }).join('');
@@ -8595,6 +8631,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const yearMonth = String(document.getElementById('month-picker')?.value || '').trim();
         if (!/^\d{4}-\d{2}$/.test(yearMonth)) throw new Error('目前排班月份格式不正確');
         if(input.dataset.importMonth!==yearMonth)throw new Error('排班月份已變更，請重新選擇職稱與匯入檔案');
+        if(!canManageSchedule()||!scheduleCanEditNow())throw new Error('排班編輯權已變更，請重新取得編輯權後再匯入');
+        // This month is also blocked by saveScheduleMonthToCloud. Reject the
+        // import before changing any local shift, personnel setting or draft.
+        if(yearMonth==='2026-10')throw new Error('2026年10月班表正在修復核對，已暫停匯入，以保護原有班別。');
         const [year, month] = yearMonth.split('-').map(Number);
         const totalDays = getDaysInMonth(year, month);
 
@@ -9734,7 +9774,7 @@ html.dark #app-main-container .p79-day-cell{border-color:#64748b!important}
 @media(max-width:700px){#p79ScheduleQuickBar #schedule-legend-left{grid-column:1/-1;margin:0;flex-basis:100%;padding-top:4px}#p79ScheduleQuickBar .p79-quick-actions{flex-basis:100%}}
 </style>
 
-<script src="/smart-punch/assets/port79-management-link.js?v=20261019-group-explicit&rev=20261023-roster-preview&syncfix=20261114-no-loop-v1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
+<script src="/smart-punch/assets/port79-management-link.js?v=20261122-seven-system-auto-v1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <script src="../assets/port79-combined-leave-link.js?v=20261020-link1"></script>
 <style id="p79-combined-shift-dot-20261020">

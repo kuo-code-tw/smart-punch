@@ -26,5 +26,5 @@ assert.equal(Object.hasOwn(punch,'history'),false,'Employee punch mode must not 
 assert.equal(punch.attendance,'manage','Existing normalized employee module grant untouched');
 assert.equal(normalize({},'superadmin').attendance,'manage');
 assert(source.includes('async function punchLogin()'),'Existing punch implementation still present');
-assert(source.includes('onclick="location.href=\'./history-data/\'"'),'History entry unchanged');
+assert(source.includes('onclick="p79NavigateWhileBackingUp(\'./history-data/\')"'),'History opens through the backup-safe navigation helper');
 console.log('PASS history read permissions preserved for admins; punch-session permissions unchanged');

@@ -1695,7 +1695,7 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
             <select id="weeklyGroupFilter" class="p79pr-select" aria-label="組別" onchange="renderPersonnelAndRanking()"><option value="">全部組別</option></select>
             <select id="personStatPerson" class="p79pr-select" aria-label="姓名" onchange="renderPersonnelAndRanking()"><option value="">全部人員</option></select>
             <button type="button" class="p79pr-action" onclick="renderPersonnelAndRanking()">↻ 更新統計</button>
-            <button type="button" id="p79prExportExcel" class="p79pr-action" onclick="exportPersonnelStatisticsExcel()">⬇ 匯出目前篩選 Excel</button>
+            <button type="button" id="p79prExportExcel" class="p79pr-action" onclick="exportPersonnelStatisticsExcel()">⬇ 匯出目前篩選試算表</button>
           </div>
         </div>
         <div class="p79pr-filter-status"><span id="weeklyScheduleGroupState" role="status"></span><span id="p79prFreshness" role="status" aria-live="polite"></span><button type="button" class="text-sky-700 underline" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div>
@@ -1919,7 +1919,7 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
       <button type="button" class="btn bg-sky-600 text-white" onclick="loadMonthlyRanking(true)">讀取整月雲端／歷史資料</button>
     </div><div id="rankingLoadState" class="text-sm mt-3" role="status"></div><div class="flex flex-wrap gap-2 items-center mt-2"><span id="rankingScheduleGroupState" class="text-xs" role="status"></span><button type="button" class="btn bg-slate-100 text-xs" onclick="retryOperationScheduleGroups()">重新讀取排班組別</button></div></div>
   </div>
-  <div class="p79-section" data-section-key="ranking-results"><div><span>所選日期人員排名</span><button type="button" id="p79prRankingExportExcel" class="btn bg-emerald-600 text-white text-xs" onclick="exportPersonnelStatisticsExcel()">⬇ 匯出目前篩選 Excel</button></div><div class="card p-4 overflow-auto"><div id="rankingCount" class="text-sm mb-3" role="status"></div><table class="tbl w-full min-w-[1300px] text-center"><thead><tr><th>名次</th><th>姓名</th><th>排班組別</th><th>作業船數</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th><th>資料狀態</th></tr></thead><tbody id="rankingBody"></tbody></table></div></div>
+  <div class="p79-section" data-section-key="ranking-results"><div><span>所選日期人員排名</span><button type="button" id="p79prRankingExportExcel" class="btn bg-emerald-600 text-white text-xs" onclick="exportPersonnelStatisticsExcel()">⬇ 匯出目前篩選試算表</button></div><div class="card p-4 overflow-auto"><div id="rankingCount" class="text-sm mb-3" role="status"></div><table class="tbl w-full min-w-[1300px] text-center"><thead><tr><th>名次</th><th>姓名</th><th>排班組別</th><th>作業船數</th><th>作業筆數</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th><th>資料狀態</th></tr></thead><tbody id="rankingBody"></tbody></table></div></div>
 </section>
 
 <dialog id="vesselMonthlyExportDialog" class="p-5">
@@ -7963,7 +7963,7 @@ async function exportPersonnelStatisticsExcel(){
     console.error('人員統計 Excel 匯出失敗',error);
     if(typeof toast==='function')toast(error?.message||'人員統計 Excel 匯出失敗');
   }finally{
-    buttons.forEach(button=>{button.disabled=false;button.textContent=button.id==='p79prRankingExportExcel'?'⬇ 匯出目前篩選 Excel':'⬇ 匯出目前篩選 Excel';});
+    buttons.forEach(button=>{button.disabled=false;button.textContent=button.id==='p79prRankingExportExcel'?'⬇ 匯出目前篩選試算表':'⬇ 匯出目前篩選試算表';});
   }
 }
 
@@ -17145,7 +17145,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(18){width:4.0%!important;min-width:0!important}
 body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(19){width:4.0%!important;min-width:0!important}
 </style>
-<script src="/smart-punch/assets/port79-management-link.js?v=20261105.1-20261017.official1&rev=20261022-workflow&sync=20261104-leave-roster-v1&syncfix=20261114-no-loop-v1"></script><script src="../assets/port79-personnel-ranking.js?v=20261117-active-hr-v1"></script>
+<script src="/smart-punch/assets/port79-management-link.js?v=20261122-seven-system-auto-v1"></script><script src="../assets/port79-personnel-ranking.js?v=20261117-active-hr-v1"></script>
 <link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-personnel-dispatch.js?v=20261111-current-roster-v6"></script>
 <script src="../assets/port79-full-refresh.js?v=20261105.1"></script>

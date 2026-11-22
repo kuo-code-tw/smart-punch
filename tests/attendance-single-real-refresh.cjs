@@ -72,10 +72,10 @@ async function simulate({roster=[reportRow],cloudFailure=false,pending=false,mon
  assert.equal(r.result,false);assert.equal(r.status.dataset.state,'error');
  const management=fs.readFileSync(path.resolve(__dirname,'../assets/port79-management-link.js'),'utf8');
  assert(management.includes("const manualOnly=context.system==='attendance'"));
- assert(management.includes('autoRefreshSafe:()=>!manualOnly&&!editing()'));
- assert(management.includes('if(manualOnly)return;'),'incoming signals must not auto refresh active attendance pages');
+ assert(management.includes('autoRefreshSafe:()=>!editing()'),'confirmed notifications may resume automatically when the view is safe');
+ assert(management.includes('if(manualOnly){\n  if(state.pending.length'),'confirmed notices auto-refresh through the existing attendance month owner');
  assert(management.includes('if(!manualOnly){const button=document.createElement'), 'attendance must have only primary refresh control');
  const events=[],run=createRunner({check(){},run:async()=>({ok:true,summary:'read-only with inconsistency',warning:true}),notify:(st,msg)=>events.push(st),setFresh(){}});
  assert.equal(await run(),true);assert.deepEqual(events,['loading','warning']);
- console.log('PASS one real refresh button, 2 authenticated fresh reads, selected day overtime cache, discrepancy warning, offline/dirty guards, manual-only management signals');
+ console.log('PASS one real refresh button, 2 authenticated fresh reads, selected day overtime cache, discrepancy warning, offline/dirty guards, and confirmed attendance auto-read');
 })().catch(e=>{console.error(e);process.exitCode=1});

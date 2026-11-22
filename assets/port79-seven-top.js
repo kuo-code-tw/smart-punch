@@ -61,7 +61,13 @@ function p79OrgComparePeople(a,b){
   if(left===right)continue;
   if(!left)return 1; // 未設定的歸屬放在已設定的同層項目之後
   if(!right)return -1;
-  const order=left.localeCompare(right,'zh-Hant',{numeric:true});
+  // Latin equipment/position abbreviations (AQC, ARMG, F/L) sort before
+  // Chinese titles; remaining Chinese labels follow Taiwan phonetic order.
+  if(key==='jobTitles'){
+   const ascii=v=>/^[A-Za-z]/.test(v)?0:1;
+   if(ascii(left)!==ascii(right))return ascii(left)-ascii(right);
+  }
+  const order=left.localeCompare(right,'zh-TW-u-co-zhuyin',{numeric:true});
   if(order)return order;
  }
  return String(a?.empId||'').localeCompare(String(b?.empId||''),'zh-Hant',{numeric:true});

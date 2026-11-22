@@ -25,9 +25,9 @@ assert(html.includes("savedReport:editExisting,reportId:editExisting?row.overtim
   'only explicit editing of a verified official declaration uses the saved-report path');
 assert(html.includes("if(editExisting&&(!row.reportVerified||!String(row.overtimeReport?.id||'').trim()))"),
   'unverified proposals must never enter the formal amendment editor');
-assert(html.includes('未核實註記／非申報'),
+assert(html.includes('尚未正式申報'),
   'unverified rows must be labeled as non-reports');
-assert(html.includes('if(!row.reportVerified&&!row.coverCandidate&&!row.coverAlreadyArranged)'),
+assert(html.includes('if(!row.reportVerified&&!row.coverCandidate&&!row.coverAlreadyArranged&&!estimateOnly)'),
   'delete action must refuse unsupported metadata');
 assert(html.includes('r.reportVerified?(r.overtimeReport?.declaredHours'),
   'export declared hours only from verified reports');

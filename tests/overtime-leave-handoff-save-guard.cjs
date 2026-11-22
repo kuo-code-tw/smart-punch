@@ -59,8 +59,9 @@ async function simulate({code='延16-04',mode='success'}={}){
  assert.deepEqual(t.posts,['SAME-ID','SAME-ID','SAME-ID'],'all safe retries preserve the idempotent report identity');
  assert.equal(t.el.open,false,'confirmed save closes after lock release');
  t=await simulate({mode:'lock-forever'});
- assert.equal(t.postCalls,3,'bounded lock retry never loops indefinitely');
- assert.equal(t.el.open,true);assert.match(t.status,/排班編輯鎖仍被占用/);
+ assert.equal(t.postCalls,5,'the five-attempt pre-write lock retry must stop without an unbounded loop');
+ assert(t.posts.every(id=>id==='SAME-ID'),'every lock refusal preserves the original idempotency key');
+ assert.equal(t.el.open,true);assert.match(t.status,/雲端仍忙碌/,'after five confirmed no-write refusals, preserve the draft and show a truthful failure');
  assert.equal(t.drafts.length,1,'draft survives lock refusal');
  t=await simulate({mode:'unknown'});
  assert.equal(t.postCalls,1,'unknown write results must NEVER be submitted twice');

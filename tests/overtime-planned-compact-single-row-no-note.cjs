@@ -20,7 +20,8 @@ assert(!html.includes("reason.detail?'<span"),'reason details must not add secon
 const empty={innerHTML:'',textContent:''},nodes={
  p79OvertimePlannedBody:{...empty},p79OvertimePlannedCount:{...empty},p79OvertimePlannedPagination:{...empty}
 };
-const c={console,Number,String,Array,Set,Map,Math,Date,
+let bulkRefreshes=0;
+const c={p79RefreshPlannedBulkControls(){bulkRefreshes++;},p79OvertimeUnitForRow:row=>row.dept,p79CanReportOvertime:()=>false,p79PlannedBulkBusy:false,p79PlannedBulkSelected:new Set(),console,Number,String,Array,Set,Map,Math,Date,
  Intl:{DateTimeFormat:function(){return{format:()=> '2026-10-29'}}},
  p79OvertimeCalculationCache:null,p79WorkOvertimeMonths:new Map(),p79MonthlyRestDraftsByMonth:new Map(),
  p79OvertimePlannedDisplayedRows:[],records:[],currentEmp:{empId:'ADMIN'},
@@ -31,7 +32,7 @@ const c={console,Number,String,Array,Set,Map,Math,Date,
  p79OvertimePlannedPage:1};
 vm.createContext(c);
 for(const name of ['p79WorkOvertimeIsUnconfirmedPlan','p79OvertimePlannedVisibleRows',
- 'p79OvertimePendingReason','p79OvertimePendingPunchCell','p79RenderOvertimePlannedRows'])
+ 'p79OvertimePendingReason','p79PlannedBulkCandidate','p79OvertimePendingPunchCell','p79RenderOvertimePlannedRows'])
  vm.runInContext(extract(name),c);
 const planned={empId:'E1',name:'某人',dateKey:'2026-10-28',monthKey:'2026-10',
  dept:'ARMG',jobTitle:'指揮手',planned:true,reportVerified:true,
@@ -47,6 +48,7 @@ assert(!missing.includes('p79-planned-reason'),'no extra note line');
 const paired={...planned,clockIn:{id:'I1',timeStr:'2026/10/28 23:38'},
  clockOut:{id:'O1',timeStr:'2026/10/29 07:46'}};
 const complete=render([paired]);
+assert.equal(bulkRefreshes,2);
 assert.match(complete,/核對申報<\/button>/,'existing review action unchanged');
 assert.match(complete,/刪除預排<\/button>/);
 assert(!complete.includes('p79-planned-reason'));

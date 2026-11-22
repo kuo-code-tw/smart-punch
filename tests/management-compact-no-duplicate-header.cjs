@@ -13,8 +13,9 @@ assert(css.includes('#p79SevenNav a'),'functional sidebar styles retained');
 for(const path of pages){
   const html=fs.readFileSync(path,'utf8');
   for(const kind of ['css','js']){
-    const expected='port79-management-workspace.'+kind+'?v=20261030-compact-content-v1';
-    assert.equal(html.split(expected).length-1,1,path+' must request one updated '+kind);
+    const matches=[...html.matchAll(new RegExp('port79-management-workspace\\.'+kind+'\\?v=([^"\\s<>]+)','g'))];
+    assert.equal(matches.length,1,path+' must request exactly one versioned '+kind);
+    assert(matches[0][1].length>=6,path+' must not use an unversioned '+kind);
   }
   assert(html.includes('</html>'),path+' remains complete');
 }

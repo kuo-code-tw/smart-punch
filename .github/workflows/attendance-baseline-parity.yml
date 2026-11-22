@@ -20,19 +20,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install ZIP verification test dependency
+        run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund jszip@3.10.1
       - name: Run full test suite on clean main and candidate, block new failures
         shell: bash
         run: |
           set -euo pipefail
+          export NODE_PATH="$GITHUB_WORKSPACE/node_modules"
           baseline_dir="$(mktemp -d)"
           git worktree add --detach "$baseline_dir" origin/main
           run_suite() {
-            local folder="$1" output="$2" label="$3" n=0 failed=0
+            local folder="$1" output="$2" label="$3" n=0 failed=0 limit
             : > "$output"
             pushd "$folder" >/dev/null
             for test_file in tests/*.cjs; do
               n=$((n+1))
-              if timeout --signal=TERM --kill-after=5s 30s node "$test_file" >/tmp/p79-parity-last-test.log 2>&1; then
+              limit=30s
+              # The synthetic benchmark repeats the historical 18,000-row implementation.
+              if [[ "$test_file" == tests/vessel-speed.cjs ]]; then limit=120s; fi
+              if timeout --signal=TERM --kill-after=5s "$limit" node "$test_file" >/tmp/p79-parity-last-test.log 2>&1; then
                 :
               else
                 failed=$((failed+1))

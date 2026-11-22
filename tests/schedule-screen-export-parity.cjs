@@ -26,14 +26,15 @@ let exported=[],sheet=null,savedAs='';
 const X={
  utils:{
   json_to_sheet:rows=>{
-   exported=rows;const ws={};
+   const ws={};if(!rows[0]?.['工號'])return ws;exported=rows;
    for(let i=0;i<rows.length;i++)for(let d=1;d<=31;d++)
     ws[(i+1)+':'+(d+4)]={v:rows[i][String(d)]};
    return ws;
   },
   encode_cell:({r,c})=>r+':'+c,
   book_new:()=>({}),
-  book_append_sheet:(wb,ws)=>{sheet=ws;}
+  aoa_to_sheet:()=>({}),
+  book_append_sheet:(wb,ws)=>{if(!wb.roster){wb.roster=ws;sheet=ws;}}
  },
  writeFile:(_,name)=>{savedAs=name;}
 };
@@ -45,11 +46,11 @@ const window={
  P79ScheduleTransferRoles:{select:async()=>['ARMG'],filter:people=>people.slice(),role:()=> 'ARMG'}
 };
 const c={
- window,XLSX:X,Date,Set,Map,Math,String,Object,Array,Number,JSON,
+ window,p79ScheduleSourceState:{month},p79ScheduleOvertimeExportRows_:()=>({detail:[],totals:[]}),XLSX:X,Date,Set,Map,Math,String,Object,Array,Number,JSON,
  document:{getElementById:id=>id==='app-main-container'?main:id==='month-picker'?picker:null},
  activeRoleTab:'ARMG',activeGroupFilter:'ALL',employees:people,
  monthlyScheduleData:monthData,monthlyScheduleMeta:meta,leaveCoverAssignments:[],leaveRecords:[],NATIONAL_HOLIDAYS:{},
- p79DisposeRosterScroll(){},scheduleEscapeHtml:v=>String(v??''),p79ScheduleHasOfficialData:()=>true,currentScheduleMonthKey:()=>month,
+ p79ScheduleLeavePolicy:{ready:false},p79DisposeRosterScroll(){},scheduleEscapeHtml:v=>String(v??''),p79ScheduleHasOfficialData:()=>true,currentScheduleMonthKey:()=>month,
  p79ScheduleRestClient:()=>({status:()=>({evidence:{complete:true,days:{}}}),refreshIfStale:async()=>{}}),
  p79UpdateTyphoonDayButton(){},getDaysInMonth:()=>31,
  scheduleMonthBounds:()=>[date(1),date(31)],updateScheduleDateRangeSummary(){},
@@ -78,7 +79,7 @@ const c={
 };
 vm.createContext(c);
 for(const n of ['p79ScheduleHasVerifiedPunch','p79ConfirmedOvertimeReport','p79ConfirmedRestOvertime','p79VisibleRestKind','p79ScheduleDisplayContext','p79ScheduleDisplayDay',
- 'p79ScheduleRestCountCells','p79ScheduleExportDay'])vm.runInContext(extract(n),c);
+ 'p79ScheduleSpecialSummaryColumns','p79ScheduleElectionSummaryDates','p79ScheduleRestCountCells','p79ScheduleExportDay'])vm.runInContext(extract(n),c);
 const renderStart=html.indexOf('    function renderRoleScheduleView()');
 const renderEnd=html.indexOf('\n    function p79SetScheduleSaving(',renderStart);
 assert(renderStart>0&&renderEnd>renderStart);
@@ -94,7 +95,7 @@ assert.equal(matched.length,83,'renderer must draw every person in the same scop
 (async()=>{
  await c.exportScheduleToExcel();
  assert.equal(exported.length,83,'export should include all 83 people, not only visible group');
- assert.equal(savedAs,'2026-10_全部職稱_排班表.xlsx');
+ assert.equal(savedAs,'2026-10_全部職稱_排班加班核對表.xlsx');
  const mismatches=[];
  let compared=0,comments=0;
  for(const tr of matched){

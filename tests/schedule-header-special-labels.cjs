@@ -5,7 +5,7 @@ const c={};vm.createContext(c);vm.runInContext(html.slice(begin,end),c);
 for(const prefix of ['颱','選','國','休','例','代'])for(const period of ['08-11','24-08','24-01'])a.equal(c.p79CompactOvertimeCode(prefix+period),prefix+period);
 a.equal(c.p79CompactOvertimeCode('颱08:00-11:00'),'颱08-11');a.equal(c.p79CompactOvertimeCode('選25-08'),'');
 for(const [type,prefix]of [['颱風日加班','颱'],['選舉日加班','選']]){a.equal(c.p79OvertimePeriodLabel({code:'國08-11',category:'國',typeName:type}),prefix+'08-11');a.equal(c.p79OvertimePeriodLabel({code:prefix+'24-01',category:'國',typeName:type}),prefix+'24-01');}
-a.equal(c.p79OvertimePeriodLabel({code:'國08-11',category:'國',typeName:'國定假日加班'}),'國08-11');a.equal(c.p79OvertimePeriodLabel({code:'代08-20',category:'延',overtimeStart:'16',overtimeEnd:'20'}),'16-20');
+a.equal(c.p79OvertimePeriodLabel({code:'國08-11',category:'國',typeName:'國定假日加班'}),'國08-11');a.equal(c.p79OvertimePeriodLabel({code:'代08-20',category:'延',overtimeStart:'16',overtimeEnd:'20'}),'延16-20');
 const style=()=>({values:{},setProperty(k,v,p){this.values[k]=[v,p]}}),headCells=Array.from({length:35},()=>({style:style()}));
 let widths=[144,84,84,84,...Array(30).fill(60),56];
 const sourceCells=widths.map((_,i)=>({getBoundingClientRect:()=>({width:widths[i]})}));

@@ -65,7 +65,7 @@ const nonPadded=api.build({
           {...reportTimes[4],id:'time-first',startTime:'0:19'}],
  audit:{status:'match'},readStatus:'ready'
 });
-assert.equal(nonPadded.details[0].period.startsWith('0:19'),'Google Sheets non-padded clock sorted first');
+assert.equal(nonPadded.details[0].period.startsWith('0:19'),true,'Google Sheets non-padded clock sorted first');
 const zero=api.sum([{name:'Zero',disc:0,load:0,hc:0,hours:0}]);
 assert.equal(zero.gph,null);
 assert.equal(/apiPost\(|saveLocal\(|fetch\(/.test(src),false,'Dashboard must be presentation-only');

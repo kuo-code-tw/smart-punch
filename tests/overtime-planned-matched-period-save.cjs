@@ -7,6 +7,8 @@ const g={};vm.runInNewContext(report,{window:g,Date,Intl,Set,Map});
 vm.runInNewContext(matchScript,{window:g,Date,Intl,Set,Map});
 const date='2026-10-28';
 const start=Date.parse('2026-10-28T07:45:00+08:00'),end=Date.parse('2026-10-28T15:48:00+08:00');
+const configured=[['休','休08-16',8,12.7,'','','08','16','full'],['休','休16-24',8,12.7,'','','16','24','full']];
+g.p79OvertimeContext={config:()=>({overtimeConversionRowsV1:configured})};
 const rules=g.P79Overtime.reportRules(),early=rules.find(r=>r[1]==='休08-16'),middle=rules.find(r=>r[1]==='休16-24');
 assert(early&&middle,'both configured rest-day periods must exist');
 const old={id:'ORIGINAL-ID',planned:true,category:'休',code:'休16-24',typeName:'休息日加班'};
@@ -40,7 +42,7 @@ assert(work.includes('if(pairs.length!==1)throw Error('),'server requires comple
 assert(work.includes('originalStart!==pair.start||originalEnd!==pair.end'),'server checks original timestamps versus latest cloud');
 assert(work.includes("matched?.suggested?.code!==draft.rule.code"),'server re-checks rule against latest real punch');
 assert(work.includes('expectedRevision:cloud.revision'),'save remains revision guarded');
-assert(report.includes('verifyPlannedReviewSelection(rows[Number(select.value)])'),'form validates before save');
+assert(report.includes('verifyPlannedReviewSelection(chosen);'),'selected planned period is revalidated against the real punch before cloud save');
 assert(report.includes("expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||'')"),'form sends optimistic baseline for same original report');
 for(const m of work.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
 new vm.Script(report);

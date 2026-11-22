@@ -8,6 +8,8 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   jsonFetch:async()=>{reads++;return fresh;},postCloud:async()=>{writes++;throw Error('unexpected mutation');},
   $:el,normalizeLeaveFilterDate:v=>v,setStatus(){},loadCloud:async()=>true,p79ToggleCreateNoCover(){}};
  vm.createContext(c);
+ vm.runInContext(html.split(/\r?\n/).find(line=>line.startsWith('function p79LeaveAuthError(')),c);
+ vm.runInContext(html.slice(html.indexOf('function p79LeaveIsTransientReadFailure('),html.indexOf('function p79StartLeaveRead(')),c);
  vm.runInContext(html.slice(html.indexOf('async function p79ReadCurrentLeaveCoverState(){'),html.indexOf('function leaveBalanceNumber')),c);
  vm.runInContext(html.slice(html.indexOf('async function p79SaveCreateLeaveWithoutCover('),html.indexOf('async function saveAdminCreateLeave(')),c);
  el('adminCreateLeaveStart').value=el('adminCreateLeaveEnd').value='2026-11-28';el('adminCreateLeaveType').value='特休假';

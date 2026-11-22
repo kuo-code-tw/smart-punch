@@ -26,7 +26,7 @@ function build({record=fixture,allowed=null,authorized=true}={}){
   });
   return elements.get(id);
  };
- const context={window:{addEventListener(){}},document:{getElementById:node,addEventListener(){}},
+ const context={window:{addEventListener(){},setInterval(){}},document:{getElementById:node,addEventListener(){}},
   getToken:()=>authorized?'VALID-TOKEN':'',$:node,console,
   YARD_HOME_STORAGE_PREFIX:'p79_yard_private_v1_',YARD_HOME_ALLOWED_PREFIX:'p79_yard_allowed_container_counts_v1_',
   localStorage:{getItem:key=>{reads++;return memory.get(key)||null;}}

@@ -17,6 +17,7 @@ const ctx={console,Date,Number,Math,String,Array,
  normalizeScheduleDateKey:x=>String(x||'').replaceAll('/','-'),
  p79DirectAttendanceTimestamp:x=>Date.parse(String(x.timeStr).replaceAll('/','-').replace(' ','T')+'+08:00'),
  p79OvertimeAttendanceIssue:()=>issue,
+ p79OvertimeCoverDateWarning:()=>null, // Row is not a cross-day leave substitution
  p79WorkOvertimeRoster:(emp,date)=>({'2026-10-28':'休',__meta:{}}),
  alert:x=>alerts.push(x),
  P79Overtime:{openReport:x=>{opened.push(x);return x},reportRules:()=>[

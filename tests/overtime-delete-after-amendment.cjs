@@ -20,7 +20,9 @@ async function simulate(mode){
  const rosterId=mode==='replaced'?'REPORT-NEW':'REPORT-1';
  const schedule=after=>({empId:'E1',month,schedule:{__meta:{[date]:after?{}:{overtimeReport:{id:rosterId}}}}});
  const context={console,Date,JSON,String,Array,Map,Set,Promise,AbortController,crypto:{randomUUID:()=> 'client-1'},
-   p79WorkOvertimeDisplayedRows:[row],p79CanDeleteOvertime:()=>true,normalizeScheduleDateKey:v=>v,
+   p79WorkOvertimeDisplayedRows:[row],p79CanDeleteOvertime:()=>true,
+   p79CanExcludeOvertimeEstimate:()=>false, // All fixture rows have a saved cloud report
+   normalizeScheduleDateKey:v=>v,
    p79WorkOvertimeMonths:state,confirm:()=>true,alert:s=>messages.push(s),
    currentPort79SsoToken:()=> 'token',getActiveGasUrl:()=> 'https://mock.invalid/exec',
    setTimeout:(fn,ms)=>1,clearTimeout:()=>{},localStorage:{setItem:(...args)=>notice.push(args)},
@@ -55,12 +57,12 @@ async function simulate(mode){
  let saved=await simulate('ok');
  assert.equal(saved.calls.filter(x=>x.action==='deleteOvertimeAssignment').length,1,'authorized deletion must proceed after any earlier edit');
  assert.equal(saved.notice.length,1,'broadcast only after verified removal');
- assert.match(saved.messages.at(-1),/已由雲端確認刪除/);
+ assert.match(saved.messages.at(-1),/加班已刪除，並已同步雲端班表/);
  assert.equal(saved.button.textContent,'刪除加班');assert.equal(saved.button.disabled,false);
  const planned=await simulate('planned');
  assert.equal(planned.calls.filter(x=>x.action==='deleteOvertimeAssignment').length,1,'manual saved plan uses the cloud-verified deletion route');
  assert.equal(planned.calls.find(x=>x.action==='deleteOvertimeAssignment').expectedReportId,'REPORT-1');
- assert.match(planned.messages.at(-1),/已由雲端確認刪除/);
+ assert.match(planned.messages.at(-1),/加班已刪除，並已同步雲端班表/);
  for(const m of ['server-disabled','replaced']){
    const guarded=await simulate(m);
    assert.equal(guarded.calls.filter(x=>x.action==='deleteOvertimeAssignment').length,0,'unsafe deletion must not be sent: '+m);

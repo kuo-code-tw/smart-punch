@@ -20,7 +20,7 @@ for(const [system,id,handler] of expected){
  assert(home.includes('id="'+id+'"'),'retains '+id);
  assert(home.includes('onclick="'+handler+'"'),'retains original navigation '+system);
 }
-assert(home.includes('id="cardHistory"')&&home.includes("onclick=\"location.href='./history-data/'\""),'original history destination preserved');
+assert(home.includes('id="cardHistory"')&&home.includes("onclick=\"p79NavigateWhileBackingUp('./history-data/')\""),'original history destination remains protected against interrupted backup');
 assert(home.includes('歷史資料庫／歷史資料中心'),'history is prominent on the dashboard');
 assert(home.includes('id="p79ModernModuleSearch"'),'management module search exists');
 assert(home.includes('p79-modern-search-dim'),'search changes only visual classes and does not change navigation');

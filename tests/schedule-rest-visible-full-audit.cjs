@@ -27,7 +27,7 @@ const c={window:null,Map,Set,Array,Number,Object,Date,Math,JSON,String,console,
 c.window=c;c.P79RestAttendance={state:()=> 'unknown'};
 c.P79SpecialOvertime={electionDates:()=>[]};
 vm.createContext(c);
-for(const n of ['p79ScheduleHasVerifiedPunch','p79VisibleRestKind','p79ScheduleDisplayContext','p79ScheduleDisplayDay','p79VisibleRestDayAudit','p79DailyRestCount','p79RestAutomaticExcludedDates','p79RestAutomaticPlan','p79RestQuotaAuditSnapshot','p79ScheduleRestCountCells'])vm.runInContext(extract(n),c);
+for(const n of ['p79ScheduleHasVerifiedPunch','p79VisibleRestKind','p79ScheduleDisplayContext','p79ScheduleDisplayDay','p79VisibleRestDayAudit','p79DailyRestCount','p79RestAutomaticExcludedDates','p79RestAutomaticPlan','p79RestQuotaAuditSnapshot','p79ScheduleSpecialSummaryColumns','p79ScheduleElectionSummaryDates','p79ScheduleRestCountCells'])vm.runInContext(extract(n),c);
 let raw=c.p79DailyRestCount(employees[0],month,monthlyScheduleMeta.E0);
 a.equal(raw.counts.例,3,'daily counter must follow the displayed typhoon-leave override, not four hidden markers');
 let visible=c.p79VisibleRestDayAudit(employees[0],month,monthlyScheduleMeta.E0);

@@ -22,8 +22,7 @@ on:
       - 'settings/**'
       - 'history-data/**'
       - 'data-cache/**'
-      # Keep the deployment gate verifiable when a regression harness is repaired.
-      - 'tests/**'
+      # Test-only changes run in management-sync; do not republish the live site.
       - '.github/workflows/pages-static.yml'
       # Version/packaging changes must publish the same commit as Windows.
       - '.github/workflows/port79-windows-updates.yml'

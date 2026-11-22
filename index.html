@@ -597,6 +597,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
         </article>
       </div>
     </div>
+    <p class="p79-home-yard-source" id="p79HomeYardSyncStatus" role="status"></p>
     <p class="p79-home-yard-source" id="p79HomeYardSource">此帳號在目前瀏覽器尚未匯入 Excel；不使用示意數字。</p>
   </section>
   <section class="p79d-section p79d-attendance" aria-labelledby="p79dAttendanceHeading">
@@ -1395,7 +1396,7 @@ function showSession(session){
    const badge=yardCard.querySelector('.badge');if(badge)badge.textContent=canUseYard?permissionLabel(session.systemPermissions.efficiency||'view'):'';
   }
   $('p79HomeYardPanel').hidden=!canUseYard;
-  if(canUseYard){renderHomeYardSummary(session);void refreshHomeYardCloud(session);}
+  if(canUseYard){renderHomeYardSummary(session);showHomeYardCloudStatus();void refreshHomeYardCloud(session,true);}
 }
 
 async function punchLogin(){
@@ -1719,15 +1720,28 @@ function renderHomeYardSummary(session){
   note.textContent='資料日期 '+latest.date+'｜來源 '+String(saved.fileName||'先前匯入 Excel')+'｜20 呎=1 TEU、40／45 呎=2 TEU；45呎須有獨立場存資料（換算值）；Excel 原始 TEU 不變。重櫃／空櫃／冷凍櫃的容許櫃數與 TEU 由管理員設定；冷凍櫃為內含分類、不重複加總；僅存於此瀏覽器。';
  }catch(error){note.textContent='本機儲位資料暫時無法讀取，請進入碼頭儲量管理確認 Excel 與容量設定。';}
 }
-async function refreshHomeYardCloud(session){
+const HOME_YARD_CLOUD_INTERVAL=60000;
+let homeYardCloudRequest=null,homeYardCloudStatus=null;
+function showHomeYardCloudStatus(){
+ const el=$('p79HomeYardSyncStatus'),session=currentSession;
+ if(!el)return;
+ const status=homeYardCloudStatus;
+ el.textContent=canViewHomeYard(session)&&status?.token===getToken()&&status.session===session
+  ?status.text:'';
+}
+async function refreshHomeYardCloud(session,seedCloud=false){
  if(!window.Port79YardAccountSync||!canViewHomeYard(session))return;
  const id=String(session.empId||session.employeeId||session.id||session.accountId||session.email||session.username||'').trim();
  if(!id)return;
  const account=encodeURIComponent(id.slice(0,120)),token=getToken();
+ if(!token||homeYardCloudRequest?.token===token&&homeYardCloudRequest.session===session)return;
+ const request={token,session};
+ const active=()=>currentSession===session&&getToken()===token&&canViewHomeYard(session);
+ homeYardCloudRequest=request;
  try{
   let data=await window.Port79YardAccountSync.sync(account);
-  if(getToken()!==token||!canViewHomeYard(currentSession))return;
-  if(!data.length&&location.hostname==='kuo-code-tw.github.io'&&
+  if(!active())return;
+  if(seedCloud&&!data.length&&location.hostname==='kuo-code-tw.github.io'&&
      (session.adminRole==='superadmin'||session.systemPermissions?.efficiency==='manage')){
    const local=JSON.parse(localStorage.getItem(YARD_HOME_STORAGE_PREFIX+account)||'null');
    if(Array.isArray(local?.rows)&&local.rows.length){
@@ -1735,18 +1749,51 @@ async function refreshHomeYardCloud(session){
     data=await window.Port79YardAccountSync.sync(account,latest);
    }
   }
-  if(getToken()!==token||!canViewHomeYard(currentSession))return;
+  if(!active())return;
   window.Port79YardAccountSync.merge(account,data);
-  renderHomeYardSummary(currentSession);
+  renderHomeYardSummary(session);
+  const last='最後同步 '+new Date().toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false});
+  homeYardCloudStatus={token,session,last,text:last};
+  showHomeYardCloudStatus();
  }catch(error){
+  if(!active())return;
+  const prior=homeYardCloudStatus;
+  const last=prior?.token===token&&prior.session===session?prior.last:'';
+  homeYardCloudStatus={token,session,last,text:'雲端同步未完成，目前顯示本機資料'+(last?'｜'+last:'')};
+  showHomeYardCloudStatus();
   console.warn('雲端儲量讀取未完成',String(error?.message||error));
+ }finally{
+  if(homeYardCloudRequest===request)homeYardCloudRequest=null;
  }
 }
 window.addEventListener('p79-home-import-complete',event=>{
  if(event?.detail?.kinds?.includes('yard')&&currentSession&&canViewHomeYard(currentSession))
   renderHomeYardSummary(currentSession);
 });
-window.addEventListener('pageshow',()=>{if(currentSession&&canViewHomeYard(currentSession)){renderHomeYardSummary(currentSession);void refreshHomeYardCloud(currentSession);}});
+function refreshVisibleHomeYard(){
+ if(document.hidden||!currentSession||!canViewHomeYard(currentSession))return;
+ renderHomeYardSummary(currentSession);
+ showHomeYardCloudStatus();
+ if(navigator.onLine)void refreshHomeYardCloud(currentSession);
+ else {
+  const status=$('p79HomeYardSyncStatus');
+  status.textContent='目前離線，顯示本機資料'+(status.textContent?'｜'+status.textContent:'');
+ }
+}
+window.addEventListener('pageshow',refreshVisibleHomeYard);
+window.addEventListener('online',refreshVisibleHomeYard);
+window.addEventListener('offline',refreshVisibleHomeYard);
+document.addEventListener('visibilitychange',refreshVisibleHomeYard);
+window.addEventListener('storage',event=>{
+ if(!currentSession||!canViewHomeYard(currentSession))return;
+ const id=String(currentSession.empId||currentSession.employeeId||currentSession.id||currentSession.accountId||
+  currentSession.email||currentSession.username||'').trim();
+ if(!id)return;
+ const account=encodeURIComponent(id.slice(0,120));
+ if([YARD_HOME_STORAGE_PREFIX,YARD_HOME_ALLOWED_PREFIX].some(prefix=>event.key===prefix+account))
+  renderHomeYardSummary(currentSession);
+});
+window.setInterval(refreshVisibleHomeYard,HOME_YARD_CLOUD_INTERVAL);
 /* A backup batch currently runs on this page. Preserve its page lifetime when a
  * manager opens another system; server-owned background jobs are still required
  * for backups to survive closing the original browser tab. */
@@ -2114,7 +2161,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script src="./attendance/v6-engine.js?v=20261029-dashboard-shared"></script>
 <script src="./assets/port79-rest-attendance.js?v=20261111-home-rest-proof-v1"></script>
 <script src="./assets/port79-schedule-punch-restore.js?v=20261111-home-rest-proof-v1"></script>
-<script src="./assets/port79-schedule-rest-evidence.js?v=20261111-home-rest-proof-v1"></script>
+<script src="./assets/port79-schedule-rest-evidence.js?v=20261122-attendance-deep-audit-v2"></script>
 <script src="./assets/port79-home-analytics.js?v=20261030-integrated-template-v9"></script>
 <script src="./assets/port79-home-dashboard.js?v=20261117-stable-data-value-v2"></script>
 <script src="./assets/port79-history-read.js?v=20261030-dashboard-readonly"></script>

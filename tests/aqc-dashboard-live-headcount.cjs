@@ -13,6 +13,7 @@ const ctx={
   Map,Set,document:{getElementById:id=>id==='kpiPeople'?node:null},
   normalizePersonName:s=>String(s||'').replace(/\s+/g,''),
   systemEmployees:[],p79AqcHeadcountVerified:false,
+  operationScheduleReads:new Map(),currentOperationScheduleStore:()=>({has:()=>false}),isoTodayLocal:()=> '2026-11-05',
   records:[{empId:'OLD',name:'已離職多年的舊員工',source:'working-report',workDate:'2026-11-05',disc:30}]
 };
 vm.createContext(ctx);
@@ -21,7 +22,7 @@ for(const name of ['currentOfficialJobTitle','isAqcEmployee','people','updateCur
 assert.equal(ctx.people().length,0,'Historical WORKING REPORT must not recreate current personnel roster');
 ctx.updateCurrentAqcHeadcount();
 assert.equal(node.textContent,'—','Before fresh HR validation stale count 37 must not be shown');
-assert.match(node.title,/尚未核對/);
+assert.match(node.title,/正在讀取當月正式排班編組/,'do not mistake historical reports for verified current staff');
 ctx.systemEmployees=[
   ...Array.from({length:36},(_,i)=>({empId:'ACTIVE-'+i,name:'現職'+i,jobTitle:'AQC',employmentStatus:'active'})),
   {empId:'OLD',name:'已離職多年的舊員工',jobTitle:'AQC',employmentStatus:'resigned'}
@@ -40,7 +41,8 @@ assert.equal(node.textContent,'—','Unverified GC backup must not present a for
 const verifiedWrites=(html.match(/p79AqcHeadcountVerified=true;/g)||[]).length;
 const resets=(html.match(/p79AqcHeadcountVerified=false;/g)||[]).length;
 assert(verifiedWrites>=4,'Manual, group and two cloud HR refreshes must verify roster before display');
-assert(resets>=3,'Initial screen and GC snapshots should remain unverified');
+assert(resets>=2,'Initial screen and GC snapshots remain unverified until authenticated HR or monthly roster evidence arrives');
+assert(html.includes('let p79AqcHeadcountVerified=false;'),'initial headcount verification must default to false');
 assert((html.match(/updateCurrentAqcHeadcount\(\);/g)||[]).length>=4,'Dashboard and background HR reads must refresh header');
 assert(!fn('people').includes('forEach(r=>'),'Historical working-report fallback must not return');
 for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi))if(!/\bsrc=|application\/ld\+json/.test(m[1]))new vm.Script(m[2]);

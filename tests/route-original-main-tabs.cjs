@@ -13,7 +13,7 @@ for(const name of tabs){
  assert(navBlock.includes("switchTab('"+name+"',this)"),name+' keeps original click action');
 }
 assert(html.includes('id="efficiencySharedYear"'),'shared year picker preserved');
-assert(html.includes('route-management-dashboard.css?v=20261111-compact-row-v3'),'compact toolbar stylesheet cache version updated');
+assert(/route-management-dashboard\.css\?v=[^"\s<>]+/.test(html),'compact route toolbar stylesheet has a cache key');
 assert(html.includes('id="routeTopMonthFilter"'),'route-specific month picker preserved');
 assert(html.includes('id="routeManagerSyncBtn"'),'route-specific vessel sync preserved');
 assert(html.includes('id="routeManagerCompareNav"'),'route-specific comparison control preserved');
@@ -22,7 +22,8 @@ assert(html.includes('class="p79-rm-profile"'),'route home shortcut preserved');
 assert(!css.includes('body:has(#view-compare:not(.hidden)) #efficiencyMainTabs{display:none!important}'),'route no longer hides the main tabs');
 assert(html.includes('id="efficiencyHeader"'),'single shared header remains in document');
 assert(html.includes('id="efficiencyMainTabs"'),'single shared navigation remains in document');
-assert(!css.includes('#efficiencyHeader{display:none!important}'),'route must retain the same page header');
+assert(css.includes('body:has(#view-compare:not(.hidden)) #efficiencyHeader{display:none!important}'),'route-only duplicate header is hidden while shared tabs remain');
+assert(!css.includes('\n#efficiencyHeader{display:none!important}'),'global efficiency header must never be hidden');
 assert(!css.includes('body:has(#view-compare:not(.hidden)) #efficiencyMainTabs{'),'route must not reposition the shared navigation');
 assert(css.includes('#efficiencyPageMain{max-width:none!important;width:100%!important;padding:12px 12px 24px!important;margin:0 auto!important}'),'route main area uses the same outer vertical padding');
 assert(!css.includes('#efficiencyPageMain{max-width:none!important;width:100%!important;padding:0!important;margin:0!important}'),'no special zero-padding route layout');

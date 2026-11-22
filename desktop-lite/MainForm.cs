@@ -707,19 +707,19 @@ namespace Port79Lite {
     // No pending patch means no restart is needed.
     bool restartSafe=!cloudWorkerJobActive&&!cacheInProgress&&
      (manual||!userInteractedSinceLaunch);
-    if((shell!=null||websitePending)&&manual&&!restartSafe){
+    if((shell!=null||websitePending)&&manual&&(!restartSafe||userInteractedSinceLaunch)){
      var pendingType=shell!=null?"Windows 主程式及網站":"網站畫面";
      var answer=MessageBox.Show(this,
-      "已找到並驗證新版"+pendingType+"，但目前仍有雲端資料同步。\n\n"+
+      "已找到並驗證新版"+pendingType+"。請先儲存目前工作，再重新啟動。\n\n"+
       "選「是」：中止尚未完成的背景同步，立即套用新版並重新啟動。已儲存的 local-data 快取保留；尚未儲存的表單可能遺失。\n\n"+
       "選「否」：保留目前工作，更新檔保存在本機，稍後再按「檢查並更新系統」。",
       "79號碼頭｜新版已準備完成",MessageBoxButtons.YesNo,
       MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2);
-     if(answer==DialogResult.Yes)restartSafe=true;
+     restartSafe=answer==DialogResult.Yes;
     }
     if(shell!=null){
      if(!restartSafe){
-      UpdateStatus("Windows 新版已下載；同步進行中，等待下次手動套用。",manual);
+      UpdateStatus("Windows 新版已下載；工作或同步進行中，可在儲存後從首頁套用。",manual);
       Log("Windows update staged; restart deferred until next explicit manual choice");
       return;
      }
@@ -731,7 +731,7 @@ namespace Port79Lite {
     }
     if(websitePending){
      if(!restartSafe){
-      UpdateStatus("網站新版已下載；同步進行中，等待下次手動套用。",manual);
+      UpdateStatus("網站新版已下載；工作或同步進行中，可在儲存後從首頁套用。",manual);
       Log("Website update staged; restart deferred until next explicit manual choice");
       return;
      }
@@ -776,3 +776,4 @@ namespace Port79Lite {
   }
  }
 }
+

@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('work-hours/index.html','utf8');
 
-assert.match(html,/＋ 申報加班<\/button>\s*<button id="p79OvertimePlannedToggle"/,'top toolbar modal button follows 申報加班');
+assert.match(html,/＋ 申報加班<\/button>[\s\S]{0,400}<button id="p79OvertimePlannedToggle"/,'planned modal follows the report and report-options actions in the toolbar');
 assert.match(html,/<button id="p79OvertimePlannedToggle"[^>]+aria-controls="p79OvertimePlannedDialog" aria-haspopup="dialog" aria-expanded="false"/,'modal button is accessible');
 assert.match(html,/<dialog id="p79OvertimePlannedDialog"[^>]+oncancel="p79PlannedDialogCancel\(event\)" onclose="p79PlannedDialogClosed\(\)"/,'native dialog protects in-progress edits and restores toolbar on close');
 assert.match(html,/<section id="p79OvertimePlannedSection"/,'same original planned list remains inside modal');
@@ -28,7 +28,7 @@ const dialog={
  showModal(){if(this.open)throw Error('already open');this.open=true;showCount++;},
  close(){if(!this.open)throw Error('already closed');this.open=false;closeCount++;}
 };
-const ctx={document:{getElementById:id=>id==='p79OvertimePlannedDialog'?dialog:id==='p79OvertimePlannedToggle'?button:null}};
+const ctx={p79PlannedBulkBusy:false,p79PlannedBulkSelected:new Set(),document:{getElementById:id=>id==='p79OvertimePlannedDialog'?dialog:id==='p79OvertimePlannedToggle'?button:null}};
 vm.createContext(ctx);vm.runInContext(code,ctx);
 ctx.p79ToggleOvertimePlanned();
 assert.equal(dialog.open,true,'toolbar opens centered native modal');

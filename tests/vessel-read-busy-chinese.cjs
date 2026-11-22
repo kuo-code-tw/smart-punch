@@ -7,7 +7,7 @@ function fn(name){let a=html.indexOf('function '+name+'(');assert(a>=0);if(html.
  vm.createContext(c);vm.runInContext(fn('p79ReadFullVesselData'),c);
  assert((await c.p79ReadFullVesselData('gcGetData',{})).ok);assert.equal(calls,3);assert.equal(lights.length,2);
  calls=0;c.apiGetQuick=async()=>{calls++;throw Error('權限不足');};await assert.rejects(c.p79ReadFullVesselData('gcGetData'),/權限不足/);assert.equal(calls,1);
- calls=0;c.apiGetQuick=async()=>{calls++;throw Object.assign(Error('busy'),{retryable:true});};await assert.rejects(c.p79ReadFullVesselData('gcGetData'),e=>e.vesselReadPending===true);assert.equal(calls,6);assert(clock<90000);
+ calls=0;c.apiGetQuick=async()=>{calls++;throw Object.assign(Error('busy'),{retryable:true});};await assert.rejects(c.p79ReadFullVesselData('gcGetData'),e=>e.vesselReadPending===true);assert(calls>6&&calls<=20,'retryable remote lock may outlast six attempts but must stop within the 90s budget');assert(clock<90000,'deadline prevents indefinite retries');
  const names={shipMasters:[{vessel:'WAN HAI 123',vesselChineseName:'測試船名'}],String,Set,localStorage:{getItem:()=>JSON.stringify({OTHER:'另一艘'})}};
  vm.createContext(names);vm.runInContext(fn('p79VesselChineseName')+'\n'+fn('p79VesselChineseDisplay'),names);
  assert.equal(names.p79VesselChineseDisplay({vessel:'WAN HAI 123'}),'測試船名');assert.equal(names.p79VesselChineseDisplay({vessel:'OTHER'}),'另一艘');assert.equal(names.p79VesselChineseDisplay({vessel:'UNKNOWN'}),'');

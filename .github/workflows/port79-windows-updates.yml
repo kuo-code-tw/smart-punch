@@ -79,7 +79,7 @@ jobs:
         shell: pwsh
         working-directory: production
         run: |
-          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs desktop-lite/tests/update-visible-menu.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs tests/windows-release-version-contract.cjs tests/home-login-version-fast-audit.cjs tests/windows-cache-incremental-resume.cjs tests/windows-stale-ui-after-new-zip.cjs tests/home-attendance-inline-channel.cjs tests/windows-download-link.cjs tests/cache-center-history-on-demand.cjs
+          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs desktop-lite/tests/update-visible-menu.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs tests/windows-release-version-contract.cjs tests/home-login-version-fast-audit.cjs tests/homepage-auto-update-bridge.cjs tests/home-yard-refresh.cjs tests/windows-cache-incremental-resume.cjs tests/windows-stale-ui-after-new-zip.cjs tests/home-attendance-inline-channel.cjs tests/windows-download-link.cjs tests/cache-center-history-on-demand.cjs
           if($LASTEXITCODE -ne 0){throw 'Windows unit tests failed'}
           & ./desktop-lite/tests/shell-updater-safety.ps1
           if($LASTEXITCODE -ne 0){throw 'Updater preservation tests failed'}
@@ -206,3 +206,4 @@ jobs:
           # Older Windows EXEs check this fixed legacy tag.
           gh release upload port79-windows-lite-20261120 dist/Port79-Windows-Lite.zip --clobber -R "$REPO"
           echo "Published $tag and refreshed stable legacy download"
+

@@ -15,5 +15,9 @@ a.equal(context.p79AttendanceReportedOvertime(row('468'),state({overtimeReport:r
 a.equal(context.p79AttendanceReportedOvertime(row('468'),state({overtimeReport:report,overtimeRevocations:[{confirmed:true,reportId:'REAL'}]})),null,'revoked report is not active');
 const declared=context.p79AttendanceReportedOvertime(row('468'),state({overtimeReport:{...report,code:'國08-14',overtimeEnd:'14',declaredHours:8}}));a.equal(declared.minutes,480,'configured declared hours are not reconstructed from interval length');
 context.window.P79Overtime={overtimeMinutes:()=>0};a.equal(context.p79AttendanceReportedOvertime(row('468'),state({overtimeReport:report})),null,'non-overlapping legacy report does not repeat on a second same-day shift');delete context.window.P79Overtime;
-const coverState=state({});coverState.rows.push({empId:'TARGET',schedule:{[date]:'早'}});coverState.covers=[{leaveEmpId:'TARGET',workerIds:['468','OTHER'],startDate:date,endDate:date,mode:'two'}];const cover=context.p79AttendanceReportedOvertime(row('468'),coverState);a.equal(cover.label,'代08-12');a.equal(cover.pending,true);a.equal(cover.report,null);
-console.log('PASS all 83 staff across quota categories: no phantom declarations, exact typhoon codes, exclusions/revocations, declared hours, and pending genuine covers');
+const coverState=state({});coverState.rows.push({empId:'TARGET',schedule:{[date]:'早'}});coverState.covers=[{leaveEmpId:'TARGET',workerIds:['468','OTHER'],startDate:date,endDate:date,mode:'two'}];a.equal(context.p79AttendanceReportedOvertime(row('468'),coverState),null,'leave cover alone must not be presented as overtime');
+coverState.rows[0].schedule.__meta[date].overtimeReport={id:'COVER-REPORT',category:'代',code:'代08-12',declaredHours:4,overtimeStart:'08:00',overtimeEnd:'12:00'};
+const cover=context.p79AttendanceReportedOvertime(row('468'),coverState);
+a.equal(cover.label,'代08-12');a.equal(cover.pending,false);a.equal(cover.report.id,'COVER-REPORT');
+
+console.log('PASS all 83 staff across quota categories: no phantom declarations, exact typhoon codes, exclusions/revocations, declared hours, and separate leave-cover and saved overtime records');

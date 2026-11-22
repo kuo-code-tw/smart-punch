@@ -22,8 +22,8 @@ assert.match(src,/MessageBoxButtons\.YesNo/,
  'Synchronizing or unsaved work requires explicit operator choice before restart');
 assert.match(src,/MessageBoxDefaultButton\.Button2/,
  'Default must protect active data downloads');
-assert.match(src,/if\(\(shell!=null\|\|websitePending\)&&manual&&!restartSafe\)/);
-assert.match(src,/if\(answer==DialogResult\.Yes\)restartSafe=true/);
+assert.match(src,/if\(\(shell!=null\|\|websitePending\)&&manual&&\(!restartSafe\|\|userInteractedSinceLaunch\)\)/);
+assert.match(src,/restartSafe=answer==DialogResult\.Yes/);
 assert.match(src,/if\(shell!=null\)\{[\s\S]*?await ReleaseUpdater\.LaunchAsync\(shell,root,Process\.GetCurrentProcess\(\)\.Id\);[\s\S]*?ExitApp\(\)/);
 assert.match(src,/if\(websitePending\)\{[\s\S]*?exit=true;Application\.Restart\(\);Close\(\)/);
 assert.match(src,/if\(manual\)MessageBox\.Show\(this,[\s\S]*?"79號碼頭｜已是最新版"/);

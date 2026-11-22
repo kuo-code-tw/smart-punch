@@ -2,7 +2,7 @@
 const fs=require('node:fs'),assert=require('node:assert/strict');
 const source=fs.readFileSync('work-hours/index.html','utf8');
 assert(source.includes('id="p79OvertimeMissingConversionPanel"'),'summary must have a visible missing-conversion list');
-assert(source.includes('p79RenderOvertimeMissingConversion(rows,loadingWithoutRows);'),'summary list must refresh with filtered rows');
+assert(source.includes('p79RenderOvertimeMissingConversion(completedRows,loadingWithoutRows);'),'summary list refreshes from completed and authorized rows, never planned estimates');
 const begin=source.indexOf('        // 和「換算加班時數」統計使用相同的正式申報');
 const end=source.indexOf('        function renderOvertimeStats() {',begin);
 assert(begin>0&&end>begin);

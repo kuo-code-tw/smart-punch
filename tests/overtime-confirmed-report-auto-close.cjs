@@ -9,7 +9,7 @@ const extract=(start,finish)=>{
 };
 const helper=extract(' function closeConfirmedReportDialog(el){',' const inputStyle=');
 const handler=extract('   let submissionBusy=false;', '\n   };\n  }catch(e)');
-assert(source.includes('const validation=await prepareSaveValidation(validationRequest,true)'),
+assert(source.includes('const validation=await prepareSaveValidation(validationRequest,true,'),
  'new+review flow reuses one current official conversion table before submission');
 assert(!handler.includes('await ensureSpecialRule(chosen)'),
  'confirmed submission must not repeat the same rule fetch after the spinner');
