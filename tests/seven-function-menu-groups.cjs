@@ -31,7 +31,9 @@ for(const selector of ['.p79-menu-sections','.p79-menu-items','data-group="maint
 assert(workspaceCss.includes('Unified seven-system feature menu'),'workspace dropdown sizing missing');
 for(const page of ['attendance','work-hours','leave','schedule','aqc-efficiency','hr','history-data']){
  const html=fs.readFileSync(page+'/index.html','utf8');
- const version=(html.match(/menu=20261112-clean-v1/g)||[]).length;
- assert.equal(version,3,page+' should refresh common JS/CSS plus workspace stylesheet');
+ for(const asset of ['port79-seven-top.js','port79-seven-top.css','port79-management-workspace.css']){
+  const matches=[...html.matchAll(new RegExp(asset.replace(/\./g,'\\.')+'\\?v=([^"\\s<>]+)','g'))];
+  assert.equal(matches.length,1,page+' must load one versioned '+asset);
+ }
 }
 console.log('PASS unified task-grouped menus across 7 systems; existing actions retained, permissions and handlers unchanged, all 7 pages cache-busted');
