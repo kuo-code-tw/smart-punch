@@ -63,6 +63,7 @@ assert.equal(stats.byDay[0].bundleMismatch,0,'11/08: 861+797-4=1654');
 assert.equal(stats.byDay[1].bundleUnknown,1,'11/07 must not claim missing 6 as Bundle');
 assert.equal(stats.byDay[2].bundleMismatch,1,'11/06 +2 mismatch is flagged');
 api.render();
+console.log('TERMINAL-DIAG',JSON.stringify({month:api.options(),scoped:api.scopeTo79and80('2026-11',ships,records).ships.length,day:els.terminalDayBody.innerHTML.slice(0,360)}));
 assert(els.terminalDayBody.innerHTML.includes('861'));
 assert(els.terminalDayBody.innerHTML.includes('p79-ter-bundle'));
 assert(els.terminalDayBody.innerHTML.includes('p79-ter-bundle-value'),'Bundle number has hover target');
