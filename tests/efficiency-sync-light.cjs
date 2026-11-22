@@ -16,7 +16,7 @@ const manual=html.slice(html.indexOf('async function manualCloudSync('),html.ind
   // verifies clean, unchanged revisions can safely skip this expensive read.
   vm.runInContext('p79EfficiencyReadbackRequired=true;',c);
   const task=c.manualCloudSync();await new Promise(resolve=>setImmediate(resolve));
-  if(!['upload-failure','busy-then-success'].includes(scenario)){assert(readStarted);assert.equal(elements.efficiencySyncLight.dataset.state,'syncing','intermediate successful read cannot turn green');if(scenario==='slow-warning'){watchdog();assert.equal(elements.efficiencySyncLight.dataset.state,'syncing');assert.equal(elements.efficiencySyncError.open,false,'slow request must not expand an error dialog');assert.equal(elements.efficiencySyncError.style.color,'#92400e');}release();}
+  if(!['upload-failure','busy-then-success'].includes(scenario)){assert(readStarted,'strict readback must begin in scenario: '+scenario);assert.equal(elements.efficiencySyncLight.dataset.state,'syncing','intermediate successful read cannot turn green');if(scenario==='slow-warning'){watchdog();assert.equal(elements.efficiencySyncLight.dataset.state,'syncing');assert.equal(elements.efficiencySyncError.open,false,'slow request must not expand an error dialog');assert.equal(elements.efficiencySyncError.style.color,'#92400e');}release();}
   await task;
   // An orphan 'busy' flag with no active Promise cannot be interpreted as a
   // completed upload. Fail closed instead of starting a duplicate cloud writer.
