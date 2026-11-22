@@ -5,16 +5,23 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve
 async function run(){
  let now=Date.now(),token='MANAGER';const requests=[];
  const cloud={ok:true,revision:'CURRENT',records:[],schedules:[{empId:'E1',schedule:{}}]};
+ let active=0,peak=0;const started=[];
  const c={console,Date:class extends Date{static now(){return now;}},AbortController,setTimeout,clearTimeout,
   sessionStorage:{getItem:()=>null},p79OvertimeContext:{token:()=>token,gasUrl:()=> 'https://fixture.invalid'},
-  fetch:async url=>{const gate=deferred();requests.push({url,gate});return gate.promise;}};
+  fetch:async url=>{const gate=deferred();active++;peak=Math.max(peak,active);started.push(url);requests.push({url,gate});try{return await gate.promise}finally{active--;}}};
  c.window=c;vm.createContext(c);vm.runInContext(source,c);const api=c.P79Overtime;
  const request=()=>({empId:'E1',date:'2026-11-28',leaveHandoffId:'L1'});
  const resolveReads=()=>{for(const {url,gate} of requests.splice(0))gate.resolve({ok:true,json:async()=>url.includes('getOvertimeConfig')?{ok:true,config:{overtimeConversionRowsV1:[],overtimeReportTypesV1:[]}}:cloud});};
  let draft=request(),running=api.prepareSaveValidation(draft);
- assert.equal(requests.length,2,'rules and employee/day context start concurrently');
- assert(requests.some(r=>r.url.includes('getOvertimeConfig')));assert(requests.some(r=>r.url.includes('getOvertimeReportContext')));
- resolveReads();await running;assert.equal(api.takeSaveContext(draft),cloud);
+ assert.equal(requests.length,1,'rule verification begins before the identity and attendance context read');
+ assert(requests[0].url.includes('getOvertimeConfig'),'fresh official rule table is consulted first');
+ resolveReads();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(requests.length,1,'authoritative employee/day context begins after GAS rule lock completes');
+ assert(requests[0].url.includes('getOvertimeReportContext'));
+ resolveReads();await running;
+ assert.equal(peak,1,'two cloud GETs must not contend for the GAS data lock');
+ assert(started.some(url=>url.includes('getOvertimeConfig'))&&started.some(url=>url.includes('getOvertimeReportContext')));
+ assert.equal(api.takeSaveContext(draft),cloud);
  assert.equal(api.takeSaveContext(draft),null,'preflight is consumed exactly once');
  for(const change of [()=>now+=15001,()=>token='OTHER',d=>d.date='2026-11-29',d=>d.empId='E2',d=>d.leaveHandoffId='L2']){
   token='MANAGER';draft=request();running=api.prepareSaveValidation(draft,false);resolveReads();await running;change(draft);
@@ -34,6 +41,6 @@ async function run(){
  assert.equal(calls,1,'double click cannot start a second preflight');assert.equal(node('#p79OtStage').disabled,true);
  validation.reject(Error('offline'));await Promise.all([first,second]);assert.equal(node('#p79OtStage').disabled,false,'failed preflight unlocks button');
  assert.match(node('#p79OtStatus').textContent,/offline/);
- console.log('PASS concurrent fresh rules/context, one-use identity/date/leave-scoped preflight, expiry, missing revision, double-click mutex and failure recovery');
+ console.log('PASS serialized fresh rules/context, one-use identity/date/leave-scoped preflight, expiry, missing revision, double-click mutex and failure recovery');
 }
 run().catch(e=>{console.error(e);process.exit(1)});
