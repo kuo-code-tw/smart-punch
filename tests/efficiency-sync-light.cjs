@@ -7,6 +7,7 @@ const manual=html.slice(html.indexOf('async function manualCloudSync('),html.ind
   const c={setTimeout,clearTimeout,console:{error(){}},document:{getElementById:id=>elements[id]},readQueue:()=>pending,requireEfficiencyAccess:()=>true,flushQueue:async()=>{if(scenario==='upload-failure')return{ok:false,error:'雲端鎖定，稍後重試'};return{ok:true};},restoreVesselDataFromCloud:async()=>{readStarted=true;c.p79SetEfficiencySyncLight('success');await new Promise(resolve=>release=resolve);if(scenario==='read-failure')throw Error('read failed');if(scenario==='new-pending')pending=[{}];return true;},setEfficiencySaveState(){},toast(){},
   // The production strict readback wrapper replaces direct restore calls.
   p79WaitStrictVesselReadback:async()=>c.restoreVesselDataFromCloud(),
+  cloudBusy:false, // The actual page declares this foreground/cloud mutual exclusion flag.
   efficiencyHasUnsavedChanges:false,requireSuperAdminAccess:()=>false};
   if(scenario==='busy-then-success'){c.cloudBusy=true;c.gcQueueFlushPromise=null;c.setTimeout=(fn,ms)=>{if(ms>1000)return setTimeout(fn,ms);c.cloudBusy=false;queueMicrotask(fn);};}
   let watchdog;
