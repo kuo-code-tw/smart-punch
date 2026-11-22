@@ -55,5 +55,5 @@ assert(script.includes("matched.filter(p=>p.group===peopleGroup)"),'filter chang
 assert(script.includes('renderPeople();'),'monthly roster updates rerender the table');
 assert(script.includes("aria-pressed"),'selected button is accessible');
 assert(css.includes('.p79r-people-panel .p79d-table-scroll'),'compact table stays within card');
-assert(html.includes('all-hatches-v1'),'all-person efficiency JS and CSS asset versions bypass older browser cache');
+for(const asset of ['port79-reference-dashboard.js','port79-reference-dashboard.css'])assert(new RegExp(asset.replace(/\./g,'\\.')+'\\?v=[^"\\s<>]+').test(html),'current all-person efficiency '+asset+' must be cache-versioned');
 console.log('PASS A/B/C/D grouping; AQC suffix removed in ranking only; unique-ID and name reconciliation, unknown/duplicate names safe; official data immutable; buttons wired and cache refreshed');
