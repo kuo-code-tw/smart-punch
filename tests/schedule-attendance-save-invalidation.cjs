@@ -30,8 +30,9 @@ const client=ctx.window.P79ScheduleRestEvidence.create({
  assert.equal(after.actualShifts['E1|'+date],'早','every company and group remains part of the audit');
  assert.equal(counts[month],2,'invalidation bypasses cached official month');
  const html=fs.readFileSync('schedule/index.html','utf8');
- assert(html.includes("event.key!=='port79_attendance_sync_notice_v1'"),'schedule listens to confirmed saves in another tab');
- assert(html.includes('p79ScheduleRestClient().invalidate(month)'),'schedule forces a fresh official audit');
+ assert(html.includes("event.key==='port79_attendance_sync_notice_v1'"),'schedule listens to confirmed saves in another tab');
+ assert(html.includes('p79ScheduleRestClient().invalidate(currentMonth)'),'schedule forces a fresh official audit');
+ assert(html.includes('p79AttendanceNoticeRefreshTimer=setTimeout'),'burst saves coalesce before refreshing official data');
  assert(html.includes('20261122-attendance-save-invalidation-v1'),'browser must load the updated evidence client');
  console.log('PASS attendance save notice invalidates cache and updates cross-company roster without modifying formal shifts');
 })().catch(e=>{console.error(e);process.exitCode=1});
