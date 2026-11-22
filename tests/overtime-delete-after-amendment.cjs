@@ -20,7 +20,9 @@ async function simulate(mode){
  const rosterId=mode==='replaced'?'REPORT-NEW':'REPORT-1';
  const schedule=after=>({empId:'E1',month,schedule:{__meta:{[date]:after?{}:{overtimeReport:{id:rosterId}}}}});
  const context={console,Date,JSON,String,Array,Map,Set,Promise,AbortController,crypto:{randomUUID:()=> 'client-1'},
-   p79WorkOvertimeDisplayedRows:[row],p79CanDeleteOvertime:()=>true,normalizeScheduleDateKey:v=>v,
+   p79WorkOvertimeDisplayedRows:[row],p79CanDeleteOvertime:()=>true,
+   p79CanExcludeOvertimeEstimate:()=>false, // All fixture rows have a saved cloud report
+   normalizeScheduleDateKey:v=>v,
    p79WorkOvertimeMonths:state,confirm:()=>true,alert:s=>messages.push(s),
    currentPort79SsoToken:()=> 'token',getActiveGasUrl:()=> 'https://mock.invalid/exec',
    setTimeout:(fn,ms)=>1,clearTimeout:()=>{},localStorage:{setItem:(...args)=>notice.push(args)},
