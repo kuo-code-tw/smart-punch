@@ -12,7 +12,8 @@ assert.equal(overtime.missingConversion,2,'unknown stored conversions are not in
 assert.equal(overtime.convertedHours,0,'no verified converted value may be claimed for missing data');
 const titles=report.analyzeOvertime({employees:[{empId:'E1',jobTitle:'技術員'},{empId:'E2',jobTitle:'領班'},{empId:'E3',jobTitle:'行政'}],schedules:[{empId:'E1',jobTitle:'舊職稱',schedule:{__meta:{'2026-10-01':{overtimeReport:{id:'A',declaredHours:2.5}},'2026-10-02':{overtimeReport:{id:'A',declaredHours:2.5}}}}},{empId:'E2',schedule:{__meta:{'2026-10-03':{overtimeReport:{id:'B',declaredHours:1.25}},'2026-10-04':{overtimeReport:{id:'C',declaredHours:7,status:'已撤銷'}}}}}]},'2026-10');
 assert.equal(titles.hours,3.75);assert.equal(titles.count,2);
-assert.deepEqual(titles.rows,[{title:'技術員',hours:2.5,count:1},{title:'領班',hours:1.25,count:1},{title:'行政',hours:0,count:0}],'HR job titles, zero-hour roles, duplicates and cancelled reports');
+assert.deepEqual(titles.rows.map(({title,hours,count})=>({title,hours,count})),[{title:'技術員',hours:2.5,count:1},{title:'領班',hours:1.25,count:1},{title:'行政',hours:0,count:0}],'HR job titles, zero-hour roles, duplicates and cancelled reports');
+assert.equal(titles.missingConversion,2,'missing conversions remain visible per job title without invented pay');
 const attendance=report.analyzeAttendance({records:[{empId:'E1',timeStr:'2026/10/01 07:00',status:'上班簽到'},{empId:'E1',timeStr:'2026/10/01 19:00',status:'下班簽退'},{empId:'E2',timeStr:'2026/10/02 19:00',status:'下班簽退'}]},'2026-10');
 assert.equal(attendance.personDays,1,'an isolated out-punch does not establish a worked day');assert.deepEqual(attendance.weeklyPeople,[1,0,0,0,0]);assert.equal(attendance.pendingShifts,null,'no invented pending-shift count without the shared engine');
 const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('assets/port79-reference-dashboard.css','utf8'),ui=fs.readFileSync('assets/port79-reference-dashboard.js','utf8');
