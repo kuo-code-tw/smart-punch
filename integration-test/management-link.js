@@ -330,7 +330,7 @@ function notify(state){
  b.querySelector('[data-label]').textContent=state.running?'正在核對跨系統最新資料…':names+' 有更新'+(editing()?'｜'+editingMessage():'｜準備自動核對');
  if(manualOnly){
   if(state.pending.length&&!state.running&&state.generation!==lastFailedGeneration&&!editing()&&document.visibilityState==='visible'){
-   clearTimeout(timer);timer=setTimeout(()=>void synchronize(),650);
+   clearTimeout(timer);timer=setTimeout(()=>void synchronize(),500);
   }else if(state.pending.length&&!state.running&&state.generation!==lastFailedGeneration)scheduleReadIdleResume();
   return;
  }
@@ -352,7 +352,7 @@ async function synchronize(manual=false){
   lastFailedGeneration=binding.engine.status().generation;
   clearTimeout(timer);timer=null;
   if(bar){bar.querySelector('[data-label]').textContent=result.reason==='editing'?editingMessage():
-   '跨系統更新未完成'+(result.errorType?'（'+result.errorType+'）':'')+'；已停止自動重試，請按「更新相關資料」重試';}
+   '跨系統更新未完成'+(result.errorType?'（'+result.errorType+'）':'')+'；已停止自動重試，'+(manualOnly?'下次已確認異動會重新核對，必要時可使用原有的「重新整理」':'請按「更新相關資料」重試');}
  }else{lastFailedGeneration=-1;}
 }
 function boot(){
@@ -367,11 +367,14 @@ const resume=(event)=>{if(stopped||suspended)return;
  // Normal clicks/focus events must never invent a cross-system mutation.
  // A real return from a long-hidden tab may check remote-device changes once.
  if(event?.type==='visibilitychange'&&document.visibilityState==='hidden'){hiddenAt=Date.now();return;}
- if(binding&&['leave','schedule','workhours','history'].includes(context.system)&&
+ if(binding&&['leave','schedule','workhours','history','attendance'].includes(context.system)&&
     event?.type==='visibilitychange'&&document.visibilityState==='visible'&&hiddenAt>0&&
     Date.now()-hiddenAt>=120000&&Date.now()-lastFocusCheck>=300000){
   lastFocusCheck=Date.now();
-  binding.engine.receive({v:1,id:context.system+'-return-'+lastFocusCheck,at:lastFocusCheck,topics:['leave','cover','schedule','overtime']});
+  const returnTopics=context.system==='history'?['attendance','schedule','efficiency','history']:
+    context.system==='attendance'?['people','organization','permissions','attendance','leave','cover','schedule','overtime']:
+    ['leave','cover','schedule','overtime'];
+  binding.engine.receive({v:1,id:context.system+'-return-'+lastFocusCheck,at:lastFocusCheck,topics:returnTopics});
  }
  if(event?.type==='visibilitychange'&&document.visibilityState==='visible')hiddenAt=0;
  if(manualOnly&&!binding){boot();return;}
