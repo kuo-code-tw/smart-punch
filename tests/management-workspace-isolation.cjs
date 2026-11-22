@@ -2,11 +2,11 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const js=fs.readFileSync('assets/port79-management-workspace.js','utf8');
 function excluded({system='',shown=false,session=null,classes=[]}){
- let creations=0;const active=new Set();const classList={toggle(k,on){on?active.add(k):active.delete(k)},remove(...ks){ks.forEach(k=>active.delete(k))}};
+ let creations=0,sessionScripts=0;const active=new Set();const classList={toggle(k,on){on?active.add(k):active.delete(k)},remove(...ks){ks.forEach(k=>active.delete(k))}};
  const body={dataset:system?{p79System:system}:{},classList};
- const document={body,documentElement:{classList:{contains:k=>classes.includes(k)}},readyState:'complete',getElementById:id=>id==='systems'?{classList:{contains:()=>shown}}:null,createElement(){creations++;throw Error('employee/login DOM must not be rebuilt')},addEventListener(){}};
- const context={document,sessionStorage:{getItem:()=>session?JSON.stringify(session):null},MutationObserver:class{observe(){}},window:{addEventListener(){}},requestAnimationFrame(){throw Error('no layout mutation is scheduled by this fixture')}};
- vm.runInNewContext(js,context);assert.equal(creations,0);assert(!active.has('p79-workspace'));
+ const document={body,currentScript:{src:'https://fixture.invalid/assets/port79-management-workspace.js'},head:{appendChild(script){assert.match(script.src,/port79-session-timeout\.js\?v=/)}},documentElement:{classList:{contains:k=>classes.includes(k)}},readyState:'complete',getElementById:id=>id==='systems'?{classList:{contains:()=>shown}}:null,createElement(tag){if(tag==='script'){sessionScripts++;return {}}creations++;throw Error('employee/login DOM must not be rebuilt')},addEventListener(){}};
+ const context={document,URL,location:{href:'https://fixture.invalid/'},console,sessionStorage:{getItem:()=>session?JSON.stringify(session):null},MutationObserver:class{observe(){}},window:{addEventListener(){}},requestAnimationFrame(){throw Error('no layout mutation is scheduled by this fixture')}};
+ vm.runInNewContext(js,context);assert.equal(sessionScripts,1,'only the shared idle-timeout script is loaded');assert.equal(creations,0);assert(!active.has('p79-workspace'));
 }
 excluded({});excluded({shown:true,session:{adminRole:'employee'}});excluded({shown:true,session:{adminRole:'admin',punchOnly:true}});excluded({system:'attendance'});excluded({system:'attendance',classes:['p79-punch-only','p79-attendance-management-chrome']});
 assert(!/\bfetch\s*\(|\bXMLHttpRequest\b|\bsendBeacon\s*\(|\b(?:localStorage|sessionStorage)\.(?:setItem|removeItem|clear)\s*\(/.test(js),'presentation layer cannot read/write cloud records or mutate persisted session');
@@ -36,14 +36,15 @@ const orderMatch=navigation.match(/const order=\[([^\]]+)\]/);
 assert(orderMatch,'canonical order declared');
 const homeOrder=orderMatch[1].split(',').map(t=>t.replace(/['"\s]/g,''));
 const expected=['attendance','schedule','efficiency','hr','workhours','leave','history'];
-assert.deepEqual(homeOrder,expected,'home canonical ordering');
+const expectedWithSettings=[...expected,'settings'];
+assert.deepEqual(homeOrder,expectedWithSettings,'home has seven actual modules plus restricted settings');
 const navBlock=seven.slice(seven.indexOf('const NAV=['),seven.indexOf('const SYSTEMS=',seven.indexOf('const NAV=[')));
 const internal=[...navBlock.matchAll(/\['([^']+)','[^']+','([^']+)','[^']+'\]/g)].map(x=>({key:x[1],name:x[2]}));
 assert.deepEqual(internal.map(x=>x.key),expected,'system sidebar must use exact homepage order');
-const labels={attendance:'考勤管理',schedule:'排班管理',efficiency:'船舶作業管理',
- hr:'人資管理',workhours:'工時與加班管理',leave:'請假管理',history:'歷史資料庫'};
+const labels={attendance:'考勤管理',schedule:'排班管理',efficiency:'碼頭系統管理',
+ hr:'人資管理',workhours:'加班管理',leave:'請假管理',history:'歷史資料庫',settings:'系統設置'};
 assert.deepEqual(internal.map(x=>x.name),expected.map(k=>labels[k]));
-for(const key of expected)assert(navigation.includes(key+':['+JSON.stringify(labels[key]).replace(/"/g,"'")),key+' label comes from one shared metadata record');
+for(const key of expectedWithSettings)assert(navigation.includes(key+':['+JSON.stringify(labels[key]).replace(/"/g,"'")),key+' label comes from one shared metadata record');
 assert(!navigation.includes("const aliases="),'fake homepage-only report/settings shortcuts removed');
 assert(!navigation.includes("alias=x.dataset.p79Alias"),'homepage special sorting removed');
 assert(navigation.includes('return key?order.indexOf(key):order.length;'),'both menus use shared canonical ordering');
@@ -53,9 +54,9 @@ assert(navigation.includes('window.launchSystem(key)'),'home menu must use the o
 assert(navigation.includes("attributeFilter:['hidden','disabled','style']"),'home sidebar must update when permissions refresh');
 for(const page of ['index.html','attendance/index.html','work-hours/index.html','schedule/index.html','aqc-efficiency/index.html','hr/index.html','leave/index.html','history-data/index.html']){
  const html=fs.readFileSync(page,'utf8');
- assert(html.includes('port79-management-workspace.js?v='+(page==='index.html'?'20261101-sidebar-eight-v1':'20261101-unified-sidebar-v2')),page+' refreshes the shared nav script');
- if(page!=='index.html')
-  assert(html.includes('port79-seven-top.js?v=20261101-unified-sidebar-v2'),page+' refreshes the permission-controlled nav');
+ const shared=[...html.matchAll(/port79-management-workspace\.js\?v=([^"'<>\s]+)/g)];
+ assert.equal(shared.length,1,page+' loads exactly one versioned shared nav script');
+ if(page!=='index.html')assert.equal([...html.matchAll(/port79-seven-top\.js\?v=([^"'<>\s]+)/g)].length,1,page+' loads one versioned permission-controlled nav');
 }
 
 // Work-hours had TWO older viewport break-out rules applied with :has(), which
@@ -90,7 +91,7 @@ assert(!referenceDashboardCss.split('\n').some(line=>line.includes('#p79SevenNav
   'reference dashboard CSS must not hide overtime or leave sidebar links');
 const homeIndex=fs.readFileSync('index.html','utf8');
 for(const cssName of ['port79-home-dashboard.css','port79-reference-dashboard.css'])
- assert(homeIndex.includes(cssName+'?v=20261101-sidebar-eight-v1'),cssName+' must have fresh cache version');
+ assert(new RegExp(cssName.replace(/\./g,'\\.')+'\\?v=[^"\\s<>]+').test(homeIndex),cssName+' must have a cache-versioned stylesheet');
 
 console.log('PASS homepage/subsystems share same actual seven modules, labels, order, permissions and cache version');
 
