@@ -44,7 +44,9 @@ console.log('PASS one-character sick leave and actual daily hours in screen, pri
  const c={Date,Map,Set,Promise,Intl,AbortController,setTimeout,clearTimeout,encodeURIComponent,document:{getElementById:()=>({dataset:{p79MonthInitialized:'1'},value:'ALL'})},currentPort79SsoToken:()=> 'token',normalizeScheduleDateKey:x=>x,getAttendanceDateKey:x=>x,getActiveGasUrl:()=> 'https://example.invalid',p79WorkOvertimeMonths:new Map(),p79WorkOvertimeLoadLanes:[Promise.resolve(),Promise.resolve(),Promise.resolve()],p79WorkOvertimeLoadQueue:Promise.resolve(),p79WorkOvertimeNextLane:0,p79WorkOvertimeRenderTimer:null,p79OvertimeCalculationCache:null,lastAttendanceCloudRevision:'',p79WorkhoursIsEditing:()=>false,renderOvertimeStats(){},fetch:()=>{active++;peak=Math.max(peak,active);return new Promise(resolve=>pending.push(()=>{active--;resolve({json:async()=>({ok:true,schedules:[],leaveRecords:[]})});}));}};
  vm.createContext(c);vm.runInContext(fn('p79LoadWorkOvertimeMonths'),c);c.p79LoadWorkOvertimeMonths(Array.from({length:6},(_,i)=>({timeStr:'2026-'+String(i+1).padStart(2,'0')+'-01'})));
  await new Promise(resolve=>setImmediate(resolve));assert.equal(active,3);
- for(let round=0;round<2;round++){pending.splice(0).forEach(f=>f());await new Promise(resolve=>setImmediate(resolve));}
- await c.p79WorkOvertimeLoadQueue;assert.equal(peak,3);assert.equal(c.p79WorkOvertimeMonths.size,6);assert([...c.p79WorkOvertimeMonths.values()].every(x=>x.ready&&!x.pending));clearTimeout(c.p79WorkOvertimeRenderTimer);
+ // Month-end overnight accounting requires the next month as well (Jan–Jul).
+ // Seven queued month reads run on three lanes, so the last lane needs a third completion turn.
+ for(let round=0;round<3;round++){pending.splice(0).forEach(f=>f());await new Promise(resolve=>setImmediate(resolve));}
+ await c.p79WorkOvertimeLoadQueue;assert.equal(peak,3);assert.equal(c.p79WorkOvertimeMonths.size,7);assert(c.p79WorkOvertimeMonths.has('2026-07'));assert([...c.p79WorkOvertimeMonths.values()].every(x=>x.ready&&!x.pending));clearTimeout(c.p79WorkOvertimeRenderTimer);
  console.log('PASS bounded three-month parallel reads and complete roster state');
 })().catch(e=>{console.error(e);process.exitCode=1;});
