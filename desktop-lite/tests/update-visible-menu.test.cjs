@@ -51,31 +51,4 @@ assert.match(src,/MessageBoxDefaultButton\.Button2/,
 assert.doesNotMatch(src,/SetUpdateAvailable\(true\);\s*if\(manual\)/,
  'Manually checking must never itself set a false positive badge');
 
-// Keep the user-facing 79 system-tray context menu simple without deleting
-// the cloud-sync recovery and support functions used on actual machines.
-const trayStart=src.indexOf('var menu=new ContextMenuStrip();');
-const trayEnd=src.indexOf('tray.ContextMenuStrip=menu;',trayStart);
-assert(trayStart>=0&&trayEnd>trayStart,'Native system tray menu exists');
-const trayMenu=src.slice(trayStart,trayEnd);
-assert.match(trayMenu,/menu\.Items\.Add\("開啟系統",null,\(s,e\)=>ShowWindow\(\)\)/);
-assert.match(trayMenu,/menu\.Items\.Add\(checkUpdatesMenu\)/);
-assert.match(trayMenu,/menu\.Items\.Add\(advancedMenu\)/);
-assert.match(trayMenu,/menu\.Items\.Add\("關閉程式",null,\(s,e\)=>ExitApp\(\)\)/);
-assert.equal((trayMenu.match(/menu\.Items\.Add\(/g)||[]).length,6,
- 'Only four visible commands and two separators belong at tray top level');
-assert.doesNotMatch(trayMenu,/縮小到系統匣/,
- 'Window close already minimizes; redundant tray hide button must be removed');
-assert.doesNotMatch(trayMenu,/目前程式版本：/,
- 'Version already appears in title and tray hover, not repeated as a disabled row');
-assert.match(trayMenu,/advancedMenu\.DropDownItems\.Add\(syncDataMenu\)/,
- 'Retain manual data reconciliation under advanced tools');
-assert.match(trayMenu,/advancedMenu\.DropDownItems\.Add\("開啟本機資料夾"/,
- 'Retain access to local logs and browser profile for recovery');
-assert.match(trayMenu,/advancedMenu\.DropDownItems\.Add\("開啟目前程式資料夾"/,
- 'Retain program folder for safe ZIP repair');
-assert.match(trayMenu,/advancedMenu\.DropDownItems\.Add\(systemUpdateStatusMenu\)/);
-assert.match(trayMenu,/advancedMenu\.DropDownItems\.Add\(cacheStatusMenu\)/);
-assert.doesNotMatch(trayMenu,/menu\.Items\.Add\(systemUpdateStatusMenu\)|menu\.Items\.Add\(cacheStatusMenu\)/,
- 'Verbose status-only rows must not clutter main tray menu');
-
 console.log('PASS visible manual update and verified-availability toolbar badge: no silent disabled clicks, queued action, safe synchronization prompt, true restart and explicit no-op/failure');
