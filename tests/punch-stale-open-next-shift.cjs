@@ -14,7 +14,7 @@ function fn(source,name) {
 }
 function make({source=candidate,rows,archive=[],now='2026/11/22 07:42',
   old='2026/11/19 15:41',incomingStatus='上班簽到',deleted=false,
-  newer=false,badRead=false,missingSheet=false,monthlyRows={},unreadableMonth}={}) {
+  newer=false,badRead=false,missingSheet=false,monthlyRows={},unreadableMonth,missingMonth}={}) {
   const initial={id:'OLD-IN',empId:'FIXTURE-E1',attNo:'001',
     type:'IN',status:'上班簽到',timeStr:old};
   const next={id:'NEW-IN',empId:'FIXTURE-E1',attNo:'001',
@@ -47,8 +47,11 @@ function make({source=candidate,rows,archive=[],now='2026/11/22 07:42',
     getAttendanceMonthlySheet_:(_ss,key,create)=>{
       assert.equal(create,false);
       if(key===unreadableMonth) throw Error('monthly ledger unavailable');
-      const rows=monthlyRows[key] ?? (key===old.slice(0,7).replace('/','-')?archive:null);
-      return rows && {rows};
+      if(key===missingMonth) return null;
+      // The fixture represents an existing, empty monthly sheet by default.
+      // Missing monthly tabs must be an explicit fault, never conflated with zero rows.
+      const rows=monthlyRows[key] ?? (key===old.slice(0,7).replace('/','-')?archive:[]);
+      return {rows};
     }
   };
   vm.createContext(context);
@@ -119,6 +122,15 @@ test('current-month annual ledger provides proof and blocks newer punches',()=>{
   assert.equal(make({rows:[],monthlyRows:{'2026-11':[old]}}).check().ok,true);
   assert.equal(make({rows:[old],monthlyRows:{'2026-11':[old,newer]}}).check().ok,false);
   assert.equal(make({rows:[old],unreadableMonth:'2026-11'}).check().ok,false);
+});
+test('missing required monthly evidence fails closed rather than silently skipping',()=>{
+  const old={id:'OLD-IN',empId:'FIXTURE-E1',status:'上班簽到',timeStr:'2026/10/18 15:41'};
+  assert.equal(make({old:'2026/10/18 15:41',rows:[],archive:[old],missingMonth:'2026-11'}).check().ok,false);
+  assert.equal(make({rows:[{...old,timeStr:'2026/11/19 15:41'}],missingMonth:'2026-11'}).check().ok,false);
+});
+test('existing empty month is distinct from missing month',()=>{
+  const old={id:'OLD-IN',empId:'FIXTURE-E1',status:'上班簽到',timeStr:'2026/10/18 15:41'};
+  assert.equal(make({old:'2026/10/18 15:41',rows:[],archive:[old],monthlyRows:{'2026-11':[]}}).check().ok,true);
 });
 test('later punches in intervening months and across years block recovery',()=>{
   const old='2025/12/30 15:41';
