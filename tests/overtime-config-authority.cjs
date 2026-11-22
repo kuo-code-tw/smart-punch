@@ -4,7 +4,7 @@ const c={Date,Intl,Map,Set,TextEncoder};c.window=c;
 let config={overtimeConversionRowsV1:[['延','延16-20',4,'','08','16','16','20','after']],overtimeReportTypesV1:[['平日延時加班','延']],overtimeArchivedRuleKeysV1:[]};
 c.p79OvertimeContext={config:()=>config};vm.createContext(c);vm.runInContext(fs.readFileSync('assets/port79-overtime-report.js','utf8'),c);const api=c.P79Overtime;
 assert.equal(api.activeReportRules().length,1);assert.equal(api.report(config.overtimeConversionRowsV1[0]).convertedHours,6.02,'only the GAS-recognized legacy 08–16 plus 16–20 extension resolves to 6.02');
-assert.equal(api.report(['延','延20-24',4,'','16','20','20','24','after']).convertedHours,null,'other blank conversion periods stay unknown');
+assert.equal(api.report(['延','延20-24',4,'','08','16','20','24','after']).convertedHours,null,'other blank conversion periods stay unknown');
 assert.equal(api.activeSupportPeriods(config.overtimeConversionRowsV1,config).added,0);
 assert.equal(api.specialRows(config.overtimeConversionRowsV1,config,[[8,3]]).length,1,'no generated special-day periods');
 config.overtimeReportTypesV1=[];assert.equal(api.activeReportRules().length,0,'deleted type not offered');
