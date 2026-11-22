@@ -34,6 +34,8 @@ namespace Port79Lite {
   private bool updateBusy=false;
   private bool manualUpdateQueued=false;
   private readonly Label updateNotice;
+  private readonly Label updateAvailableBadge;
+  private bool verifiedUpdateAvailable=false;
   // Only restart in the background when the user has not begun working.
   private bool userInteractedSinceLaunch=false;
   private bool initiated=false;
@@ -103,6 +105,20 @@ namespace Port79Lite {
    updateNotice.Click+=(s,e)=>updateNotice.Visible=false;
    Controls.Add(updateNotice);
    updateNotice.BringToFront();
+   // Persistent toolbar indicator only when the official website or Windows
+   // update has actually been verified and staged. Clicking uses the same
+   // existing updater (including sync/unsaved-work protections).
+   updateAvailableBadge=new Label {
+    Width=180,Height=35,Visible=false,Text="有系統更新｜點此更新",
+    BorderStyle=BorderStyle.FixedSingle,
+    BackColor=Color.FromArgb(255,237,192),ForeColor=Color.FromArgb(117,61,12),
+    Font=new Font("Microsoft JhengHei",9,FontStyle.Bold),
+    Padding=new Padding(9,5,9,5),TextAlign=ContentAlignment.MiddleCenter,
+    Cursor=Cursors.Hand,Anchor=AnchorStyles.Top|AnchorStyles.Right,
+    AccessibleName="有系統更新，點擊執行安全更新"
+   };
+   updateAvailableBadge.Click+=(s,e)=>{if(!exit) _=CheckUpdates(true);};
+   Controls.Add(updateAvailableBadge);
    // Tiny icon and slim progress at the upper-right; no full-width strip.
    cachePanel=new Panel {
     Width=222,Height=52,BackColor=Color.FromArgb(246,251,255),
@@ -136,7 +152,9 @@ namespace Port79Lite {
    cacheTooltip=new ToolTip { ShowAlways=true };
    cacheTooltip.SetToolTip(cachePanel,"本機資料下載進度");
    cacheTooltip.SetToolTip(cacheTitle,"本機資料下載進度");
+   cacheTooltip.SetToolTip(updateAvailableBadge,"已找到並驗證正式系統更新。點擊使用現有安全更新程序；不會直接刪除本機資料。");
    cachePanel.BringToFront();
+   updateAvailableBadge.BringToFront();
    updateNotice.BringToFront();
    cacheDismissTimer=new System.Windows.Forms.Timer { Interval=6000 };
    cacheDismissTimer.Tick+=(s,e)=>{cacheDismissTimer.Stop();cachePanel.Visible=false;};
@@ -181,8 +199,12 @@ namespace Port79Lite {
    };
   }
   private void PositionCachePanel(){
-   cachePanel.Location=new Point(Math.Max(8,ClientSize.Width-cachePanel.Width-12),8);
-   updateNotice.Location=new Point(Math.Max(8,ClientSize.Width-updateNotice.Width-12),70);
+   // Keep the cache progress and manual status visible below the update badge.
+   updateAvailableBadge.Location=new Point(Math.Max(8,ClientSize.Width-updateAvailableBadge.Width-12),8);
+   cachePanel.Location=new Point(Math.Max(8,ClientSize.Width-cachePanel.Width-12),
+    verifiedUpdateAvailable?50:8);
+   updateNotice.Location=new Point(Math.Max(8,ClientSize.Width-updateNotice.Width-12),
+    verifiedUpdateAvailable?108:70);
   }
   private void ShowWindow(){Show();WindowState=FormWindowState.Maximized;Activate();}
   private void ExitApp(){exit=true;tray.Visible=false;Close();}
@@ -653,6 +675,17 @@ namespace Port79Lite {
   }
   // Visible native WinForms feedback: independent of the web page and any
   // Windows notification settings, so clicking tray update cannot be silent.
+  private void SetUpdateAvailable(bool available){
+   verifiedUpdateAvailable=available;
+   updateAvailableBadge.Visible=available;
+   checkUpdatesMenu.Text=available?"有系統更新｜點此更新":"檢查並更新系統（程式及畫面）";
+   checkUpdatesMenu.ForeColor=available?Color.FromArgb(160,77,12):SystemColors.ControlText;
+   Text="79號碼頭雲端智慧系統｜"+
+    (displayVersion.Length>0?displayVersion:"版本待驗證")+
+    (available?"｜有系統更新":"");
+   if(available)updateAvailableBadge.BringToFront();
+   PositionCachePanel();
+  }
   private void UpdateStatus(string message,bool visible=false){
    systemUpdateStatusMenu.Text=SafeStatus("更新系統："+message,100);
    systemUpdateStatusMenu.ToolTipText=SafeStatus(message,220);
@@ -702,6 +735,11 @@ namespace Port79Lite {
      shellFailure=e.Message;
      Log("Windows shell auto update deferred: "+e.Message);
     }
+    // Only show the persistent badge after the update has been downloaded and
+    // verified (or a previously verified site stage is already pending).
+    // Incomplete network checks never fabricate an available update.
+    if(shell!=null||websitePending)SetUpdateAvailable(true);
+    else if(siteFailure==null&&shellFailure==null)SetUpdateAvailable(false);
     // A manual click intentionally requests an update. If cloud sync is active,
     // ask before interrupting it; already saved local-data is never deleted.
     // No pending patch means no restart is needed.
