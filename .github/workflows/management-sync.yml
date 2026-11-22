@@ -42,7 +42,10 @@ jobs:
           failed=0
           for test_file in tests/*.cjs; do
             echo "::group::${test_file}"
-            if timeout --signal=TERM --kill-after=5s 30s node "$test_file"; then
+            limit=30s
+            # The synthetic benchmark repeats the historical 18,000-row implementation.
+            if [[ "$test_file" == tests/vessel-speed.cjs ]]; then limit=120s; fi
+            if timeout --signal=TERM --kill-after=5s "$limit" node "$test_file"; then
               :
             else
               echo "::error file=${test_file}::Integration regression failed"
