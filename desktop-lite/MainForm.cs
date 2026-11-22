@@ -163,29 +163,32 @@ namespace Port79Lite {
    tray=new NotifyIcon{Icon=Icon ?? SystemIcons.Application,Visible=true,
     Text=SafeStatus("79號碼頭｜"+(displayVersion.Length>0?displayVersion:"版本待驗證"),60)};
    var menu=new ContextMenuStrip();
+   // Keep the daily-use right-click menu short. Advanced support and
+   // diagnostic entries remain accessible under one submenu.
    menu.Items.Add("開啟系統",null,(s,e)=>ShowWindow());
-   menu.Items.Add("縮小到系統匣",null,(s,e)=>Hide());
    menu.Items.Add(new ToolStripSeparator());
-   // One update command. Updates both the Windows program and modified
-   // website UI/code, preserving local-data; no user-managed ZIP download.
+   // One update command still handles verified site + native releases.
    checkUpdatesMenu=new ToolStripMenuItem("檢查79號碼頭電腦版更新",null,async(s,e)=>await CheckUpdates(true)){
     ToolTipText="只更新79號碼頭電腦版及網頁畫面；更新由程式處理。保留本機資料，不用自行下載 ZIP。"
    };
    menu.Items.Add(checkUpdatesMenu);
+   var advancedMenu=new ToolStripMenuItem("其他工具");
    var syncDataMenu=new ToolStripMenuItem("重新核對六項基本資料（歷史按月）",null,async(s,e)=>await ForceDownload()){
     ToolTipText="核對考勤、工時、請假、排班、效率、人資；歷史資料到歷史中心選月份讀取，本機快取保留。"
    };
-   menu.Items.Add(syncDataMenu);
+   advancedMenu.DropDownItems.Add(syncDataMenu);
+   advancedMenu.DropDownItems.Add(new ToolStripSeparator());
+   advancedMenu.DropDownItems.Add("開啟本機資料夾",null,(s,e)=>OpenLocalData());
+   advancedMenu.DropDownItems.Add("開啟目前程式資料夾",null,(s,e)=>OpenCurrentProgramFolder());
+   advancedMenu.DropDownItems.Add(new ToolStripSeparator());
    systemUpdateStatusMenu=new ToolStripMenuItem("79號碼頭電腦版更新：啟動後自動檢查"){Enabled=false};
    cacheStatusMenu=new ToolStripMenuItem("資料同步狀態：尚未登入"){Enabled=false};
-   menu.Items.Add(systemUpdateStatusMenu);
-   menu.Items.Add(cacheStatusMenu);
+   advancedMenu.DropDownItems.Add(systemUpdateStatusMenu);
+   advancedMenu.DropDownItems.Add(cacheStatusMenu);
+   menu.Items.Add(advancedMenu);
    menu.Items.Add(new ToolStripSeparator());
-   menu.Items.Add("開啟本機資料夾",null,(s,e)=>OpenLocalData());
-   menu.Items.Add("開啟目前程式資料夾",null,(s,e)=>OpenCurrentProgramFolder());
-   menu.Items.Add(new ToolStripMenuItem("目前程式版本："+(displayVersion.Length>0?displayVersion:"版本待驗證")){
-    Enabled=false,ToolTipText=root
-   });
+   // The close button already minimizes to tray; a duplicate tray command is
+   // unnecessary. Version remains in window title/tray hover text.
    menu.Items.Add("關閉程式",null,(s,e)=>ExitApp());
    tray.ContextMenuStrip=menu;
    tray.DoubleClick+=(s,e)=>ShowWindow();
