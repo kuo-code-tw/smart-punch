@@ -22,7 +22,7 @@ const element={innerHTML:'',textContent:''},nodes={
 const ctx={console,Number,String,Array,Set,Map,Math,Date,
  Intl:{DateTimeFormat:function(){return{format:()=> '2026-10-28'}}},
  p79OvertimeCalculationCache:null,p79WorkOvertimeMonths:new Map(),p79MonthlyRestDraftsByMonth:new Map(),
- p79OvertimePlannedDisplayedRows:[],records:[],currentEmp:{empId:'ADMIN'},
+ p79OvertimePlannedDisplayedRows:[],p79PlannedBulkSelected:new Set(),p79PlannedBulkBusy:false,records:[],currentEmp:{empId:'ADMIN'},
  p79ResolvePlannedOvertimePeriod:()=>null,
  // Dedicated unit/month filtering uses fixture departments; batch controls and
  // master-roster resolution are tested in their own regressions.
