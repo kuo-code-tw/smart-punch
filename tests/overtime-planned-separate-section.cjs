@@ -11,8 +11,12 @@ assert(html.includes('id="p79OvertimePlannedBody"'),'planned section gets its ow
 assert(html.includes('id="p79OvertimePlannedCount"'),'planned count displayed independently');
 assert(html.includes('id="overtimeTableBody"'),'main confirmed overtime table remains');
 assert(html.includes('rows:confirmedPageRows, plannedRows:plannedPageRows'),'source splits confirmed and planned once');
-assert(html.includes('p79RenderOvertimePlannedRows(p79OvertimeCalculationCache?.plannedRows||[],month,dept,jobTitle,employeeId)'),'render planned section with filters, not source filter');
-assert(html.includes("const allOvertimeRows = buildOvertimeStatisticsRows().filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))"),'official rows stay unplanned');
+assert(html.includes('p79RenderOvertimePlannedRows(plannedRows,month,dept,jobTitle,employeeId)'),'render planned section from the verified saved-plan set with shared month/department/job/employee filters');
+// Cloud-saved plans also appear in the daily ledger with clear pending labels;
+// they must never inflate completed hours, title averages, or export totals.
+assert(html.includes('const allOvertimeRows=p79OvertimeMainLedgerRows(formalRows,plannedRows)'),'main ledger retains independently labelled saved plans for correction');
+assert(html.includes('const completedRows=rows.filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))'),'completed totals exclude saved pending plans');
+assert(html.includes('const completedJobRows=jobTitleRows.filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))'),'job-title totals exclude saved pending plans');
 const element={innerHTML:'',textContent:''},nodes={
  p79OvertimePlannedBody:{...element},p79OvertimePlannedCount:{...element},p79OvertimePlannedPagination:{...element}};
 const ctx={console,Number,String,Array,Set,Map,Math,Date,
