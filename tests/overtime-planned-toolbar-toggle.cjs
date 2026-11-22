@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const html=fs.readFileSync('work-hours/index.html','utf8');
 
-assert.match(html,/＋ 申報加班<\/button>\s*<button id="p79OvertimePlannedToggle"/,'top toolbar modal button follows 申報加班');
+assert.match(html,/＋ 申報加班<\/button>[\s\S]{0,400}<button id="p79OvertimePlannedToggle"/,'planned modal follows the report and report-options actions in the toolbar');
 assert.match(html,/<button id="p79OvertimePlannedToggle"[^>]+aria-controls="p79OvertimePlannedDialog" aria-haspopup="dialog" aria-expanded="false"/,'modal button is accessible');
 assert.match(html,/<dialog id="p79OvertimePlannedDialog"[^>]+oncancel="p79PlannedDialogCancel\(event\)" onclose="p79PlannedDialogClosed\(\)"/,'native dialog protects in-progress edits and restores toolbar on close');
 assert.match(html,/<section id="p79OvertimePlannedSection"/,'same original planned list remains inside modal');
