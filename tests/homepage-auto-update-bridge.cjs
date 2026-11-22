@@ -4,7 +4,7 @@ const home=fs.readFileSync('index.html','utf8');
 const login=fs.readFileSync('assets/port79-login-version-check.js','utf8');
 const native=fs.readFileSync('desktop-lite/MainForm.cs','utf8');
 assert.match(home,/id="p79LoginCheckNow"[^>]*>立即更新<\/button>/);
-assert.match(home,/port79-login-version-check\.js\?v=20261122-home-auto-v1/);
+assert.match(home,/port79-login-version-check\.js\?v=20261122-naming-v2/);
 assert.match(native,/payload\.kind=="port79-system-update-command-v1"/);
 assert.match(native,/source\.AbsolutePath\.Equals\("\/smart-punch\/index\.html"/);
 assert.match(native,/payload\.action=="install"\)_ = CheckUpdates\(true\)/);
