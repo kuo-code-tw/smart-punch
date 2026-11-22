@@ -19,15 +19,20 @@ origin.appendChild(edit);origin.appendChild(add);
 const nodes={p79OvertimePlannedDialog:dialog,p79OvertimePlannedToggle:toggle,editRecordModal:edit,addRecordModal:add};
 const shown=[],records=[{id:'IN1',empId:'E1',attNo:'7',status:'上班簽到',timeStr:'2026/10/28 23:38:00'}];
 const planned={empId:'E1',attNo:'7',name:'測試員工',dateKey:'2026-10-28',reportVerified:true,overtimeReport:{planned:true,id:'PLAN'},clockIn:records[0],clockOut:null};
+const now=Date.parse('2026-11-01T12:00:00+08:00');
+class FixtureDate extends Date{
+ constructor(...args){super(...(args.length?args:[now]));}
+ static now(){return now;}
+}
 const c={window:null,document:{getElementById:id=>nodes[id]||null,createComment:txt=>({textContent:txt})},
- p79OvertimePlannedDisplayedRows:[planned],records,p79PlannedAttendanceModalAnchors:new Map(),
+ p79PlannedBulkBusy:false,p79OvertimePlannedDisplayedRows:[planned],records,p79PlannedAttendanceModalAnchors:new Map(),
  currentEmp:{empId:'ADMIN'},canPerformAdminAction:()=>true,currentPort79SsoToken:()=> 'USER-1',
  p79DirectAttendanceTimestamp:r=>Date.parse(r.timeStr.replaceAll('/','-').replace(' ','T')+'+08:00'),
  getAttendanceRecordType:r=>r.status==='上班簽到'?'IN':'OUT',
  normalizeAttendanceStatsAttNo:n=>String(n||'').trim(),loadAttendanceMonthFromCloud:async()=>true,
  normalizeScheduleDateKey:s=>String(s).replaceAll('/','-'),getAttendanceDateKey:s=>s.slice(0,10),
  renderOvertimeStats(){},p79OvertimeCalculationCache:null,
- encodeURIComponent,decodeURIComponent,Date,Intl,Set,Map,String,Array,Number,JSON,console,
+ encodeURIComponent,decodeURIComponent,Date:FixtureDate,Intl,Set,Map,String,Array,Number,JSON,console,
  showToast:msg=>shown.push(msg),
  openEditRecordModal:async(...args)=>{shown.push({kind:'edit',args});edit.classList.remove('hidden');return true},
  openRowManualAdd:async(...args)=>{shown.push({kind:'add',args});add.classList.remove('hidden');return true}};
