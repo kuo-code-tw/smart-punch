@@ -145,7 +145,15 @@
  function normalizeStored(value){return value===undefined?[]:validate(value);}
  function resolvedRule(row){
   const r=row.slice();
-  if(r[3]===null||r[3]===undefined||String(r[3]).trim()==='')r[3]='';
+  if(r[3]===null||r[3]===undefined||String(r[3]).trim()===''){
+   r[3]='';
+   // Mirror the narrow, audited GAS legacy conversion exactly. Do not guess
+   // missing rates for other report types or time windows.
+   const time=x=>String(x??'').trim().replace(/:00$/,'').padStart(2,'0');
+   if(r[0]==='延'&&r[8]==='after'&&Number(r[2])===4&&
+      time(r[4])==='08'&&time(r[5])==='16'&&time(r[6])==='16'&&time(r[7])==='20'&&
+      /^(?:代|延)?(?:08-20|16-20)$/.test(String(r[1]||'').trim()))r[3]=6.02;
+  }
   return r;
  }
 
