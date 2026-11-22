@@ -6,7 +6,7 @@ const ui=fs.readFileSync('assets/port79-home-compact-controls.js','utf8');
 const download=fs.readFileSync('assets/port79-windows-download.js','utf8');
 assert.match(home,/port79-home-compact-controls\.css\?v=20261121-v1/);
 assert.match(home,/port79-home-compact-controls\.js\?v=20261121-v1/);
-assert.match(home,/id="p79WindowsDownloadLink"[^>]*>⬇ 系統下載<\/a>/);
+assert.match(home,/id="p79WindowsDownloadLink"[^>]*>⬇ 電腦版下載<\/a>/);
 assert.match(home,/id="logoutBtn"/,'Original logout control is retained');
 assert.match(home,/id="systems"/,'Original login and module entry is retained');
 assert.match(download,/document\.getElementById\('p79HomeCompactActions'\)/,
