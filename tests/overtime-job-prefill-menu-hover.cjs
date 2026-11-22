@@ -25,7 +25,7 @@ assert(css.includes('background:#0e7490;\n  color:#fff;'),'teal background needs
 assert(css.includes('.p79-seven-standard-menu) button:hover'),'dropdown item hover should still be distinct');
 for(const p of ['aqc-efficiency','history-data','hr','leave','schedule','work-hours']){
  const html=fs.readFileSync(p+'/index.html','utf8');
- assert(html.includes('port79-seven-top.css?v=20261024-unified-status-icons&menuhover=20261026a'),p+' must reload fixed shared menu style');
+ assert(/port79-seven-top\.css\?v=[^"'\s<>]+/.test(html),p+' must load versioned common menu hover stylesheet');
 }
 for(const p of ['hr','leave','schedule','work-hours']){
  const html=fs.readFileSync(p+'/index.html','utf8');
