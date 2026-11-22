@@ -4,7 +4,10 @@ const manual=html.slice(html.indexOf('async function manualCloudSync('),html.ind
 (async()=>{
  for(const scenario of ['success','upload-failure','read-failure','new-pending','busy-then-success','slow-warning']){
   const elements=Object.fromEntries(['efficiencySyncLight','efficiencySyncDot','efficiencySyncLabel','cloudState','efficiencyCloudSyncBtn','efficiencySyncError','efficiencySyncErrorText'].map(id=>[id,{style:{setProperty(k,v){this[k]=v}},dataset:{},textContent:'同步雲端'}]));let pending=[],release,readStarted=false;
-  const c={setTimeout,clearTimeout,console:{error(){}},document:{getElementById:id=>elements[id]},readQueue:()=>pending,requireEfficiencyAccess:()=>true,flushQueue:async()=>{if(scenario==='upload-failure')return{ok:false,error:'雲端鎖定，稍後重試'};return{ok:true};},restoreVesselDataFromCloud:async()=>{readStarted=true;c.p79SetEfficiencySyncLight('success');await new Promise(resolve=>release=resolve);if(scenario==='read-failure')throw Error('read failed');if(scenario==='new-pending')pending=[{}];return true;},setEfficiencySaveState(){},toast(){}};
+  const c={setTimeout,clearTimeout,console:{error(){}},document:{getElementById:id=>elements[id]},readQueue:()=>pending,requireEfficiencyAccess:()=>true,flushQueue:async()=>{if(scenario==='upload-failure')return{ok:false,error:'雲端鎖定，稍後重試'};return{ok:true};},restoreVesselDataFromCloud:async()=>{readStarted=true;c.p79SetEfficiencySyncLight('success');await new Promise(resolve=>release=resolve);if(scenario==='read-failure')throw Error('read failed');if(scenario==='new-pending')pending=[{}];return true;},setEfficiencySaveState(){},toast(){},
+  // The production strict readback wrapper replaces direct restore calls.
+  p79WaitStrictVesselReadback:async()=>c.restoreVesselDataFromCloud(),
+  efficiencyHasUnsavedChanges:false,requireSuperAdminAccess:()=>false};
   if(scenario==='busy-then-success'){c.cloudBusy=true;c.gcQueueFlushPromise=null;c.setTimeout=(fn,ms)=>{if(ms>1000)return setTimeout(fn,ms);c.cloudBusy=false;queueMicrotask(fn);};}
   let watchdog;
   if(scenario==='slow-warning'){c.setTimeout=(fn,ms)=>{if(ms===60000){watchdog=fn;return 0;}return setTimeout(fn,ms);};}
