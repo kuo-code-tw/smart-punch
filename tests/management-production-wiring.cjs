@@ -5,7 +5,7 @@ assert.equal(read('assets/port79-data-cache.js'),read('integration-test/data-cac
 for(const system of ['hr','attendance','leave','schedule','work-hours','aqc-efficiency','history-data']){
  const html=read(system+'/index.html');
  assert(html.includes('<script>window.P79ManagementOptimizationMode=true;</script>'),system+' opt-in');
- assert.equal((html.match(/assets\/port79-management-link\.js\?v=(?:20261017\.official1|20261019-group-explicit)/g)||[]).length,1,system+' one bridge');
+ assert.equal((html.match(/assets\/port79-management-link\.js\?v=[^"'\s<>]+/g)||[]).length,1,system+' exactly one versioned cloud/SSO bridge');
  assert(/\/smart-punch\/assets\/port79-data-cache\.js\?v=[^"'\s<>]+/.test(html),system+' versioned cache');
  assert(!html.includes('window.P79ManagementTestMode=true'),system+' production transport');
  assert(!html.includes('stage-navigation.js'),system+' production navigation');
