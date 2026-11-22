@@ -17,17 +17,19 @@ assert.equal(merge([active],[],month).length,1);
 assert.throws(()=>merge([active],[{empId:'BAD',month,schedule:null}],month),/格式不完整/);
 // Real group-edit -> real save handler: inactive historical rows must survive,
 // and an explicit move to 不分組 must be serialized before saving.
-let posted,queued=0;const emp={id:'A',name:'在職',role:'AQC',group:'B組',lockType:'ROTATION',order:10};
+let posted,queued=0;const verification=[];const emp={id:'A',name:'在職',role:'AQC',group:'B組',lockType:'ROTATION',order:10};
 const c={console,JSON,Set,Object,Array,String,Date,Promise,Error,
  employees:[emp],monthlyScheduleData:{A:{[day]:'中'}},monthlyScheduleMeta:{A:{}},
- p79ScheduleCloudRows:[hidden],schedulePersonnelOverrides:{[month]:{}},
+ p79ScheduleCloudRows:[hidden],p79ScheduleSourceState:{month},p79ScheduleBaseDigest:'',
+ p79ScheduleVerifyBeforeWrite:async(m,version)=>{assert.equal(m,month);assert.equal(version,7);verification.push('before');},
+ p79ScheduleVerifyAfterWrite:async(m,rows)=>{assert.equal(m,month);assert.deepEqual(plain(rows),posted.schedules);verification.push('after');return {rows:posted.schedules};},schedulePersonnelOverrides:{[month]:{}},
  currentScheduleMonthKey:()=>month,currentPort79SsoToken:()=> 'test',
  requireScheduleEditLock:()=>true,p79EnsureGroupEdit:async()=>true,
  scheduleEditLockState:{mine:true},p79ScheduleGroupHistoryUnverifiedMonth:'',
  p79ApplyNoPunchRestFromOfficial:async()=>{},p79ApplyAutomaticRestMetadata(){},approvedLeaveForEmployee:()=>null,p79LeaveCoverOnDay:()=>[],
  p79ScheduleLocalMutationVersion:7,scheduleRoleGroupList:()=>['B組','不分組'],scheduleOrderNumber:x=>x,
  nextScheduleOrder:()=>20,saveAllDataToLocalStorage(){},queuePersonnelCloudSave(){queued++;},buildRoleTabsAndRender(){},
- p79CreateScheduleSaveRequestId:()=> 'request123',cloudPost:async payload=>{posted=plain(payload);return {ok:true};},
+ p79CreateScheduleSaveRequestId:()=> 'request123',cloudPost:async payload=>{verification.push('write');posted=plain(payload);return {ok:true};},
  p79BuildScheduleOvertimeMeta(){throw Error('hidden row must not enter editable overtime validation');},
  p79MarkScheduleCloudWriteConfirmed(v){assert.equal(v,7);},p79RefreshScheduleRestCounts(){},
  p79ScheduleRestClient:()=>({refresh(){}}),localStorage:{setItem(){}},sessionStorage:{getItem:()=>null},P79Overtime:{KEY:'unused'},
@@ -39,11 +41,13 @@ for(const [a,b] of [
  ['    async function updateEmpGroupAndResort(','    async function updateEmpRoleAndResort('],
  ['    function p79PreserveHiddenScheduleRows(','    function p79ApplySchedulePayload('],
  ['    function p79PreserveLinkedScheduleDays(','    function p79PreserveHiddenScheduleRows('],
+ ['    function p79ScheduleBulkOverwriteStats(','    async function p79ScheduleReadGuardMonth('],
  ['    async function saveScheduleMonthToCloud(','    async function saveScheduleEmployeesToCloud(']
 ])vm.runInContext(block(a,b),c);
 (async()=>{
  await c.updateEmpGroupAndResort('A','不分組');assert.equal(queued,1);assert.equal(emp.group,'不分組');assert.equal(c.schedulePersonnelOverrides[month].A.groupExplicit,true);
- assert.equal(await c.saveScheduleMonthToCloud(false),true);assert.equal(posted.expectedEmployeeCount,2);
+ c.p79ScheduleSourceState.month='2026-10';assert.equal(await c.saveScheduleMonthToCloud(false),false);assert.equal(posted,undefined);
+ c.p79ScheduleSourceState.month=month;assert.equal(await c.saveScheduleMonthToCloud(false),true);assert.deepEqual(verification,['before','write','after']);assert.equal(posted.expectedEmployeeCount,2);
  assert.deepEqual(posted.schedules.find(r=>r.empId==='LEFT'),hidden);
  const saved=posted.schedules.find(r=>r.empId==='A');assert.equal(saved.group,'不分組');assert.equal(saved.schedule.__personnel.groupExplicit,true);
  // Use the actual reload/inheritance functions to verify the explicit setting wins.
