@@ -55,7 +55,7 @@ function unit(options={}){
  await new Promise(setImmediate);
  assert.equal(a.href,immutable,'Latest metadata must choose immutable version-stamped ZIP');
  const version='V261121.'+(Number.parseInt('464f4886',16)%100000).toString().padStart(5,'0');
- assert.equal(a.textContent,'⬇ 系統下載 '+version,'Short V prefix, date and five decimal revision digits');
+ assert.equal(a.textContent,'⬇ 電腦版下載 '+version,'Short V prefix, date and five decimal revision digits');
  assert.match(version,/^V[0-9]{6}\.[0-9]{5}$/);
  assert.equal(s.requests.length,1,'Only one public release lookup after login');
  assert.match(s.requests[0].url,/api.github.com\/repos\/kuo-code-tw\/smart-punch\/releases\/latest/);
@@ -93,6 +93,6 @@ function unit(options={}){
  assert.match(source,/credentials:'omit'/,'Public metadata never includes private credentials');
  const compactCss=fs.readFileSync('assets/port79-home-compact-controls.css','utf8');
  assert.match(compactCss,/p79HomeCompactActions #p79WindowsDownloadLink:not\(\[hidden\]\)/);
- assert.match(home,/aria-label="系統下載（Windows 完整程式 ZIP）"/);
+ assert.match(home,/aria-label="79號碼頭電腦版下載（完整程式 ZIP）"/);
  console.log('PASS Windows download: immutable versioned asset, version label, no stale tag, permission protections, safe fallback');
 })().catch(error=>{console.error(error);process.exitCode=1;});
