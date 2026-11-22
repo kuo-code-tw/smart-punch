@@ -109,13 +109,13 @@ namespace Port79Lite {
    // update has actually been verified and staged. Clicking uses the same
    // existing updater (including sync/unsaved-work protections).
    updateAvailableBadge=new Label {
-    Width=180,Height=35,Visible=false,Text="有系統更新｜點此更新",
+    Width=280,Height=35,Visible=false,Text="有79號碼頭電腦版更新｜點此更新",
     BorderStyle=BorderStyle.FixedSingle,
     BackColor=Color.FromArgb(255,237,192),ForeColor=Color.FromArgb(117,61,12),
     Font=new Font("Microsoft JhengHei",9,FontStyle.Bold),
     Padding=new Padding(9,5,9,5),TextAlign=ContentAlignment.MiddleCenter,
     Cursor=Cursors.Hand,Anchor=AnchorStyles.Top|AnchorStyles.Right,
-    AccessibleName="有系統更新，點擊執行安全更新"
+    AccessibleName="有79號碼頭電腦版更新，點擊執行安全更新"
    };
    updateAvailableBadge.Click+=(s,e)=>{if(!exit) _=CheckUpdates(true);};
    Controls.Add(updateAvailableBadge);
@@ -152,7 +152,7 @@ namespace Port79Lite {
    cacheTooltip=new ToolTip { ShowAlways=true };
    cacheTooltip.SetToolTip(cachePanel,"本機資料下載進度");
    cacheTooltip.SetToolTip(cacheTitle,"本機資料下載進度");
-   cacheTooltip.SetToolTip(updateAvailableBadge,"已找到並驗證正式系統更新。點擊使用現有安全更新程序；不會直接刪除本機資料。");
+   cacheTooltip.SetToolTip(updateAvailableBadge,"已驗證79號碼頭電腦版有更新。點擊使用安全更新程序；不會刪除本機資料。");
    cachePanel.BringToFront();
    updateAvailableBadge.BringToFront();
    updateNotice.BringToFront();
@@ -168,15 +168,15 @@ namespace Port79Lite {
    menu.Items.Add(new ToolStripSeparator());
    // One update command. Updates both the Windows program and modified
    // website UI/code, preserving local-data; no user-managed ZIP download.
-   checkUpdatesMenu=new ToolStripMenuItem("檢查並更新系統（程式及畫面）",null,async(s,e)=>await CheckUpdates(true)){
-    ToolTipText="只更新正式發布後有變更的程式與畫面；Windows 主程式更新由系統內部處理。保留本機資料，不用自行下載 ZIP。"
+   checkUpdatesMenu=new ToolStripMenuItem("檢查79號碼頭電腦版更新",null,async(s,e)=>await CheckUpdates(true)){
+    ToolTipText="只更新79號碼頭電腦版及網頁畫面；更新由程式處理。保留本機資料，不用自行下載 ZIP。"
    };
    menu.Items.Add(checkUpdatesMenu);
    var syncDataMenu=new ToolStripMenuItem("重新核對六項基本資料（歷史按月）",null,async(s,e)=>await ForceDownload()){
     ToolTipText="核對考勤、工時、請假、排班、效率、人資；歷史資料到歷史中心選月份讀取，本機快取保留。"
    };
    menu.Items.Add(syncDataMenu);
-   systemUpdateStatusMenu=new ToolStripMenuItem("系統更新狀態：啟動後自動檢查"){Enabled=false};
+   systemUpdateStatusMenu=new ToolStripMenuItem("79號碼頭電腦版更新：啟動後自動檢查"){Enabled=false};
    cacheStatusMenu=new ToolStripMenuItem("資料同步狀態：尚未登入"){Enabled=false};
    menu.Items.Add(systemUpdateStatusMenu);
    menu.Items.Add(cacheStatusMenu);
@@ -329,13 +329,13 @@ namespace Port79Lite {
    }catch(Exception ex){
     Log("startup: "+ex);
     MessageBox.Show("無法開啟本機系統。Windows 需要 WebView2 Runtime，並且整個程式資料夾必須完整。\n"+ex.Message,
-      "79號碼頭 Windows 版",MessageBoxButtons.OK,MessageBoxIcon.Error);
+      "79號碼頭電腦版",MessageBoxButtons.OK,MessageBoxIcon.Error);
    }
   }
   private async Task InitializeCloudWorker(CoreWebView2Environment env){
    try{
     var file=Path.Combine(root,"site","smart-punch","assets","port79-cache-worker.html");
-    if(!File.Exists(file))throw new FileNotFoundException("背景雲端下載頁缺少，請執行正式系統更新");
+    if(!File.Exists(file))throw new FileNotFoundException("背景雲端下載頁缺少，請執行79號碼頭電腦版更新");
     // Keep a live separate browser document, offscreen; Visible=false can
     // suspend initialization on some WebView2 runtime versions.
     cloudWorker=new WebView2 {Location=new Point(-100,-100),Size=new Size(1,1),
@@ -354,7 +354,7 @@ namespace Port79Lite {
       cloudWorkerJobActive=false;
       UpdateCacheStatus(new CacheStatusPayload {kind="port79-cache-status-v1",
        phase="interrupted",title="背景同步中斷",
-       detail="Windows 背景下載器已停止；已完成快取保留，可重新下載",
+       detail="79號碼頭電腦版背景下載器已停止；已完成快取保留，可重新下載",
        completed=lastCacheStatus?.completed??0,total=7});
      }
      Log("background cache WebView process failed");
@@ -626,7 +626,7 @@ namespace Port79Lite {
    }
    try{
     if(!cloudWorkerReady||cloudWorker?.CoreWebView2==null)
-     throw new InvalidOperationException("背景雲端下載器尚未啟動，請先執行正式系統更新");
+     throw new InvalidOperationException("背景雲端下載器尚未啟動，請先執行79號碼頭電腦版更新");
     if(web.CoreWebView2==null||web.Source?.AbsoluteUri.StartsWith(LocalRoot,StringComparison.OrdinalIgnoreCase)!=true)
      throw new InvalidOperationException("請先在 79號碼頭管理系統登入後同步雲端資料");
     // Fetch session only from the current trusted local site; credentials
@@ -678,21 +678,21 @@ namespace Port79Lite {
   private void SetUpdateAvailable(bool available){
    verifiedUpdateAvailable=available;
    updateAvailableBadge.Visible=available;
-   checkUpdatesMenu.Text=available?"有系統更新｜點此更新":"檢查並更新系統（程式及畫面）";
+   checkUpdatesMenu.Text=available?"有79號碼頭電腦版更新｜點此更新":"檢查79號碼頭電腦版更新";
    checkUpdatesMenu.ForeColor=available?Color.FromArgb(160,77,12):SystemColors.ControlText;
    Text="79號碼頭雲端智慧系統｜"+
     (displayVersion.Length>0?displayVersion:"版本待驗證")+
-    (available?"｜有系統更新":"");
+    (available?"｜有79號碼頭電腦版更新":"");
    if(available)updateAvailableBadge.BringToFront();
    PositionCachePanel();
   }
   private void UpdateStatus(string message,bool visible=false){
-   systemUpdateStatusMenu.Text=SafeStatus("更新系統："+message,100);
+   systemUpdateStatusMenu.Text=SafeStatus("電腦版更新："+message,100);
    systemUpdateStatusMenu.ToolTipText=SafeStatus(message,220);
    NotifyHomeUpdateStatus(message);
    if(visible){
     ShowWindow();
-    updateNotice.Text="🔄 系統更新｜"+SafeStatus(message,160)+"  （點擊可關閉提示）";
+    updateNotice.Text="🔄 79號碼頭電腦版更新｜"+SafeStatus(message,160)+"  （點擊可關閉提示）";
     updateNotice.Visible=true;
     updateNotice.BringToFront();
    }
@@ -707,7 +707,7 @@ namespace Port79Lite {
     return;
    }
    updateBusy=true;
-   if(manual)UpdateStatus("正在查詢最新正式網站與 Windows 程式版本；請看此處的檢查結果…",true);
+   if(manual)UpdateStatus("正在查詢79號碼頭網頁版與電腦版最新版本；請看此處的檢查結果…",true);
    int stagedSite=0;
    bool websitePending=false;
    string siteFailure=null,shellFailure=null;
@@ -729,7 +729,7 @@ namespace Port79Lite {
     // Never make an explicit second ZIP download step mandatory for the user.
     // A release is verified in the app, and kept staged until a safe restart.
     try{
-     UpdateStatus(websitePending?"網站更新檔已驗證，繼續核對 Windows 主程式…":"正在核對最新 Windows 主程式及下載檔…",manual);
+     UpdateStatus(websitePending?"79號碼頭網頁版更新檔已驗證，繼續核對電腦版主程式…":"正在核對79號碼頭電腦版主程式及更新檔…",manual);
      shell=await ReleaseUpdater.PrepareAsync(root,DataRoot,Log);
     }catch(Exception e){
      shellFailure=e.Message;
@@ -746,22 +746,22 @@ namespace Port79Lite {
     bool restartSafe=!cloudWorkerJobActive&&!cacheInProgress&&
      (manual||!userInteractedSinceLaunch);
     if((shell!=null||websitePending)&&manual&&!restartSafe){
-     var pendingType=shell!=null?"Windows 主程式及網站":"網站畫面";
+     var pendingType=shell!=null?"79號碼頭電腦版程式及網頁畫面":"79號碼頭網頁版畫面";
      var answer=MessageBox.Show(this,
-      "已找到並驗證新版"+pendingType+"，但目前仍有雲端資料同步。\n\n"+
+      "已找到並驗證"+pendingType+"更新，但目前仍有雲端資料同步。\n\n"+
       "選「是」：中止尚未完成的背景同步，立即套用新版並重新啟動。已儲存的 local-data 快取保留；尚未儲存的表單可能遺失。\n\n"+
-      "選「否」：保留目前工作，更新檔保存在本機，稍後再按「檢查並更新系統」。",
+      "選「否」：保留目前工作，更新檔保存在本機，稍後再按「檢查79號碼頭電腦版更新」。",
       "79號碼頭｜新版已準備完成",MessageBoxButtons.YesNo,
       MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2);
      if(answer==DialogResult.Yes)restartSafe=true;
     }
     if(shell!=null){
      if(!restartSafe){
-      UpdateStatus("Windows 新版已下載；同步進行中，等待下次手動套用。",manual);
+      UpdateStatus("79號碼頭電腦版更新檔已下載；同步進行中，等待下次手動套用。",manual);
       Log("Windows update staged; restart deferred until next explicit manual choice");
       return;
      }
-     UpdateStatus("Windows 新版已驗證，正在啟動更新工具；系統會自動重新開啟。",manual);
+     UpdateStatus("79號碼頭電腦版更新檔已驗證，正在安裝更新；完成後會自動重新開啟。",manual);
      await ReleaseUpdater.LaunchAsync(shell,root,Process.GetCurrentProcess().Id);
      Log("Windows updater accepted handoff; old app closing for automatic restart");
      ExitApp();
@@ -769,11 +769,11 @@ namespace Port79Lite {
     }
     if(websitePending){
      if(!restartSafe){
-      UpdateStatus("網站新版已下載；同步進行中，等待下次手動套用。",manual);
+      UpdateStatus("79號碼頭網頁版更新檔已下載；同步進行中，等待下次手動套用。",manual);
       Log("Website update staged; restart deferred until next explicit manual choice");
       return;
      }
-     UpdateStatus("網站新版已驗證，正在重新啟動程式並套用畫面。",manual);
+     UpdateStatus("79號碼頭網頁版更新檔已驗證，正在重新啟動電腦版套用新版畫面。",manual);
      Log("Website update verified; restart to apply staged site without a prompt");
      exit=true;Application.Restart();Close();
      return;
@@ -791,9 +791,9 @@ namespace Port79Lite {
     }
     UpdateStatus("已是目前正式版本，沒有需要套用的更新，因此不必關閉視窗。",manual);
     if(manual)MessageBox.Show(this,
-     "已完成正式網站及 Windows 程式的版本檢查。\n\n"+
-     "目前已是最新版，沒有需要下載或套用的檔案，因此程式不會自動關閉。",
-     "79號碼頭｜已是最新版",MessageBoxButtons.OK,MessageBoxIcon.Information);
+     "已完成79號碼頭網頁版與電腦版的版本檢查。\n\n"+
+     "79號碼頭電腦版已是最新版，沒有需要下載或套用的檔案，因此程式不會自動關閉。",
+     "79號碼頭電腦版｜已是最新版",MessageBoxButtons.OK,MessageBoxIcon.Information);
    }catch(Exception e){
     Log("unified system update error: "+e.Message);
     UpdateStatus("更新執行失敗；現有程式與本機資料已保留。",manual);
@@ -801,7 +801,7 @@ namespace Port79Lite {
      "無法套用新版，為安全起見已保留目前程式。\n\n"+
      SafeStatus(e.Message,450)+"\n\n"+
      "更新紀錄：開啟本機資料夾 → logs → windows-lite.log",
-     "79號碼頭｜更新未完成",MessageBoxButtons.OK,MessageBoxIcon.Error);
+     "79號碼頭電腦版｜更新未完成",MessageBoxButtons.OK,MessageBoxIcon.Error);
    }finally{
     updateBusy=false;
     // Keep the manual tray item actionable while an automatic check is

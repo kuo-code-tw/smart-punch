@@ -149,7 +149,7 @@ namespace Port79LiteNativeUpdater {
     }
    }
    if(!hasExe||!hasSite||!hasHelper)
-    throw new InvalidDataException("正式更新檔缺少 Windows 主程式、首頁或原生更新器");
+    throw new InvalidDataException("79號碼頭電腦版更新檔缺少主程式、首頁或原生更新器");
    // Fail before the old app exits if the install directory is read-only.
    var probe=Path.Combine(Root,".port79-native-updater-write-test-"+ParentPid);
    try{File.WriteAllText(probe,"ok");}finally{try{if(File.Exists(probe))File.Delete(probe);}catch{}}

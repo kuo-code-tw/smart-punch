@@ -4,7 +4,7 @@ const home=fs.readFileSync('index.html','utf8');
 const login=fs.readFileSync('assets/port79-login-version-check.js','utf8');
 const native=fs.readFileSync('desktop-lite/MainForm.cs','utf8');
 assert.match(home,/id="p79LoginCheckNow"[^>]*>立即更新<\/button>/);
-assert.match(home,/port79-login-version-check\.js\?v=20261122-home-auto-v1/);
+assert.match(home,/port79-login-version-check\.js\?v=20261122-naming-v2/);
 assert.match(native,/payload\.kind=="port79-system-update-command-v1"/);
 assert.match(native,/source\.AbsolutePath\.Equals\("\/smart-punch\/index\.html"/);
 assert.match(native,/payload\.action=="install"\)_ = CheckUpdates\(true\)/);
@@ -13,6 +13,11 @@ assert.match(login,/root\.chrome\.webview\.postMessage\(JSON\.stringify/);
 assert.match(login,/root\.sessionStorage\?\.getItem\(STORED_BUILD\)/);
 assert.match(login,/if\(!force&&homepageBusy\(\)\)return false/);
 assert.doesNotMatch(login,/localStorage\.clear\(\)|indexedDB\.deleteDatabase/);
+
+assert.match(login,/正在下載並更新79號碼頭電腦版/,'Desktop update status names the Port79 app');
+assert.doesNotMatch(login,/正在下載並更新 Windows 系統/,'Never imply a Microsoft Windows OS update');
+assert.match(login,/79號碼頭網頁版有更新/,'Web update should have a separate label');
+assert.match(home,/id="deployStatusTitle">79號碼頭網頁版更新中/);
 
 const api=require('../assets/port79-login-version-check.js');
 const sha1='aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';

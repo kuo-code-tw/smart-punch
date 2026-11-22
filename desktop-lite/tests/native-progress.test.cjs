@@ -173,7 +173,7 @@ test('native WinForms integration shows status permanently and in tray without a
 
 test('one Update System menu handles both website and native shell without separate ZIP action',()=>{
  const releaseSource=fs.readFileSync(path.join(__dirname,'../ReleaseUpdater.cs'),'utf8');
- assert.match(nativeSource,/ToolStripMenuItem\("檢查並更新系統（程式及畫面）"/);
+ assert.match(nativeSource,/ToolStripMenuItem\("檢查79號碼頭電腦版更新"/);
  assert.doesNotMatch(nativeSource,/ToolStripMenuItem\("更新 Windows 主程式/,'No separate manual shell update menu');
  assert.match(nativeSource,/await Updater\.StageFromOfficialAsync/,'Updates only changed public site files');
  assert.match(nativeSource,/await ReleaseUpdater\.PrepareAsync/,'Checks native shell in same action');
@@ -181,7 +181,7 @@ test('one Update System menu handles both website and native shell without separ
  assert.match(nativeSource,/Application\.Restart\(\)/,'Site-only update can apply without downloading another ZIP');
  assert.match(nativeSource,/exit=true;Application\.Restart\(\);Close\(\);/,'Restart must bypass normal hide-to-tray close guard');
  assert.match(nativeSource,/Interval=300000/,'Automatic checks stay enabled');
- assert.match(releaseSource,/沿用已驗證的 Windows 更新檔，沒有再次下載/,'Verified staged release is reused');
+ assert.match(releaseSource,/沿用已驗證的79號碼頭電腦版更新檔，沒有再次下載/,'Verified staged release is reused');
  assert.match(releaseSource,/if\(foundShell&&identical\)/,'Newly unpacked identical shell is not reinstalled');
  assert.match(releaseSource,/installed-shell-sha256\.txt/,'Installed version is preserved');
  assert.match(releaseSource,/relative\.StartsWith\("local-data\//,'User data is excluded from release');
@@ -207,7 +207,7 @@ test('Windows app has one unmistakable update entry and a dedicated 79 icon',()=
  const csproj=fs.readFileSync(path.join(__dirname,'../Port79Lite.csproj'),'utf8');
  const build=fs.readFileSync(path.join(__dirname,'../build-portable.ps1'),'utf8');
  const generator=fs.readFileSync(path.join(__dirname,'../generate-icon.ps1'),'utf8');
- assert.match(nativeSource,/檢查並更新系統（程式及畫面）/);
+ assert.match(nativeSource,/檢查79號碼頭電腦版更新/);
  assert.match(nativeSource,/版本待驗證/,'Missing manifest must be labeled unverified without a letter');
  assert.match(nativeSource,/V\\d\{6\}\\.\\d\{5\}/,'Displayed version must contain compact V date and five decimal digits');
  assert.doesNotMatch(nativeSource,/return "V"\+shortSha/,'Never display hexadecimal commit on Windows');

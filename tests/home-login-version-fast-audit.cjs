@@ -26,7 +26,7 @@ assert.match(home,/id="p79LoginVersionStatus"/,'visible login update status rest
 assert.match(home,/id="p79LoginCheckNow"/);
 assert.match(home,/p79ApplyBuildVersion/,'one verified version applied to every bundled module');
 assert.doesNotMatch(home,/setTimeout\(refreshSystemVersions/,'do not fetch six huge module pages on login');
-assert.match(home,/port79-login-version-check\.js\?v=20261122-home-auto-v1/);
+assert.match(home,/port79-login-version-check\.js\?v=20261122-naming-v2/);
 assert.match(home,/white-space:nowrap;overflow:hidden;text-overflow:ellipsis/,'Version check must stay one line');
 assert.equal(versionModule.compactStatus(true,'V261121.34805',{version:'V261121.48139'},'V261121.34805','20:41'),
  '🔎 V261121.34805｜已是最新版｜20:41','A newer web build should not make the installed latest Windows release look outdated');

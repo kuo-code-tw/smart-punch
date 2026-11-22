@@ -82,7 +82,7 @@ function refreshBrowser(version,force=false){
   if(!force&&url.searchParams.get('_homeUpdated')===version)return false;
   url.searchParams.set('_homeUpdated',version);
   url.searchParams.set('_updateAt',String(Date.now()));
-  write('🔄 正在自動更新首頁…');
+  write('🔄 正在更新79號碼頭網頁版…');
   root.location.replace(url.href);
   return true;
  }catch(_){return false;}
@@ -109,13 +109,13 @@ async function check(force=false){
   if(pageVersion&&typeof root.p79ApplyBuildVersion==='function')
    root.p79ApplyBuildVersion(pageVersion);
   const label=$('p79MainVersion');
-  if(label)label.textContent=(native?'Windows 本機版：':'網頁版：')+(pageVersion||'版本尚未驗證');
+  if(label)label.textContent=(native?'79號碼頭電腦版：':'79號碼頭網頁版：')+(pageVersion||'版本尚未驗證');
   const time=new Intl.DateTimeFormat('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Taipei'}).format(new Date());
   const brief=compactStatus(native,pageVersion,web,release,time);
   const details=[
    (native?'本機':'目前網站')+'：'+(pageVersion||'未驗證'),
    '線上網站：'+(web?.version||'未核對'),
-   'Windows 最新發布：'+(release||'未核對'),
+   '79號碼頭電腦版最新發布：'+(release||'未核對'),
    '檢查時間：'+time
   ].join('｜');
   const field=$('p79LoginVersionStatus');
@@ -125,7 +125,7 @@ async function check(force=false){
   lastResult=result;
   // Never interrupt a signed-in dashboard, password entry or an open editor.
   if(!native&&web&&pageVersion&&web.version!==pageVersion){
-   if(homepageBusy())write('🔄 網站有新版｜閒置時自動更新｜'+time);
+   if(homepageBusy())write('🔄 79號碼頭網頁版有更新｜閒置時自動更新｜'+time);
    else refreshBrowser(web.version);
   }
   return result;
@@ -137,29 +137,29 @@ async function startUpdate(){
  if(nativeBridge()){
   try{
    nativeUpdateRunning=true;
-   write('🔄 正在下載並更新 Windows 系統…');
+   write('🔄 正在下載並更新79號碼頭電腦版…');
    root.chrome.webview.postMessage(JSON.stringify({
     kind:'port79-system-update-command-v1',action:'install'
    }));
   }catch(_){
    nativeUpdateRunning=false;
-   write('⚠ 無法啟動 Windows 更新，請使用系統匣的更新功能');
+   write('⚠ 無法啟動79號碼頭電腦版更新，請使用系統匣的「檢查79號碼頭電腦版更新」');
   }
   return;
  }
  const result=await check(true);
  if(!result?.web?.version){
-  write('⚠ 暫時無法核對最新網頁版本');
+  write('⚠ 暫時無法核對79號碼頭網頁版最新版本');
   return;
  }
- if(!refreshBrowser(result.web.version,true))write('⚠ 首頁更新未啟動，請稍後再試');
+ if(!refreshBrowser(result.web.version,true))write('⚠ 79號碼頭網頁版更新未啟動，請稍後再試');
 }
 function init(){
  if(!$('p79LoginVersionStatus'))return;
  const button=$('p79LoginCheckNow');
  if(button){
-  button.textContent=nativeBridge()?'立即更新系統':'立即更新首頁';
-  button.title=nativeBridge()?'下載、驗證並安裝正式 Windows／網站更新，保留本機資料':'將首頁更新為網站最新正式版本';
+  button.textContent=nativeBridge()?'更新電腦版':'更新網頁版';
+  button.title=nativeBridge()?'下載、驗證並安裝79號碼頭電腦版與網頁版更新，保留本機資料':'將79號碼頭網頁版更新為最新正式版本';
   button.addEventListener('click',()=>void startUpdate());
  }
  root.addEventListener('port79-system-update-status',event=>{
