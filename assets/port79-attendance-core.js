@@ -198,10 +198,10 @@ window.addEventListener('storage',event=>{
  if(event.key===OUTBOX_KEY){updateUi();return;}
  if(event.key==='port79_attendance_sync_notice_v1')scheduleDelta(100);
 });
-function remove(key,payload){
+function remove(key,payload,confirmed=true){
   const q=readQueue(),next=q.filter(x=>x.key!==key||(payload&&!samePayload(x.payload,payload)));
   if(next.length===q.length)return false;
-  saveQueue(next);if(payload)p79NotifyAttendanceWrite(payload);return true;
+  saveQueue(next);if(payload&&confirmed)p79NotifyAttendanceWrite(payload);return true;
 }
 function pendingForId(id){
   const s=String(id??'');
@@ -756,7 +756,7 @@ async function drain(force=false){
         if(nonRetryable && err?.duplicatePunch===true && String(cur?.payload?.action||'')!=='deleteRecord' && !['updateRecord','editRecord'].includes(String(cur?.payload?.action||''))){
           // V5.10.17：雲端判定為重複刷卡時不可一直重試，
           // 並把剛才 optimistic 加入的本機那一筆回滾。
-          remove(cur.key,cur.payload);
+          remove(cur.key,cur.payload,false);
           if(rid!=null){
             const ridText=String(rid);
             rejectedPunchById.set(ridText, String(err?.message||'重複刷卡已阻擋'));
@@ -848,7 +848,7 @@ async function drainFast(force=true, concurrency=4){
       const rid=cur?.payload?.record?.id ?? cur?.payload?.id;
 
       if(nonRetryable && err?.duplicatePunch===true && String(cur?.payload?.action||'')!=='deleteRecord' && !['updateRecord','editRecord'].includes(String(cur?.payload?.action||''))){
-        remove(cur.key,cur.payload);
+        remove(cur.key,cur.payload,false);
         if(rid!=null){
           const ridText=String(rid);
           rejectedPunchById.set(ridText,String(err?.message||'重複刷卡已阻擋'));
@@ -1281,7 +1281,7 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
       if(current&&!samePayload(current.payload,payload))return {ok:false,queued:true,error:reason};
 
       if(err?.retryable===false && err?.duplicatePunch===true){
-        remove(opKey(payload),payload);
+        remove(opKey(payload),payload,false);
         const rid=recordId!=null?String(recordId):'';
         if(rid){
           rejectedPunchById.set(rid, reason);
