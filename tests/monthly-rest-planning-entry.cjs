@@ -6,9 +6,11 @@ const start=source.indexOf(' function choosePlanningMode('),end=source.indexOf("
 const nodes=new Map(),q=s=>{if(!nodes.has(s))nodes.set(s,{});return nodes.get(s);};
 let requests=0,refreshes=0,close;
 const original=[{checked:true,id:'formal-original'}];
-const c={id:x=>String(x||'').trim().toUpperCase(),manualPeople:new Map(),document:{querySelector:()=>({closest:()=>({addEventListener:(name,fn)=>{assert.equal(name,'close');close=fn;}})})},busy:false,autoPlan:false,model:{rows:original},snapshot:{},loadedPeople:[],loadedMonth:'2026-10',rules:[],el:{isConnected:true},q,paint(){},controls(){},plan:(s,p,m,r,o)=>({rows:[],plannedRows:o.manualOnly?[]:[{checked:false,id:'suggestion'}]}),g:{P79Overtime:{openReport:async options=>{assert.equal(options.manualPlan,true);requests++;return {addEventListener:(name,fn)=>{assert.equal(name,'close');close=fn;}};}}}};
+const c={today:()=> '2026-10-29',id:x=>String(x||'').trim().toUpperCase(),manualPeople:new Map(),document:{querySelector:()=>({closest:()=>({addEventListener:(name,fn)=>{assert.equal(name,'close');close=fn;}})})},busy:false,autoPlan:false,model:{rows:original},snapshot:{},loadedPeople:[],loadedMonth:'2026-10',rules:[],el:{isConnected:true},q,paint(){},controls(){},plan:(s,p,m,r,o)=>({rows:[],plannedRows:o.manualOnly?[]:[{checked:false,id:'suggestion'}]}),g:{P79Overtime:{openReport:async options=>{assert.equal(options.manualPlan,true);requests++;return {addEventListener:(name,fn)=>{assert.equal(name,'close');close=fn;}};}}}};
 q('#mrLoad').click=()=>refreshes++;
-vm.createContext(c);vm.runInContext(source.slice(start,end),c);
+vm.createContext(c);
+vm.runInContext(source.slice(source.indexOf(' function isReadOnlySource('),source.indexOf(' function visibleExistingRows(')),c);
+vm.runInContext(source.slice(start,end),c);
 assert.equal(q('#mrManualMode').checked,true);assert.equal(q('#mrAutoMode').checked,false);
 q('#mrAutoMode').checked=true;q('#mrAutoMode').onchange();
 assert.equal(q('#mrPlannedSection').hidden,false);assert.equal(q('#mrNewPlan').hidden,true);
