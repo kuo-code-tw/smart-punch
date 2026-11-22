@@ -18,4 +18,8 @@ assert(prevented&&stopped,'capture guard blocks deletion before the overtime han
 assert.match(alerts[0],/自動計算/);
 listeners.storage({key:'sp_records_v5'});
 assert.equal(typeof queuedTimer,'function');
-(async()=>{await queuedTimer();assert.equal(refreshes,1,'an attendance cache change reloads the current cloud month');assert.equal(renders,1,'successful reload recalculates visible overtime');console.log('PASS cross-tab attendance refresh and generated overtime delete guard')})().catch(error=>{console.error(error);process.exitCode=1});
+(async()=>{await queuedTimer();assert.equal(refreshes,1,'an attendance cache change reloads the current cloud month');assert.equal(renders,1,'successful reload recalculates visible overtime');
+listeners.storage({key:'port79_attendance_sync_notice_v1',newValue:JSON.stringify({action:'addRecord',at:Date.now()})});
+assert.equal(typeof queuedTimer,'function','a confirmed attendance change wakes work-hours');
+await queuedTimer();assert.equal(refreshes,2,'confirmed cloud punch revalidates work-hours');assert.equal(renders,2,'confirmed punch recalculates overtime stats');
+console.log('PASS cross-tab confirmed attendance refresh, work-hours recalculation and generated overtime delete guard')})().catch(error=>{console.error(error);process.exitCode=1});
