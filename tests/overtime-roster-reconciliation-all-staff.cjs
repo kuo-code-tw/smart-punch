@@ -57,7 +57,8 @@ assert.match(resultBadge,/原正式申報：休16-24/,'original report is availa
 assert(!resultBadge.includes('<small')&&!resultBadge.includes('rounded-lg border'),'long warning card removed');
 assert.equal(warning(row,{...review,mismatch:false},x=>String(x),r=>r.code),'','matched periods produce no warning');
 assert.match(warning(row,{...review,state:'tentative',confirmed:false},x=>String(x),r=>r.code),/時段暫估/,'incomplete punch uses tentative color');
-assert(html.includes('escapeHtml(p79OvertimePeriodLabel(row.overtimeReport))'),'the original cloud declaration stays in the visible summary');
+assert(html.includes("'原正式申報：'+p79OvertimePeriodLabel(row.overtimeReport)"),'the unchanged cloud declaration remains in the visible reconciliation hover');
+assert(html.includes('escapeHtml(hoverText)'),'the original report period is escaped inside the accessible hover');
 
 assert(html.includes('尚未簽退，不代表已完成'),'incomplete punch cannot create fake full-day hours');
 const scripts=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)];
