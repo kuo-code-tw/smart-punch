@@ -76,7 +76,9 @@
   if(mode==='two'){
    if(/^(早|早班)$/.test(shift))return index===0?'08:00–12:00':'12:00–16:00';
    if(/^(中|中班)$/.test(shift))return index===0?'16:00–20:00':'20:00–24:00';
-   if(/^(晚|晚班)$/.test(shift))return index===0?'次日 00:00–04:00':'次日 04:00–08:00';
+   // Verified same-day two-person late-shift cover is credited 16–20 / 20–24;
+   // historical next-morning overtime is accounted separately by the formal backend.
+   if(/^(晚|晚班)$/.test(shift))return index===0?'16:00–20:00':'20:00–24:00';
    return (index===0?'前段':'後段')+' 4H（正式班別待核對）';
   }
   const base=/^(早|早班)$/.test(shift)?'08:00–16:00':
