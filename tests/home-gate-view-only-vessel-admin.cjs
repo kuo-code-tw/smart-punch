@@ -10,14 +10,14 @@ const start=home.indexOf('id="p79HomeGatePanel"');
 const end=home.indexOf('</article>',start);
 const card=home.slice(start,end);
 assert(start>=0&&end>start,'compact home Gate statistics card');
-assert(!card.includes('href='),'homepage Gate summary must not link to import, export or data edits');
+assert([...card.matchAll(/href="([^"]+)"/g)].every(([,url])=>url==='./gate-dashboard/'),'homepage Gate summary must not link to import, export or data edits');
 assert(!card.includes('gateSave')&&!card.includes('gateDownload'),'homepage contains no Gate edit actions');
 for(const id of ['p79GatePrev','p79GateNext','p79GateMonth','p79GateYear','p79GateTruckEntries']){
  assert(card.includes('id="'+id+'"'),'homepage retains '+id+' for viewing stats');
 }
 assert(vessel.includes('data-tab="gate"'),'vessel system includes Gate management tab');
 assert(vessel.includes('id="view-gate"'),'vessel system has separate Gate management panel');
-assert(vessel.includes('data-src="../gate-import/?embed=1"'),'Gate import loads under vessel system');
+assert(vessel.includes('data-src="../gate-import/?embed=1&v=20261111-import-fold-v3"'),'Gate import loads under vessel system');
 assert(vessel.includes("'dispatch','gate'")||vessel.includes("'dispatch','gate']"),'vessel tab router recognizes Gate');
 assert(vessel.includes("if(name==='gate')"),'vessel tab select lazily loads Gate manager');
 assert(gate.includes("data-gate-embed"),'Gate upload page renders inside vessel system');

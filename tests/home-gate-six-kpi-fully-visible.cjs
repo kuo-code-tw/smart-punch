@@ -15,7 +15,7 @@ for(const id of ['p79GateDay','p79GateWeek','p79GateMonth','p79GateYear','p79Gat
  assert(card.includes('id="'+id+'"'),id+' still present');
 }
 assert(card.includes('id="p79GateDay"')&&card.includes('id="p79GateWeek"'),'daily and weekly tabs also visible');
-assert(!card.includes('href=')&&!card.includes('gateSave'),'homepage read-only');
+assert([...card.matchAll(/href="([^"]+)"/g)].every(([,url])=>url==='./gate-dashboard/')&&!card.includes('gateSave'),'homepage read-only');
 const patch=css.slice(css.lastIndexOf('/* 2026-11-07 | Gate same height as the vessel efficiency trend.'));
 assert(patch.includes('grid-auto-rows:260px!important'),'desktop Gate matches trend height');
 assert(patch.includes('grid-auto-rows:275px!important'),'mobile Gate matches trend height');

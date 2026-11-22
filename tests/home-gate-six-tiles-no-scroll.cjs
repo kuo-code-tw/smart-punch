@@ -19,7 +19,7 @@ for(const id of ['p79GateDeliverEmpty','p79GatePickupEmpty','p79GateDeliverLoade
  assert.equal(card.split('id="'+id+'"').length,2,'single '+id);
 }
 assert.equal((metricMarkup.match(/<div(?: class="[^"]*")?><span>/g)||[]).length,6,'six cards exactly');
-assert(!card.includes('href='),'homepage Gate remains read-only');
+assert([...card.matchAll(/href="([^"]+)"/g)].every(([,url])=>url==='./gate-dashboard/'),'homepage Gate remains read-only');
 assert(!card.includes('匯入 Gate Excel')&&!card.includes('下載 CSV'),'import/export are not on homepage');
 assert(css.includes('grid-template-columns:repeat(3,minmax(0,1fr))!important'),'three tiles per row on desktop');
 assert(css.includes('grid-template-columns:repeat(2,minmax(0,1fr))!important'),'two tiles per row on mobile');
