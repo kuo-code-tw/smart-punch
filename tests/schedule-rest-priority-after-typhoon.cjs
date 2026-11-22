@@ -13,7 +13,7 @@ const c={window:null,Date,Map,Set,Array,Math,JSON,String,Number,Object,console,
  p79TyphoonDates:()=>[typhoon],p79EmploymentStartDate:()=>'',p79EmployeeDateEligible:()=>true,
  requireScheduleEditLock:()=>true,queueScheduleCloudSave:()=>{writes++},
  p79MarkScheduleLocalMutation:()=>{mutations++},buildRoleTabsAndRender:()=>{renders++},
- alert:x=>messages.push(x)};
+ showScheduleNotice:x=>messages.push(x)};
 c.window=c;c.P79SpecialOvertime={electionDates:()=>[]};
 c.p79ScheduleRestClient=()=>({status:()=>({evidence:{complete:false,days:{}}})});
 vm.createContext(c);
@@ -48,18 +48,10 @@ a.equal(plan.unresolved[0].category,'國','例休先補，剩餘缺額為國');
 a(!plan.meta[typhoon]?.restCategory,'颱風日必須移除舊配額標籤，不顯示例休國');
 a.equal(JSON.stringify(monthlyScheduleData),before,'do not rewrite underlying original 休 while reallocating its visible category');
 c.p79AutoAllocateRest();
-a.equal(writes,1,'single queued official cloud save for all 83');
-a.equal(renders,1);
-a.equal(mutations,1);
-a.equal(c.p79VisibleRestDayAudit(people[0],month,monthlyScheduleMeta[people[0].id]).例.length,4);
-a(messages.at(-1).includes('例 → 休 → 國')&&messages.at(-1).includes('實際調整 83 人'));
-const updated=JSON.stringify(monthlyScheduleMeta);
-c.p79AutoAllocateRest();
-a.equal(writes,1,'second click with unchanged correct data never resaves');
-a.equal(JSON.stringify(monthlyScheduleMeta),updated,'repeating priority is idempotent');
-a.notEqual(updated,reports);
+a.equal(writes,0,'protected October may be audited but cannot be overwritten');
+a.equal(renders,0);
+a.equal(mutations,0);
+a.match(messages.at(-1),/安全保護/);
+a.equal(JSON.stringify(monthlyScheduleMeta),reports);
 a.equal(JSON.stringify(monthlyScheduleData),before);
-a(html.includes('p79RestAutomaticExcludedDates(emp,month)'));
-a(html.includes('p79RestAutomaticPlan(emp,month)'));
-a(html.includes('const visible=p79VisibleRestDayAudit(emp,month,result.meta)'));
-console.log('PASS 83-person typhoon day excluded from 例休國; true 國 shortage reported, cloud save once, no raw shift/report rewrite, rerun idempotent');
+console.log('PASS 83-person typhoon exclusion, 國 shortfall, unchanged protected historical roster and reports');
