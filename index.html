@@ -400,14 +400,14 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
     <div id="sessionBar" class="session">
       <div><strong id="sessionTitle"></strong><small id="sessionMeta"></small></div>
       <div class="p79-windows-download-slot">
-        <a id="p79WindowsDownloadLink" class="p79-windows-download-link" href="https://github.com/kuo-code-tw/smart-punch/releases/latest/download/Port79-Windows-Lite.zip" target="_blank" rel="noopener noreferrer" hidden aria-label="系統下載（Windows 完整程式 ZIP）" title="自動查詢 GitHub 最新 Windows 正式版本，下載檔包含版本編號及 SHA-256 校驗">⬇ 系統下載</a>
+        <a id="p79WindowsDownloadLink" class="p79-windows-download-link" href="https://github.com/kuo-code-tw/smart-punch/releases/latest/download/Port79-Windows-Lite.zip" target="_blank" rel="noopener noreferrer" hidden aria-label="79號碼頭電腦版下載（完整程式 ZIP）" title="下載最新79號碼頭電腦版，更新檔包含版本編號及 SHA-256 校驗">⬇ 電腦版下載</a>
         <button id="logoutBtn" class="logout" type="button">登出</button>
       </div>
     </div>
 
     <div id="loginBox" class="login-box">
       <div id="deployStatusBanner" class="deploy-status-banner" role="status" aria-live="polite">
-        <div class="deploy-status-title">🛠️ <span id="deployStatusTitle">系統更新中</span></div>
+        <div class="deploy-status-title">🛠️ <span id="deployStatusTitle">79號碼頭網頁版更新中</span></div>
         <div id="deployStatusSub" class="deploy-status-sub">GitHub Pages 正在部署最新版本，更新期間暫停登入，完成後會自動恢復。</div>
         <div id="deployStatusMeta" class="deploy-status-meta"></div>
       </div>
@@ -754,7 +754,7 @@ function p79SetDeploymentUi(updating,payload={}){
 
   if(updating){
     banner?.classList.add('show');
-    if(title)title.textContent=String(payload.message||'系統更新中');
+    if(title)title.textContent=String(payload.message||'79號碼頭網頁版更新中');
     if(sub)sub.textContent='GitHub Pages 正在部署最新版本，更新期間暫停登入；部署完成後請按「手動更新」重新檢查。';
     if(meta){
       const started=payload.started_at?String(payload.started_at):'';
@@ -762,11 +762,11 @@ function p79SetDeploymentUi(updating,payload={}){
     }
     if(account)account.disabled=true;
     if(password)password.disabled=true;
-    if(punch){punch.disabled=true;punch.textContent='🛠️ 系統更新中'}
-    if(manage){manage.disabled=true;manage.textContent='🛠️ 系統更新中'}
+    if(punch){punch.disabled=true;punch.textContent='🛠️ 網頁版更新中'}
+    if(manage){manage.disabled=true;manage.textContent='🛠️ 網頁版更新中'}
     if($('status')){
       $('status').className='status warning';
-      $('status').textContent='🛠️ 系統正在更新，登入暫停；完成後請按手動更新重新檢查。';
+      $('status').textContent='🛠️ 79號碼頭網頁版正在更新，登入暫停；完成後請按手動更新重新檢查。';
     }
   }else{
     banner?.classList.remove('show');
@@ -1399,7 +1399,7 @@ function showSession(session){
 }
 
 async function punchLogin(){
-  if(port79DeploymentUpdating){p79SetDeploymentUi(true,{message:'系統更新中'});return}
+  if(port79DeploymentUpdating){p79SetDeploymentUi(true,{message:'79號碼頭網頁版更新中'});return}
   if(loginBusy)return;
   const loginId=$('account').value.trim();
   if(!loginId){$('status').className='status error';$('status').textContent='請輸入員工編號。';return}
@@ -1514,7 +1514,7 @@ async function isCloudAdminAccount(loginId){
   return admins.some(a=>String(a.empId||a.id||'').trim().toUpperCase()===id||String(a.attNo||'').trim().toUpperCase()===id);
 }
 async function manageLogin(){
-  if(port79DeploymentUpdating){p79SetDeploymentUi(true,{message:'系統更新中'});return}
+  if(port79DeploymentUpdating){p79SetDeploymentUi(true,{message:'79號碼頭網頁版更新中'});return}
   if(loginBusy)return;
   const loginId=$('account').value.trim();
   if(!loginId){$('status').className='status error';$('status').textContent='請先輸入管理員工號。';return}
