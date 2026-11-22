@@ -352,6 +352,9 @@ function create(ctx){
  function invalidate(month){
    const token=ctx.token();if(!token)return Promise.resolve(null);
    for(const key of reads.keys())if(key.startsWith(token+'|'))reads.delete(key);
+   // Other visited months must be rechecked when selected again. A correction
+   // may move a punch across month boundaries, not just change today's cell.
+   for(const [key,state] of states)if(key!==month&&state?.token===token)states.delete(key);
    // Keep the last verified snapshot visible while rechecking whenever safe.
    if(states.get(month)?.pending)states.delete(month);
    return refresh(month);
