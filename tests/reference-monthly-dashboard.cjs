@@ -18,7 +18,7 @@ const attendance=report.analyzeAttendance({records:[{empId:'E1',timeStr:'2026/10
 assert.equal(attendance.personDays,1,'an isolated out-punch does not establish a worked day');assert.deepEqual(attendance.weeklyPeople,[1,0,0,0,0]);assert.equal(attendance.pendingShifts,null,'no invented pending-shift count without the shared engine');
 const html=fs.readFileSync('index.html','utf8'),css=fs.readFileSync('assets/port79-reference-dashboard.css','utf8'),ui=fs.readFileSync('assets/port79-reference-dashboard.js','utf8');
 for(const id of ['p79DashMonth','p79DashRefresh','p79DashPersonDays','p79DashOvertimeHours','p79DashAnomalies'])assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
-assert(!html.includes('p79d-dashboard-controls'),'reference has no extra toolbar above the two sections');assert(html.includes('最近七天船舶效率'));assert(html.includes('本月人員效率排行'));
+assert(!html.includes('p79d-dashboard-controls'),'reference has no extra toolbar above the two sections');assert(html.includes('船舶效率趨勢')&&html.includes('id="p79EffWeek"')&&html.includes('id="p79EffMonth"'),'vessel trend supports real week/month navigation rather than a fixed seven-day label');assert(html.includes('本月人員效率排行'));
 assert(css.includes('minmax(0,1.12fr) minmax(0,1.12fr) minmax(0,.78fr)'),'three ship panels at desktop size');assert(css.includes('@media(max-width:620px)'));
 for(const id of ['p79DashChartPrevious','p79DashChartNext','p79DashChartPage'])assert(html.includes('id="'+id+'"'),'dashboard carousel exists: '+id);
 assert(ui.includes('function setLeaveReport(report)'),'second page keeps formal approved leave');
