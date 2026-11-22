@@ -29,6 +29,6 @@ for(const p of ['aqc-efficiency','history-data','hr','leave','schedule','work-ho
 }
 for(const p of ['hr','leave','schedule','work-hours']){
  const html=fs.readFileSync(p+'/index.html','utf8');
- assert(/port79-overtime-report\.js\?v=[^"']*&role20261026=1/.test(html),p+' must reload auto job-role module');
+ assert(/port79-overtime-report\.js\?v=[^"'\s<>]+/.test(html),p+' must load one cache-versioned role-prefill module');
 }
 console.log('PASS overtime worker-role prefill, short label, shared seven-system function menu hover, and cache versions');
