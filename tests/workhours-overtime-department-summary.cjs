@@ -72,5 +72,6 @@ assert.equal(pendingLabel({...pending,planned:true},duration),'','future planned
 assert.match(pendingLabel({...pending,specialOvertimeMinutes:120},duration),/加班出勤 2 小時 29 分/,'ordinary work evidence remains separate from special-day notice');
 assert(html.includes("'特殊日出勤 '+formatDurationMinutes(row.specialOvertimeMinutes)"),'special-day indication remains separately labeled');
 assert(html.includes("row.specialOvertimeMinutes>0?'特殊日出勤 '+formatDurationMinutes(row.specialOvertimeMinutes)"),'special day overlap is shown separately as attendance evidence, not certified declaration');
-assert(html.includes('const pendingEstimateCount=rows.filter('),'count pending estimated overtime');
+assert(html.includes('const pendingEstimate=p79UnreportedOvertimeSummary(completedRows);'),'pending estimate counts must be calculated from completed real attendance only');
+assert(html.includes('const pendingEstimateCount=pendingEstimate.count;'),'display the scope-filtered estimate count, without extra full roster scans');
 console.log('PASS all-employee job-title burden sharing, including non-reporters and a zero-overtime title: 4/8 actuals, decimal conversion, unknown/mismatched values, deduplication, per-person averages, invalid and revoked/preview exclusions');
