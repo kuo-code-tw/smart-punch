@@ -10409,7 +10409,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 // Show only cloud-confirmed, employee-owned historical punch gaps.
                 // The notice is informational and never changes the IN/OUT guard.
                 try {
-                    if (p79IsPunchEntryMode() && window.P79MissingPunchNotice) {
+                    if (p79IsPunchEntryMode() && window.p79PunchInProgress!==true && window.P79MissingPunchNotice) {
                         const regular=matched.filter(r=>
                             getPunchChannel(r.status)==='REGULAR' && !!getPunchTypeFromStatus(r.status));
                         const daily=buildDailyAttendanceRows(regular);
