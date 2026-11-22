@@ -32,4 +32,23 @@ assert.match(src,/log/i);
 assert.match(release,/UPDATER_READY|runner-ready-/);
 assert.match(updater,/baseBundleVersion/);
 assert.doesNotMatch(src,/Directory\.Delete\(DataRoot/,'Never delete user cache on update');
-console.log('PASS visible manual update: no silent disabled clicks, queued action, safe synchronization prompt, true restart and explicit no-op/failure');
+assert.match(src,/private readonly Label updateAvailableBadge;/);
+assert.match(src,/private bool verifiedUpdateAvailable=false;/);
+assert.match(src,/updateAvailableBadge=new Label\s*\{[\s\S]*Text="有系統更新｜點此更新"/,
+ 'The toolbar should show the exact requested text only when an update is ready');
+assert.match(src,/updateAvailableBadge\.Click\+=\(s,e\)=>\{if\(!exit\) _=CheckUpdates\(true\);\};/,
+ 'Clicking the badge must use the existing verified updater');
+assert.match(src,/checkUpdatesMenu\.Text=available\?"有系統更新｜點此更新":"檢查並更新系統（程式及畫面）"/,
+ 'Tray menu must be labeled only when a verified update is available');
+assert.match(src,/updateAvailableBadge\.Visible=available;/,
+ 'No update means no persistent badge');
+assert.match(src,/if\(shell!=null\|\|websitePending\)SetUpdateAvailable\(true\);\s*else if\(siteFailure==null&&shellFailure==null\)SetUpdateAvailable\(false\);/,
+ 'Badge must require staged official files, and failures must not claim an update');
+assert.match(src,/verifiedUpdateAvailable\?50:8/, 'Badge must not cover cache-download progress');
+assert.match(src,/verifiedUpdateAvailable\?108:70/, 'Badge must not cover manual update status');
+assert.match(src,/MessageBoxDefaultButton\.Button2/,
+ 'Active downloads must still default to postponing restart');
+assert.doesNotMatch(src,/SetUpdateAvailable\(true\);\s*if\(manual\)/,
+ 'Manually checking must never itself set a false positive badge');
+
+console.log('PASS visible manual update and verified-availability toolbar badge: no silent disabled clicks, queued action, safe synchronization prompt, true restart and explicit no-op/failure');
