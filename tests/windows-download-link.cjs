@@ -84,7 +84,7 @@ function unit(options={}){
  assert(home.includes('id="logoutBtn"'),'Logout remains');
  assert(home.includes('id="loginBox"'),'Login remains');
  assert(home.includes('id="systems"'),'System homepage remains');
- assert(home.includes('assets/port79-windows-download.js?v=20261121-short-v6'));
+ assert(home.includes('assets/port79-windows-download.js?v=20261122-naming-v7'));
  assert(home.includes('assets/port79-home-compact-controls.css?v=20261121-v1'));
  assert(home.includes('assets/port79-home-compact-controls.js?v=20261121-v1'));
  assert(home.includes('p79-windows-download-link[hidden]{display:none!important}'));
