@@ -30,7 +30,7 @@ namespace Port79Lite {
    ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
    var helper=Path.Combine(root,"app","Port79Updater.exe");
    if(!File.Exists(helper))throw new FileNotFoundException(
-    "目前的 Windows 程式缺少原生更新器 Port79Updater.exe。為保護 local-data，請只將最新版 ZIP 的程式檔更新一次；不用調整 PowerShell 安全設定。");
+    "目前的79號碼頭電腦版缺少原生更新器 Port79Updater.exe。為保護 local-data，請只將最新版 ZIP 的程式檔更新一次；不用調整 PowerShell 安全設定。");
    using(var client=new HttpClient {Timeout=TimeSpan.FromSeconds(60)}){
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Port79-WindowsLite-Updater/1.0");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
@@ -39,14 +39,14 @@ namespace Port79Lite {
      Api+"?checked="+DateTimeOffset.UtcNow.ToUnixTimeSeconds()).ConfigureAwait(true));
     if(release==null||release.draft||!System.Text.RegularExpressions.Regex.IsMatch(
      release.tag_name??"", @"^port79-windows-lite-[0-9]{8}-[a-f0-9]{12}$"))
-     throw new InvalidDataException("未取得可驗證的最新正式 Windows 發布資訊");
+     throw new InvalidDataException("未取得可驗證的79號碼頭電腦版正式更新資訊");
     var url=ReleaseDownloadBase+release.tag_name+"/Port79-Windows-Lite.zip";
     var asset=release.assets?.SingleOrDefault(x=>x?.name=="Port79-Windows-Lite.zip");
     if(asset==null||asset.browser_download_url!=url||asset.size<=0||asset.size>Limit||
       asset.digest==null||!asset.digest.StartsWith("sha256:",StringComparison.Ordinal))
-      throw new InvalidDataException("Windows 發布檔缺少有效 SHA-256 或來源不符合預期");
+      throw new InvalidDataException("79號碼頭電腦版更新檔缺少有效 SHA-256 或來源不符合預期");
     var digest=asset.digest.Substring(7).ToLowerInvariant();
-    if(!HashValid(digest))throw new InvalidDataException("Windows 發布 SHA-256 格式錯誤");
+    if(!HashValid(digest))throw new InvalidDataException("79號碼頭電腦版更新檔 SHA-256 格式錯誤");
     var updates=Path.Combine(data,"updates");Directory.CreateDirectory(updates);
     var installedFile=Path.Combine(updates,"installed-shell-sha256.txt");
     var installedExeHash=Path.Combine(updates,"installed-shell-exe-sha256.txt");
@@ -59,20 +59,20 @@ namespace Port79Lite {
     var exeHash=File.Exists(installedExeHash)?File.ReadAllText(installedExeHash).Trim().ToLowerInvariant():"";
     if(markerMatches&&HashValid(exeHash)&&File.Exists(exeFile)&&
        String.Equals(Sha256(File.ReadAllBytes(exeFile)),exeHash,StringComparison.OrdinalIgnoreCase)){
-     log("Windows EXE 已核對最新版："+digest.Substring(0,12));
+     log("79號碼頭電腦版程式已核對最新版："+digest.Substring(0,12));
      return null;
     }
-    if(markerMatches)log("版本紀錄存在但 EXE 尚未核對，重新驗證 Windows 主程式，不會清除本機資料");
+    if(markerMatches)log("版本紀錄存在但 EXE 尚未核對，重新驗證79號碼頭電腦版主程式，不會清除本機資料");
     var zip=Path.Combine(updates,"pending-windows-release.zip");
     // When the verified release is already staged, pressing "更新系統" again
     // must not download the same complete ZIP for a second time.
     byte[] bytes=null;
     if(File.Exists(zip)&&new FileInfo(zip).Length==asset.size){
      var cached=File.ReadAllBytes(zip);
-     if(Sha256(cached)==digest){bytes=cached;log("沿用已驗證的 Windows 更新檔，沒有再次下載");}
+     if(Sha256(cached)==digest){bytes=cached;log("沿用已驗證的79號碼頭電腦版更新檔，沒有再次下載");}
     }
     if(bytes==null){
-     log("首次自動下載正式 Windows 更新檔，無須使用者自行取得 ZIP…");
+     log("正在下載79號碼頭電腦版更新檔，無須自行取得 ZIP…");
      bytes=await client.GetByteArrayAsync(url).ConfigureAwait(true);
      if(bytes.Length>Limit||bytes.LongLength!=asset.size||Sha256(bytes)!=digest)
       throw new InvalidDataException("下載內容與 GitHub 正式發布 SHA-256 不一致；已取消更新");
@@ -118,7 +118,7 @@ namespace Port79Lite {
      if(foundShell&&identical){
       File.WriteAllText(installedExeHash,Sha256(File.ReadAllBytes(exeFile)));
       File.WriteAllText(installedFile,digest);
-      log("Windows 主程式檔案已與發佈版本相同，已重新核對 EXE 並保留本機資料");
+      log("79號碼頭電腦版程式檔案已與發布版本相同，已核對主程式並保留本機資料");
       return null;
      }
     }
@@ -135,7 +135,7 @@ namespace Port79Lite {
    // Native .NET helper is used instead of PowerShell, so Group Policy,
    // execution policy and blocked .ps1 files cannot silently prevent updates.
    if(!File.Exists(p.Helper))throw new FileNotFoundException(
-    "找不到本機 Windows 原生更新工具，舊系統不會關閉；請先修復更新程式檔案。",p.Helper);
+    "找不到79號碼頭電腦版更新工具，現有程式不會關閉；請先修復更新程式檔案。",p.Helper);
    var updateDir=Path.Combine(root,"local-data","updates");
    Directory.CreateDirectory(updateDir);
    var ready=Path.Combine(updateDir,"runner-ready-"+parentPid+".flag");
@@ -179,7 +179,7 @@ namespace Port79Lite {
      if(String.IsNullOrEmpty(reason))
       reason="原生更新器沒有回覆接手訊號"+(exitCode.HasValue?"（結束代碼 "+exitCode.Value+"）":"（啟動逾時）");
      throw new InvalidOperationException(
-      "Windows 原生更新未能啟動，原本系統已保留。\n"+
+      "79號碼頭電腦版更新未能啟動，原有程式已保留。\n"+
       reason+"\n"+
       "請查看更新紀錄：local-data\\logs\\windows-upgrade.txt"+
       (File.Exists(log)?"":"（沒有產生紀錄，可能被安全軟體限制執行）"));
