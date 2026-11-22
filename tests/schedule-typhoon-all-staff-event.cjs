@@ -9,7 +9,7 @@ const shifts={},meta={};
 people.forEach((e,i)=>{shifts[e.id]={[typhoonDate]:i<41?'休':'早'};meta[e.id]={};});
 const saved=JSON.stringify({shifts,meta}),calendar=[typhoonDate];
 const c={window:null,Array,Date,Set,Map,String,Number,Math,JSON,Object,
- monthlyScheduleData:shifts,monthlyScheduleMeta:meta,
+ monthlyScheduleData:shifts,monthlyScheduleMeta:meta,employees:people,
  p79RestQuota:()=>({days:31,counts:{例:4,休:5,國:2}}),
  p79TyphoonDates:()=>calendar.slice(),
  p79EmploymentStartDate:()=>'',scheduleTaipeiTodayKey:()=>month+'-25',
@@ -26,7 +26,7 @@ c.window=c;c.P79RestAttendance={state:(_snap,id,date)=>{
  return Number(id.slice(1))<41?'rest':'worked';
 }};
 vm.createContext(c);
-for(const name of ['p79ScheduleTyphoonHasWork','p79ScheduleTyphoonDays','p79ScheduleRestCountCells'])
+for(const name of ['p79ScheduleTyphoonHasWork','p79ScheduleTyphoonDays','p79ScheduleSpecialSummaryColumns','p79ScheduleElectionSummaryDates','p79ScheduleRestCountCells'])
  vm.runInContext(extract(name),c);
 let counted=0,restCounted=0,workCounted=0,skipped=[];
 for(const e of people){
@@ -37,7 +37,7 @@ for(const e of people){
  else skipped.push(e.id);
  const summary=c.p79ScheduleRestCountCells(e,month,{},off,work);
  a(summary.includes('data-rest-category="颱"'));
- a(summary.includes('<span>'+total+' 天</span>'));
+ a(summary.includes('<span>'+total+'</span>'));
 }
 a.equal(counted,80,'all active people on marked day, including original 休, are counted');
 a.equal(restCounted,41,'41 originally scheduled rests count as typhoon calendar days');
