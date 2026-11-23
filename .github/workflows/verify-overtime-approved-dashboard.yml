@@ -1,0 +1,39 @@
+name: Verify approved overtime dashboard without data changes
+on:
+  pull_request:
+    paths:
+      - 'work-hours/index.html'
+      - 'assets/port79-overtime-approved-dashboard.css'
+      - 'assets/port79-overtime-approved-dashboard.js'
+      - 'tests/overtime-approved-dashboard-ui.cjs'
+      - '.github/workflows/verify-overtime-approved-dashboard.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'work-hours/index.html'
+      - 'assets/port79-overtime-approved-dashboard.css'
+      - 'assets/port79-overtime-approved-dashboard.js'
+      - 'tests/overtime-approved-dashboard-ui.cjs'
+      - '.github/workflows/verify-overtime-approved-dashboard.yml'
+permissions:
+  contents: read
+jobs:
+  ui-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify UX source parses and no data path changed
+        run: |
+          node --check assets/port79-overtime-approved-dashboard.js
+          node tests/overtime-approved-dashboard-ui.cjs
+      - name: Keep existing overtime reports and data protections working
+        run: |
+          node tests/overtime-manager-unified-grid.cjs
+          node tests/overtime-main-ledger-includes-saved-plans.cjs
+          node tests/overtime-existing-record-controls.cjs
+          node tests/overtime-planned-toolbar-toggle.cjs
+          node tests/overtime-passive-view-readonly.cjs
