@@ -38,4 +38,32 @@ assert.equal(map.ARM.remaining,0,'no due is still listed');
 assert.equal(JSON.stringify({snapshot,model}),prior,'read-only cannot mutate submitted reports');
 assert.match(src,/id="mrAutoSupplementRows"/);
 assert.match(src,/automaticSupplementReviewRows\(snapshot,loadedPeople,loadedMonth,model\)/);
+
+// Simplified UI must keep the exact official controller and save guards.
+// Only existing DOM nodes are moved into optional details; no new writes.
+new vm.Script(src);
+const layoutStart=src.indexOf('function simplifyMonthlyRestLayout(');
+const layoutEnd=src.indexOf('async function open(settings={})',layoutStart);
+assert(layoutStart>=0&&layoutEnd>layoutStart,'simple monthly rest layout is registered');
+const layout=src.slice(layoutStart,layoutEnd);
+for(const id of ['mrSimpleGuide','mrMoreFilters','mrReadySection','mrAutoDetails',
+ 'mrAdvancedPlanning','mrExistingDetails','mrSourceDetails'])
+ assert(layout.includes(id),'simple summary/advanced section exists: '+id);
+for(const id of ['mrMonth','mrDept','mrJob','mrEmp','mrPlanningModes',
+ 'mrNeedSection','mrPlannedSection','mrExistingSection','mrRows',
+ 'mrAutoSupplementRows','mrSave','mrLoad'])
+ assert(src.includes(id),'unchanged monthly source and action retained: '+id);
+assert(layout.includes("advanced.open=settings.autoPlan===true"),
+ 'explicit auto-planning entry remains expanded');
+assert(layout.includes("el.querySelector('#mrRows')?.closest('.scroll')"),
+ 'verified submit candidates are promoted to first action area');
+assert(layout.includes("details.id='mrAutoDetails'"),
+ 'nine-column employee detail must be optional');
+assert(!/(?:saveReport|updateSchedule|postToCloud|fetch\(|localStorage\.|sessionStorage\.)/.test(layout),
+ 'simplifying the layout must not submit or alter cloud/local data');
+assert(src.includes('simplifyMonthlyRestLayout(el,settings);'),
+ 'simple layout is actually applied before opening the dialog');
+assert.match(layout,/#p79MonthlyRest \.p79-ot-ux-dialog-tabs\{display:none!important\}/,
+ 'duplicate nested tab bar is not visible');
+
 console.log('PASS: automatic monthly supplement status covers every role, F/L, complete, no-report flags, and missing roster; no writes');
