@@ -1463,7 +1463,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
                                 <th class="px-2 py-3 text-center whitespace-nowrap">加班時數</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">申報加班</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">狀態/異常</th>
-                                <th class="px-2 py-3 text-center whitespace-nowrap">排班例／休／國</th>
+                                <th class="px-2 py-3 text-center whitespace-nowrap">排班月統計（例／休／國／選）</th>
                                 <th class="px-2 py-3 text-center whitespace-nowrap">操作</th>
                             </tr>
                         </thead>
@@ -15536,48 +15536,105 @@ function getManualPairRecordAnchor(record) {
         document.addEventListener('visibilitychange',()=>{
             if(document.visibilityState==='visible')p79RevalidateAttendanceOvertimeOnReturn();
         });
-        // Read ONLY this employee's verified, same-month official roster for the
-        // attendance note column. Never infer a legal rest category from punches,
-        // department-wide holidays, a different employee, or current HR profile.
-        // This function only renders; it does not modify attendance/schedules.
+        // Read-only per-employee MONTHLY rest quota counters. These are not
+        // individual-day shift names and never create leave or overtime claims.
         function p79AttendanceOfficialRestCategory(row,employee,view){
             const date=p79AttendanceOvertimeDate(row),month=date.slice(0,7);
-            if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return {state:'missing',label:'未取得班表'};
             const id=String(employee?.empId||'').trim().toUpperCase();
-            if(!id)return {state:'missing',label:'未取得班表'};
+            if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!id)
+                return {state:'missing',label:'未取得班表'};
             p79AttendanceLoadViewMonth(month,view);
-            const stored=p79AttendanceOvertimeMonths.get(month),token=view?.token||getAttendanceEmployeeMasterToken();
-            if(!token||!stored||stored.token!==token||!stored.ready)
-                return {state:stored?.pending&&stored.token===token?'loading':'missing',
-                    label:stored?.pending&&stored.token===token?'讀取班表中':'未取得班表'};
-            const rosterRows=p79AttendanceRosterRows(stored,id,view).filter(r=>!r.month||r.month===month);
-            const found=rosterRows.filter(r=>r?.schedule&&Object.prototype.hasOwnProperty.call(r.schedule,date));
-            if(!found.length)return {state:'missing',label:'未取得班表'};
-            const categoryFor=roster=>{
-                const raw=String(roster?.[date]??'').trim(),meta=roster?.__meta?.[date]||{};
-                const map={'例':'例','例假':'例','例假日':'例','休':'休','休息日':'休','國':'國','國假':'國','國定假日':'國'};
-                // Display the exact employee/date's official roster. Do not infer
-                // statutory rest classifications from a weekday or another user.
-                const code=raw.replace(/\s+/g,'');
-                let category=map[code]||'';
-                if(!category&&/^[例休國]\d{1,2}(?::\d{2})?[-－]\d{1,2}(?::\d{2})?$/.test(code))category=code[0];
-                const split=/^20-24[＋+]([例休國])$/.exec(code);
-                if(!category&&split)category=split[1];
-                const specific=map[String(meta.restCategory||'').trim()]||'';
-                // A verified unused-rest/quota-worked day may retain 早/中/晚
-                // as the saved shift while its official rest type is in metadata.
-                // The plain restCategory attribute alone is NOT evidence.
-                if(!category&&specific&&meta.restQuotaOvertime===true)category=specific;
-                if(category==='休'&&specific)category=specific;
-                return {category,raw};
-            };
-            const values=found.map(r=>categoryFor(r.schedule));
-            if(new Set(values.map(v=>v.category||('班:'+v.raw))).size>1)return {state:'conflict',label:'班表待核對'};
-            const value=values[0];
-            // A stored normal shift is meaningful schedule information; never
-            // replace every 早/中/晚 day with a blank dash.
-            if(!value.category)return {state:'normal',label:value.raw||'未排班',raw:value.raw};
-            return {state:'rest',label:value.category,raw:value.raw,date};
+            const state=p79AttendanceOvertimeMonths.get(month);
+            const token=view?.token||getAttendanceEmployeeMasterToken();
+            if(!token||!state||state.token!==token||!state.ready)
+                return {state:state?.pending&&state.token===token?'loading':'missing',
+                    label:state?.pending&&state.token===token?'班表讀取中':'未取得班表'};
+            const key=month+'|'+id;
+            const cached=view?.restSummary?.get(key);
+            if(cached)return cached;
+            const rows=p79AttendanceRosterRows(state,id,view)
+                .filter(r=>!r.month||r.month===month);
+            if(!rows.length)return {state:'missing',label:'該月尚無班表'};
+            if(rows.some(r=>!r.schedule||JSON.stringify(r.schedule)!==JSON.stringify(rows[0].schedule)))
+                return {state:'conflict',label:'班表待核對'};
+            if(typeof p79RestQuota!=='function'||typeof p79AllocateRestMonth!=='function')
+                return {state:'missing',label:'統計模組未載入'};
+            const saved=rows[0].schedule;
+            try{
+                const quota=p79RestQuota(month);
+                const official=(state.people||[]).find(p=>String(p.empId||p.id||'').trim().toUpperCase()===id)||{};
+                const iso=value=>{
+                    const text=String(value||'').trim().replace(/\//g,'-').slice(0,10);
+                    return /^\d{4}-\d{2}-\d{2}$/.test(text)?text:'';
+                };
+                const hire=iso(official.employmentStartDate||official.hireDate||official.startDate||
+                    employee?.employmentStartDate||employee?.hireDate||employee?.startDate);
+                const stop=iso(official.lastWorkDate||official.terminationDate||
+                    employee?.lastWorkDate||employee?.terminationDate);
+                const resigned=Object.keys(saved).filter(d=>d.startsWith(month+'-')&&
+                    ['離','離職'].includes(String(saved[d]||'').trim())).sort()[0]||'';
+                const end=[stop,resigned].filter(Boolean).sort()[0]||'';
+                const days=Array.from({length:quota.days},(_,i)=>
+                    month+'-'+String(i+1).padStart(2,'0'));
+                const eligible=d=>(!hire||d>=hire)&&(!end||d<end);
+                const required=days.filter(eligible);
+                if(!required.length||required.some(d=>!String(saved[d]||'').trim()))
+                    return {state:'missing',label:'班表未齊，待核對'};
+                const election=new Set((window.P79SpecialOvertime?.electionDates?.()||[])
+                    .filter(d=>d.startsWith(month+'-')));
+                for(const d of days){
+                    if(/選舉|投票/.test(String(window.P79OfficialCalendar?.get?.(d)?.name||'')))election.add(d);
+                }
+                for(const item of state.rows||[])for(const d of days){
+                    if(String(item.schedule?.[d]||'').trim()==='選')election.add(d);
+                }
+                const typhoon=new Set(required.filter(d=>String(saved[d]||'').trim()==='颱'));
+                const meta=saved.__meta||{};
+                // The SAME quota allocator used by the scheduling page:
+                // inputs are verified cloud schedule + metadata, never punch
+                // guesses, current-week defaults, or another employee's row.
+                const allocation=p79AllocateRestMonth(saved,meta,month,[],hire,end,
+                    [...new Set([...election,...typhoon])],[...typhoon],[],[]);
+                const dates=Object.fromEntries(['例','休','國'].map(k=>[k,new Set()]));
+                const asKind=raw=>{
+                    const value=String(raw||'').trim();
+                    const split=/^20-24[＋+]([例休國])$/.exec(value);
+                    return split?.[1]||/^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';
+                };
+                for(const d of required){
+                    if(typhoon.has(d))continue;
+                    const code=String(saved[d]||'').trim();
+                    const planned=allocation.meta?.[d]||{};
+                    const initial=meta[d]||{};
+                    let category=asKind(code);
+                    if(code==='休'||['auto-v1','auto-excess-v1'].includes(planned.restAllocationSource)&&category)
+                        category=['例','休','國'].includes(planned.restCategory)?planned.restCategory:category;
+                    if(category==='國'&&quota.counts.國===0)category='休';
+                    if(category&&dates[category])dates[category].add(d);
+                    // Saved, non-revoked formal overtime also consumes the
+                    // original category, exactly once; no draft/flag counts.
+                    const report=initial.overtimeReport;
+                    const confirmed=String(report?.id||'').trim()&&
+                        initial.overtimeExcluded!==true&&
+                        !(initial.overtimeRevocations||[]).some(x=>x?.confirmed===true&&
+                          String(x.reportId)===String(report.id));
+                    if(confirmed&&dates[report.category]&&
+                        !(report.category==='國'&&quota.counts.國===0))
+                        dates[report.category].add(d);
+                }
+                const counts={};
+                for(const k of ['例','休','國']){
+                    const n=dates[k].size;
+                    counts[k]=[n,Math.max(0,Number(allocation.quota?.[k]??quota.counts[k])-n)];
+                }
+                const result={state:'ready',month,counts,
+                    election:[...election].filter(eligible).length,
+                    typhoon:[...typhoon].filter(eligible).length};
+                view?.restSummary?.set(key,result);
+                return result;
+            }catch(error){
+                return {state:'missing',label:'班表統計待核對'};
+            }
         }
         function p79AttendanceRosterGroup(row,employee,view){
             const month=p79AttendanceOvertimeDate(row).slice(0,7);
@@ -16479,7 +16536,7 @@ function getManualPairRecordAnchor(record) {
 
             p79MainTableDuplicateRows = renderRows;
             p79AdminAttendanceReportRows = renderRows;
-            const overtimeView={token:getAttendanceEmployeeMasterToken(),specialParts:new WeakMap(),rosterIndex:new WeakMap(),loadedMonths:new Set()};
+            const overtimeView={token:getAttendanceEmployeeMasterToken(),specialParts:new WeakMap(),rosterIndex:new WeakMap(),loadedMonths:new Set(),restSummary:new Map()};
             tbody.innerHTML = renderRows.map((row, rowIndex) => {
                 const reportEmployee = findEmployeeForAttendanceIdentity(row, visibleEmployees);
                 const overtimeSubmissionState = p79AttendanceOvertimeSubmissionState(row, reportEmployee, overtimeView);
@@ -16501,18 +16558,19 @@ function getManualPairRecordAnchor(record) {
                     ''
                 ).trim();
                 const rosterRest=p79AttendanceOfficialRestCategory(row,displayEmp,overtimeView);
-                const rosterRestName={例:'例假日',休:'休息日',國:'國定假日'};
-                const restColor={例:'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950 dark:text-rose-200',
-                                 休:'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950 dark:text-amber-200',
-                                 國:'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200'};
-                const rosterRestTitle=rosterRest.state==='rest'
-                    ? '正式排班：'+rosterRestName[rosterRest.label]+'；僅供辨識，不代表已申報或核准加班'
-                    : rosterRest.state==='normal'?'正式排班：'+(rosterRest.raw||'未排班')+'；非例／休／國'
-                    : rosterRest.state==='loading'?'正在核對該員工本月正式排班'
-                    : rosterRest.state==='conflict'?'同一員工日期有不一致的正式排班紀錄，請先核對':'該員工當日正式班表尚未取得';
-                const rosterRestHtml=rosterRest.state==='rest'
-                    ? '<span data-p79-official-rest="'+rosterRest.label+'" class="inline-flex items-center justify-center min-w-8 rounded-lg border px-2.5 py-1 font-black text-sm '+restColor[rosterRest.label]+'" title="'+escapeHtml(rosterRestTitle)+'">'+rosterRest.label+'</span>'
-                    : '<span class="text-[11px] text-slate-500" title="'+escapeHtml(rosterRestTitle)+'">'+escapeHtml(rosterRest.label)+'</span>';
+                const rosterRestTitle=rosterRest.state==='ready'
+                    ? rosterRest.month+' 正式排班月統計；例／休／國＝已分配／剩餘，選＝選舉日事件；只供核對，不是加班申報或核准'
+                    : rosterRest.label;
+                const rosterRestHtml=rosterRest.state==='ready'
+                    ? '<div data-p79-rest-month="'+escapeHtml(rosterRest.month)+'" class="inline-flex items-center justify-center gap-2 text-[11px] font-bold whitespace-nowrap">'+
+                      ['例','休','國'].map((kind,i)=>'<span data-rest-category="'+kind+'" class="'+
+                        ['text-rose-700','text-blue-700','text-emerald-700'][i]+'">'+kind+
+                        ' '+rosterRest.counts[kind][0]+'/'+rosterRest.counts[kind][1]+'</span>').join('')+
+                      (rosterRest.typhoon?'<span data-rest-category="颱" class="text-cyan-700">颱 '+rosterRest.typhoon+'</span>':'')+
+                      (rosterRest.election?'<span data-rest-category="選" class="text-indigo-700">選 '+rosterRest.election+'</span>':'')+
+                      '</div>'
+                    : '<span class="text-[11px] text-amber-700" title="'+escapeHtml(rosterRestTitle)+'">'+
+                      escapeHtml(rosterRest.label)+'</span>';
 
                 const visibleAssessmentReasons=(row.attendanceAssessmentReasons||[]).filter(reason=>!String(reason).startsWith('上班時間與班表不符')&&!String(reason).startsWith('上班時間需核對：')&&String(reason)!=='下班分鐘未在45–60');
                 const hiddenTimeOnly=row.attendanceStatus==='時間需核對'&&(row.attendanceAssessmentReasons||[]).length>0&&!visibleAssessmentReasons.length;
@@ -16585,7 +16643,7 @@ function getManualPairRecordAnchor(record) {
                         <td data-p79-overtime-hours tabindex="0" onclick="this.focus()" title="滑鼠移入或點選顯示其他加班資訊" class="px-2 py-3 text-center font-black text-indigo-700 dark:text-indigo-300 whitespace-nowrap">${attendanceRowOvertimeText(row,overtimeView)}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap">${overtimeSubmissionState === 'none' ? `<button type="button" onclick="p79OpenAdminAttendanceOvertime(${rowIndex})" ${canReportThisRow ? '' : 'disabled'} class="inline-flex items-center justify-center rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-bold text-sky-800 hover:bg-sky-100 hover:border-sky-500 disabled:opacity-50 disabled:cursor-not-allowed" title="${canReportThisRow ? '帶入員工與班次日期，開啟正式加班申報' : !p79CanReportOvertime() ? '目前帳號沒有申報加班權限' : !row.clockIn || !row.clockOut ? '尚未完成上下班打卡' : '無法核對員工或日期'}">＋ 申報加班</button>` : ''}</td>
                         <td class="px-2 py-3 text-center whitespace-nowrap" ${nightWorkdayNote ? `title="${nightWorkdayTooltip}" aria-label="${nightWorkdayTooltip}"` : ''}>${nightWorkdayBadge}${statusBadge}${crossMonthBadge}${extraChecks}</td>
-                        <td data-p79-schedule-rest class="px-2 py-3 text-center whitespace-nowrap" title="${escapeHtml(rosterRestTitle)}">${rosterRestHtml}</td>
+                        <td data-p79-schedule-rest class="px-2 py-3 text-center whitespace-nowrap min-w-[260px]" title="${escapeHtml(rosterRestTitle)}">${rosterRestHtml}</td>
                         <td class="px-2 py-3 text-center">
                             <div class="flex justify-center min-w-[42px]">
                             ${allowAttendanceDelete ? `<button onclick='deleteDailyAttendance(${JSON.stringify(recordIds)})' class="inline-flex w-7 h-7 items-center justify-center rounded-full bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 hover:ring-2 hover:ring-rose-300" title="刪除整筆考勤" aria-label="刪除整筆考勤">🗑</button>` : '<span class="text-[10px] text-slate-400">—</span>'}
