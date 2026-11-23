@@ -192,8 +192,8 @@ jobs:
           signing-account-name: ${{ vars.PORT79_ARTIFACT_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ vars.PORT79_ARTIFACT_SIGNING_PROFILE }}
           files: |
-            ${{ github.workspace }}\\production\\desktop-lite\\dist\\79號碼頭_Windows輕量版\\Port79WindowsLite.exe
-            ${{ github.workspace }}\\production\\desktop-lite\\dist\\79號碼頭_Windows輕量版\\app\\Port79Updater.exe
+            ${{ github.workspace }}\production\desktop-lite\dist\79號碼頭_Windows輕量版\Port79WindowsLite.exe
+            ${{ github.workspace }}\production\desktop-lite\dist\79號碼頭_Windows輕量版\app\Port79Updater.exe
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
