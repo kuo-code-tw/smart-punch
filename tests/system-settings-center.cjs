@@ -45,7 +45,7 @@ async function simulate(adminRole){
   listeners:{},addEventListener(name,fn){this.listeners[name]=fn},focus(){this.focused=true},setAttribute(){}});return fields.get(id);}
  const stored=new Map([['port79_admin_token','real-test-token'],['port79_user_session',JSON.stringify({adminRole})]]);
  const local=new Map();
- let persisted={unrelatedOrganizationKey:{keep:true}},writes=0,failNextWrite=false;
+ let persisted={unrelatedOrganizationKey:{keep:true}},writes=0,failNextWrite=false,activeRole=adminRole;
  const doc={readyState:'loading',documentElement:{setAttribute(){}},getElementById:field,
   querySelectorAll(){return[]},addEventListener(name,fn){events[name]=fn}};
  const ctx={
@@ -56,7 +56,7 @@ async function simulate(adminRole){
   fetch:async function(endpoint,options){
    const action=options&&options.method==='POST'?JSON.parse(options.body).action:new URL(endpoint).searchParams.get('action');
    let data={ok:true};
-   if(action==='getSessionMeta')data={ok:true,adminRole};
+   if(action==='getSessionMeta')data={ok:true,adminRole:activeRole};
    if(action==='hrGetOrgOptions')data={ok:true,config:JSON.parse(JSON.stringify(persisted))};
    if(action==='saveConfig'){
     if(failNextWrite){failNextWrite=false;data={ok:false,error:'測試雲端寫入失敗'};}
@@ -116,6 +116,12 @@ async function simulate(adminRole){
  assert.equal(local.get('port79_theme'),'light');
  assert.equal(local.get('port79_year_mode'),'gregorian');
  assert.match(field('status').textContent,/讀回確認/);
+ // Role revoked while settings page is open: the next cloud save must be denied.
+ activeRole='admin';field('desktopDownloadEnabled').checked=true;
+ await field('save').listeners.click();
+ assert.equal(writes,2,'A demoted session must never change the cloud download switch');
+ assert.equal(persisted.p79SystemSettingsV1.windowsDownload.enabled,false);
+ assert.match(field('status').textContent,/超級管理員身分已失效/);
 }
 
 (async function(){
