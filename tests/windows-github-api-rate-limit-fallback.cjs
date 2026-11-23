@@ -30,8 +30,9 @@ assert.match(siteUpdater,/SaveManifest\(pending,new Manifest \{files=changed,bas
 // The native shell uses non-API metadata from an official release asset.
 // A download still requires the pinned GitHub asset URL, size and SHA-256.
 assert.match(windowsUpdater,/releases\/latest\/download\/port79-windows-update\.json/);
-assert(windowsUpdater.indexOf('GetStringAsync(PublishedRelease')<
- windowsUpdater.indexOf('GetStringAsync(\n      Api+'));
+const publicIndex=windowsUpdater.search(/GetStringAsync\(PublishedRelease/);
+const legacyIndex=windowsUpdater.search(/GetStringAsync\(\s*Api\+/);
+assert(publicIndex>=0&&legacyIndex>publicIndex,'Public release metadata must be read before API fallback');
 assert.match(windowsUpdater,/release\.source_commit\.Substring\(0,12\)/);
 assert.match(windowsUpdater,/asset\.browser_download_url!=url/);
 assert.match(windowsUpdater,/Sha256\(bytes\)!=digest/);
