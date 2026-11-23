@@ -46,18 +46,38 @@ const layoutStart=src.indexOf('function simplifyMonthlyRestLayout(');
 const layoutEnd=src.indexOf('async function open(settings={})',layoutStart);
 assert(layoutStart>=0&&layoutEnd>layoutStart,'simple monthly rest layout is registered');
 const layout=src.slice(layoutStart,layoutEnd);
-for(const id of ['mrSimpleGuide','mrMoreFilters','mrReadySection','mrAutoDetails',
+for(const id of ['mrSimpleIntro','mrSimpleOverview','mrSimpleReadyCount','mrSimplePendingCount',
+ 'mrReadySection','mrSimpleEmpty','mrPendingDetails','mrSummaryDetails','mrAutoDetails',
  'mrAdvancedPlanning','mrExistingDetails','mrSourceDetails'])
- assert(layout.includes(id),'simple summary/advanced section exists: '+id);
+ assert(layout.includes(id),'simple official workflow section exists: '+id);
+assert(layout.includes("filters.classList.add('mr-simple-filters')"),
+ 'month/department/role/person filters remain visible on the main screen');
+assert(!layout.includes('mrMoreFilters'),
+ 'do not hide common filters behind a second click');
 for(const id of ['mrMonth','mrDept','mrJob','mrEmp','mrPlanningModes',
  'mrNeedSection','mrPlannedSection','mrExistingSection','mrRows',
  'mrAutoSupplementRows','mrSave','mrLoad'])
  assert(src.includes(id),'unchanged monthly source and action retained: '+id);
 assert(layout.includes("advanced.open=settings.autoPlan===true"),
  'explicit auto-planning entry remains expanded');
+assert(layout.includes("pending.open=settings.autoPlan===true"),
+ 'an explicit auto-planning request opens relevant people to review');
+assert(layout.includes("readyTitle.textContent='已完成出勤・尚未申報'"),
+ 'ready-to-report list is primary on first view');
+assert(layout.includes("summary.after(ready)"),
+ 'eligible verified attendance list precedes all auxiliary details');
+assert(layout.includes("previous.after(advanced)"),
+ 'advanced planning and weekly audits are collapsed behind summary');
+assert.match(src,/q\('#mrSimpleReadyCount'\)\.textContent=unverifiedSource\?'待核對':candidateCount\+' 筆'/,
+ 'no candidate claims from incomplete attendance data');
+assert.match(src,/q\('#mrSimplePendingCount'\)\.textContent=unverifiedSource\?'待核對':supplementTotal\('pending'\)\+' 筆'/,
+ 'pending attendance counts use verified data');
+assert.match(src,/q\('#mrResult'\)\.textContent=lastFailure\?/,
+ 'footer errors remain available even though default status is shortened');
+
 assert(layout.includes("el.querySelector('#mrRows')?.closest('.scroll')"),
  'verified submit candidates are promoted to first action area');
-assert(layout.includes("autoDetails.id='mrAutoDetails'"),
+assert(layout.includes("mk('details','mrAutoDetails'"),
  'nine-column employee detail must be optional');
 assert(!/(?:saveReport|updateSchedule|postToCloud|fetch\(|localStorage\.|sessionStorage\.)/.test(layout),
  'simplifying the layout must not submit or alter cloud/local data');
