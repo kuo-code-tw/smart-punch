@@ -718,6 +718,8 @@ function simplifyMonthlyRestLayout(el,settings={}){
   const part=el.querySelector(selector);
   if(part)advanced.appendChild(part);
  }
+ const weekly=el.querySelector('#mrWeeklyDetails');
+ if(weekly)weekly.open=false;
  advanced.open=settings.autoPlan===true;
  auto.after(advanced);
 
