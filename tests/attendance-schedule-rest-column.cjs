@@ -1,60 +1,82 @@
 'use strict';
 const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const page=fs.readFileSync('attendance/index.html','utf8');
-const a=page.indexOf('        function p79AttendanceOfficialRestCategory(');
-const b=page.indexOf('        function p79AttendanceRosterGroup(',a);
-assert(a>=0&&b>a,'new official day classification helper is present');
-assert.match(page,/>排班例／休／國<\/th>/,'requested column header replaces old note/location label');
-assert(!page.includes('>備註/地點</th>'),'obsolete location column header removed');
-const start=page.indexOf('<td data-p79-schedule-rest');
-assert(start>0,'verified roster label is rendered in the old location cell');
-const cell=page.slice(start,page.indexOf('</td>',start)+5);
-assert(cell.includes('${rosterRestHtml}'),'cell uses roster-only presenter');
-assert(!/locationText|noteText|formatAttendanceLocationDisplay/.test(cell),'neither locations nor old notes appear in the new column');
-assert.equal((page.match(/id="adminRecordsTableBody"/g)||[]).length,1,'original attendance grid body remains');
-for(const token of [
- 'data-p79-att-no','data-p79-in-id','data-p79-out-id','data-p79-in-time','data-p79-out-time',
- 'onclick="p79OpenAdminAttendanceOvertime(${rowIndex})"','openRowManualAdd(',
- 'deleteDailyAttendance(', 'formatEditableAttendanceTimeCell(',
- 'recordStatusFilter','recordDeptFilter','recordJobTitleFilter','recordNameFilter'
-])assert(page.includes(token),'no original attendance data or actions deleted: '+token);
+const allocation=fs.readFileSync('assets/port79-rest-allocation.js','utf8');
+const start=page.indexOf('        function p79AttendanceOfficialRestCategory(');
+const end=page.indexOf('        function p79AttendanceRosterGroup(',start);
+assert(start>=0&&end>start,'monthly schedule summary must be present');
+assert.match(page,/>排班月統計（例／休／國／選）<\/th>/);
+assert.match(page,/data-p79-rest-month/,'render exact month of official roster');
+assert.match(page,/rosterRest\.counts\[kind\]\[0\]\+'\/'\+rosterRest\.counts\[kind\]\[1\]/,'show allocated/remaining');
+assert.match(page,/data-rest-category="選"/,'show election when an event exists');
+const cellStart=page.indexOf('<td data-p79-schedule-rest');
+assert(cellStart>0);
+const cell=page.slice(cellStart,page.indexOf('</td>',cellStart)+5);
+assert(!/locationText|noteText|formatAttendanceLocationDisplay/.test(cell),'no location or notes in replacement display');
+assert.match(page,/p79AttendanceOfficialRestCategory\(row,displayEmp,overtimeView\)/);
+assert.match(page,/restSummary:new Map\(\)/,'per-render cache keyed by month and employee');
+for(const item of ['data-p79-att-no','data-p79-in-id','data-p79-out-id',
+'data-p79-in-time','data-p79-out-time','p79OpenAdminAttendanceOvertime','deleteDailyAttendance(',
+'recordStatusFilter','recordDeptFilter','recordJobTitleFilter','recordNameFilter'])
+ assert(page.includes(item),'original attendance action remains: '+item);
 const states=new Map(),loaded=[];
 const ctx={
  p79AttendanceOvertimeDate:r=>r.dateKey,
- p79AttendanceLoadViewMonth:(month)=>loaded.push(month),
+ p79AttendanceLoadViewMonth:month=>loaded.push(month),
  p79AttendanceOvertimeMonths:states,
- p79AttendanceRosterRows:(state,id)=>state.rows.filter(r=>String(r.empId).toUpperCase()===id),
- getAttendanceEmployeeMasterToken:()=> 'session-1'
+ p79AttendanceRosterRows:(s,id)=>s.rows.filter(r=>String(r.empId).toUpperCase()===id),
+ getAttendanceEmployeeMasterToken:()=> 'session-1',
+ window:{
+   P79SpecialOvertime:{electionDates:()=>['2026-11-28']},
+   P79OfficialCalendar:{get:()=>null}
+ },
+ Date,Set,Map,JSON,Math,Object,Array,Number,String,RegExp
 };
 vm.createContext(ctx);
-vm.runInContext(page.slice(a,b),ctx);
-function state(rows,{ready=true,token='session-1',pending=false}={}) {
- states.set('2026-11',{ready,pending,token,rows});
-}
-const emp={empId:'E1'},row={empId:'BAD-ID-DO-NOT-USE',dateKey:'2026-11-23',noteText:'原始備註不可修改',locationText:'79號碼頭'};
-const result=()=>ctx.p79AttendanceOfficialRestCategory(row,emp,{token:'session-1'});
-for(const [raw,expected] of [['例','例'],['休','休'],['國','國'],['例假','例'],['休息日','休'],['國定假日','國'],['休08-16','休']]){
- state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':raw}}]);
- const actual=result();
- assert.equal(actual.state,'rest',raw+' is only a schedule classification');
- assert.equal(actual.label,expected,raw+' source label');
-}
-state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'休',__meta:{'2026-11-23':{restCategory:'國'}}}}]);
-assert.equal(result().label,'國','specific official rest quota overrides generic 休 marker');
-state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'早',__meta:{'2026-11-23':{restCategory:'國'}}}}]);
-assert.equal(result().state,'normal','workday is not converted to a holiday by metadata alone');
-state([{empId:'E2',month:'2026-11',schedule:{'2026-11-23':'例'}}]);
-assert.equal(result().state,'missing','never borrow another employee schedule');
-state([{empId:'E1',month:'2026-10',schedule:{'2026-11-23':'例'}}]);
-assert.equal(result().state,'missing','never borrow another month schedule');
-state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'例'}}],{ready:false,pending:true});
-assert.equal(result().state,'loading','uncertain load is not a confirmed rest day');
-state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'國'}}],{token:'different-login'});
-assert.equal(result().state,'missing','cached schedule from another session is not shown');
-state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'例'}},{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'國'}}]);
-assert.equal(result().state,'conflict','inconsistent official records require review');
-assert.equal(ctx.p79AttendanceOfficialRestCategory(row,null,{token:'session-1'}).state,'missing','never trust a stale row empId for identity');
-assert.equal(row.noteText,'原始備註不可修改','notes untouched in original records');
-assert.equal(row.locationText,'79號碼頭','location source remains intact despite hidden column');
-assert(loaded.every(month=>month==='2026-11'),'only same official schedule month read');
-console.log('PASS attendance 例休國 display: roster-only, staff/date identity, no location display, original attendance data preserved');
+vm.runInContext(allocation,ctx);
+vm.runInContext(page.slice(start,end),ctx);
+const view=()=>({token:'session-1',restSummary:new Map()});
+const emp={empId:'E1'};
+const row={dateKey:'2026-11-23',noteText:'備註原樣保留',locationText:'原始地點'};
+const month='2026-11';
+const full=()=>{
+ const schedule={};
+ for(let n=1;n<=30;n++){
+  const date=month+'-'+String(n).padStart(2,'0');
+  const day=new Date(Date.UTC(2026,10,n)).getUTCDay();
+  schedule[date]=day===0?'例':day===6?'休':'早';
+ }
+ return schedule;
+};
+const state=(rows,{token='session-1',ready=true,pending=false}={})=>
+ states.set(month,{token,ready,pending,rows,people:[{empId:'E1'}]});
+const result=v=>ctx.p79AttendanceOfficialRestCategory(row,emp,v||view());
+state([{empId:'E1',month,schedule:full()}]);
+let actual=result();
+assert.equal(actual.state,'ready','complete official month loaded');
+assert.deepEqual(Array.from(actual.counts.例),[5,0],'例 5/0 from 5 Sundays');
+assert.deepEqual(Array.from(actual.counts.休),[4,0],'休 4/0 from 4 Saturdays');
+assert.deepEqual(Array.from(actual.counts.國),[0,0],'國 0/0 when monthly quota zero');
+assert.equal(actual.election,1,'選 1 from known election day');
+const changed=full();
+changed['2026-11-01']='早';
+state([{empId:'E1',month,schedule:changed}]);
+actual=result();
+assert.deepEqual(Array.from(actual.counts.例),[5,0],'shared allocator reassigns flexible rest day to missing 例 quota');
+assert.deepEqual(Array.from(actual.counts.休),[3,1],'one fewer total off-day leaves one 休 quota unfilled');
+const other=full();
+state([{empId:'E2',month,schedule:other}]);
+assert.equal(result().state,'missing','never use another employee schedule');
+const incomplete=full();delete incomplete['2026-11-30'];
+state([{empId:'E1',month,schedule:incomplete}]);
+assert.equal(result().state,'missing','incomplete month never produces false counts');
+state([{empId:'E1',month,schedule:full()}],{token:'different-login'});
+assert.equal(result().state,'missing','reject another login cache');
+state([{empId:'E1',month,schedule:full()}],{ready:false,pending:true});
+assert.equal(result().state,'loading','read-in-progress shows loading');
+state([{empId:'E1',month,schedule:full()},{empId:'E1',month,schedule:changed}]);
+assert.equal(result().state,'conflict','contradictory duplicate employee rows blocked');
+assert.equal(row.noteText,'備註原樣保留');
+assert.equal(row.locationText,'原始地點');
+assert(loaded.every(x=>x===month),'requests exact attendance accounting month only');
+console.log('PASS verified official monthly 例5/0 休4/0 國0/0 選1 counters, user/month isolation, read-only data');
