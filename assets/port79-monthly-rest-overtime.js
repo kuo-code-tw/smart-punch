@@ -671,108 +671,142 @@ function auditText(model,empId){
 function styles(){if(document.getElementById('p79MonthlyRestStyle'))return;const el=document.createElement('style');el.id='p79MonthlyRestStyle';el.textContent=`#p79MonthlyRest{width:min(1080px,calc(100vw - 24px));max-height:90dvh;padding:0;border:0;border-radius:14px;color:#0f172a;background:#fff;box-shadow:0 20px 80px #0005;font:14px sans-serif}#p79MonthlyRest::backdrop{background:#0f172a88}#p79MonthlyRest header,#p79MonthlyRest footer{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;background:#f1f5f9}#p79MonthlyRest footer{flex-wrap:wrap}#p79MonthlyRest #mrResult{flex:1;min-width:150px;font-weight:700;color:#0369a1}#p79MonthlyRest .body{padding:12px 16px;overflow:auto;max-height:calc(90dvh - 120px)}#p79MonthlyRest .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:end}#p79MonthlyRest label{display:flex;flex-direction:column;gap:4px;font-size:12px}#p79MonthlyRest input,#p79MonthlyRest select{border:1px solid #cbd5e1;padding:6px;border-radius:7px;background:white;color:#0f172a;max-width:100%}#p79MonthlyRest button{padding:7px 12px;border:0;border-radius:8px;background:#e2e8f0;color:#0f172a;cursor:pointer}#p79MonthlyRest button.primary{background:#0369a1;color:white}#p79MonthlyRest button:disabled{opacity:.5;cursor:wait}#p79MonthlyRest table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:12px}#p79MonthlyRest th,#p79MonthlyRest td{padding:7px 5px;border-bottom:1px solid #e2e8f0;text-align:center}#p79MonthlyRest .scroll{overflow:auto;margin-top:10px}#p79MonthlyRest .國{background:#fef3c7;color:#92400e}#p79MonthlyRest .休{background:#dbeafe;color:#1e40af}#p79MonthlyRest .例{background:#fee2e2;color:#991b1b}#p79MonthlyRest td.person{white-space:nowrap;min-width:170px}#p79MonthlyRest .person-progress{display:inline-block;padding:0;background:transparent;font-size:12px;color:#0369a1;white-space:nowrap}#p79MonthlyRest #mrPlanningModes{position:sticky;top:0;z-index:3;background:#eef2ff!important}#p79MonthlyRest #mrPlanningModes label{flex-direction:row;align-items:center;font-weight:700;cursor:pointer}#p79MonthlyRest input[type=checkbox]{appearance:auto!important;pointer-events:auto!important;width:24px!important;height:24px!important;min-height:24px!important;cursor:pointer;accent-color:#0369a1}#p79MonthlyRest #mrStatus{white-space:pre-line;line-height:1.6;margin:10px 0;color:#475569}#p79MonthlyRest .mr-compact-stats{margin:10px 0;padding:11px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#334155;font-size:13px;font-weight:700;line-height:1.7}#p79MonthlyRest .filters{gap:10px}#p79MonthlyRest #mrPlanningModes{gap:14px!important;flex-wrap:wrap}#p79MonthlyRest #mrPlannedSection>.scroll{margin-top:4px}`;document.head.appendChild(el);}
 // Visual-only simplification. Preserve every existing ID, input, source,
 // handler, approval restriction and save guard. This is NOT auto-submission.
+// Presentation-only layout: all existing source IDs, handlers, formal
+// verification gates and cloud readback are retained verbatim.
 function simplifyMonthlyRestLayout(el,settings={}){
- const body=el.querySelector('.body'),base=el.querySelector('.filters');
- if(!body||!base||el.querySelector('#mrSimpleGuide'))return;
- const guide=document.createElement('div');
- guide.id='mrSimpleGuide';guide.className='mr-simple-guide';
- guide.innerHTML='<strong>每月未休假加班：三步完成核對</strong><span>① 選月份、讀取資料　→　② 核對可申報出勤　→　③ 勾選後確認申報</span><small>自動核對及預排不等於正式申報；必須有真實出勤與雲端申報確認。</small>';
- body.insertBefore(guide,base);
-
- const filters=document.createElement('details');
- filters.id='mrMoreFilters';filters.className='mr-simple-details';
- filters.innerHTML='<summary>更多篩選：部門／職稱／人員</summary>';
- const filterFields=document.createElement('div');filterFields.className='filters mr-simple-more-filters';
- for(const id of ['mrDept','mrJob','mrEmp']){
-  const field=el.querySelector('#'+id)?.closest('label');
-  if(field)filterFields.appendChild(field);
+ const body=el.querySelector('.body'),filters=el.querySelector('.filters');
+ if(!body||!filters||el.querySelector('#mrSimpleOverview'))return;
+ const mk=(tag,id,summary)=>{
+  const node=document.createElement(tag);
+  node.id=id;node.className='mr-simple-panel';
+  if(summary)node.innerHTML='<summary>'+summary+'</summary>';
+  return node;
+ };
+ const intro=mk('div','mrSimpleIntro');
+ intro.textContent='選月份及人員 → 查詢 → 勾選已核實出勤 → 確認申報';
+ body.insertBefore(intro,filters);
+ // Keep every filter visible; changing department/job/person remains a local
+ // filter, and the official secure month query is still the original #mrLoad.
+ const load=el.querySelector('#mrLoad');
+ if(load)load.textContent='查詢未休假加班';
+ const prior=el.querySelector('#mrPrior');
+ const month=el.querySelector('#mrMonth');
+ if(month)month.closest('label')?.classList.add('mr-month-filter');
+ filters.classList.add('mr-simple-filters');
+ const status=el.querySelector('#mrStatus');
+ if(status)filters.after(status);
+ const summary=mk('section','mrSimpleOverview');
+ summary.innerHTML='<div><span id="mrSimpleReadyLabel">本月可申報</span><strong id="mrSimpleReadyCount">—</strong></div>'+
+  '<div><span>申報出勤待核</span><strong id="mrSimplePendingCount">—</strong></div>'+
+  '<small id="mrSimpleGateHint" role="status">正在讀取正式班表與出勤來源</small>';
+ if(status)status.after(summary);else filters.after(summary);
+ const ready=mk('section','mrReadySection');
+ const readyTable=el.querySelector('#mrRows')?.closest('.scroll');
+ const readyTitle=readyTable?.previousElementSibling;
+ if(readyTitle?.tagName==='B'){
+  readyTitle.textContent='已完成出勤・尚未申報';
+  ready.appendChild(readyTitle);
  }
- filters.appendChild(filterFields);
- base.after(filters);
+ if(readyTable)ready.appendChild(readyTable);
+ const empty=mk('p','mrSimpleEmpty');
+ empty.textContent='查詢完成後，這裡會列出可核對的加班申報項目。';
+ ready.appendChild(empty);
+ summary.after(ready);
 
- // Make the verified attendance list the first main action after the
- // official summary. The checked rows and save action retain their IDs.
- const readyBody=el.querySelector('#mrRows')?.closest('.scroll');
- const readyTitle=readyBody?.previousElementSibling;
- const ready=document.createElement('section');ready.id='mrReadySection';
- if(readyTitle?.tagName==='B')ready.appendChild(readyTitle);
- if(readyBody)ready.appendChild(readyBody);
- const summary=el.querySelector('#mrCompactStats');
- if(summary)summary.after(ready);
+ const pending=mk('details','mrPendingDetails','查看待核對人員與原因');
+ const need=el.querySelector('#mrNeedSection');
+ if(need)pending.appendChild(need);
+ ready.after(pending);
 
+ const all=mk('details','mrSummaryDetails','查看全員未休假統計');
  const auto=el.querySelector('#mrAutomaticSupplement');
- const autoDetails=document.createElement('details');
- autoDetails.id='mrAutoDetails';autoDetails.className='mr-simple-details';
- autoDetails.innerHTML='<summary>查看每位員工自動核對明細</summary>';
- for(const item of [...auto.querySelectorAll(':scope > .scroll, :scope > small')])
-  autoDetails.appendChild(item);
- auto.appendChild(autoDetails);
- // Stay on the actual figures by default, not the 9-column diagnostic grid.
- const autoTitle=auto.querySelector('b');
- if(autoTitle)autoTitle.textContent='未休假核對摘要（全員）';
+ if(auto){
+  const title=auto.querySelector('b');
+  if(title)title.textContent='全員核對統計（非正式申報）';
+  all.appendChild(auto);
+  const grid=mk('details','mrAutoDetails','查看逐人九欄明細');
+  for(const item of [...auto.querySelectorAll(':scope > .scroll, :scope > small')])grid.appendChild(item);
+  auto.appendChild(grid);
+ }
+ pending.after(all);
 
- const advanced=document.createElement('details');
- advanced.id='mrAdvancedPlanning';advanced.className='mr-simple-details';
- advanced.innerHTML='<summary>進階：預排、逐週核對及待處理人員</summary>';
- for(const selector of ['#mrPlanningModes','#mrNeedSection','#mrPlannedSection','#mrWeeklyDetails']){
+ const previous=mk('details','mrExistingDetails','查看本月已申報紀錄');
+ const existing=el.querySelector('#mrExistingSection');
+ if(existing)previous.appendChild(existing);
+ all.after(previous);
+
+ const advanced=mk('details','mrAdvancedPlanning','進階：新增預排與逐週核對');
+ const planning=el.querySelector('#mrPlanningModes');
+ if(planning)advanced.appendChild(planning);
+ if(prior){
+  const priorWrap=mk('div','mrPriorWrap');
+  priorWrap.classList.add('filters');
+  priorWrap.appendChild(prior);
+  advanced.appendChild(priorWrap);
+ }
+ for(const selector of ['#mrPlannedSection','#mrWeeklyDetails']){
   const part=el.querySelector(selector);
   if(part)advanced.appendChild(part);
  }
  const weekly=el.querySelector('#mrWeeklyDetails');
  if(weekly)weekly.open=false;
  advanced.open=settings.autoPlan===true;
- auto.after(advanced);
+ pending.open=settings.autoPlan===true;
+ previous.after(advanced);
 
- const existing=el.querySelector('#mrExistingSection');
- if(existing){
-  const previous=document.createElement('details');
-  previous.id='mrExistingDetails';previous.className='mr-simple-details';
-  previous.innerHTML='<summary>查看本月已申報紀錄（唯讀）</summary>';
-  existing.before(previous);previous.appendChild(existing);
-  advanced.after(previous);
- }
- const status=el.querySelector('#mrStatus');
- if(status&&ready)summary?.before(status);
- // These are read-only source and audit explanations, not first-step actions.
- const diagnostics=document.createElement('details');
- diagnostics.id='mrSourceDetails';diagnostics.className='mr-simple-details';
- diagnostics.innerHTML='<summary>核對依據與資料來源說明</summary>';
- for(const selector of ['#mrBackfill','#mrPhase','#mrAuditSummary']){
-  const element=el.querySelector(selector);
-  if(element){diagnostics.appendChild(element);element.hidden=false;}
+ const diagnostics=mk('details','mrSourceDetails','核對依據與資料來源說明');
+ for(const selector of ['#mrBackfill','#mrPhase','#mrAuditSummary','#mrCompactStats']){
+  const node=el.querySelector(selector);
+  if(node){diagnostics.appendChild(node);node.hidden=false;}
  }
  const audit=el.querySelector('#mrAuditDetails')?.closest('details');
  if(audit){diagnostics.appendChild(audit);audit.hidden=false;}
- if(ready)ready.after(diagnostics);
- const style=document.createElement('style');style.id='mrSimpleLayoutStyle';
- style.textContent=`#p79MonthlyRest{width:min(1180px,calc(100vw - 20px));border-radius:16px}
- #p79MonthlyRest .body{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
- #p79MonthlyRest .body>.filters{margin:0!important;align-items:flex-end}
- #p79MonthlyRest .mr-simple-guide{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:11px 14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;color:#1d4ed8}
- #p79MonthlyRest .mr-simple-guide strong{font-size:15px;flex-basis:100%;color:#1e3a8a}
- #p79MonthlyRest .mr-simple-guide span{font-size:13px;font-weight:700}
- #p79MonthlyRest .mr-simple-guide small{font-size:11px;color:#475569;flex-basis:100%}
- #p79MonthlyRest .mr-simple-details{border:1px solid #d9e3ef;border-radius:12px;background:#fff;overflow:hidden}
- #p79MonthlyRest .mr-simple-details>summary{padding:12px 14px;font-size:13px;font-weight:800;color:#19416f;cursor:pointer;list-style:revert}
- #p79MonthlyRest .mr-simple-details[open]>summary{background:#eef6ff;border-bottom:1px solid #dce8f5}
- #p79MonthlyRest .mr-simple-details>.filters{padding:12px!important;background:#fff}
- #p79MonthlyRest #mrReadySection{border:1px solid #d9e3ef;background:#fff;border-radius:12px;padding:13px 14px}
- #p79MonthlyRest #mrReadySection>b{display:block;font-size:15px;margin:0 0 9px;color:#193d68}
- #p79MonthlyRest #mrReadySection .scroll{max-height:300px;overflow:auto}
- #p79MonthlyRest #mrAutomaticSupplement{margin:0!important;background:#f8fbff;border-color:#d9e3ef!important}
- #p79MonthlyRest #mrAutoSupplementSummary{line-height:1.8;color:#274668!important}
- #p79MonthlyRest #mrAutoDetails{margin-top:8px}
- #p79MonthlyRest #mrAutoDetails>.scroll,#p79MonthlyRest #mrAutoDetails>small{margin:10px;display:block}
- #p79MonthlyRest .p79-ot-ux-dialog-tabs{display:none!important} /* redundant sub-tabs: the dialog has a title and Close */
- #p79MonthlyRest #mrAdvancedPlanning>#mrPlanningModes{margin:10px!important}
- #p79MonthlyRest #mrAdvancedPlanning>#mrNeedSection,#p79MonthlyRest #mrAdvancedPlanning>#mrPlannedSection,#p79MonthlyRest #mrAdvancedPlanning>#mrWeeklyDetails{margin:10px!important}
- #p79MonthlyRest #mrExistingDetails #mrExistingSection{margin:10px!important}
- #p79MonthlyRest #mrStatus{border-radius:10px;background:#f1f5f9;padding:10px 12px;font-size:12px}
- #p79MonthlyRest footer{gap:10px}
- #p79MonthlyRest footer #mrSave{min-width:158px}
- @media(max-width:760px){#p79MonthlyRest .body{padding:10px}#p79MonthlyRest .mr-simple-guide{padding:10px}
- #p79MonthlyRest .body>.filters label{flex:1;min-width:130px}
- #p79MonthlyRest footer{align-items:stretch}#p79MonthlyRest footer #mrResult{flex-basis:100%}}`;
+ advanced.after(diagnostics);
+
+ // Keep the original single official #mrSave button in the footer.
+ // No local writes, no synthetic rows, no simulated approvals or submissions.
+ const style=document.createElement('style');
+ style.id='mrSimpleOfficialStyle';
+ style.textContent=`#p79MonthlyRest{width:min(1130px,calc(100vw - 18px));border-radius:14px}
+ #p79MonthlyRest .body{padding:16px;display:flex;flex-direction:column;gap:11px;overflow:auto}
+ #p79MonthlyRest #mrSimpleIntro{background:#eff6ff;border-left:4px solid #3b82f6;border-radius:8px;padding:10px 13px;color:#1e40af;font-weight:700;font-size:13px}
+ #p79MonthlyRest .mr-simple-filters{display:flex;flex-wrap:wrap;align-items:end;gap:9px;padding:0;margin:0!important}
+ #p79MonthlyRest .mr-simple-filters>label{flex:1 1 140px;min-width:140px;font-size:12px}
+ #p79MonthlyRest .mr-simple-filters>.mr-month-filter{flex:0 1 166px}
+ #p79MonthlyRest #mrLoad{background:#2563eb;color:white;min-height:37px;padding:7px 16px;border-radius:9px;white-space:nowrap}
+ #p79MonthlyRest #mrStatus{margin:0;background:#f8fafc;border-radius:8px;color:#475569;font-size:12px;padding:8px 11px;line-height:1.5}
+ #p79MonthlyRest #mrSimpleOverview{background:#f1f7ff;border:1px solid #d9e8f8;border-radius:11px;padding:12px 14px;display:flex;flex-wrap:wrap;align-items:center;gap:12px 28px}
+ #p79MonthlyRest #mrSimpleOverview>div{display:flex;gap:10px;align-items:center;white-space:nowrap}
+ #p79MonthlyRest #mrSimpleOverview span{font-weight:700;color:#334155;font-size:13px}
+ #p79MonthlyRest #mrSimpleOverview strong{font-size:22px;color:#1456a3;line-height:1}
+ #p79MonthlyRest #mrSimpleOverview small{flex-basis:100%;font-size:11px;color:#64748b}
+ #p79MonthlyRest #mrReadySection{border:1px solid #d9e3ef;border-radius:12px;padding:13px;background:white;min-height:120px}
+ #p79MonthlyRest #mrReadySection>b{display:block;margin-bottom:11px;font-size:15px;color:#183b67}
+ #p79MonthlyRest #mrReadySection>.scroll{max-height:48vh;overflow:auto}
+ #p79MonthlyRest #mrReadySection .scroll table{min-width:710px}
+ #p79MonthlyRest #mrReadySection table thead{background:#eaf3fd}
+ #p79MonthlyRest #mrReadySection table td,#p79MonthlyRest #mrReadySection table th{padding:9px 7px}
+ #p79MonthlyRest #mrSimpleEmpty{font-size:12px;color:#64748b;margin:9px 0 0}
+ #p79MonthlyRest .mr-simple-panel{min-width:0}
+ #p79MonthlyRest details.mr-simple-panel{background:#fff;border:1px solid #dce5f0;border-radius:10px;overflow:hidden}
+ #p79MonthlyRest details.mr-simple-panel>summary{cursor:pointer;font-weight:700;color:#234b75;padding:11px 14px;font-size:13px}
+ #p79MonthlyRest details.mr-simple-panel[open]>summary{background:#edf5fd;border-bottom:1px solid #dce5f0}
+ #p79MonthlyRest details.mr-simple-panel>:not(summary){margin:10px}
+ #p79MonthlyRest #mrAutoDetails{border:1px solid #dbe4ee;border-radius:8px}
+ #p79MonthlyRest #mrAutoDetails>summary{padding:9px 10px}
+ #p79MonthlyRest #mrAutoDetails>.scroll{max-height:300px;overflow:auto}
+ #p79MonthlyRest #mrAdvancedPlanning>#mrPlanningModes{padding:9px!important;margin:10px!important}
+ #p79MonthlyRest #mrAdvancedPlanning>#mrPriorWrap{display:flex}
+ #p79MonthlyRest #mrExistingDetails #mrExistingSection{border:0!important;padding:0!important}
+ #p79MonthlyRest .p79-ot-ux-dialog-tabs{display:none!important}
+ #p79MonthlyRest footer{position:sticky;bottom:0;z-index:2;gap:10px}
+ #p79MonthlyRest footer #mrResult{flex:1;white-space:normal;font-size:12px;line-height:1.4}
+ #p79MonthlyRest footer #mrSave{min-width:160px}
+ @media(max-width:800px){#p79MonthlyRest .body{padding:10px}
+ #p79MonthlyRest .mr-simple-filters>label{flex:1 1 44%}
+ #p79MonthlyRest #mrLoad{flex:1 1 100%}
+ #p79MonthlyRest #mrSimpleOverview>div{flex:1 1 100%}
+ #p79MonthlyRest footer #mrResult{flex-basis:100%}}`;
  el.appendChild(style);
 }
 async function open(settings={}){
@@ -896,6 +930,19 @@ async function open(settings={}){
    const weeks=weeklyReviewSummary(snapshot,chosenPeople(),loadedMonth,model.plannedRows);
    q('#mrWeeklyRows').innerHTML=weeks.map(w=>'<tr><td>'+esc(w.start)+'～'+esc(w.end)+(w.confirmed?'':'（參考）')+'</td><td>'+w.people.size+'</td><td>'+w.regular+'</td><td>'+w.rest+'</td><td>'+w.holiday+'</td><td>'+w.planned+'</td><td>'+(w.missing?w.missing+' 人需核對':'—')+'</td></tr>').join('')||'<tr><td colspan="7">目前無可核對的週期資料</td></tr>';
    q('#mrCompactStats').textContent='月份：'+loadedMonth+'　｜　已核對：'+audit.checked+' 人　｜　預排建議：'+visiblePlannedRows().length+' 筆　｜　正式可申報：'+audit.verified+' 筆';
+   // Simple overview comes from the SAME verified model and HR/attendance
+   // snapshot as the official original table. It does not make reports.
+   const candidateCount=pendingRows.length;
+   const verifiedReady=!unverifiedSource&&phase.canSubmit===true;
+   q('#mrSimpleReadyCount').textContent=unverifiedSource?'待核對':candidateCount+' 筆';
+   q('#mrSimpleReadyLabel').textContent=verifiedReady?'本月可申報':'待申報候選';
+   q('#mrSimplePendingCount').textContent=unverifiedSource?'待核對':supplementTotal('pending')+' 筆';
+   q('#mrSimpleGateHint').textContent=unverifiedSource
+    ?'正式來源未完整核對，暫不能申報'
+    :phase.canSubmit?'僅可勾選已核實出勤；送出後須以雲端申報編號核對'
+    :'尚未開放正式申報；可查看候選與待核原因，不能直接送出';
+   q('#mrSimpleEmpty').hidden=pendingRows.length>0;
+
    q('#mrAuditSummary').textContent='已核 '+audit.checked+' 人／無缺額 '+audit.complete+' 人｜待核對額度：例'+audit.shortage.例+'／休'+audit.shortage.休+'／國'+audit.shortage.國+'｜正式可申報 '+audit.verified+' 筆｜預排由你自行建立｜目前篩選 '+chosenPeople().length+' 人、'+visibleRows().length+' 筆（切換職稱不須重新讀取）';
    q('#mrAuditDetails').textContent=[...audit.people,...new Set([...audit.blocked,...(model.issues||[])])].join('\n')||'本次核對沒有未補額度或衝突。';
     const upcoming=visiblePlannedRows();
@@ -957,7 +1004,10 @@ async function open(settings={}){
    q('#mrSave').textContent=autoHistoricalReady()?'一次核對並申報（'+sum('selected')+' 筆已核實出勤）':autoPlan?'儲存勾選預排（'+selectedPlans.length+' 筆）':
    manualPeople.size?'設定勾選預排（'+manualPeople.size+' 人）':
    phase.canSubmit?'申報勾選項目（'+sum('selected')+' 天）':'25日起可核對正式申報';
-  q('#mrResult').textContent=autoHistoricalReady()?'自動核實候選 '+model.rows.length+' 筆／已選 '+sum('selected')+' 筆，僅申報並完成雲端讀回才算補登成功':autoPlan?'預排已儲存 '+model.plannedRows.filter(r=>r.saved).length+' 筆／已勾選 '+selectedPlans.length+' 筆（未正式申報）':'已核對成功 '+model.rows.filter(r=>r.saved).length+' 筆／待核對 '+model.rows.filter(r=>r.attempted&&!r.saved).length+' 筆／待申報 '+model.rows.filter(r=>!r.saved&&!r.attempted).length+' 筆'+(lastFailure?'｜停止原因：'+lastFailure:'');
+  q('#mrResult').textContent=lastFailure?'操作未完成：'+lastFailure:
+   autoHistoricalReady()?'已選 '+sum('selected')+' 筆核實出勤；須雲端回讀確認':
+   autoPlan?'已選預排 '+selectedPlans.length+' 筆（非正式申報）':
+   '已勾選 '+sum('selected')+' 筆；請確認日期與時段後送出';
   q('#mrRows').innerHTML=visibleRows().map(({r,i})=>r.saved?'':'<tr data-row="'+i+'"><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved||r.planned||!model.workflow.canSubmit?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+loadedMonth+'-01'+'" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td class="person">'+esc(r.name)+' <button type="button" class="person-progress" data-audit="'+esc(r.empId)+'" title="查看此人逐日額度核對">'+esc(personLabels.get(id(r.empId)))+'</button></td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c&&fullDayRule(rule))).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category&&fullDayRule(rule)?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時'+'</td><td>'+esc(r.status)+'</td></tr>').join('');
   if(busy)q('#mrResult').textContent=q('#mrStatus').textContent;
   q('#mrSave').disabled=busy||isReadOnlySource()||(autoPlan&&!autoHistoricalReady()?!selectedPlans.length:
