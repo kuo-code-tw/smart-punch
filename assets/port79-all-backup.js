@@ -51,6 +51,19 @@ async function recoverReceipt(c,item){
  if(!same(c))throw Error('登入身分已變更，已停止核對');
  throw Error('暫時無法取得雲端確認，請重試此分類；已完成的備份會自動沿用');
 }
+// A Google Apps Script server error does not prove the backup failed: the
+// snapshot may already have been written before the response was lost.
+// Read the authenticated exact-request receipt before allowing a retry.
+async function recoverAmbiguousServerError(c,item,originalError){
+ if(!c.receiptLookup||!same(c))throw originalError;
+ let status;
+ try{status=await request(c,{action:'historyBackupReceipt',type:item.type,requestId:item.id},true);}
+ catch(e){if(!same(c))throw e;throw originalError;}
+ if(status?.state==='complete')return status.receipt;
+ if(status?.state==='running')return await recoverReceipt(c,item);
+ // A pending/failed status is not a completed, verified snapshot.
+ throw originalError;
+}
 async function backupWithRetry(c,item,payload){
  // Only an explicit pre-write lock refusal is safe to re-submit automatically.
  // A lost response is looked up instead, since the server may still be writing.
@@ -65,8 +78,10 @@ async function backupWithRetry(c,item,payload){
     continue;
    }
    if(e.serverError&&e.message==='備份檔已寫入但完成紀錄尚未取得，請稍後重試')e.receiptCheck=true;
-   if(!c.receiptLookup||!e.receiptCheck||!same(c))throw e;
-   return await recoverReceipt(c,item);
+   if(!c.receiptLookup||!same(c))throw e;
+   if(e.receiptCheck)return await recoverReceipt(c,item);
+   if(e.serverError)return await recoverAmbiguousServerError(c,item,e);
+   throw e;
   }
  }
 }
@@ -211,7 +226,7 @@ async function start(onlyId=null){
   for(const item of batch.items){if(item.result||(onlyId&&item.id!==onlyId))continue;if(!same(c))throw Error('登入身分已變更，已停止後續備份');item.error='';item.running=true;render();
    try{const payload={type:item.type,requestId:item.id};if(item.type==='yard')payload.yard=yard;if(item.original)payload.original={name:item.original.name,hash:item.original.hash,base64:base64(item.original.bytes)};
     let result;
-    if(item.resume&&c.receiptLookup){const prior=await request(c,{action:'historyBackupReceipt',type:item.type,requestId:item.id},true);if(prior.state==='complete')result=prior.receipt;else if(prior.state==='running')result=await recoverReceipt(c,item);}
+    if((item.resume||item.attempted)&&c.receiptLookup){const prior=await request(c,{action:'historyBackupReceipt',type:item.type,requestId:item.id},true);if(prior.state==='complete')result=prior.receipt;else if(prior.state==='running')result=await recoverReceipt(c,item);}
     if(!result){item.attempted=true;checkpoint(c);result=await backupWithRetry(c,item,payload);}if(result?.verified!==true||result.sourceUnchanged!==true||result.type!==item.type||result.requestId!==item.id||!result.backupId)throw Error('未取得此分類的完整備份確認');result.backupUrl=link(result.backupUrl);item.result=result;
     if(item.original){item.original.receipt={backupId:result.backupId,backupUrl:result.backupUrl};await put(item.original);}
     if(item.type==='yard'&&yard&&same(c)){try{g.localStorage.setItem('p79_yard_backup_receipt_v1_'+encodeURIComponent(c.actor),JSON.stringify({fingerprint,backupUrl:result.backupUrl,backupAt:result.backupAt,updatedAt:yard.updatedAt}));}catch(_){}}
