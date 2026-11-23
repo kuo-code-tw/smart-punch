@@ -18,10 +18,18 @@ namespace Port79Lite {
   // Resolve the immutable newest release. The mutable 2026-11-20 legacy tag
   // can be cached and must never decide which executable is current.
   const string Api="https://api.github.com/repos/kuo-code-tw/smart-punch/releases/latest";
+  // Public release asset redirects to the latest immutable tag without
+  // consuming the shared GitHub REST API hourly quota.
+  const string PublishedRelease="https://github.com/kuo-code-tw/smart-punch/releases/latest/download/port79-windows-update.json";
   const string ReleaseDownloadBase="https://github.com/kuo-code-tw/smart-punch/releases/download/";
   const long Limit=30L*1024*1024;
   public sealed class GitAsset {public string name {get;set;} public string browser_download_url {get;set;} public string digest {get;set;} public long size {get;set;} }
-  public sealed class GitRelease {public bool draft {get;set;} public string tag_name {get;set;} public GitAsset[] assets {get;set;} }
+  public sealed class GitRelease {
+   public bool draft {get;set;}
+   public string tag_name {get;set;}
+   public string source_commit {get;set;}
+   public GitAsset[] assets {get;set;}
+  }
   public sealed class Prepared {public string Zip {get;set;} public string Digest {get;set;} public string Helper {get;set;} }
   static readonly JavaScriptSerializer Json=new JavaScriptSerializer {MaxJsonLength=1000000};
   static bool HashValid(string text){return text?.Length==64&&text.All(x=>(x>='0'&&x<='9')||(x>='a'&&x<='f'));}
@@ -34,9 +42,28 @@ namespace Port79Lite {
    using(var client=new HttpClient {Timeout=TimeSpan.FromSeconds(60)}){
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Port79-WindowsLite-Updater/1.0");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-    // An uncached metadata request avoids stale release JSON after publishing.
-    var release=Json.Deserialize<GitRelease>(await client.GetStringAsync(
-     Api+"?checked="+DateTimeOffset.UtcNow.ToUnixTimeSeconds()).ConfigureAwait(true));
+    // First use the publicly published GitHub Release asset, not the
+    // rate-limited api.github.com endpoint. Only old releases that predate
+    // this manifest need the legacy API compatibility fallback.
+    GitRelease release=null;
+    try{
+     var json=await client.GetStringAsync(PublishedRelease+"?checked="+
+      DateTimeOffset.UtcNow.ToUnixTimeSeconds()).ConfigureAwait(true);
+     if(json.Length>10000)throw new InvalidDataException("Windows 正式更新清單長度異常");
+     release=Json.Deserialize<GitRelease>(json);
+     if(release==null||
+        !System.Text.RegularExpressions.Regex.IsMatch(release.source_commit??"",
+         "^[a-f0-9]{40}$")||
+        !String.Equals(release.source_commit.Substring(0,12),
+         (release.tag_name??"").Split('-').LastOrDefault(),StringComparison.Ordinal))
+      throw new InvalidDataException("Windows 正式更新清單版本校驗失敗");
+     log("已透過 GitHub 正式發行檔案取得更新資訊，不消耗 GitHub API 查詢額度");
+    }catch(HttpRequestException e){
+     log("新版發布清單暫無法連線，改採舊版 GitHub API 核對："+e.Message);
+     var json=await client.GetStringAsync(
+      Api+"?checked="+DateTimeOffset.UtcNow.ToUnixTimeSeconds()).ConfigureAwait(true);
+     release=Json.Deserialize<GitRelease>(json);
+    }
     if(release==null||release.draft||!System.Text.RegularExpressions.Regex.IsMatch(
      release.tag_name??"", @"^port79-windows-lite-[0-9]{8}-[a-f0-9]{12}$"))
      throw new InvalidDataException("未取得可驗證的79號碼頭電腦版正式更新資訊");
