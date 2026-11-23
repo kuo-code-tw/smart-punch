@@ -16,8 +16,10 @@ function Assert-Signed([string]$path) {
   if ($sig.Status -ne [System.Management.Automation.SignatureStatus]::Valid -or !$sig.SignerCertificate) {
     throw "Publisher signature not trusted for $path : $($sig.Status). Do not publish an unsigned app."
   }
-  $eku = $sig.SignerCertificate.EnhancedKeyUsageList | Where-Object { $_.ObjectId.Value -eq '1.3.6.1.5.5.7.3.3' }
-  if (!$eku) { throw "Certificate is not valid for code signing: $path" }
+  $ekuExtension = $sig.SignerCertificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.37' } | Select-Object -First 1
+  if (!$ekuExtension -or !($ekuExtension.EnhancedKeyUsages | Where-Object { $_.Value -eq '1.3.6.1.5.5.7.3.3' })) {
+    throw "Certificate is not valid for code signing: $path"
+  }
   return $sig.SignerCertificate.Subject
 }
 
