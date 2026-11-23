@@ -28,10 +28,19 @@ engine.shiftWorkdayNote(prev);assert.equal(JSON.stringify(prev),untouched,'toolt
 for(const [page,label] of [[att,'attendance'],[wh,'work-hours']]){
  assert(page.includes('const nightWorkdayNote=window.P79AttendanceV6?.shiftWorkdayNote?.(row)||null;'),label+' computes note from paired shift');
  assert(page.includes('↔ ${escapeHtml(nightWorkdayNote.label)}'),label+' marks status clearly');
+ if(label==='attendance'){
+  assert(page.includes('data-p79-schedule-rest'),'attendance renders official employee roster 例／休／國 instead of locations');
+  assert(page.includes('p79AttendanceOfficialRestCategory(row,displayEmp,overtimeView)'),'attendance joins the staff member and accounting date');
+ } else {
  assert(page.includes('備註：${escapeHtml(nightWorkdayNote.summary)}'),label+' displays note in the remarks cell');
+ }
  assert(page.includes('title="${nightWorkdayTooltip}"'),label+' has native mouse-hover tooltip');
  assert(page.includes('>${nightWorkdayBadge}${statusBadge}'),label+' shows the cross-day warning before the clipped normal status');
+ if(label==='attendance'){
+  assert(page.includes('title="${nightWorkdayTooltip}" aria-label="${nightWorkdayTooltip}"'),'attendance cross-day status keeps tooltip and accessibility');
+ } else {
  assert(page.includes('text-slate-500 text-[11px] leading-5" ${nightWorkdayNote ? `title="${nightWorkdayTooltip}"` : \'\'}>'),label+' exposes hover details across the whole remarks cell');
+ }
  assert(page.includes('aria-label="${nightWorkdayTooltip}"'),label+' preserves full details for accessibility');
  assert(page.includes('tabindex="0"'),label+' allows keyboard focus');
  assert(page.includes('v6-engine.js?v=20261101-ship-workday-tooltip'),label+' invalidates stale engine cache');
