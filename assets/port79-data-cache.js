@@ -1431,7 +1431,7 @@ if(typeof window.addEventListener==='function'){
 }
 
 window.Port79DataCache={preloadCurrent,getDisplaySnapshot,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
-if(!window.__p79BrowserBackgroundWorker&&document?.head?.appendChild&&document?.createElement){
+if(!window.__p79BrowserBackgroundWorker&&typeof document!=='undefined'&&document?.head?.appendChild&&document?.createElement){
  // Shared by every management page without changing its own navigation flow.
  const src=document.querySelector?.('script[src*="port79-data-cache.js"]')?.src;
  if(src){
