@@ -49,6 +49,14 @@ namespace Port79LiteNativeUpdater {
     return 0;
    }catch(Exception error){
     Log("ERROR "+error.GetType().Name+": "+error.Message);
+    // If argument parsing, a missing .NET dependency or an early path check
+    // fails BEFORE LogFile is set, preserve a bootstrap error next to the
+    // launched helper so the still-running parent can report the real cause.
+    try{
+     var self=Process.GetCurrentProcess().MainModule.FileName;
+     var earlyLog=self+".bootstrap-error.txt";
+     File.WriteAllText(earlyLog,error.GetType().Name+": "+error.Message,Encoding.UTF8);
+    }catch{}
     // A pre-handoff failure is visible to the old running app.
     try{
      if(!ReadyWritten&&!String.IsNullOrEmpty(Updates))
