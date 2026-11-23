@@ -30,7 +30,7 @@ assert(!/innerHTML\s*=.*(?:\b姓名|\b員工編號|\b89\s*小時)/.test(code),'n
 let idMap=new Map(),events={},observer=null,clicked=[],closed=0;
 class Node{
  constructor(tag='div'){this.tagName=tag;this.children=[];this.dataset={};this.attrs={};this.listeners={};this.className='';this.id='';this.open=false;this.hidden=false;
-  this.classList={contains:x=>this.className.split(/\s+/).includes(x),toggle:(x,value)=>{let a=new Set(this.className.split(/\s+/).filter(Boolean));if(value)a.add(x);else a.delete(x);this.className=[...a].join(' ';},add:(x)=>this.classList.toggle(x,true),remove:(x)=>this.classList.toggle(x,false)};}
+  this.classList={contains:x=>this.className.split(/\s+/).includes(x),toggle:(x,value)=>{let a=new Set(this.className.split(/\s+/).filter(Boolean));if(value)a.add(x);else a.delete(x);this.className=[...a].join(' ');},add:(x)=>this.classList.toggle(x,true),remove:(x)=>this.classList.toggle(x,false)};}
  append(...children){for(const child of children){this.children.push(child);child.parentElement=this;if(child.id)idMap.set(child.id,child);}}
  insertBefore(child,reference){const at=this.children.indexOf(reference);assert(at>=0,'target pane belongs to workspace');this.children.splice(at,0,child);child.parentElement=this;if(child.id)idMap.set(child.id,child);}
  prepend(...children){this.children.unshift(...children);for(const c of children)if(c.id)idMap.set(c.id,c);}
