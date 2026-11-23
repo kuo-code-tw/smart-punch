@@ -759,6 +759,7 @@ function simplifyMonthlyRestLayout(el,settings={}){
  #p79MonthlyRest #mrAutoSupplementSummary{line-height:1.8;color:#274668!important}
  #p79MonthlyRest #mrAutoDetails{margin-top:8px}
  #p79MonthlyRest #mrAutoDetails>.scroll,#p79MonthlyRest #mrAutoDetails>small{margin:10px;display:block}
+ #p79MonthlyRest .p79-ot-ux-dialog-tabs{display:none!important} /* redundant sub-tabs: the dialog has a title and Close */
  #p79MonthlyRest #mrAdvancedPlanning>#mrPlanningModes{margin:10px!important}
  #p79MonthlyRest #mrAdvancedPlanning>#mrNeedSection,#p79MonthlyRest #mrAdvancedPlanning>#mrPlannedSection,#p79MonthlyRest #mrAdvancedPlanning>#mrWeeklyDetails{margin:10px!important}
  #p79MonthlyRest #mrExistingDetails #mrExistingSection{margin:10px!important}
