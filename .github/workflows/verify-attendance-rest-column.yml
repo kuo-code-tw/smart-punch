@@ -1,0 +1,31 @@
+name: Verify attendance roster 例休國 column safely
+on:
+  pull_request:
+    paths:
+      - attendance/index.html
+      - tests/attendance-schedule-rest-column.cjs
+      - .github/workflows/verify-attendance-rest-column.yml
+  push:
+    branches: [main]
+    paths:
+      - attendance/index.html
+      - tests/attendance-schedule-rest-column.cjs
+      - .github/workflows/verify-attendance-rest-column.yml
+permissions:
+  contents: read
+jobs:
+  official-rest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check schedule-origin labels and unchanged records/actions
+        run: |
+          node tests/attendance-schedule-rest-column.cjs
+          node tests/attendance-roster-group.cjs
+          node tests/attendance-overtime-rest-hover.cjs
+          node tests/attendance-hours-column.cjs
+          node tests/attendance-quick-unit-hierarchy.cjs
