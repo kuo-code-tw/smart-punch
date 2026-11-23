@@ -29,6 +29,9 @@ assert.match(html,/hrGetOrgOptions/);
 assert.match(html,/saveConfig/);
 assert.match(html,/getSessionMeta/);
 assert.match(html,/verifiedSuperadmin/);
+assert.match(html,/#desktopDownload/);
+assert.match(html,/id="desktopDownloadEnabled"/);
+assert.match(html,/windowsDownload:\{enabled:false\}/);
 assert.match(html,/JSON\.stringify\(actual\)!==JSON\.stringify\(draft\)/);
 assert.match(html,/TextEncoder/);
 assert.doesNotMatch(html,/alert\(['"](?:成功|已儲存)/);
@@ -75,10 +78,12 @@ async function simulate(adminRole){
   return;
  }
  field('noticeEnabled').checked=true;field('noticeText').value='測試公告';
+ field('desktopDownloadEnabled').checked=true;
  await field('save').listeners.click();
  assert.equal(writes,1,'Save must call backend once');
  assert.equal(persisted.unrelatedOrganizationKey.keep,true,'Save must preserve unrelated canonical configuration');
  assert.equal(persisted.p79SystemSettingsV1.notice.text,'測試公告');
+ assert.equal(persisted.p79SystemSettingsV1.windowsDownload.enabled,true,'Only verified superadmin can persist globally enabled download');
  assert.match(field('status').textContent,/雲端.*讀回確認/);
  field('themeMode').value='dark';field('themeMode').listeners.change.call(field('themeMode'));
  assert.equal(local.get('port79_theme'),'dark');
@@ -92,12 +97,14 @@ async function simulate(adminRole){
  await field('reloadCloud').listeners.click();
  await new Promise(resolve=>setTimeout(resolve,10));
  assert.equal(field('noticeText').value,'測試公告','Reload discards unsaved local draft and reads canonical cloud data');
+ assert.equal(field('desktopDownloadEnabled').checked,true,'Reload reads actual cloud switch');
  // Restore must not silently change local appearance if cloud write fails.
  failNextWrite=true;
  await field('restore').listeners.click();
  assert.equal(local.get('port79_theme'),'dark','Failed cloud restore must preserve local theme');
  assert.equal(local.get('port79_year_mode'),'roc','Failed cloud restore must preserve local calendar mode');
  assert.equal(field('noticeEnabled').checked,true,'Failed cloud restore must preserve draft');
+ assert.equal(field('desktopDownloadEnabled').checked,true,'Failed restore must preserve download switch');
  assert.equal(writes,1,'Failed cloud write must not be counted as successful');
  assert.match(field('status').textContent,/測試雲端寫入失敗/);
  // Successful restore must update cloud config AND local preferences exactly once.
@@ -105,6 +112,7 @@ async function simulate(adminRole){
  assert.equal(writes,2);
  assert.equal(persisted.p79SystemSettingsV1.notice.enabled,false);
  assert.equal(persisted.p79SystemSettingsV1.notice.text,'');
+ assert.equal(persisted.p79SystemSettingsV1.windowsDownload.enabled,false,'Restore closes download by default');
  assert.equal(local.get('port79_theme'),'light');
  assert.equal(local.get('port79_year_mode'),'gregorian');
  assert.match(field('status').textContent,/讀回確認/);
