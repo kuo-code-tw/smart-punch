@@ -66,6 +66,10 @@ jobs:
        github.event.workflow_run.head_branch == 'main' &&
        github.event.workflow_run.event != 'pull_request')
     runs-on: windows-latest
+    permissions:
+      contents: read
+      # Used only for Artifact Signing on authorized non-PR production builds.
+      id-token: write
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -169,6 +173,51 @@ jobs:
               if($actual -ne $expected){throw "Old website source in ZIP: $relative"}
             }
           } finally {$z.Dispose()}
+      # Authenticode signing is a real publisher identity check, not an attempt
+      # to turn off or bypass Windows SmartScreen. Configure the verified Azure
+      # signing identity before enabling signed official releases. Pull requests
+      # never receive the Azure signing credentials or invoke the signer.
+      - name: Authenticate verified publisher with Azure OIDC
+        if: github.event_name != 'pull_request' && vars.PORT79_SIGNING_PROVIDER == 'azure'
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Sign Windows shell and update helper with the verified publisher
+        if: github.event_name != 'pull_request' && vars.PORT79_SIGNING_PROVIDER == 'azure'
+        uses: azure/artifact-signing-action@v2
+        with:
+          endpoint: ${{ vars.PORT79_ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.PORT79_ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.PORT79_ARTIFACT_SIGNING_PROFILE }}
+          files: |
+            ${{ github.workspace }}\\production\\desktop-lite\\dist\\79號碼頭_Windows輕量版\\Port79WindowsLite.exe
+            ${{ github.workspace }}\\production\\desktop-lite\\dist\\79號碼頭_Windows輕量版\\app\\Port79Updater.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+      - name: Reject untrusted signed releases and repack signed EXEs
+        shell: pwsh
+        working-directory: production
+        env:
+          PORT79_SIGNING_PROVIDER: ${{ vars.PORT79_SIGNING_PROVIDER }}
+          PORT79_REQUIRE_SIGNED_WINDOWS: ${{ vars.PORT79_REQUIRE_SIGNED_WINDOWS }}
+          PORT79_EVENT: ${{ github.event_name }}
+        run: |
+          if($env:PORT79_EVENT -eq 'pull_request'){
+            Write-Host 'PR safety: building an unsigned test artifact only; signing credentials are not used.'
+            exit 0
+          }
+          if($env:PORT79_REQUIRE_SIGNED_WINDOWS -eq 'true' -and $env:PORT79_SIGNING_PROVIDER -ne 'azure'){
+            throw 'Signed Windows release is mandatory but an approved signing provider is not configured.'
+          }
+          if($env:PORT79_SIGNING_PROVIDER -eq 'azure'){
+            & ./desktop-lite/tests/repack-signed-release.ps1
+            if(-not $?){throw 'Signed executable verification/repackaging failed'}
+          } else {
+            Write-Host 'UNSIGNED: No trusted publisher is configured; SmartScreen may block this release.'
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: verified-port79-windows
