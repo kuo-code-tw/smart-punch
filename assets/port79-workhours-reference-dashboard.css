@@ -6,7 +6,13 @@ body.p79-work-hours-page #viewAdmin.p79-ref-active .admin-desktop-shell{display:
 body.p79-work-hours-page #viewAdmin.p79-ref-active .admin-desktop-content{width:100%!important;max-width:none!important;min-height:0!important;background:#eef6ff!important;border:0!important;padding:4px!important}
 /* In overview mode show only the approved dashboard, not fragments of legacy tabs.
  * Toggling back to the native workbench restores every original element. */
-body.p79-work-hours-page #viewAdmin.p79-ref-active .admin-desktop-content > :not(#p79WorkhoursReference):not(#prReturn){display:none!important}
+/* The shared overtime tab rail is the actual landing-page navigation.
+ * Never hide it when the official overview is selected. */
+body.p79-work-hours-page #viewAdmin.p79-ref-active .admin-desktop-content > :not(#p79WorkhoursReference):not(#prReturn):not(#p79-overtime-approved-tabs){display:none!important}
+body.p79-work-hours-page #viewAdmin.p79-ref-active #p79-overtime-approved-tabs{display:block!important;position:relative;width:100%;margin:0 0 12px!important}
+/* The navigation replaces the extra back-to-overview button without
+   removing its built-in fallback when JS navigation could not be created. */
+body.p79-work-hours-page #viewAdmin:has(#p79-overtime-approved-tabs) #prReturn{display:none!important}
 body.p79-work-hours-page #viewAdmin.p79-ref-active .desktop-side-rail,
 body.p79-work-hours-page #viewAdmin.p79-ref-active .admin-page-head,
 body.p79-work-hours-page #viewAdmin.p79-ref-active #adminContentOvertime,

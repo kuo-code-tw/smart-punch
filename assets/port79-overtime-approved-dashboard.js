@@ -15,6 +15,7 @@ const selectors={
   reset:'.p79-ot-btn-reset'
 };
 const entries=[
+  ['home','▤ 工時與加班總覽'],
   ['overview','▥ 加班總覽（人員統計）'],
   ['monthly','▦ 每月未休假加班'],
   ['history','▤ 申報／異動紀錄'],
@@ -36,12 +37,15 @@ function setActive(view){
 function original(view){return d.querySelector('#adminContentOvertime '+(selectors[view]||'#no-such-action'));}
 function showOvertimePanel(){
  const panel=d.getElementById('adminContentOvertime');
- if(!panel)return false;
- if(!panel.classList.contains('hidden'))return true;
- // The shared homepage tab bar lives OUTSIDE this hidden panel. When the
- // visitor starts on monthly attendance statistics, enter the existing
- // authorized overtime tab before delegating to a modal/action.
+ const admin=d.getElementById('viewAdmin');
+ if(!panel||!admin)return false;
+ // The approved work-hours overview uses p79-ref-active to hide every
+ // legacy content panel with !important. The old logic only removed the
+ // panel's .hidden class, so the entire navigation remained unreachable.
  if(typeof window==='undefined'||typeof window.switchAdminTab!=='function')return false;
+ if(typeof window.canOpenAdminTab==='function'&&!window.canOpenAdminTab('overtime'))return false;
+ admin.classList.remove('p79-ref-active');
+ if(!panel.classList.contains('hidden'))return true;
  window.switchAdminTab('overtime');
  return !panel.classList.contains('hidden');
 }
@@ -59,6 +63,12 @@ function closeMonthly(){
  else if(typeof dialog.close==='function')dialog.close();
 }
 function activate(view){
+ if(view==='home'){
+  if(!window.P79WorkhoursReferenceNav?.show?.())return;
+  closeMonthly();
+  setActive('home');
+  return;
+ }
  if(view==='overview'){
   if(!showOvertimePanel())return;
   closeMonthly();
@@ -84,8 +94,8 @@ function activate(view){
 function makeButton(view,label){
  const b=d.createElement('button');
  b.type='button';b.textContent=label;b.dataset.p79OvertimeTab=view;
- b.className='p79-ot-ux-tab'+(view==='overview'?' is-active':view==='report'?' is-primary':view==='planned'?' is-alert':view==='reset'?' is-secondary':'');
- b.setAttribute('role','tab');b.setAttribute('aria-selected',view==='overview'?'true':'false');
+ b.className='p79-ot-ux-tab'+(view==='home'?' is-active':view==='report'?' is-primary':view==='planned'?' is-alert':view==='reset'?' is-secondary':'');
+ b.setAttribute('role','tab');b.setAttribute('aria-selected',view==='home'?'true':'false');
  b.addEventListener('click',()=>activate(view));
  return b;
 }
@@ -122,11 +132,15 @@ function init(){
  // The landing-page navigation must NOT be a child of the hidden overtime
  // content. The work-hours homepage can initially show the stats pane.
  // Keep the original overtime cards/forms exactly where they already are.
- workspace.insertBefore(header,host);
+ workspace.insertBefore(header,d.getElementById('p79WorkhoursReference')||host);
  // Mark ready only after the replacement controls exist. Original actions
  // remain available if JS fails before this point.
  host.dataset.p79UxReady='1';
  root=header;
+ // The real landing page is the reference work-hours dashboard; make its
+ // navigation active immediately instead of waiting for an申報加班 click.
+ if(d.getElementById('viewAdmin')?.classList.contains('p79-ref-active'))setActive('home');
+ window.P79OvertimeTabs={syncTo:setActive};
  const observer=new MutationObserver(()=>{
   const modal=d.getElementById('p79MonthlyRest');
   if(modal&&modal.open)decorateMonthlyDialog();

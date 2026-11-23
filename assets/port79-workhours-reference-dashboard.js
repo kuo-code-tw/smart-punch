@@ -328,6 +328,7 @@
  function legacy(target){
   const view=id('viewAdmin');if(!view)return;
   view.classList.remove('p79-ref-active');id('prReturn').hidden=false;
+  window.P79OvertimeTabs?.syncTo?.('overview');
   if(typeof switchAdminTab==='function')switchAdminTab(['stats','records','live'].includes(target)?target:'overtime');
   if(target==='report'&&typeof p79CanReportOvertime==='function'&&p79CanReportOvertime())window.P79Overtime?.openReport?.();
   if(target==='audit'&&typeof p79CanExportOvertimeApplication==='function'&&p79CanExportOvertimeApplication())window.P79OvertimeStatus?.open?.();
@@ -352,6 +353,15 @@
  }
  function refresh(){if(!id('p79WorkhoursReference'))return;try{paint(compute())}
   catch(e){say('prDataStatus','無法核對正式資料：'+String(e?.message||e));id('prDataStatus').dataset.error='true'}}
+ // The default overview is a genuine page in the same navigation, not a
+ // separate destination that must be reached via an extra back button.
+ function showReference(){
+  const view=id('viewAdmin');if(!view||!id('p79WorkhoursReference'))return false;
+  view.classList.add('p79-ref-active');
+  const back=id('prReturn');if(back)back.hidden=true;
+  refresh();return true;
+ }
+ window.P79WorkhoursReferenceNav={show:showReference};
  async function mount(){
   const host=id('viewAdmin')?.querySelector('.admin-desktop-content');
   if(!host||id('p79WorkhoursReference'))return;
@@ -361,9 +371,14 @@
    if(!markup.includes('id="p79WorkhoursReference"')||!markup.includes('id="prTableBody"'))throw Error('版型檔格式錯誤');
   }catch(e){console.warn('工時版型尚未讀取完成，保留原本功能',e);return}
   const template=document.createElement('template');template.innerHTML=markup.trim();host.prepend(template.content);
+  // Both scripts can initialize in either order (the HTML template is async).
+  // The navigation must always be the FIRST child of the real work-hours
+  // homepage, above the reference dashboard, not below it or in a hidden pane.
+  const tabs=id('p79-overtime-approved-tabs');
+  if(tabs)host.insertBefore(tabs,id('p79WorkhoursReference'));
   const back=document.createElement('button');back.type='button';back.id='prReturn';back.hidden=true;back.textContent='返回工時與加班總覽';
   back.style.cssText='border:0;border-radius:8px;padding:7px 12px;background:#087afa;color:white;font-weight:900;margin:8px 0';
-  back.addEventListener('click',()=>{id('viewAdmin').classList.add('p79-ref-active');back.hidden=true;refresh()});
+  back.addEventListener('click',()=>{if(showReference())window.P79OvertimeTabs?.syncTo?.('home')});
   host.insertBefore(back,id('p79WorkhoursReference').nextSibling);
   id('prStart').value=dateTaipei().slice(0,7)+'-01';
   const now=dateTaipei();const [y,m]=now.slice(0,7).split('-').map(Number);
@@ -376,8 +391,8 @@
    if(filter==='prJob')id('prPerson').value='ALL';
    state.page=1;refresh()
   });
-  id('viewAdmin').classList.add('p79-ref-active');
-  refresh();lastAutoSignature=autoSignature();
+  showReference();window.P79OvertimeTabs?.syncTo?.('home');
+  lastAutoSignature=autoSignature();
  }
  function init(){
   let attempts=0;
