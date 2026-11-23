@@ -10,6 +10,19 @@ assert.match(src,/private bool manualUpdateQueued=false;/);
 assert.match(src,/if\(updateBusy\)\s*\{\s*if\(manual\)/,
  'Manual click during automatic check must be queued and acknowledged');
 assert.match(src,/manualUpdateQueued=true/);
+assert.doesNotMatch(src,/背景版本檢查尚未完成；已記下你的手動更新要求/,
+ 'Do not leave users with an indefinite queued-version-check notice');
+assert.match(src,/手動更新已接手完成版本核對/,
+ 'Manual click must promote the running check rather than restart network work');
+assert.match(src,/if\(manualUpdateQueued\)\s*\{\s*manual=true;\s*manualUpdateQueued=false;/,
+ 'One verified scan must honor the queued manual request immediately');
+const nativeFirst=src.indexOf('shell=await ReleaseUpdater.PrepareAsync(root,DataRoot,Log)');
+const websiteNext=src.indexOf('stagedSite=await Updater.StageFromOfficialAsync(site,DataRoot,Log)');
+assert(nativeFirst>=0&&websiteNext>nativeFirst,
+ 'Check the complete verified Windows release before individual website files');
+assert.match(src,/if\(shell==null\)\s*\{/,
+ 'Skip redundant individual website downloads when a complete Windows ZIP is ready');
+
 assert.match(src,/BeginInvoke\(new Action\(\(\)=>\{if\(!exit\) _=CheckUpdates\(true\);\}\)\)/,
  'Queued manual action must actually run after background work');
 assert.doesNotMatch(src,/checkUpdatesMenu\.Enabled=false/,
