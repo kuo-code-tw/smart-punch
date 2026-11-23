@@ -52,6 +52,21 @@ a{color:#1265bd}
   try{localStorage.setItem(KEY,JSON.stringify(record))}catch(_){}
   try{channel?.postMessage(record)}catch(_){}
  }
+ async function savedWhere(){
+  try{
+   // Folder writes are intentionally delayed during ordinary use. An explicit
+   // download must flush them before claiming that the chosen folder is saved.
+   await api.flushFolder();
+   const result=await api.getFolderSyncStatus();
+   if(result.state==='permission'||result.state==='error')
+    return {warning:true,text:'硬碟資料夾尚未保存（'+result.label+'），請返回資料庫中心重新授權。瀏覽器快取仍保留。'};
+   if(result.folder&&result.state==='done')
+    return {warning:false,text:'已保存至所選資料夾「'+result.folder+'」及瀏覽器快取。'};
+   if(result.folder)
+    return {warning:true,text:'所選資料夾「'+result.folder+'」尚未確認保存，請回資料庫中心檢查狀態。'};
+   return {warning:false,text:'資料已保存在瀏覽器快取；尚未選擇電腦資料夾。'};
+  }catch(error){return {warning:true,text:'資料夾保存狀態無法確認，瀏覽器快取仍可使用：'+String(error?.message||error)}}
+ }
  function signedIn(){
   try{
    const session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');
@@ -75,9 +90,11 @@ a{color:#1265bd}
      publish('downloading',(labels[sys]||sys)+'｜'+note+(error?'｜'+String(error.message||error):''),done.size,total);
     },{quickFirst:true,historyOnDemand:true});
     const failures=rows.filter(x=>!x.ok),success=rows.filter(x=>x.ok).length;
-    finished=true;publish(failures.length?(success?'partial':'failed'):'complete',failures.length?
-      '未完成：'+failures.map(x=>(labels[x.system]||x.system)+' '+x.error).join('；'):
-      '六項基本資料已完成或沿用本機快取，其他頁面可以正常操作。',success,rows.length);
+    publish('downloading','基本資料已處理，正在確認所選電腦資料夾的檔案寫入…',success,rows.length);
+    const storage=await savedWhere();
+    finished=true;publish(failures.length||storage.warning?(success?'partial':'failed'):'complete',failures.length?
+      '未完成：'+failures.map(x=>(labels[x.system]||x.system)+' '+x.error).join('；')+'｜'+storage.text:
+      '六項基本資料已完成或沿用本機快取。'+storage.text,success,rows.length);
    }else if(mode==='quick'){
     publish('downloading','快速預載有權限的常用系統資料。',0,0);
     const completed=new Set();
@@ -86,9 +103,11 @@ a{color:#1265bd}
      publish('downloading',(labels[sys]||sys)+'｜'+({loading:'讀取中',done:'已完成',reused:'使用新近快取',error:'未完成'})[phase]+(error?'｜'+error:''),completed.size,0);
     }});
     const rows=res.results||[],failures=rows.filter(x=>!x.ok),ok=rows.filter(x=>x.ok).length;
-    finished=true;publish(res.status==='changed'||res.status==='denied'?'failed':failures.length?'partial':'complete',
+    publish('downloading','常用資料預載已處理，正在核對本機資料夾…',ok,rows.length);
+    const storage=await savedWhere();
+    finished=true;publish(res.status==='changed'||res.status==='denied'?'failed':failures.length||storage.warning?'partial':'complete',
       res.status==='changed'?'帳號或權限已改變，停止舊資料下載。':
-      res.status==='denied'?'此帳號沒有預載權限。':'常用資料預載已結束。',ok,rows.length);
+      res.status==='denied'?'此帳號沒有預載權限。':'常用資料預載已結束。'+storage.text,ok,rows.length);
    }else{
     if(!['attendance','workhours','leave','schedule','efficiency','hr'].includes(selected))throw Error('此系統不支援完整下載');
     current=selected;
@@ -97,7 +116,9 @@ a{color:#1265bd}
      if(Number.isFinite(Number(total))){monthTotal=Math.max(0,Number(total));monthCompleted=Math.max(0,Number(number)||0)}
      publish('downloading',message||'正在讀取 '+(labels[current]||current),0,1);
     },{interactive:true});
-    finished=true;publish('complete',(labels[current]||current)+'下載已完成。',1,1);
+    publish('downloading','系統已下載，正在確認本機資料夾…',1,1);
+    const storage=await savedWhere();
+    finished=true;publish(storage.warning?'partial':'complete',(labels[current]||current)+'下載已完成。'+storage.text,1,1);
    }
   }catch(error){finished=true;publish('failed','下載失敗：'+String(error?.message||error),done.size,mode==='all'?6:mode==='current'?1:0)}
  }
