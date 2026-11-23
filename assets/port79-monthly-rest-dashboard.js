@@ -37,6 +37,24 @@ function sourceRows(el){
  });
  return {ready,planned,prior};
 }
+// Selection for inspection is independent of the official submit checkbox.
+ // Pending/uncertain rows may be inspected even when cloud rules block filing.
+function selectionKey(row){return JSON.stringify([row.kind,row.id,row.date,row.name,row.category,row.period]);}
+function selectionMode(row){
+ if(!row)return 'none';
+ if(row.kind==='existing')return row.status==='已核對出勤'?'none':'review';
+ if(row.kind==='plan')return row.disabled?'review':'native';
+ if(row.kind==='ready')return !row.disabled&&/可申報/.test(row.status)&&
+   !/缺|不足|無法|失敗|錯誤/.test(row.status)?'native':'review';
+ return 'none';
+}
+function markForReview(selected,row,checked){
+ if(selectionMode(row)!=='review')return false;
+ const key=selectionKey(row);
+ if(checked)selected.add(key);else selected.delete(key);
+ return true;
+}
+function reviewSelected(selected,row){return selectionMode(row)==='review'&&selected.has(selectionKey(row));}
 function mount(el){
  if(!el||el.id!=='p79MonthlyRest'||$(el,'#mrUxRoot'))return;
  const body=$(el,'.body'),originalMonth=$(el,'#mrMonth'),originalDept=$(el,'#mrDept');
@@ -140,6 +158,7 @@ function mount(el){
  <p id="mrUxListHint" style="font-size:11px;color:#617e9f;margin:9px 3px 0">所有數字均取自當月正式來源，尚未核實的預排不等於已申報。</p>
  </section>
  <aside class="mr-ux-card mr-ux-reasons"><h3>ⓘ 待核對原因</h3>
+ <div id="mrUxReviewSummary" role="status" aria-live="polite" style="font-size:12px;color:#476587;line-height:1.55;margin:8px 2px">勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。</div>
  <div class="mr-ux-reason"><b>▤ 時段衝突</b><small>建議時段與既有排班／打卡不一致時需重新核對。</small></div>
  <div class="mr-ux-reason"><b>▧ 缺少必要資料</b><small>班表、出勤或人員資料缺漏時不允許直接申報。</small></div>
  <div class="mr-ux-reason"><b>♙ 人員異動</b><small>到職、離職、職稱或權限變更時依正式資料重新確認。</small></div>
@@ -149,7 +168,7 @@ function mount(el){
  <button type="button" id="mrUxSubmit" class="mr-ux-primary" disabled>➤ 正式申報</button></footer>`;
  body.prepend(shell);
  const q=sel=>$(shell,sel);
- const state={tab:'pending',name:'',status:'',hint:'',snapshot:null,rendering:false,disposed:false};
+ const state={tab:'pending',name:'',status:'',hint:'',snapshot:null,rendering:false,disposed:false,reviewSelected:new Set()};
  function rows(){
   const data=sourceRows(el);
   const pendingReports=data.prior.filter(r=>r.status!=='已核對出勤'&&!/已取消|歷史版本/.test(r.status));
@@ -181,6 +200,13 @@ function mount(el){
    if(q('#mrUxDept').innerHTML!==sourceOptions)q('#mrUxDept').innerHTML=sourceOptions;
    if(q('#mrUxDept').value!==originalDept.value)q('#mrUxDept').value=originalDept.value;
    const view=currentView(),{data,pending,verified,shown}=view;
+   // Discard local inspection picks for rows no longer in the live source.
+   const reviewKeys=new Set(pending.filter(r=>selectionMode(r)==='review').map(selectionKey));
+   for(const key of state.reviewSelected)if(!reviewKeys.has(key))state.reviewSelected.delete(key);
+   const isPicked=r=>selectionMode(r)==='review'?reviewSelected(state.reviewSelected,r):!!r.checked;
+   const selectedPending=pending.filter(isPicked);
+   const selectedReview=selectedPending.filter(r=>selectionMode(r)==='review');
+   const selectedNative=selectedPending.length-selectedReview.length;
    const needs=$$(el,'#mrNeedRows tr').filter(x=>$(x,'.need-plan')).length;
    const ready=data.ready.filter(r=>kind(r)==='ready').length;
    const sourceLoaded=!!text(el,'#mrAuditSummary');
@@ -198,11 +224,18 @@ function mount(el){
    q('#mrUxReload').title=sourceFailed?'重新讀取正式班表與考勤':'重新讀取雲端資料';
    q('#mrUxTabPending').setAttribute('aria-selected',String(state.tab==='pending'));
    q('#mrUxTabDone').setAttribute('aria-selected',String(state.tab==='done'));
-   q('#mrUxAll').disabled=state.tab!=='pending'||!shown.some(r=>!r.disabled&&['ready','plan'].includes(kind(r)));
-   const eligible=shown.filter(r=>!r.disabled&&['ready','plan'].includes(kind(r)));
-   q('#mrUxAll').checked=eligible.length>0&&eligible.every(r=>r.checked);
-   const selected=data.ready.filter(r=>r.checked).length+data.planned.filter(r=>r.checked).length;
-   q('#mrUxSelected').textContent='已勾選 '+selected+' 筆';
+   const eligible=state.tab==='pending'?shown.filter(r=>selectionMode(r)!=='none'):[];
+   q('#mrUxAll').disabled=eligible.length===0;
+   q('#mrUxAll').checked=eligible.length>0&&eligible.every(isPicked);
+   q('#mrUxAll').indeterminate=eligible.some(isPicked)&&!q('#mrUxAll').checked;
+   q('#mrUxSelected').textContent='已勾選 '+selectedPending.length+' 筆（待核對 '+selectedReview.length+'／可處理 '+selectedNative+'）';
+   q('#mrUxReviewSummary').innerHTML=selectedPending.length?
+     '<b>已選取 '+selectedPending.length+' 筆供核對（其中 '+selectedReview.length+' 筆尚未符合申報條件）</b>'+
+     selectedPending.slice(0,8).map(r=>'<div style="border-top:1px solid #dbe8f9;margin-top:7px;padding-top:7px">'+
+       esc(r.date)+'｜'+esc(r.name)+'｜'+esc(label(r))+
+       '<small style="display:block;color:#657b95">'+esc(r.source||r.status||'需核對正式班表及出勤')+'</small></div>').join('')+
+     (selectedPending.length>8?'<small>另有 '+(selectedPending.length-8)+' 筆已勾選</small>':''):
+     '勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。';
    const nativeSave=$(el,'#mrSave'),nativePlan=$(el,'#mrSavePlans');
    q('#mrUxSavePlan').disabled=!!nativePlan?.disabled||!data.planned.some(r=>r.checked);
    q('#mrUxSubmit').disabled=!data.ready.some(r=>r.checked&&!r.disabled)||!/申報/.test(nativeSave?.textContent||'');
@@ -212,12 +245,12 @@ function mount(el){
     q('#mrUxSubmit').disabled=false;
    q('#mrUxHint').textContent=state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
    q('#mrUxRows').innerHTML=shown.map(r=>{
-    const type=kind(r),status=label(r),selectable=state.tab==='pending'&&r.kind!=='existing'&&!r.disabled;
-    const id=esc(r.id),kindKey=esc(r.kind);
+    const type=kind(r),status=label(r),selectable=state.tab==='pending'&&selectionMode(r)!=='none';
+    const id=esc(r.id),kindKey=esc(r.kind),key=esc(selectionKey(r));
     const operations=r.kind==='ready'?
-     '<button type="button" data-action="edit" data-kind="ready" data-id="'+id+'">✎ 編輯</button><button type="button" data-action="view" data-kind="ready" data-id="'+id+'">◎ 檢視</button>':
-     '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'">◎ 檢視</button>';
-    return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" '+(r.checked?'checked ':'')+(selectable?'':'disabled ')+
+     '<button type="button" data-action="edit" data-kind="ready" data-id="'+id+'" data-key="'+key+'">✎ 編輯</button><button type="button" data-action="view" data-kind="ready" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>':
+     '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
+    return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
       'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date)+'</td><td>'+esc(r.name)+'</td>'+
       '<td><span class="mr-ux-kind">'+esc(r.category)+'</span></td><td>'+esc(periodLabel(r.period))+'</td><td>'+esc(r.hours)+'</td>'+
       '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span></td><td>'+operations+'</td></tr>';
@@ -225,6 +258,11 @@ function mount(el){
    q('#mrUxListHint').textContent='顯示 '+shown.length+' 筆；預排建議須核對並儲存，正式申報僅接受符合現有8小時及雲端規則的項目。';
    q('#mrUxExport').disabled=!shown.length;
   }finally{state.rendering=false;}
+ }
+ function updatePick(row,checked){
+  if(!row)return;
+  if(selectionMode(row)==='review'){markForReview(state.reviewSelected,row,checked);return;}
+  if(selectionMode(row)==='native')nativePick(row,checked);
  }
  function nativePick(row,checked){
   if(!row||row.kind==='existing')return;
@@ -272,34 +310,38 @@ function mount(el){
   };
   editor.showModal();
  }
- q('#mrUxMonth').onchange=e=>{if(!originalMonth.disabled){originalMonth.value=e.target.value;originalMonth.dispatchEvent(new Event('change',{bubbles:true}));}};
+ q('#mrUxMonth').onchange=e=>{if(!originalMonth.disabled){state.reviewSelected.clear();originalMonth.value=e.target.value;originalMonth.dispatchEvent(new Event('change',{bubbles:true}));}};
  q('#mrUxDept').onchange=e=>{if(!originalDept.disabled){originalDept.value=e.target.value;originalDept.dispatchEvent(new Event('change',{bubbles:true}));}};
  q('#mrUxName').oninput=e=>{state.name=e.target.value;render();};
  q('#mrUxState').onchange=e=>{state.status=e.target.value;render();};
  q('#mrUxTabPending').onclick=()=>{state.tab='pending';render();};
  q('#mrUxTabDone').onclick=()=>{state.tab='done';render();};
- q('#mrUxReload').onclick=()=>{state.hint='';$(el,'#mrLoad')?.click();render();};
+ q('#mrUxReload').onclick=()=>{state.hint='';state.reviewSelected.clear();$(el,'#mrLoad')?.click();render();};
  q('#mrUxAuto').onclick=()=>{
   const mode=$(el,'#mrAutoMode');if(!mode||mode.disabled)return;
   mode.checked=true;mode.dispatchEvent(new Event('change',{bubbles:true}));
   state.tab='pending';state.hint='已依正式排班及未休額度產生可用的預排建議；須勾選並儲存才會成立，並非正式申報。';render();
  };
  q('#mrUxBatch').onclick=()=>{
-  const records=currentView().shown.filter(r=>r.kind!=='existing'&&!r.disabled);
-  const allChecked=records.length&&records.every(r=>r.checked);
-  for(const r of records)nativePick(r,!allChecked);
-  state.hint=records.length?'已'+(allChecked?'取消':'勾選')+' '+records.length+' 筆供核對；尚未儲存或正式申報。':'目前沒有可以批次核對的項目。';
+  const selected=currentView().pending.filter(r=>selectionMode(r)==='review'?
+   reviewSelected(state.reviewSelected,r):!!r.checked);
+  if(!selected.length){
+   state.hint='請先勾選待核對資料；可以勾選灰色狀態的項目查看原因，但不會直接申報。';
+  }else{
+   const blocked=selected.filter(r=>selectionMode(r)==='review').length;
+   state.hint='已選取 '+selected.length+' 筆核對資料，其中 '+blocked+' 筆待查核；右側顯示所選項目，尚未修改正式申報狀態。';
+  }
   render();
  };
- q('#mrUxAll').onchange=e=>{for(const r of currentView().shown.filter(r=>r.kind!=='existing'&&!r.disabled))nativePick(r,e.target.checked);render();};
+ q('#mrUxAll').onchange=e=>{for(const r of currentView().shown.filter(r=>selectionMode(r)!=='none'))updatePick(r,e.target.checked);render();};
  q('#mrUxRows').addEventListener('change',e=>{
   const target=e.target;if(target.dataset.action!=='pick')return;
-  const row=currentView().shown.find(x=>x.kind===target.dataset.kind&&String(x.id)===String(target.dataset.id));
-  nativePick(row,target.checked);render();
+  const row=currentView().shown.find(x=>selectionKey(x)===target.dataset.key);
+  updatePick(row,target.checked);render();
  });
  q('#mrUxRows').addEventListener('click',e=>{
   const button=e.target.closest('[data-action]');if(!button)return;
-  const row=currentView().shown.find(x=>x.kind===button.dataset.kind&&String(x.id)===String(button.dataset.id));
+  const row=currentView().shown.find(x=>selectionKey(x)===button.dataset.key);
   if(button.dataset.action==='view')details(row);
   if(button.dataset.action==='edit')edit(row);
  });
@@ -356,5 +398,5 @@ function mount(el){
  },{once:true});
  render();
 }
-global.P79MonthlyRestDashboard={mount,sourceRows,periodLabel};
+global.P79MonthlyRestDashboard={mount,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected};
 })(window,document);
