@@ -102,3 +102,5 @@ function unit(options={}){
  assert.match(home,/aria-label="79號碼頭電腦版下載（完整程式 ZIP）"/);
  console.log('PASS Windows download: immutable versioned asset, version label, no stale tag, permission protections, safe fallback');
 })().catch(error=>{console.error(error);process.exitCode=1;});
+// Also exercise the new cloud setting's off/on/failure and session-change cases.
+require('./windows-download-cloud-toggle.cjs');
