@@ -88,7 +88,7 @@ function open({url,row=null,side='',onStatus=()=>{},onSynced=async()=>{}}={}){
   headline=host.querySelector('.p79-early-inline-head span');
  const instance={
   frame,host,loading,headline,payload,nonce,opened:false,writing:false,saving:false,ready:false,
-  timer:0,reportTimer:0,initConfirmed:false,onMessage:null,
+  timer:0,reportTimer:0,initConfirmed:false,failed:false,onMessage:null,
   status(message){
    if(current!==instance)return;
    const value=String(message||'');
@@ -106,7 +106,7 @@ function open({url,row=null,side='',onStatus=()=>{},onSynced=async()=>{}}={}){
   const info=String(message.message||'').slice(0,450);
   switch(message.action){
    case 'ready':
-    if(instance.opened||instance.initConfirmed)return;
+    if(instance.opened||instance.initConfirmed||instance.failed)return;
     if(!instance.ready){
      instance.ready=true;
      root.clearTimeout(instance.timer);
@@ -114,7 +114,7 @@ function open({url,row=null,side='',onStatus=()=>{},onSynced=async()=>{}}={}){
      // Allow its original cloud/identity checks to complete rather than
      // misreporting a 25-second page-load failure.
      instance.timer=root.setTimeout(()=>{
-      if(current===instance&&!instance.opened)
+      if(current===instance&&!instance.opened&&!instance.failed)
        instance.status('已連接考勤原始頁面，但正式員工與打卡資料尚未核對完成；請檢查登入權限及雲端連線，未修改任何資料。');
      },65000);
      instance.status('正在核對原始員工與打卡紀錄，載入考勤管理原本的表單…');
@@ -155,6 +155,8 @@ function open({url,row=null,side='',onStatus=()=>{},onSynced=async()=>{}}={}){
     break;
    case 'error':
     instance.writing=false;
+    instance.failed=true;
+    root.clearTimeout(instance.timer);
     instance.status('正式考勤未確認同步：'+(info||'請查看表單中的錯誤提示。'));
     break;
    case 'cancelled':
