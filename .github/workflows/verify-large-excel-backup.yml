@@ -32,7 +32,7 @@ jobs:
         run: |
           node --check assets/port79-backup-excel.js
           node --check tests/backup-readable-excel.cjs
-          node --check backend/backup-readable-excel.gs
+          node -e "new (require('vm').Script)(require('fs').readFileSync('backend/backup-readable-excel.gs','utf8'))"
       - name: Test full, oversized, and resumed XLSX backups
         run: |
           node tests/backup-readable-excel.cjs
