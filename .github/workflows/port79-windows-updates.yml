@@ -91,6 +91,14 @@ jobs:
         shell: pwsh
         working-directory: production
         run: |
+          # Exercise the same API-independent site manifest generator used by
+          # GitHub Pages before releasing any native executable.
+          node scripts/write-port79-version.cjs .
+          if($LASTEXITCODE -ne 0){throw 'Site version manifest generation failed'}
+          node scripts/write-port79-site-files.cjs .
+          if($LASTEXITCODE -ne 0){throw 'API-independent site manifest generation failed'}
+          node -e "const m=require('./port79-site-files.json');if(!/^[a-f0-9]{40}$/.test(m.commit)||m.files.length<100||m.files.length>400)process.exit(1)"
+          if($LASTEXITCODE -ne 0){throw 'Published site hash list invalid'}
           dotnet restore desktop-lite/Port79Lite.csproj /p:Platform=x64
           if($LASTEXITCODE -ne 0){throw 'Restore failed'}
           & ./desktop-lite/build-portable.ps1
