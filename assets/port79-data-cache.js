@@ -1251,11 +1251,50 @@ function ensureStyle(){if(document.getElementById('p79CacheStyle'))return;const 
 .p79-cache-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.p79-cache-row{border:1px solid #e2e8f0;border-radius:14px;padding:11px 12px;background:#f8fafc}.dark .p79-cache-row{background:#111827;border-color:#334155}.p79-cache-row b{display:block;font-size:13px}.p79-cache-meta{font-size:11px;color:#64748b;margin-top:5px;line-height:1.45}.dark .p79-cache-meta{color:#94a3b8}.p79-cache-state{font-size:11px;font-weight:900;margin-top:5px;color:#047857}.p79-cache-state.error{color:#be123c}.p79-cache-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px;padding-top:14px;border-top:1px solid #e2e8f0}.dark .p79-cache-actions{border-color:#334155}.p79-cache-btn{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:12px;padding:10px 13px;font-size:12px;font-weight:900;cursor:pointer}.p79-cache-btn.primary{background:#2563eb;border-color:#2563eb;color:#fff}.p79-cache-btn.all{background:#0f766e;border-color:#0f766e;color:#fff}.p79-cache-btn.danger{color:#be123c}.p79-cache-btn:disabled{opacity:.5;cursor:not-allowed}.dark .p79-cache-btn:not(.primary):not(.all){background:#111827;color:#e2e8f0;border-color:#475569}.p79-cache-note{margin-top:12px;padding:10px 12px;border-radius:12px;background:#eff6ff;color:#1e40af;font-size:11px;line-height:1.55}.dark .p79-cache-note{background:rgba(30,64,175,.18);color:#bfdbfe}
 @media(max-width:680px){.p79-cache-grid{grid-template-columns:1fr}#p79CacheModal{padding:14px}}
 `;document.head.appendChild(s)}
+
+// The web browser must keep cloud downloads in a separate same-origin tab:
+// fetches attached to the current management page stop on navigation.
+// This tab inherits the opener's authorized sessionStorage (no token in URL).
+function startBrowserBackgroundDownload(action,system){
+ const key='p79BrowserCacheProgressV1';
+ let prior=null;
+ try{prior=JSON.parse(localStorage.getItem(key)||'null')}catch(_){}
+ if(prior?.viewer===viewerKey()&&['downloading','starting'].includes(prior.phase)&&
+   Date.now()-Number(prior.updatedAt||0)<90000){
+  setProgress('背景下載仍在進行：'+String(prior.detail||'').slice(0,110)+'。請查看右下角進度並保留背景下載分頁。');
+  return true;
+ }
+ const loader=document.querySelector('script[src*="port79-data-cache.js"]');
+ if(!loader?.src)return false;
+ const url=new URL('port79-browser-background.html',loader.src);
+ url.searchParams.set('mode',action);
+ if(action==='current')url.searchParams.set('system',system);
+ // The direct user click must synchronously open the tab or popup blockers win.
+ // Each run uses a new browsing context so it cannot reuse another login's
+ // sessionStorage from an earlier finished download.
+ const tab=window.open(url.href,'_blank');
+ if(!tab){
+  setProgress('瀏覽器封鎖了背景下載分頁。請允許此網站開啟彈出式視窗後再按一次下載。');
+  return true;
+ }
+ try{tab.opener=null}catch(_){}
+ try{const now=Date.now();localStorage.setItem(key,JSON.stringify({
+  phase:'starting',viewer:viewerKey(),startedAt:now,updatedAt:now,
+  completed:0,total:action==='all'?6:action==='current'?1:0,
+  detail:'已開啟獨立下載分頁，正在確認權限。'
+ }))}catch(_){}
+ setProgress('下載已交給背景分頁；可關閉此視窗、切換排班或考勤。請保持背景下載分頁開啟，右下角會顯示目前進度。');
+ return true;
+}
 function ensureModal(){
  ensureStyle();let b=document.getElementById('p79CacheBackdrop');if(b)return b;
  b=document.createElement('div');b.id='p79CacheBackdrop';b.innerHTML=`<div id="p79CacheModal" role="dialog" aria-modal="true"><div class="p79-cache-head"><div><div class="p79-cache-title">☁️ 79號碼頭雲端資料庫</div><div class="p79-cache-sub">本機加速讀取，修改仍透過各系統同步雲端。</div></div><button class="p79-cache-close" type="button">✕</button></div><div id="p79DeviceStatus" class="p79-cache-note" role="status"></div><div class="p79-cache-actions"><button class="p79-cache-btn" data-cache-action="folder">選擇電腦資料夾</button><button class="p79-cache-btn" data-cache-action="reconnect">重新授權資料夾</button><button class="p79-cache-btn" data-cache-action="disconnect">停用資料夾</button><button class="p79-cache-btn" data-cache-action="persist">保留手機／瀏覽器資料</button></div><div class="p79-cache-note">電腦：請先建立並選擇「79號碼頭雲端資料庫」資料夾。手機：按「保留手機／瀏覽器資料」，也可將系統加入主畫面。清除網站資料後，電腦檔案仍保留，但需重新選擇資料夾。資料夾快取不會自行覆寫雲端；請以各系統的儲存／同步狀態確認上傳結果。</div><div id="p79CacheRows" class="p79-cache-grid"></div><div class="p79-cache-actions"><button class="p79-cache-btn primary" data-cache-action="quick">快速預載常用資料（人資／排班／請假）</button><button class="p79-cache-btn" data-cache-action="current">下載目前系統完整資料</button><button class="p79-cache-btn all" data-cache-action="all">下載六項基本資料（歷史按月）</button><button class="p79-cache-btn danger" data-cache-action="clear">清除本機快取</button></div><div class="p79-cache-note">注意：上述六項基本資料下載不包含「碼頭儲量」；歷史月份請到歷史資料中心按月讀取。Yard Excel 數據仍是各瀏覽器獨立的帳號本機資料，Windows 版本不能藉由此下載動作取得網頁版的儲量。系統不會以零或假數字代替缺失數據。</div><div id="p79CacheProgress" class="p79-cache-note">選取資料夾後會先找回目前帳號已有的快取，不必再次下載。同一帳號重新登入會重用既有檔案；首次使用的新帳號需下載其權限範圍內的資料。考勤／工時下載前會核對版本，資料未變時重用完整快取。</div></div>`;
  document.body.appendChild(b);b.querySelector('.p79-cache-close').onclick=()=>b.classList.remove('open');b.addEventListener('click',e=>{if(e.target===b)b.classList.remove('open')});
  b.addEventListener('click',async e=>{const btn=e.target.closest('[data-cache-action]');if(!btn)return;const act=btn.dataset.cacheAction;const buttons=[...b.querySelectorAll('[data-cache-action]')];buttons.forEach(x=>x.disabled=true);try{
+   // Windows already has its own background WebView2 worker. Web opens a
+   // separate same-origin tab so other system pages remain fully usable.
+   if(['all','current','quick'].includes(act)&&!window.chrome?.webview?.postMessage&&
+      startBrowserBackgroundDownload(act,currentSystem()))return;
    if(act==='folder'){setProgress(await connectFolder());await refreshModal()}
    if(act==='reconnect'){setProgress(await reconnectFolder());await refreshModal()}
    if(act==='disconnect'){setProgress(await disconnectFolder());await refreshModal()}
@@ -1400,6 +1439,16 @@ if(typeof window.addEventListener==='function'){
 }
 
 window.Port79DataCache={preloadCurrent,getDisplaySnapshot,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
+if(!window.__p79BrowserBackgroundWorker&&!window.chrome?.webview?.postMessage&&typeof document!=='undefined'&&document?.head?.appendChild&&document?.createElement){
+ // Shared by every management page without changing its own navigation flow.
+ const src=document.querySelector?.('script[src*="port79-data-cache.js"]')?.src;
+ if(src){
+  const tag=document.createElement('script');
+  tag.src=new URL('port79-browser-download-status.js?v=20261123-bg-status-v1',src).href;
+  tag.defer=true;
+  document.head.appendChild(tag);
+ }
+}
 })();
 
 

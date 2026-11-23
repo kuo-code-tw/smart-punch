@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>79號碼頭｜背景雲端資料下載</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Microsoft JhengHei",sans-serif;color-scheme:light}
+body{max-width:690px;margin:40px auto;padding:0 22px;color:#16304c;background:#f3f8ff}
+main{padding:28px;border:1px solid #d8e5f3;border-radius:18px;background:white;box-shadow:0 9px 28px #284e7712}
+h1{font-size:23px;margin:0 0 12px}p{line-height:1.65}.status{font-size:20px;font-weight:800}
+progress{width:100%;height:18px;margin:10px 0}small{font-size:13px;color:#526980}
+#detail{white-space:pre-wrap;word-break:break-word;background:#eff6ff;border-radius:12px;padding:12px;margin:14px 0}
+a{color:#1265bd}
+</style>
+</head>
+<body>
+<main>
+<h1>☁ 79號碼頭雲端資料庫</h1>
+<p>此分頁負責下載與保存有權限的系統快取。<strong>請保持此分頁開啟，返回原本的系統分頁就能繼續操作排班、考勤等功能。</strong></p>
+<p id="summary" class="status" role="status" aria-live="polite">正在確認登入狀態…</p>
+<progress id="bar" max="1" value="0"></progress>
+<div id="detail">尚未開始</div>
+<small>進度只計算已成功完成的項目；考勤會另外顯示月份進度。離開或關閉此下載分頁會中止未完成的工作。網頁背景分頁可能受到瀏覽器節電限制。</small>
+</main>
+<script>window.__p79BrowserBackgroundWorker=true;</script>
+<script src="./port79-data-cache.js?v=20261123-browser-background-progress-v1"></script>
+<script>
+(function(){
+ 'use strict';
+ const KEY='p79BrowserCacheProgressV1', CHANNEL='p79-browser-cache-progress';
+ const labels={attendance:'考勤',workhours:'工時統計',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料'};
+ const status=document.getElementById('summary'),detail=document.getElementById('detail'),bar=document.getElementById('bar');
+ const api=window.Port79DataCache;
+ const args=new URLSearchParams(location.search),mode=args.get('mode')||'all';
+ const selected=args.get('system')||'attendance';
+ const startedAt=Date.now();
+ let finished=false,current='',monthCompleted=0,monthTotal=0,channel=null;
+ const done=new Set();
+ try{if(typeof BroadcastChannel==='function')channel=new BroadcastChannel(CHANNEL)}catch(_){}
+ function viewer(){try{return api?.viewerKey?.()||''}catch(_){return ''}}
+ function publish(phase,message,completed=done.size,total=6,extra={}){
+  const record={phase,detail:String(message||'').slice(0,180),viewer:viewer(),system:current,
+   completed, total, monthCompleted,monthTotal,startedAt,updatedAt:Date.now(),...extra};
+  const ratio=total>0?Math.max(0,Math.min(1,completed/total)):0;
+  status.textContent=({downloading:'下載中',complete:'下載完成',partial:'部分完成',failed:'下載失敗',interrupted:'下載中斷'})[phase]||'確認中';
+  bar.max=1;bar.value=ratio;
+  detail.textContent='已完成 '+completed+'/'+(total||'--')+' 項'+
+   (current?'\n目前系統：'+(labels[current]||current):'')+
+   (monthTotal?'\n考勤月份：'+monthCompleted+'/'+monthTotal+' 月':'')+
+   '\n'+record.detail;
+  try{localStorage.setItem(KEY,JSON.stringify(record))}catch(_){}
+  try{channel?.postMessage(record)}catch(_){}
+ }
+ async function savedWhere(){
+  try{
+   // Folder writes are intentionally delayed during ordinary use. An explicit
+   // download must flush them before claiming that the chosen folder is saved.
+   await api.flushFolder();
+   const result=await api.getFolderSyncStatus();
+   if(result.state==='permission'||result.state==='error')
+    return {warning:true,text:'硬碟資料夾尚未保存（'+result.label+'），請返回資料庫中心重新授權。瀏覽器快取仍保留。'};
+   if(result.folder&&result.state==='done')
+    return {warning:false,text:'已保存至所選資料夾「'+result.folder+'」及瀏覽器快取。'};
+   if(result.folder)
+    return {warning:true,text:'所選資料夾「'+result.folder+'」尚未確認保存，請回資料庫中心檢查狀態。'};
+   return {warning:false,text:'資料已保存在瀏覽器快取；尚未選擇電腦資料夾。'};
+  }catch(error){return {warning:true,text:'資料夾保存狀態無法確認，瀏覽器快取仍可使用：'+String(error?.message||error)}}
+ }
+ function signedIn(){
+  try{
+   const session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');
+   const role=String(session?.adminRole||session?.role||'').toLowerCase();
+   return session&&session.punchOnly!==true&&['admin','superadmin'].includes(role)&&
+    !!String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||'').trim();
+  }catch(_){return false}
+ }
+ window.addEventListener('pagehide',()=>{if(!finished)publish('interrupted','下載分頁已關閉或離開，未完成的項目不算成功。',done.size,mode==='all'?6:mode==='current'?1:0)});
+ async function run(){
+  if(!api||!signedIn()){finished=true;publish('failed','登入資訊未帶入背景分頁。請從已登入的管理首頁重新開啟下載。',0,0);return}
+  if(!['all','quick','current'].includes(mode)){finished=true;publish('failed','未知的下載方式。',0,0);return}
+  // Resolve an already approved folder before the first snapshot is queued,
+  // otherwise a deferred IndexedDB handle load could race the final disk flush.
+  try{await api.getFolderSyncStatus()}catch(_){}
+  try{
+   if(mode==='all'){
+    publish('downloading','正在讀取六項基本資料；歷史月份依需要另行讀取。');
+    const rows=await api.downloadAll((sys,index,total,state,error,message,month)=>{
+     current=sys;
+     if(state==='done'||state==='reused')done.add(sys);
+     if(month&&Number.isFinite(Number(month.monthTotal))){monthTotal=Math.max(0,Number(month.monthTotal));monthCompleted=Math.max(0,Number(month.monthCompleted)||0)}
+     const note=message||({loading:'正在讀取雲端',done:'完成',reused:'沿用已保存快取',error:'未完成',skipped:'略過',detail:'整理資料中'})[state]||state;
+     publish('downloading',(labels[sys]||sys)+'｜'+note+(error?'｜'+String(error.message||error):''),done.size,total);
+    },{quickFirst:true,historyOnDemand:true});
+    const failures=rows.filter(x=>!x.ok),success=rows.filter(x=>x.ok).length;
+    publish('downloading','基本資料已處理，正在確認所選電腦資料夾的檔案寫入…',success,rows.length);
+    const storage=await savedWhere();
+    finished=true;publish(failures.length||storage.warning?(success?'partial':'failed'):'complete',failures.length?
+      '未完成：'+failures.map(x=>(labels[x.system]||x.system)+' '+x.error).join('；')+'｜'+storage.text:
+      '六項基本資料已完成或沿用本機快取。'+storage.text,success,rows.length);
+   }else if(mode==='quick'){
+    publish('downloading','快速預載有權限的常用系統資料。',0,0);
+    const completed=new Set();
+    const res=await api.preloadCurrent({network:true,onProgress:(sys,phase,error)=>{
+     current=sys;if(phase==='done'||phase==='reused')completed.add(sys);
+     publish('downloading',(labels[sys]||sys)+'｜'+({loading:'讀取中',done:'已完成',reused:'使用新近快取',error:'未完成'})[phase]+(error?'｜'+error:''),completed.size,0);
+    }});
+    const rows=res.results||[],failures=rows.filter(x=>!x.ok),ok=rows.filter(x=>x.ok).length;
+    publish('downloading','常用資料預載已處理，正在核對本機資料夾…',ok,rows.length);
+    const storage=await savedWhere();
+    finished=true;publish(res.status==='changed'||res.status==='denied'?'failed':failures.length||storage.warning?'partial':'complete',
+      res.status==='changed'?'帳號或權限已改變，停止舊資料下載。':
+      res.status==='denied'?'此帳號沒有預載權限。':'常用資料預載已結束。'+storage.text,ok,rows.length);
+   }else{
+    if(!['attendance','workhours','leave','schedule','efficiency','hr'].includes(selected))throw Error('此系統不支援完整下載');
+    current=selected;
+    publish('downloading','正在下載 '+(labels[current]||current),0,1);
+    await api.downloadSystem(current,(sys,number,total,state,message)=>{
+     if(Number.isFinite(Number(total))){monthTotal=Math.max(0,Number(total));monthCompleted=Math.max(0,Number(number)||0)}
+     publish('downloading',message||'正在讀取 '+(labels[current]||current),0,1);
+    },{interactive:true});
+    publish('downloading','系統已下載，正在確認本機資料夾…',1,1);
+    const storage=await savedWhere();
+    finished=true;publish(storage.warning?'partial':'complete',(labels[current]||current)+'下載已完成。'+storage.text,1,1);
+   }
+  }catch(error){finished=true;publish('failed','下載失敗：'+String(error?.message||error),done.size,mode==='all'?6:mode==='current'?1:0)}
+ }
+ run();
+})();
+</script>
+</body>
+</html>

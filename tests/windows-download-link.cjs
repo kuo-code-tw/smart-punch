@@ -104,3 +104,5 @@ function unit(options={}){
 })().catch(error=>{console.error(error);process.exitCode=1;});
 // Also exercise the new cloud setting's off/on/failure and session-change cases.
 require('./windows-download-cloud-toggle.cjs');
+// Shared web/Windows cache bundle must also preserve independent browser sync progress.
+require('./browser-background-download-progress.cjs');

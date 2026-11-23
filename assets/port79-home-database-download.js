@@ -11,7 +11,7 @@
  function permitted(){
   try{
    const session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null');
-   const token=String(sessionStorage.getItem('port79_user_token')||'').trim();
+   const token=String(sessionStorage.getItem('port79_user_token')||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||'').trim();
    const role=String(session?.adminRole||session?.role||'').toLowerCase();
    return !!session&&!!token&&session.punchOnly!==true&&
     (role==='admin'||role==='superadmin')&&

@@ -101,6 +101,7 @@ function fixture({role='admin',loggedIn=true,punchOnly=false,folder=true}={}){
  assert(unsupported.persist.focused,'Unsupported folder API highlights browser storage instead');
  assert.match(unsupported.records.get('p79HomeDatabaseGuide').textContent,/瀏覽器內部快取/);
 
+ assert.match(source,/sessionStorage\.getItem\('port79_admin_token'\)/,'Legacy signed-in managers retain database entry');
  assert.match(home,/id="p79WindowsDownloadLink"[\s\S]{0,400}id="p79HomeDatabaseDownload"/);
  assert.match(home,/id="p79HomeDatabaseDownload"[^>]*type="button" hidden/);
  assert.match(home,/port79-home-database-download\.js\?v=20261123-db-folder-v1/);
