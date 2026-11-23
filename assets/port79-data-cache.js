@@ -1089,6 +1089,72 @@ async function reusableSystemDownload(sys,scopeAtStart){
  if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
  return snapshot;
 }
+// Browser/WebView2 quick warm-up: no executable, no external folder and no
+// automatic full-history download. The home screen may call preloadCurrent()
+// during login; by default it warms only already verified local snapshots.
+// Live preloading happens only when the operator explicitly clicks the quick
+// prefetch control in the cache centre.
+let quickPreloadPromise=null;
+function permittedQuickSystems(){
+ let session=null;
+ try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||
+  sessionStorage.getItem('admin_session')||'null')}catch(_){}
+ const role=String(session?.adminRole||session?.role||'').toLowerCase();
+ if(!session||session.punchOnly===true||!['admin','superadmin'].includes(role)||!token())return [];
+ const permissions=session.systemPermissions||{};
+ return ['hr','schedule','leave'].filter(sys=>
+   role==='superadmin'||['view','edit','manage'].includes(String(permissions[sys]||'').toLowerCase()));
+}
+function quickPreloadSameContext(ctx){
+ return ctx.viewer===viewerKey()&&ctx.token===token()&&ctx.scope===displayScope()&&
+   ctx.gas===gasUrl()&&ctx.stamp===mutationStamp()&&
+   window.__port79CachedSessionRefreshPending!==true;
+}
+async function preloadCurrent(options={}){
+ const network=options.network===true;
+ if(window.__port79CachedSessionRefreshPending===true)return {status:'verifying',results:[]};
+ const systems=permittedQuickSystems();
+ if(!systems.length)return {status:'denied',results:[]};
+ if(network&&quickPreloadPromise)return quickPreloadPromise;
+ const ctx={viewer:viewerKey(),token:token(),scope:displayScope(),gas:gasUrl(),stamp:mutationStamp()};
+ const task=(async()=>{
+  const results=[];
+  for(const sys of systems){
+   if(!quickPreloadSameContext(ctx))return {status:'changed',results};
+   const cached=await getDisplaySnapshot(sys,{timeoutMs:1200,month:sys==='efficiency'?ymNow():undefined}).catch(()=>null);
+   if(!quickPreloadSameContext(ctx))return {status:'changed',results};
+   if(cached&&(!network||Date.now()-Number(cached.savedAt||0)<30000)){
+    options.onProgress?.(sys,'reused');
+    results.push({system:sys,ok:true,reused:true});
+    continue;
+   }
+   if(!network){
+    results.push({system:sys,ok:false,skipped:true});
+    continue;
+   }
+   options.onProgress?.(sys,'loading');
+   try{
+    if(window.navigator?.onLine===false)throw Error('瀏覽器目前離線');
+    const data=await downloadSystem(sys,null,{interactive:true});
+    if(!quickPreloadSameContext(ctx))return {status:'changed',results};
+    if(data?.ok!==true)throw Error('雲端尚未回傳完整資料');
+    options.onProgress?.(sys,'done');
+    results.push({system:sys,ok:true});
+   }catch(error){
+    if(!quickPreloadSameContext(ctx))return {status:'changed',results};
+    const message=String(error?.message||error);
+    options.onProgress?.(sys,'error',message);
+    results.push({system:sys,ok:false,error:message});
+    if(['P79_AUTH','P79_SCOPE'].includes(error?.code))break;
+   }
+  }
+  return {status:network?'completed':'local',results};
+ })();
+ if(!network)return task;
+ quickPreloadPromise=task;
+ try{return await task}finally{if(quickPreloadPromise===task)quickPreloadPromise=null}
+}
+window.addEventListener?.('port79-home-session-refreshed',()=>{void preloadCurrent().catch(()=>{});});
 let lastAllDownload=null;
 async function downloadAll(onProgress,options={}){
  // Interactive Windows batches show usable independent system data before the
@@ -1187,7 +1253,7 @@ function ensureStyle(){if(document.getElementById('p79CacheStyle'))return;const 
 `;document.head.appendChild(s)}
 function ensureModal(){
  ensureStyle();let b=document.getElementById('p79CacheBackdrop');if(b)return b;
- b=document.createElement('div');b.id='p79CacheBackdrop';b.innerHTML=`<div id="p79CacheModal" role="dialog" aria-modal="true"><div class="p79-cache-head"><div><div class="p79-cache-title">☁️ 79號碼頭雲端資料庫</div><div class="p79-cache-sub">本機加速讀取，修改仍透過各系統同步雲端。</div></div><button class="p79-cache-close" type="button">✕</button></div><div id="p79DeviceStatus" class="p79-cache-note" role="status"></div><div class="p79-cache-actions"><button class="p79-cache-btn" data-cache-action="folder">選擇電腦資料夾</button><button class="p79-cache-btn" data-cache-action="reconnect">重新授權資料夾</button><button class="p79-cache-btn" data-cache-action="disconnect">停用資料夾</button><button class="p79-cache-btn" data-cache-action="persist">保留手機／瀏覽器資料</button></div><div class="p79-cache-note">電腦：請先建立並選擇「79號碼頭雲端資料庫」資料夾。手機：按「保留手機／瀏覽器資料」，也可將系統加入主畫面。清除網站資料後，電腦檔案仍保留，但需重新選擇資料夾。資料夾快取不會自行覆寫雲端；請以各系統的儲存／同步狀態確認上傳結果。</div><div id="p79CacheRows" class="p79-cache-grid"></div><div class="p79-cache-actions"><button class="p79-cache-btn primary" data-cache-action="current">下載目前系統完整資料</button><button class="p79-cache-btn all" data-cache-action="all">下載六項基本資料（歷史按月）</button><button class="p79-cache-btn danger" data-cache-action="clear">清除本機快取</button></div><div class="p79-cache-note">注意：上述六項基本資料下載不包含「碼頭儲量」；歷史月份請到歷史資料中心按月讀取。Yard Excel 數據仍是各瀏覽器獨立的帳號本機資料，Windows 版本不能藉由此下載動作取得網頁版的儲量。系統不會以零或假數字代替缺失數據。</div><div id="p79CacheProgress" class="p79-cache-note">選取資料夾後會先找回目前帳號已有的快取，不必再次下載。同一帳號重新登入會重用既有檔案；首次使用的新帳號需下載其權限範圍內的資料。考勤／工時下載前會核對版本，資料未變時重用完整快取。</div></div>`;
+ b=document.createElement('div');b.id='p79CacheBackdrop';b.innerHTML=`<div id="p79CacheModal" role="dialog" aria-modal="true"><div class="p79-cache-head"><div><div class="p79-cache-title">☁️ 79號碼頭雲端資料庫</div><div class="p79-cache-sub">本機加速讀取，修改仍透過各系統同步雲端。</div></div><button class="p79-cache-close" type="button">✕</button></div><div id="p79DeviceStatus" class="p79-cache-note" role="status"></div><div class="p79-cache-actions"><button class="p79-cache-btn" data-cache-action="folder">選擇電腦資料夾</button><button class="p79-cache-btn" data-cache-action="reconnect">重新授權資料夾</button><button class="p79-cache-btn" data-cache-action="disconnect">停用資料夾</button><button class="p79-cache-btn" data-cache-action="persist">保留手機／瀏覽器資料</button></div><div class="p79-cache-note">電腦：請先建立並選擇「79號碼頭雲端資料庫」資料夾。手機：按「保留手機／瀏覽器資料」，也可將系統加入主畫面。清除網站資料後，電腦檔案仍保留，但需重新選擇資料夾。資料夾快取不會自行覆寫雲端；請以各系統的儲存／同步狀態確認上傳結果。</div><div id="p79CacheRows" class="p79-cache-grid"></div><div class="p79-cache-actions"><button class="p79-cache-btn primary" data-cache-action="quick">快速預載常用資料（人資／排班／請假）</button><button class="p79-cache-btn" data-cache-action="current">下載目前系統完整資料</button><button class="p79-cache-btn all" data-cache-action="all">下載六項基本資料（歷史按月）</button><button class="p79-cache-btn danger" data-cache-action="clear">清除本機快取</button></div><div class="p79-cache-note">注意：上述六項基本資料下載不包含「碼頭儲量」；歷史月份請到歷史資料中心按月讀取。Yard Excel 數據仍是各瀏覽器獨立的帳號本機資料，Windows 版本不能藉由此下載動作取得網頁版的儲量。系統不會以零或假數字代替缺失數據。</div><div id="p79CacheProgress" class="p79-cache-note">選取資料夾後會先找回目前帳號已有的快取，不必再次下載。同一帳號重新登入會重用既有檔案；首次使用的新帳號需下載其權限範圍內的資料。考勤／工時下載前會核對版本，資料未變時重用完整快取。</div></div>`;
  document.body.appendChild(b);b.querySelector('.p79-cache-close').onclick=()=>b.classList.remove('open');b.addEventListener('click',e=>{if(e.target===b)b.classList.remove('open')});
  b.addEventListener('click',async e=>{const btn=e.target.closest('[data-cache-action]');if(!btn)return;const act=btn.dataset.cacheAction;const buttons=[...b.querySelectorAll('[data-cache-action]')];buttons.forEach(x=>x.disabled=true);try{
    if(act==='folder'){setProgress(await connectFolder());await refreshModal()}
@@ -1195,6 +1261,23 @@ function ensureModal(){
    if(act==='disconnect'){setProgress(await disconnectFolder());await refreshModal()}
    if(act==='persist'){setProgress(await retainDeviceData());await refreshModal()}
    if(act==='clear'){if(confirm('確定清除此瀏覽器的七大系統本機快取？')){await clear();setProgress('已清除瀏覽器快取；硬碟資料夾檔案仍保留，啟用時可重新讀取。');await refreshModal()}}
+   if(act==='quick'){
+     setProgress('正在預載有權限的常用資料，不下載全部考勤歷史…');
+     const result=await preloadCurrent({network:true,onProgress:(sys,phase,error)=>{
+       setProgress((phase==='error'?'⚠️ ':phase==='reused'?'✓ ':'⬇️ ')+
+         (SYSTEM_LABELS[sys]||sys)+'：'+
+         ({loading:'預載中',reused:'沿用近30秒本機資料',done:'完成',error:'未完成'}[phase]||phase)+
+         (error?'｜'+error:''));
+     }});
+     const ok=result.results.filter(x=>x.ok).length;
+     const fail=result.results.filter(x=>!x.ok);
+     setProgress(result.status==='changed'?'登入身分或權限已變更，已停止預載；原資料不變。':
+       result.status==='denied'?'目前帳號沒有可預載的管理資料權限。':
+       '常用資料預載完成：'+ok+'/'+result.results.length+' 項'+
+       (fail.length?'；未完成：'+fail.map(x=>SYSTEM_LABELS[x.system]+(x.error?' '+x.error:'')).join('、'):'')+
+       '。正式申報仍需重新向雲端核對。');
+     await refreshModal();
+   }
    if(act==='current'){const sys=currentSystem();if(sys==='history'){setProgress('歷史資料請在歷史資料中心選擇月份並按「讀取月份」，已有的歷史快取不會重新下載。');return;}setProgress(`正在下載 ${SYSTEM_LABELS[sys]}…`);const snap=await downloadSystem(sys,(s,i,total,state,label)=>setProgress(`⬇️ ${label||SYSTEM_LABELS[sys]} ${i}/${total}`));setProgress(sys==='attendance'||sys==='workhours'?`✅ ${SYSTEM_LABELS[sys]}完整資料已載入｜考勤 ${Number(snap?.recordCount||0)} 筆｜員工主檔 ${Number(snap?.employeeCount||0)} 人`:`✅ ${SYSTEM_LABELS[sys]} 快取完成。`);await refreshModal()}
    if(act==='all'){
    // Windows has a separate same-origin WebView2 worker that continues across
@@ -1316,7 +1399,7 @@ if(typeof window.addEventListener==='function'){
  window.__port79NativeCloudSyncReady=true;
 }
 
-window.Port79DataCache={getDisplaySnapshot,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
+window.Port79DataCache={preloadCurrent,getDisplaySnapshot,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 })();
 
 
