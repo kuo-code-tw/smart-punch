@@ -737,8 +737,10 @@ function simplifyMonthlyRestLayout(el,settings={}){
  diagnostics.innerHTML='<summary>核對依據與資料來源說明</summary>';
  for(const selector of ['#mrBackfill','#mrPhase','#mrAuditSummary']){
   const element=el.querySelector(selector);
-  if(element)diagnostics.appendChild(element);
+  if(element){diagnostics.appendChild(element);element.hidden=false;}
  }
+ const audit=el.querySelector('#mrAuditDetails')?.closest('details');
+ if(audit){diagnostics.appendChild(audit);audit.hidden=false;}
  if(ready)ready.after(diagnostics);
  const style=document.createElement('style');style.id='mrSimpleLayoutStyle';
  style.textContent=`#p79MonthlyRest{width:min(1180px,calc(100vw - 20px));border-radius:16px}
