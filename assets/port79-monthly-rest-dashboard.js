@@ -329,7 +329,12 @@ function mount(el){
  for(const selector of ['#mrRows','#mrPlannedRows','#mrExistingRows','#mrNeedRows','#mrAutoSupplementRows','#mrAuditSummary','#mrStatus','#mrSave','#mrSavePlans']){
   const node=$(el,selector);if(!node)continue;
   const observer=new MutationObserver(()=>render());
-  observer.observe(node,{childList:true,subtree:selector==='#mrStatus'||selector==='#mrAuditSummary',characterData:selector==='#mrStatus',attributes:['#mrSave','#mrSavePlans'].includes(selector),attributeFilter:['disabled']});
+  // DOM MutationObserver forbids attributeFilter together with attributes:false.
+  // This previously threw on the first table observer, leaving every KPI as '—'.
+  const button=['#mrSave','#mrSavePlans'].includes(selector);
+  const options={childList:true,subtree:selector==='#mrStatus'||selector==='#mrAuditSummary',characterData:selector==='#mrStatus'};
+  if(button){options.attributes=true;options.attributeFilter=['disabled'];}
+  observer.observe(node,options);
   observers.push(observer);
  }
  el.addEventListener('close',()=>{state.disposed=true;observers.forEach(o=>o.disconnect());},{once:true});
