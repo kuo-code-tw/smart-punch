@@ -31,8 +31,8 @@
   const user=window.Port79DataCache?.viewerKey?.();
   if(!record||record.viewer!==user||!record.startedAt||record.startedAt<=lastDismissed||
      Date.now()-Number(record.updatedAt||0)>3600000){panel.hidden=true;return}
-  const active=record.phase==='downloading',stalled=active&&Date.now()-record.updatedAt>90000;
-  const state=active?(stalled?'進度暫未更新':'下載中'):
+  const active=['downloading','starting'].includes(record.phase),stalled=active&&Date.now()-record.updatedAt>90000;
+  const state=active?(stalled?'進度暫未更新':record.phase==='starting'?'準備中':'下載中'):
     ({complete:'已完成',partial:'部分完成',failed:'失敗',interrupted:'已中斷'})[record.phase]||'待確認';
   const completed=Math.max(0,Number(record.completed)||0),total=Math.max(0,Number(record.total)||0);
   const names={attendance:'考勤',workhours:'工時統計',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料'};
