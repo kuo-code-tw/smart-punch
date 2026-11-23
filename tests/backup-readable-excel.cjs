@@ -31,6 +31,51 @@ function setup(options={}){
   await retry.w.Port79BackupExcel.run(b,{actor:'A',endpoint:'https://example.invalid/exec',token:'fixture',same:()=>true});assert(b.excelComplete,'automatic '+phase+' retry completes');
   const repeated=retry.calls.filter(p=>(p.phase||'export')===phase);assert.equal(JSON.stringify(repeated[0]),JSON.stringify(repeated[1]),'lost reply retries identical '+phase+' payload');
  }
+ // Reproduce the production error: a local XLSX exceeds the 17 MiB
+ // base64 server limit. Verify that every source data row survives in
+ // readable, smaller XLSX parts and every upload stays below the limit.
+ function fixtureLarge(x){
+  const X=x.w.XLSX,rows=[['欄位','內容'],...Array.from({length:26},(_,i)=>['ROW-'+i,'原始內容'+i])];
+  let first=true;
+  X.read=()=>({SheetNames:['1_本機大量資料'],Sheets:{'1_本機大量資料':{rows}}});
+  X.utils.sheet_to_json=s=>s.rows;
+  X.write=b=>{
+   if(first){first=false;const a=new Uint8Array(11*1024*1024);a.set([80,75,3,4]);return a.buffer;}
+   const flat=b.sheets.map(s=>s.rows.map(r=>r[0]));
+   const json=Buffer.from(JSON.stringify(flat),'utf8'),count=flat.reduce((n,rs)=>n+Math.max(0,rs.length-1),0);
+   const a=new Uint8Array(Math.max(256,json.length+10,count*480000+256));
+   a.set([80,75,3,4]);a.set(json,4);return a.buffer;
+  };
+  return rows;
+ }
+ const large=setup({before:p=>{if(p.phase==='local'&&p.base64.length>6*1024*1024)return {ok:true,json:async()=>({ok:false,error:'電腦端Excel大小無效'})};}}),largeRows=fixtureLarge(large),largeBatch=makeBatch();
+ await large.w.Port79BackupExcel.run(largeBatch,{actor:'A',endpoint:'https://example.invalid/exec',token:'fixture',same:()=>true});
+ assert(largeBatch.excelComplete,'oversized local Excel completes via bounded parts');
+ const uploads=large.calls.filter(p=>p.phase==='local');
+ assert(uploads.length>1,'oversized Excel must be divided into multiple server uploads');
+ assert(uploads.every((p,i)=>p.partIndex===i&&p.partTotal===uploads.length&&p.base64.length<6*1024*1024),'no upload may exceed the safe server envelope');
+ const localZip=await JSZip.loadAsync(await large.downloads[0].arrayBuffer(),{checkCRC32:true});
+ const names=Object.keys(localZip.files).filter(n=>/^電腦端資料\/本機資料.*\.xlsx$/.test(n));
+ assert.equal(names.length,uploads.length,'download ZIP must contain every cloud-uploaded workbook part');
+ assert(localZip.file('備份說明/本機資料分冊說明.txt'),'user must be told to read all Excel parts');
+ const collected=[];
+ for(const name of names){
+  const b=Buffer.from(await localZip.file(name).async('uint8array'));
+  const json=b.subarray(4,b.indexOf(0,4)).toString('utf8');
+  collected.push(...JSON.parse(json).flat().filter(v=>v!=='欄位'));
+ }
+ assert.deepEqual(collected,largeRows.slice(1).map(r=>r[0]),'every original row appears exactly once despite repeated headers');
+
+ let failPart=true;
+ const resume=setup({before:p=>{if(p.phase==='local'&&p.partIndex===1&&failPart)return {ok:true,json:async()=>({ok:false,error:'伺服器暫時無法寫入'})};}}),resumeRows=fixtureLarge(resume),resumeBatch=makeBatch(),context={actor:'A',endpoint:'https://example.invalid/exec',token:'fixture',same:()=>true};
+ await assert.rejects(resume.w.Port79BackupExcel.run(resumeBatch,context),/伺服器暫時無法寫入/);
+ assert.equal(resume.calls.filter(p=>p.phase==='local'&&p.partIndex===0).length,1,'previously confirmed local part must stay complete');
+ failPart=false;
+ await resume.w.Port79BackupExcel.run(resumeBatch,context);
+ assert(resumeBatch.excelComplete);
+ assert.equal(resume.calls.filter(p=>p.phase==='local'&&p.partIndex===0).length,1,'manual retry cannot upload the verified first local part twice');
+ assert.equal(resume.calls.filter(p=>p.phase==='local'&&p.partIndex===1).length,2,'only the unconfirmed part retries');
+
  const denied=setup({fast:true,before:()=>({ok:true,json:async()=>({ok:false,error:'登入失效，請重新登入'})})});await assert.rejects(denied.w.Port79BackupExcel.run(makeBatch(),{actor:'A',endpoint:'https://example.invalid/exec',same:()=>true}),/登入失效/);assert.equal(denied.calls.length,1,'authorization refusal never retries');
  let changed=false;const switched=setup({fast:true,onWait:()=>changed=true,before:()=>{throw new TypeError('Failed to fetch');}});await assert.rejects(switched.w.Port79BackupExcel.run(makeBatch(),{actor:'A',endpoint:'https://example.invalid/exec',same:()=>!changed}),/登入已變更/);assert.equal(switched.calls.length,1,'identity change during retry wait blocks another POST');
  let offline=true;const partial=setup({fast:true,before:p=>{if(p.index===1&&offline)throw new TypeError('Failed to fetch');}}),partialBatch=makeBatch(),partialContext={actor:'A',endpoint:'https://example.invalid/exec',same:()=>true};await assert.rejects(partial.w.Port79BackupExcel.run(partialBatch,partialContext),/Failed to fetch/);assert.equal(partial.calls.filter(p=>p.index===1).length,6,'retry budget is bounded');assert(!partialBatch.excelComplete);assert.equal(partial.downloads.length,0,'incomplete export cannot offer download');const diagnostic=partial.nodes.get('p79BackupErrorDetails').querySelector('pre').textContent;assert.match(diagnostic,/船舶.*雲端匯出及下載Excel.*第2\/2份/);assert.match(diagnostic,/Failed to fetch/);assert.match(diagnostic,/台灣時間/);assert(!diagnostic.includes('fixture-token'));assert(fs.readFileSync('assets/port79-messages.js','utf8').includes("closest('[data-p79-raw-error]')"),'raw diagnostic bypasses generic translation');offline=false;await partial.w.Port79BackupExcel.run(partialBatch,partialContext);assert(partialBatch.excelComplete);assert.equal(partial.calls.filter(p=>p.index===0).length,1,'already verified file survives retry and manual continuation');
@@ -38,6 +83,19 @@ function setup(options={}){
  let touches=0;const c={p79HistoryBackupSession_:()=>{throw Error('denied');},getSpreadsheet_:()=>({}),p79ExcelContext_:()=>touches++};vm.createContext(c);vm.runInContext(backend,c);
  for(const phase of ['list','complete','local','export'])assert.throws(()=>c.p79BackupReadableExcel_({phase}),/denied/);assert.equal(touches,0,'no source metadata before superadmin authorization');
  assert.throws(()=>c.p79ExcelFolder_('English'),/中文/);
+ // The backend accepts numbered workbook parts but never accepts invalid
+ // indices or bypasses the existing SHA-256 and XLSX checks.
+ const savedParts=[],partProps=new Map(),partBytes=[80,75,3,4];
+ Object.assign(c,{p79ExcelHash_:()=> 'part-hash',p79ExcelPeriod_:()=> '202611',p79ExcelStamp_:()=> '20261123',
+   p79ExcelFolder_:()=>({createFile:blob=>{savedParts.push(blob.name);return {getId:()=> 'part-id',getBlob:()=>({getBytes:()=>partBytes})};}}),
+   PropertiesService:{getScriptProperties:()=>({getProperty:k=>partProps.get(k)||null,setProperty:(k,v)=>partProps.set(k,v)})},
+   Utilities:{base64Decode:()=>partBytes,newBlob:(b,mime,name)=>({name})}});
+ assert.throws(()=>c.p79BackupLocalExcel_({base64:'UEsDBA==',hash:'part-hash',partIndex:2,partTotal:2}),/分冊編號/);
+ assert.throws(()=>c.p79BackupLocalExcel_({base64:'UEsDBA==',hash:'part-hash',partIndex:-1,partTotal:2}),/分冊編號/);
+ assert.throws(()=>c.p79BackupLocalExcel_({base64:'UEsDBA==',hash:'part-hash',partIndex:0,partTotal:129}),/分冊編號/);
+ assert.equal(c.p79BackupLocalExcel_({base64:'UEsDBA==',hash:'part-hash',partIndex:0,partTotal:3}).verified,true);
+ assert(savedParts[0].includes('第1份_共3份'),'Drive workbook name identifies its part number');
+
  const claims=new Map();let core=0,lockOwned=false;
  Object.assign(c,{p79ExcelExisting_:()=>null,PropertiesService:{getScriptProperties:()=>({getProperty:k=>claims.get(k)||null,setProperty:(k,v)=>claims.set(k,v),deleteProperty:k=>claims.delete(k)})},LockService:{getUserLock:()=>({tryLock:()=>{lockOwned=true;return true;},releaseLock:()=>{lockOwned=false;}})},Utilities:{getUuid:()=> 'owner'},p79ExcelExportSourceCore_:()=>{assert.equal(lockOwned,false,'network export must not hold global lock');core++;return {ok:true};}});
  claims.set('P79_EXCEL_BUSY_source',JSON.stringify({owner:'other',at:Date.now()}));assert.throws(()=>c.p79ExcelExportSource_({ids:['source']},0),/正在產生/);assert.equal(core,0,'another computer cannot duplicate an active export');
