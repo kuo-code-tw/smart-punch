@@ -204,6 +204,8 @@ namespace Port79Lite {
   private void ShowWindow(){Show();WindowState=FormWindowState.Maximized;Activate();}
   private void ExitApp(){exit=true;tray.Visible=false;Close();}
   private string DataRoot=>Path.Combine(root,"local-data");
+  private static readonly bool AttendanceInlineProbe = Array.Exists(Environment.GetCommandLineArgs(),
+   argument=>argument=="--port79-verify-attendance-inline");
   private void OpenLocalData(){
    Directory.CreateDirectory(DataRoot);
    try{Process.Start(new ProcessStartInfo("explorer.exe","\""+DataRoot+"\""){UseShellExecute=true});}catch{}
@@ -221,7 +223,7 @@ namespace Port79Lite {
     // Only apply staged patches created for THIS bundle, never old ZIPs.
     int appliedSiteFiles=0;
     try {
-     appliedSiteFiles=Updater.ApplyIfVerified(site,DataRoot,Log);
+     if(!AttendanceInlineProbe)appliedSiteFiles=Updater.ApplyIfVerified(site,DataRoot,Log);
      if(appliedSiteFiles>0)systemUpdateStatusMenu.Text="系統檔案：已套用 "+appliedSiteFiles+" 項新版";
     }catch(Exception error){
      Log("staged system update rejected, preserved existing site: "+error.Message);
@@ -300,8 +302,7 @@ namespace Port79Lite {
        a=>a=="--port79-verify-import-frames")){
        probedImportFrames=true;await ProbeImportFrames();
       }
-      if(!probedAttendanceInline&&Array.Exists(Environment.GetCommandLineArgs(),
-       a=>a=="--port79-verify-attendance-inline")){
+      if(!probedAttendanceInline&&AttendanceInlineProbe){
        probedAttendanceInline=true;await ProbeAttendanceInlineChannel();
       }
      }
@@ -694,6 +695,8 @@ namespace Port79Lite {
   }
 
   private async Task CheckUpdates(bool manual=false){
+   // Validate the packaged pages without staging or restarting into a public release.
+   if(AttendanceInlineProbe)return;
    if(updateBusy){
     if(manual){
      manualUpdateQueued=true;
