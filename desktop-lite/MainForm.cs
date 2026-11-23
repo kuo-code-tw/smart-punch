@@ -313,10 +313,16 @@ namespace Port79Lite {
     // The second WebView2 stays at its own fixed same-origin worker URL.
     // Navigating the visible WebView cannot terminate its fetch or IndexedDB.
     _=InitializeCloudWorker(env);
-    // Check immediately on startup, not only after the first ten-minute timer tick.
-    // Read-only public program files are verified and staged; active pages are
-    // never replaced in-place, so unsaved form edits cannot be interrupted.
-    _=CheckUpdates(false);
+    // Check immediately on normal startup, not only after the first timer.
+    // The native attendance-inline smoke runs a read-only, origin-checked
+    // iframe handshake. An unrelated live update can close/restart the EXE
+    // before the handshake proves the embedded attendance page works.
+    // Isolate ONLY that explicit verification mode; normal users still
+    // receive automatic update checks on startup.
+    var inlineSmoke=Array.Exists(Environment.GetCommandLineArgs(),
+     a=>a=="--port79-verify-attendance-inline");
+    if(!inlineSmoke)_=CheckUpdates(false);
+    else Log("ATTENDANCE INLINE CHECK: startup auto update deferred for read-only smoke");
     // Periodically check for subsequent public site revisions while running.
     var tick=new Timer{Interval=300000};
     tick.Tick+=async(s,e)=>await CheckUpdates();
