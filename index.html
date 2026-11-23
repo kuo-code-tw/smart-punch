@@ -401,6 +401,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
       <div><strong id="sessionTitle"></strong><small id="sessionMeta"></small></div>
       <div class="p79-windows-download-slot">
         <a id="p79WindowsDownloadLink" class="p79-windows-download-link" target="_blank" rel="noopener noreferrer" hidden aria-label="79號碼頭電腦版下載（完整程式 ZIP）" title="下載最新79號碼頭電腦版，更新檔包含版本編號及 SHA-256 校驗">⬇ 電腦版下載</a>
+        <button id="p79HomeDatabaseDownload" class="p79-home-db-download" type="button" hidden aria-label="下載資料庫並選擇儲存位置" title="開啟79號碼頭雲端資料庫，選擇電腦資料夾並下載有權限的快取">⬇ 下載資料庫</button>
         <button id="logoutBtn" class="logout" type="button">登出</button>
       </div>
     </div>
@@ -2352,15 +2353,22 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 .p79-windows-download-link:hover,.p79-windows-download-link:focus-visible{background:#096bad;color:#fff!important;outline-offset:3px}
 .p79-windows-download-link small{color:#dceeff;font-size:10px;margin:0;font-weight:700}
 .p79-windows-download-link[hidden]{display:none!important}
+.p79-home-db-download{display:inline-flex;align-items:center;justify-content:center;gap:6px;background:#087d70;color:#fff!important;border:1px solid #047265;cursor:pointer;text-decoration:none;padding:9px 13px;border-radius:10px;font-size:13px;font-weight:900;white-space:nowrap;box-shadow:0 5px 16px rgba(0,95,78,.15);line-height:1.25}
+.p79-home-db-download:hover,.p79-home-db-download:focus-visible{background:#07695f;color:#fff!important;outline-offset:3px}
+.p79-home-db-download[hidden]{display:none!important}
+.p79-home-db-guide{margin:10px 0 4px;padding:12px 14px;border:1px solid #83c9bf;border-radius:12px;background:#ecfaf7;color:#174d46;line-height:1.7;font-size:13px;font-weight:650}
+.dark .p79-home-db-guide{background:#103b36;color:#ddfff8;border-color:#296b61}
+html body.p79-workspace #p79WorkspaceTopbar #p79HomeDatabaseDownload:not([hidden]){display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto;min-height:37px;padding:7px 10px;margin-right:7px;box-sizing:border-box;background:#087d70!important;color:#fff!important;font-size:12px!important;line-height:1.2!important;border-radius:10px!important;white-space:nowrap!important;z-index:2}
 html body.p79-workspace #p79WorkspaceTopbar #p79WindowsDownloadLink:not([hidden]){display:inline-flex!important;align-items:center!important;flex:0 0 auto;min-height:37px;padding:7px 10px;margin-right:7px;max-width:250px;box-sizing:border-box;background:#0d81ce!important;color:#fff!important;font-size:12px!important;line-height:1.2!important;border-radius:10px!important;white-space:nowrap;z-index:2}
 html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar .p79-toolbar-tools>#p79WindowsDownloadLink:not([hidden]){display:inline-flex!important}
 @media(max-width:900px){html body.p79-workspace #p79WorkspaceTopbar #p79WindowsDownloadLink:not([hidden]){font-size:11px!important;padding:6px!important;margin-right:2px}html body.p79-workspace #p79WorkspaceTopbar #p79WindowsDownloadLink small{display:none!important}}
-@media(max-width:650px){.p79-windows-download-slot{width:100%;display:grid;grid-template-columns:1fr;gap:8px}.p79-windows-download-link{justify-content:center}.p79-windows-download-slot .logout{width:100%}}
+@media(max-width:650px){.p79-windows-download-slot{width:100%;display:grid;grid-template-columns:1fr;gap:8px}.p79-windows-download-link,.p79-home-db-download{justify-content:center}.p79-windows-download-slot .logout{width:100%}}
 </style>
 <script defer src="./assets/port79-login-version-check.js?v=20261122-naming-v2"></script>
 <!-- Compact homepage top controls: visual layout only, original download/login handlers preserved. -->
-<link rel="stylesheet" href="./assets/port79-home-compact-controls.css?v=20261121-v1">
-<script defer src="./assets/port79-home-compact-controls.js?v=20261121-v1"></script>
+<link rel="stylesheet" href="./assets/port79-home-compact-controls.css?v=20261123-db-download-v2">
+<script defer src="./assets/port79-home-compact-controls.js?v=20261123-db-download-v2"></script>
 <script defer src="./assets/port79-windows-download.js?v=20261123-superadmin-cloud-v2"></script>
+<script defer src="./assets/port79-home-database-download.js?v=20261123-db-folder-v1"></script>
 </body>
 </html>
