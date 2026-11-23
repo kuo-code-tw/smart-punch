@@ -142,6 +142,10 @@ async function reload(){if(busy||!verifiedSuperadmin)return;busy=true;q('reloadC
 async function save(){if(!verifiedSuperadmin){status('沒有通過超級管理員雲端驗證，禁止寫入','error');return false;}if(busy)return false;var draft=readDraft();if(draft.notice.enabled&&!draft.notice.text){status('請先輸入要公告的內容','error');q('noticeText').focus();return false;}
 busy=true;q('save').disabled=true;q('restore').disabled=true;status('正在讀取最新雲端設定並保存…');
 try{
+ // Revalidate current cloud identity before every write, including restoring defaults.
+ var meta=await cloudGet('getSessionMeta');
+ var roleNow=String(meta.adminRole||meta.actualAdminRole||meta.role||meta.session&&meta.session.adminRole||'').toLowerCase();
+ if(roleNow!=='superadmin')throw Error('超級管理員身分已失效，禁止變更電腦版下載權限');
  var latest=await cloudGet('hrGetOrgOptions');if(!latest.config||typeof latest.config!=='object')throw Error('無法確認雲端原始設定，已取消儲存');
  var config=Object.assign({},latest.config);config[KEY]=draft;
  if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw Error('雲端原有設定容量不足，未覆寫正式資料');
