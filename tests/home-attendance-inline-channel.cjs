@@ -12,7 +12,9 @@ async function scenario(cloudResult){
  const frameWin={postMessage(data,target){
   if(guestEvents.message)guestEvents.message({data,origin:ORIGIN,source:guestRoot.parent});
  }};
- const frame={contentWindow:frameWin,hidden:true,removeAttribute(name){if(name==='src')this.src='';}};
+ const frame={contentWindow:frameWin,hidden:false,starting:true,ariaHidden:true,
+  classList:{remove(name){if(name==='p79-early-inline-starting')frame.starting=false;}},
+  removeAttribute(name){if(name==='src')this.src='';if(name==='aria-hidden')this.ariaHidden=false;}};
  const loading={hidden:false,textContent:''},headline={textContent:''},closeBtn={addEventListener(){}};
  const host={parentNode:null,innerHTML:'',id:'',setAttribute(){},
   querySelector(sel){return sel==='iframe'?frame:sel==='.p79-early-inline-loading'?loading:
@@ -34,7 +36,9 @@ async function scenario(cloudResult){
  assert.equal(childUrl.pathname,'/smart-punch/attendance/');
  assert.equal(childUrl.searchParams.get('homeInline'),'1');
  assert.match(nonce,/^[a-f0-9]{32}$/);
- assert.equal(frame.hidden,true,'Never show the original full page');
+ assert.equal(frame.hidden,false,'Keep child WebView2 frame live during handshake');
+ assert.equal(frame.starting,true,'Only a 1px offscreen child loads, not the full page');
+ assert.match(host.innerHTML,/class="p79-early-inline-starting"/);
  assert.equal(api.isWriting(),false);
  // Bogus origin/nonce must never receive the row identity or SSO token.
  const bad=()=>parentEvents.message({source:frameWin,origin:'https://evil.example',
@@ -67,7 +71,8 @@ async function scenario(cloudResult){
  assert(!messages.some(x=>x.action==='saved'),'No optimistic success');
  assert(interval);
  interval();
- assert.equal(frame.hidden,false,'Show only the original modal after it opens');
+ assert.equal(frame.starting,false,'Expand the original form only after it opens');
+ assert.equal(frame.ariaHidden,false);
  assert.equal(loading.hidden,true);
  assert(messages.some(x=>x.action==='opened'));
  const result=await guestRoot.postToCloud({action:'addRecord',record:{empId:'E1'}});

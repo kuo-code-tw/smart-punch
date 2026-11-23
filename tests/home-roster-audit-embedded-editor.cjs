@@ -9,14 +9,16 @@ const attendance=fs.readFileSync('attendance/index.html','utf8');
 const handoff=fs.readFileSync('assets/port79-attendance-audit-handoff.js','utf8');
 assert.match(home,/id="p79DashEarlyPunchDialog"/);
 assert.doesNotMatch(home,/id="p79EarlyPunchEditorFrame"/,'Never reintroduce gray full-page editor');
-assert.match(home,/assets\/port79-home-audit-inline-editor\.js\?v=20261121-inline-channel-v3/);
+assert.match(home,/assets\/port79-home-audit-inline-editor\.js\?v=20261123-webview2-ready-v1/);
 assert.match(src,/P79HomeAuditInlineEditor/);
 assert.match(src,/bridge\.open\(/);
 assert.match(src,/addEventListener\('cancel',event=>/);
 assert.match(src,/event\.preventDefault\(\)/,'Escape cannot interrupt an active cloud write');
 assert.doesNotMatch(src,/root\.location\.href=url\.href|launchSystem\('attendance'\)/,'Audit never navigates');
 assert.doesNotMatch(home,/data-early-attendance/,'No jump-to-attendance button');
-assert.match(bridge,/frame\.hidden=false;loading\.hidden=true/,'Only the original modal becomes visible');
+assert.match(bridge,/frame\.classList\.remove\('p79-early-inline-starting'\)/,'Only the original modal becomes visible');
+assert.match(bridge,/frame\.removeAttribute\('aria-hidden'\)/);
+assert.match(bridge,/<iframe[^>]*class="p79-early-inline-starting"/,'Do not hide an uninitialized WebView2 iframe');
 assert.doesNotMatch(bridge,/frame\.contentWindow\.(document|location)/,
  'WebView2 isolated child frame must never be accessed as an ordinary DOM');
 assert.match(bridge,/event\.source!==frame\.contentWindow/);
@@ -39,7 +41,7 @@ assert.match(handoff,/matchingIdentity/,'Exact employee and original punch pairi
 assert.match(handoff,/P79AttendanceInlineReport\('error'/,'Invalid pairing is visible in audit details');
 assert.match(css,/#p79Dashboard #p79EarlyInlineEditor iframe\[hidden\]/);
 assert.match(attendance,/port79-attendance-audit-handoff\.js\?v=20261121-inline-channel-v3/);
-assert.match(attendance,/port79-attendance-inline-guest\.js\?v=20261121-inline-channel-v3/);
+assert.match(attendance,/port79-attendance-inline-guest\.js\?v=20261123-webview2-ready-retry-v1/);
 assert.match(attendance,/get\('homeInline'\)!=='1'\)startAutoUpdateCheck\(\)/,'Form is not interrupted by auto-reload');
 assert.doesNotMatch(src,/action:'addRecord'|action:'updateRecord'/,'Home never implements a duplicate writer');
 console.log('PASS original attendance modal in-place: origin-verified message channel, no parent DOM access, exact official cloud writer and no redirects');

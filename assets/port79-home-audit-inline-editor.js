@@ -82,13 +82,13 @@ function open({url,row=null,side='',onStatus=()=>{},onSynced=async()=>{}}={}){
  host.innerHTML='<div class="p79-early-inline-head"><span>📝 正在載入考勤管理原始表單</span>'+
   '<button type="button" data-early-inline-close>返回待核明細 ✕</button></div>'+
   '<p class="p79-early-inline-loading" role="status">正在確認員工與正式考勤修改權限…</p>'+
-  '<iframe title="正式考勤原本修改與補卡表單" hidden referrerpolicy="same-origin"></iframe>';
+  '<iframe title="正式考勤原本修改與補卡表單" class="p79-early-inline-starting" aria-hidden="true" referrerpolicy="same-origin"></iframe>';
  dialog.appendChild(host);
  const frame=host.querySelector('iframe'),loading=host.querySelector('.p79-early-inline-loading'),
   headline=host.querySelector('.p79-early-inline-head span');
  const instance={
   frame,host,loading,headline,payload,nonce,opened:false,writing:false,saving:false,ready:false,
-  timer:0,reportTimer:0,onMessage:null,
+  timer:0,reportTimer:0,initConfirmed:false,failed:false,onMessage:null,
   status(message){
    if(current!==instance)return;
    const value=String(message||'');
@@ -106,17 +106,30 @@ function open({url,row=null,side='',onStatus=()=>{},onSynced=async()=>{}}={}){
   const info=String(message.message||'').slice(0,450);
   switch(message.action){
    case 'ready':
-    if(instance.ready)return;
-    instance.ready=true;
-    // Child receives its one-time row via an authenticated same-origin
-    // channel; no parent access to iframe.document or shared storage needed.
+    if(instance.opened||instance.initConfirmed||instance.failed)return;
+    if(!instance.ready){
+     instance.ready=true;
+     root.clearTimeout(instance.timer);
+     // The heavy attendance page has acknowledged its secure channel.
+     // Allow its original cloud/identity checks to complete rather than
+     // misreporting a 25-second page-load failure.
+     instance.timer=root.setTimeout(()=>{
+      if(current===instance&&!instance.opened&&!instance.failed)
+       instance.status('已連接考勤原始頁面，但正式員工與打卡資料尚未核對完成；請檢查登入權限及雲端連線，未修改任何資料。');
+     },65000);
+     instance.status('正在核對原始員工與打卡紀錄，載入考勤管理原本的表單…');
+    }
+    // If WebView2 discarded the first init while loading, a repeated
+    // ready from this exact nonce-bound child safely retries the handoff.
     frame.contentWindow.postMessage({type:TYPE,action:'init',nonce,payload},root.location.origin);
-    instance.status('正在核對原始員工與打卡紀錄，載入考勤管理原本的表單…');
     break;
    case 'opened':
     if(instance.opened)return;
     instance.opened=true;
-    frame.hidden=false;loading.hidden=true;
+    frame.classList.remove('p79-early-inline-starting');
+    frame.removeAttribute('aria-hidden');
+    loading.hidden=true;
+    root.clearTimeout(instance.timer);
     instance.status('請直接修改／補卡，儲存後會同步考勤與待核明細。');
     break;
    case 'writing':
@@ -142,12 +155,15 @@ function open({url,row=null,side='',onStatus=()=>{},onSynced=async()=>{}}={}){
     break;
    case 'error':
     instance.writing=false;
+    instance.failed=true;
+    root.clearTimeout(instance.timer);
     instance.status('正式考勤未確認同步：'+(info||'請查看表單中的錯誤提示。'));
     break;
    case 'cancelled':
     if(!instance.writing&&!instance.saving)close();
     break;
    case 'progress':
+    instance.initConfirmed=true;
     if(info)instance.status(info);
     break;
   }
@@ -160,8 +176,9 @@ function open({url,row=null,side='',onStatus=()=>{},onSynced=async()=>{}}={}){
    '原本考勤表單尚未完成員工／打卡資料核對。請確認正式考勤權限與雲端連線；沒有修改任何資料。':
    '考勤原始頁面尚未回覆安全載入訊號，可能登入狀態失效或 WebView2 阻止內嵌。未寫入任何考勤資料。');
  },25000);
- // No contentWindow.document or child location access: WebView2 may isolate
- // even a virtual-hosted child frame and raise SecurityError.
+ // Keep the 1x1 offscreen frame rendering (not display:none/hidden)
+ // so WebView2 can initialize it before we receive 'opened'.
+ // Never read the child DOM or location across an isolated frame.
  frame.src=location.href;
  instance.status('正在載入考勤管理完全相同的修改／補卡表單，原待核清單不跳頁。');
  return true;

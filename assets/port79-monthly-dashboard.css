@@ -281,6 +281,16 @@ html body.p79-workspace:has(#systems.show):has(#p79Dashboard) #p79Dashboard .p79
  display:block;width:100%!important;height:100%!important;max-width:100%!important;
  border:0!important;outline:0!important;background:transparent!important
 }
+/* A display:none iframe can be suspended before its same-origin handshake
+   in WebView2. Keep it as a live, offscreen 1px surface until the child
+   confirms the original attendance modal has opened. */
+#p79Dashboard #p79EarlyInlineEditor iframe.p79-early-inline-starting{
+ position:absolute!important;left:-100px!important;top:-100px!important;
+ flex:none!important;width:1px!important;height:1px!important;
+ min-width:1px!important;min-height:1px!important;
+ max-width:1px!important;max-height:1px!important;
+ opacity:0!important;pointer-events:none!important;
+}
 #p79Dashboard #p79EarlyInlineEditor iframe[hidden],
 #p79Dashboard #p79EarlyInlineEditor .p79-early-inline-loading[hidden]{display:none!important}
 @media(max-width:650px){
