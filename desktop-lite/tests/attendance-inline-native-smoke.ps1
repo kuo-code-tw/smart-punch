@@ -25,7 +25,11 @@ try{
    }
   }
   $p.Refresh()
-  if($p.HasExited){throw 'EXE exited before proving the real attendance iframe handshake'}
+  if($p.HasExited){
+   $details=if(Test-Path -LiteralPath $log){Get-Content -LiteralPath $log -Tail 12 -ErrorAction SilentlyContinue}
+   throw ("EXE exited before proving the real attendance iframe handshake (exit $($p.ExitCode)). " +
+     ($details -join [Environment]::NewLine))
+  }
  }
  if(!$passed){throw 'Real attendance iframe did not respond in 55 seconds; no production release'}
  Write-Host 'PASS real Windows WebView2: attendance HTML is embedded and sends origin-verified handshake, no form writes'

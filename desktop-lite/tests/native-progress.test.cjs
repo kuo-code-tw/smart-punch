@@ -178,8 +178,7 @@ test('one Update System menu handles both website and native shell without separ
  assert.match(nativeSource,/await Updater\.StageFromOfficialAsync/,'Updates only changed public site files');
  assert.match(nativeSource,/await ReleaseUpdater\.PrepareAsync/,'Checks native shell in same action');
  assert.match(nativeSource,/await ReleaseUpdater\.LaunchAsync\(shell,root,Process\.GetCurrentProcess\(\)\.Id\)/);
- assert.match(nativeSource,/Application\.Restart\(\)/,'Site-only update can apply without downloading another ZIP');
- assert.match(nativeSource,/exit=true;Application\.Restart\(\);Close\(\);/,'Restart must bypass normal hide-to-tray close guard');
+ assert.match(nativeSource,/staged for next normal Windows launch/);
  assert.match(nativeSource,/Interval=300000/,'Automatic checks stay enabled');
  assert.match(releaseSource,/沿用已驗證的79號碼頭電腦版更新檔，沒有再次下載/,'Verified staged release is reused');
  assert.match(releaseSource,/if\(foundShell&&identical\)/,'Newly unpacked identical shell is not reinstalled');
@@ -187,9 +186,9 @@ test('one Update System menu handles both website and native shell without separ
  assert.match(releaseSource,/relative\.StartsWith\("local-data\//,'User data is excluded from release');
 });
 
-test('system file restart and verified Windows updater reopen the app automatically',()=>{
+test('website updates wait for startup and verified Windows updater can reopen the app',()=>{
  const updater=fs.readFileSync(path.join(__dirname,'../app/upgrade-windows.ps1'),'utf8');
- assert.match(nativeSource,/exit=true;Application\.Restart\(\);Close\(\);/,'Site-file update restarts the Windows app');
+ assert.doesNotMatch(nativeSource,/Application\.Restart\(\)/,'A website-only update leaves the active app open');
  assert.match(nativeSource,/Shown\+=async\(s,e\)=>\{[\s\S]*?ShowWindow\(\);/,'Reopened app must show its main window');
  assert.match(nativeSource,/await ReleaseUpdater\.LaunchAsync\(shell,root,Process\.GetCurrentProcess\(\)\.Id\)/,'Native update launches helper before shutdown');
  assert.match(updater,/AUTO_RESTART_SUCCESS pid=/,'Updater logs verified automatic reopening');

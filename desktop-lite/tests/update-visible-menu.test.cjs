@@ -22,10 +22,11 @@ assert.match(src,/MessageBoxButtons\.YesNo/,
  'Synchronizing or unsaved work requires explicit operator choice before restart');
 assert.match(src,/MessageBoxDefaultButton\.Button2/,
  'Default must protect active data downloads');
-assert.match(src,/if\(\(shell!=null\|\|websitePending\)&&manual&&!restartSafe\)/);
+assert.match(src,/if\(shell!=null&&manual&&!restartSafe\)/);
 assert.match(src,/if\(answer==DialogResult\.Yes\)restartSafe=true/);
 assert.match(src,/if\(shell!=null\)\{[\s\S]*?await ReleaseUpdater\.LaunchAsync\(shell,root,Process\.GetCurrentProcess\(\)\.Id\);[\s\S]*?ExitApp\(\)/);
-assert.match(src,/if\(websitePending\)\{[\s\S]*?exit=true;Application\.Restart\(\);Close\(\)/);
+assert.match(src,/if\(websitePending\)\{[\s\S]*?staged for next normal Windows launch[\s\S]*?return;/);
+assert.doesNotMatch(src,/Application\.Restart\(\)/);
 assert.match(src,/if\(manual\)MessageBox\.Show\(this,[\s\S]*?"79號碼頭電腦版｜已是最新版"/);
 assert.match(src,/if\(manual\)MessageBox\.Show\(this,[\s\S]*?"79號碼頭電腦版｜更新未完成"/);
 assert.match(src,/log/i);

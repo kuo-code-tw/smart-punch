@@ -204,6 +204,8 @@ namespace Port79Lite {
   private void ShowWindow(){Show();WindowState=FormWindowState.Maximized;Activate();}
   private void ExitApp(){exit=true;tray.Visible=false;Close();}
   private string DataRoot=>Path.Combine(root,"local-data");
+  private static readonly bool AttendanceInlineProbe = Array.Exists(Environment.GetCommandLineArgs(),
+   argument=>argument=="--port79-verify-attendance-inline");
   private void OpenLocalData(){
    Directory.CreateDirectory(DataRoot);
    try{Process.Start(new ProcessStartInfo("explorer.exe","\""+DataRoot+"\""){UseShellExecute=true});}catch{}
@@ -221,7 +223,7 @@ namespace Port79Lite {
     // Only apply staged patches created for THIS bundle, never old ZIPs.
     int appliedSiteFiles=0;
     try {
-     appliedSiteFiles=Updater.ApplyIfVerified(site,DataRoot,Log);
+     if(!AttendanceInlineProbe)appliedSiteFiles=Updater.ApplyIfVerified(site,DataRoot,Log);
      if(appliedSiteFiles>0)systemUpdateStatusMenu.Text="系統檔案：已套用 "+appliedSiteFiles+" 項新版";
     }catch(Exception error){
      Log("staged system update rejected, preserved existing site: "+error.Message);
@@ -300,8 +302,7 @@ namespace Port79Lite {
        a=>a=="--port79-verify-import-frames")){
        probedImportFrames=true;await ProbeImportFrames();
       }
-      if(!probedAttendanceInline&&Array.Exists(Environment.GetCommandLineArgs(),
-       a=>a=="--port79-verify-attendance-inline")){
+      if(!probedAttendanceInline&&AttendanceInlineProbe){
        probedAttendanceInline=true;await ProbeAttendanceInlineChannel();
       }
      }
@@ -694,6 +695,8 @@ namespace Port79Lite {
   }
 
   private async Task CheckUpdates(bool manual=false){
+   // Validate the packaged pages without staging or restarting into a public release.
+   if(AttendanceInlineProbe)return;
    if(updateBusy){
     if(manual){
      manualUpdateQueued=true;
@@ -740,8 +743,8 @@ namespace Port79Lite {
     // No pending patch means no restart is needed.
     bool restartSafe=!cloudWorkerJobActive&&!cacheInProgress&&
      (manual||!userInteractedSinceLaunch);
-    if((shell!=null||websitePending)&&manual&&!restartSafe){
-     var pendingType=shell!=null?"79號碼頭電腦版程式及網頁畫面":"79號碼頭網頁版畫面";
+    if(shell!=null&&manual&&!restartSafe){
+     var pendingType="79號碼頭電腦版程式及網頁畫面";
      var answer=MessageBox.Show(this,
       "已找到並驗證"+pendingType+"更新，但目前仍有雲端資料同步。\n\n"+
       "選「是」：中止尚未完成的背景同步，立即套用新版並重新啟動。已儲存的 local-data 快取保留；尚未儲存的表單可能遺失。\n\n"+
@@ -763,14 +766,11 @@ namespace Port79Lite {
      return;
     }
     if(websitePending){
-     if(!restartSafe){
-      UpdateStatus("79號碼頭網頁版更新檔已下載；同步進行中，等待下次手動套用。",manual);
-      Log("Website update staged; restart deferred until next explicit manual choice");
-      return;
-     }
-     UpdateStatus("79號碼頭網頁版更新檔已驗證，正在重新啟動電腦版套用新版畫面。",manual);
-     Log("Website update verified; restart to apply staged site without a prompt");
-     exit=true;Application.Restart();Close();
+     UpdateStatus("79號碼頭網頁更新已下載並驗證，下次正常開啟電腦版時套用。",manual);
+     Log("Website update verified; staged for next normal Windows launch");
+     if(manual)MessageBox.Show(this,
+      "網頁更新已準備完成。你可以繼續作業，下次正常開啟電腦版時會套用。",
+      "79號碼頭｜網頁更新已準備完成",MessageBoxButtons.OK,MessageBoxIcon.Information);
      return;
     }
     if(siteFailure!=null||shellFailure!=null){
