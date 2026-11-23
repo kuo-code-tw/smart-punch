@@ -79,6 +79,9 @@ a{color:#1265bd}
  async function run(){
   if(!api||!signedIn()){finished=true;publish('failed','登入資訊未帶入背景分頁。請從已登入的管理首頁重新開啟下載。',0,0);return}
   if(!['all','quick','current'].includes(mode)){finished=true;publish('failed','未知的下載方式。',0,0);return}
+  // Resolve an already approved folder before the first snapshot is queued,
+  // otherwise a deferred IndexedDB handle load could race the final disk flush.
+  try{await api.getFolderSyncStatus()}catch(_){}
   try{
    if(mode==='all'){
     publish('downloading','正在讀取六項基本資料；歷史月份依需要另行讀取。');
