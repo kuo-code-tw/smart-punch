@@ -181,9 +181,16 @@ namespace Port79Lite {
     File.AppendAllText(path,DateTime.Now.ToString("o")+" "+message+Environment.NewLine,Encoding.UTF8);
    }catch{}
   }
+  // Windows argv parsing treats a backslash immediately before the closing
+  // quote as an escape for that quote. AppDomain.CurrentDomain.BaseDirectory
+  // normally ENDS with '\', so naive wrapping corrupts --install-root and
+  // consumes the following --parent-pid argument before Main() can log.
+  // Double only the final run of backslashes before the closing quote.
   static string Quote(string s){
    if(String.IsNullOrEmpty(s)||s.IndexOf('"')>=0||s.IndexOf('\n')>=0||s.IndexOf('\r')>=0)throw new InvalidDataException("Windows 更新路徑含有不合法字元");
-   return "\""+s+"\"";
+   int trailing=0;
+   for(int i=s.Length-1;i>=0&&s[i]=='\\';i--)trailing++;
+   return "\""+s+new string('\\',trailing)+"\"";
   }
   public static async Task LaunchAsync(Prepared p,string root,int parentPid){
    if(p==null)throw new ArgumentNullException("p");
