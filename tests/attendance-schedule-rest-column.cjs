@@ -43,6 +43,19 @@ state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'休',__meta:{'2026-11
 assert.equal(result().label,'國','specific official rest quota overrides generic 休 marker');
 state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'早',__meta:{'2026-11-23':{restCategory:'國'}}}}]);
 assert.equal(result().state,'normal','workday is not converted to a holiday by metadata alone');
+
+assert.equal(result().label,'早','ordinary roster shift stays visible instead of an unexplained dash');
+state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'中'}}]);
+assert.equal(result().label,'中','middle shift is visible as saved');
+state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'晚'}}]);
+assert.equal(result().label,'晚','night shift is visible as saved');
+state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'早',__meta:{'2026-11-23':{restCategory:'國',restQuotaOvertime:true}}}}]);
+assert.equal(result().label,'國','verified work-on-unused-rest metadata identifies the special day');
+state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'早',__meta:{'2026-11-23':{restCategory:'國',restQuotaOvertime:false}}}}]);
+assert.equal(result().label,'早','unverified rest allocation must not relabel an ordinary shift');
+state([{empId:'E1',month:'2026-11',schedule:{'2026-11-23':'20-24＋例'}}]);
+assert.equal(result().label,'例','existing split-day official rest code is recognizable');
+
 state([{empId:'E2',month:'2026-11',schedule:{'2026-11-23':'例'}}]);
 assert.equal(result().state,'missing','never borrow another employee schedule');
 state([{empId:'E1',month:'2026-10',schedule:{'2026-11-23':'例'}}]);
