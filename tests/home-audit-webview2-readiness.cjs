@@ -18,10 +18,11 @@ assert.match(parent,/frame\.classList\.remove\('p79-early-inline-starting'\)/);
 assert.match(parent,/frame\.removeAttribute\('aria-hidden'\)/);
 
 // Do not treat a slow cloud/employee preflight as failed iframe loading.
-assert.match(parent,/case 'ready':\s*if\(instance\.opened\|\|instance\.initConfirmed\)return;/);
+assert.match(parent,/case 'ready':\s*if\(instance\.opened\|\|instance\.initConfirmed\|\|instance\.failed\)return;/);
 assert.match(parent,/instance\.timer=root\.setTimeout\(\(\)=>\{[^}]*正式員工與打卡資料尚未核對完成/s);
 assert.match(parent,/\},65000\)/);
 assert.match(parent,/case 'progress':\s*instance\.initConfirmed=true/);
+assert.match(parent,/case 'error':\s*instance\.writing=false;\s*instance\.failed=true;\s*root\.clearTimeout\(instance\.timer\)/,'Original cloud failure must not be overwritten by load timeout');
 
 // If an init message is missed during child navigation, the child retries
 // its nonce-bound ready until the original attendance page accepts init.
