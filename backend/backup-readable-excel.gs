@@ -100,13 +100,15 @@ function p79BackupReadableExcel_(data){
   return {ok:true,verified:true,type:context.group.type,backupId:context.saved.backupId,index:index,total:context.ids.length,file:{name:result.meta.name,hash:result.meta.hash,cloudId:result.meta.fileId,base64:Utilities.base64Encode(result.bytes)}};
 }
 function p79BackupLocalExcel_(data){
-  var encoded=data.base64;
+  var encoded=data.base64,partIndex=data.partIndex===undefined?0:Number(data.partIndex),partTotal=data.partTotal===undefined?1:Number(data.partTotal);
+  if(!Number.isInteger(partIndex)||!Number.isInteger(partTotal)||partTotal<1||partTotal>128||partIndex<0||partIndex>=partTotal)throw Error('電腦端Excel分冊編號無效');
   if(typeof encoded!=='string'||encoded.length>17*1024*1024)throw Error('電腦端Excel大小無效');
   var bytes=Utilities.base64Decode(encoded),hash=p79ExcelHash_(bytes);
   if(bytes.length<4||bytes.length>12*1024*1024||(bytes[0]&255)!==80||(bytes[1]&255)!==75||hash!==data.hash)throw Error('電腦端Excel格式或校驗無效');
   var props=PropertiesService.getScriptProperties(),key='P79_LOCAL_EXCEL_'+hash+'_'+p79ExcelPeriod_(),prior=JSON.parse(props.getProperty(key)||'null');
   if(prior){try{var old=p79ExcelPrivate_(DriveApp.getFileById(prior.fileId));if(p79ExcelHash_(old.getBlob().getBytes())===hash)return {ok:true,verified:true,hash:hash,backupAt:prior.backupAt,unchanged:true};}catch(_){} }
-  var name='本機資料_'+p79ExcelStamp_()+'.xlsx',file=p79ExcelFolder_('電腦端資料').createFile(Utilities.newBlob(bytes,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',name));
+  var suffix=partTotal>1?'_第'+(partIndex+1)+'份_共'+partTotal+'份':'';
+  var name='本機資料_'+p79ExcelStamp_()+suffix+'.xlsx',file=p79ExcelFolder_('電腦端資料').createFile(Utilities.newBlob(bytes,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',name));
   if(p79ExcelHash_(file.getBlob().getBytes())!==hash)throw Error('電腦端Excel雲端讀回校驗不符');
   var result={ok:true,verified:true,fileId:file.getId(),hash:hash,backupAt:new Date().toISOString()};props.setProperty(key,JSON.stringify(result));return result;
 }
