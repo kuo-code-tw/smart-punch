@@ -1055,40 +1055,6 @@ async function downloadSystem(sys,onProgress,readOptions={}){
  }
  throw new Error('未知系統：'+sys);
 }
-// Successfully downloaded independent systems are persisted in IndexedDB, not
-// just in lastAllDownload's page-local three-minute memory.
-const SYSTEM_REUSE_MAX_AGE_MS=30*60*1000;
-// Automatic app startup must resume verified IndexedDB data instead of
-// downloading all seven systems again every 30 minutes. This is a bounded
-// offline-first resume (24 h), not a claim that the cloud is unchanged;
-// the explicit tray/cloud-center refresh still performs live cloud reads.
-const SYSTEM_AUTO_RESUME_MAX_AGE_MS=24*60*60*1000;
-async function startupCachedSystem(sys,scopeAtStart){
- if(!['attendance','workhours','leave','schedule','efficiency','hr','history'].includes(sys))return null;
- const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
- if(!snapshot||snapshot.data?.ok!==true||snapshot.kind!=='system'||snapshot.system!==sys||
-    snapshot.displayScope!==scopeAtStart||!Number.isFinite(Number(snapshot.savedAt)))return null;
- if(Date.now()-Number(snapshot.savedAt)>SYSTEM_AUTO_RESUME_MAX_AGE_MS)return null;
- if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
- if(sys==='schedule'&&snapshot.scope?.month&&snapshot.scope.month!==ymNow())return null;
- if(sys==='attendance'||sys==='workhours'){
-  const data=snapshot.data;
-  if(!data.fullDatabase||!Array.isArray(data.months)||!Array.isArray(data.monthStats)||
-     data.monthStats.length!==data.months.length||data.monthStats.some(x=>x.ok!==true))return null;
- }
- return snapshot;
-}
-
-async function reusableSystemDownload(sys,scopeAtStart){
- if(!['leave','schedule','efficiency','hr','history'].includes(sys))return null;
- const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
- if(!snapshot||snapshot.data?.ok!==true||snapshot.displayScope!==scopeAtStart)return null;
- if(Date.now()-Number(snapshot.savedAt)>SYSTEM_REUSE_MAX_AGE_MS)return null;
- if(snapshot.system!==sys||snapshot.kind!=='system')return null;
- // The current month is part of scoped, mutable efficiency results.
- if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
- return snapshot;
-}
 // Browser/WebView2 quick warm-up: no executable, no external folder and no
 // automatic full-history download. The home screen may call preloadCurrent()
 // during login; by default it warms only already verified local snapshots.
@@ -1155,6 +1121,40 @@ async function preloadCurrent(options={}){
  try{return await task}finally{if(quickPreloadPromise===task)quickPreloadPromise=null}
 }
 window.addEventListener?.('port79-home-session-refreshed',()=>{void preloadCurrent().catch(()=>{});});
+// Successfully downloaded independent systems are persisted in IndexedDB, not
+// just in lastAllDownload's page-local three-minute memory.
+const SYSTEM_REUSE_MAX_AGE_MS=30*60*1000;
+// Automatic app startup must resume verified IndexedDB data instead of
+// downloading all seven systems again every 30 minutes. This is a bounded
+// offline-first resume (24 h), not a claim that the cloud is unchanged;
+// the explicit tray/cloud-center refresh still performs live cloud reads.
+const SYSTEM_AUTO_RESUME_MAX_AGE_MS=24*60*60*1000;
+async function startupCachedSystem(sys,scopeAtStart){
+ if(!['attendance','workhours','leave','schedule','efficiency','hr','history'].includes(sys))return null;
+ const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
+ if(!snapshot||snapshot.data?.ok!==true||snapshot.kind!=='system'||snapshot.system!==sys||
+    snapshot.displayScope!==scopeAtStart||!Number.isFinite(Number(snapshot.savedAt)))return null;
+ if(Date.now()-Number(snapshot.savedAt)>SYSTEM_AUTO_RESUME_MAX_AGE_MS)return null;
+ if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
+ if(sys==='schedule'&&snapshot.scope?.month&&snapshot.scope.month!==ymNow())return null;
+ if(sys==='attendance'||sys==='workhours'){
+  const data=snapshot.data;
+  if(!data.fullDatabase||!Array.isArray(data.months)||!Array.isArray(data.monthStats)||
+     data.monthStats.length!==data.months.length||data.monthStats.some(x=>x.ok!==true))return null;
+ }
+ return snapshot;
+}
+
+async function reusableSystemDownload(sys,scopeAtStart){
+ if(!['leave','schedule','efficiency','hr','history'].includes(sys))return null;
+ const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
+ if(!snapshot||snapshot.data?.ok!==true||snapshot.displayScope!==scopeAtStart)return null;
+ if(Date.now()-Number(snapshot.savedAt)>SYSTEM_REUSE_MAX_AGE_MS)return null;
+ if(snapshot.system!==sys||snapshot.kind!=='system')return null;
+ // The current month is part of scoped, mutable efficiency results.
+ if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
+ return snapshot;
+}
 let lastAllDownload=null;
 async function downloadAll(onProgress,options={}){
  // Interactive Windows batches show usable independent system data before the
