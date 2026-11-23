@@ -112,9 +112,19 @@
   if(token!==lastManagerToken){
    lastManagerToken=token;downloadAllowed=false;lastSettingsCheck=0;
   }
-  link.hidden=!(active&&downloadAllowed);
-  if(link.hidden){link.removeAttribute('href');link.setAttribute('aria-disabled','true');}
-  else{
+  // Show the original control to managers even when download is not enabled.
+  // Keep server-verified settings as the only authority for a usable link.
+  link.hidden=!active;
+  if(!active){
+   link.removeAttribute('href');
+   link.setAttribute('aria-disabled','true');
+  }else if(!downloadAllowed){
+   link.removeAttribute('href');
+   link.setAttribute('aria-disabled','true');
+   link.textContent='⬇ 電腦版下載（未開放）';
+   link.title='雲端尚未開放或無法確認 Windows 下載權限。超級管理員可在「系統設定」開啟；旁邊的資料庫下載不受影響。';
+   placeInVisibleToolbar();
+  }else{
    link.removeAttribute('aria-disabled');
    if(!link.hasAttribute('href'))link.href=DOWNLOAD_URL;
    placeInVisibleToolbar();
