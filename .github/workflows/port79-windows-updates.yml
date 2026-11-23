@@ -83,7 +83,7 @@ jobs:
         shell: pwsh
         working-directory: production
         run: |
-          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs desktop-lite/tests/update-visible-menu.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs tests/windows-release-version-contract.cjs tests/home-login-version-fast-audit.cjs tests/windows-cache-incremental-resume.cjs tests/windows-stale-ui-after-new-zip.cjs tests/home-attendance-inline-channel.cjs tests/home-audit-webview2-readiness.cjs tests/windows-download-link.cjs tests/cache-center-history-on-demand.cjs
+          node --test desktop-lite/tests/login-after-admin.test.cjs desktop-lite/tests/native-progress.test.cjs desktop-lite/tests/update-handoff.test.cjs desktop-lite/tests/update-visible-menu.test.cjs tests/native-cloud-download-dispatch.cjs tests/native-cloud-batch-stall.cjs tests/native-cloud-background-navigation.cjs tests/windows-release-version-contract.cjs tests/windows-github-api-rate-limit-fallback.cjs tests/home-login-version-fast-audit.cjs tests/windows-cache-incremental-resume.cjs tests/windows-stale-ui-after-new-zip.cjs tests/home-attendance-inline-channel.cjs tests/home-audit-webview2-readiness.cjs tests/windows-download-link.cjs tests/cache-center-history-on-demand.cjs
           if($LASTEXITCODE -ne 0){throw 'Windows unit tests failed'}
           & ./desktop-lite/tests/shell-updater-safety.ps1
           if($LASTEXITCODE -ne 0){throw 'Updater preservation tests failed'}
@@ -91,6 +91,14 @@ jobs:
         shell: pwsh
         working-directory: production
         run: |
+          # Exercise the same API-independent site manifest generator used by
+          # GitHub Pages before releasing any native executable.
+          node scripts/write-port79-version.cjs .
+          if($LASTEXITCODE -ne 0){throw 'Site version manifest generation failed'}
+          node scripts/write-port79-site-files.cjs .
+          if($LASTEXITCODE -ne 0){throw 'API-independent site manifest generation failed'}
+          node -e "const m=require('./port79-site-files.json');if(!/^[a-f0-9]{40}$/.test(m.commit)||m.files.length<100||m.files.length>400)process.exit(1)"
+          if($LASTEXITCODE -ne 0){throw 'Published site hash list invalid'}
           dotnet restore desktop-lite/Port79Lite.csproj /p:Platform=x64
           if($LASTEXITCODE -ne 0){throw 'Restore failed'}
           & ./desktop-lite/build-portable.ps1
@@ -200,11 +208,18 @@ jobs:
           manifest="$(unzip -p dist/Port79-Windows-Lite.zip '*/site/smart-punch/port79-version.json')"
           source_day="$(printf '%s' "$manifest" | python3 -c "import json,sys,re;m=json.load(sys.stdin);v=m['version'];c=m['commit'];assert re.fullmatch(r'V[0-9]{6}\.[0-9]{5}',v);assert c=='$SITE_SHA';print('20'+v[1:7])")"
           tag="port79-windows-lite-${source_day}-${SITE_SHA:0:12}"
+          # Release asset metadata is served via github.com/releases/latest/download,
+          # NOT the rate-limited unauthenticated api.github.com endpoint. The
+          # Windows app still hashes the entire downloaded ZIP before executing.
+          export PORT79_RELEASE_TAG="$tag"
+          export PORT79_RELEASE_DIGEST="$(sha256sum dist/Port79-Windows-Lite.zip | cut -d' ' -f1)"
+          export PORT79_RELEASE_SIZE="$(stat -c%s dist/Port79-Windows-Lite.zip)"
+          python3 -c 'import json,os;tag=os.environ["PORT79_RELEASE_TAG"];sha=os.environ["SITE_SHA"];repo=os.environ["REPO"];digest=os.environ["PORT79_RELEASE_DIGEST"];size=int(os.environ["PORT79_RELEASE_SIZE"]);assert len(digest)==64 and size>0;asset={"name":"Port79-Windows-Lite.zip","browser_download_url":f"https://github.com/{repo}/releases/download/{tag}/Port79-Windows-Lite.zip","digest":"sha256:"+digest,"size":size};json.dump({"tag_name":tag,"draft":False,"source_commit":sha,"assets":[asset]},open("dist/port79-windows-update.json","w"),separators=(",",":"))'
           if gh release view "$tag" -R "$REPO" >/dev/null 2>&1; then
             echo "Already published $tag; no duplicate release"
             exit 0
           fi
-          gh release create "$tag" dist/Port79-Windows-Lite.zip "dist/Port79-Windows-Lite-${SITE_SHA:0:12}.zip" -R "$REPO" \
+          gh release create "$tag" dist/Port79-Windows-Lite.zip "dist/Port79-Windows-Lite-${SITE_SHA:0:12}.zip" dist/port79-windows-update.json -R "$REPO" \
             --title "79號碼頭 Windows 正式更新 ($tag)" --target "$SITE_SHA" --latest \
             --notes "Verified Windows native package and production site $SITE_SHA. No local-data or private yard backup."
           # Older Windows EXEs check this fixed legacy tag.

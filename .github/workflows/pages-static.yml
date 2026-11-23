@@ -24,6 +24,7 @@ on:
       - 'data-cache/**'
       # Keep the deployment gate verifiable when a regression harness is repaired.
       - 'tests/**'
+      - 'scripts/write-port79-site-files.cjs'
       - '.github/workflows/pages-static.yml'
       # Version/packaging changes must publish the same commit as Windows.
       - '.github/workflows/port79-windows-updates.yml'
@@ -66,6 +67,7 @@ jobs:
           node tests/vessel-dashboard-month-scope-20261102.cjs
           node tests/vessel-completion-export-integrity.cjs
           node tests/personnel-current-hr-verification.cjs
+          node tests/windows-github-api-rate-limit-fallback.cjs
       - name: Verify no new production regressions against previous main
         shell: bash
         run: |
@@ -107,6 +109,7 @@ jobs:
       - name: Stamp the exact published website version
         run: |
           node scripts/write-port79-version.cjs .
+          node scripts/write-port79-site-files.cjs .
           node -e "const v=require('./port79-version.json');if(!/^V[0-9]{6}\.[0-9]{5}$/.test(v.version)||!/^[a-f0-9]{40}$/.test(v.commit))process.exit(1)"
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

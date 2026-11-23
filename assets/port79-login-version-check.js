@@ -4,6 +4,8 @@
 const LOCAL='./port79-version.json';
 const WEB='https://kuo-code-tw.github.io/smart-punch/port79-version.json';
 const LATEST='https://api.github.com/repos/kuo-code-tw/smart-punch/releases/latest';
+const RELEASE_CACHE='p79_public_release_check_v1';
+const RELEASE_TTL_MS=2*60*60*1000,RELEASE_ERROR_TTL_MS=30*60*1000;
 const INTERVAL=300000,EXPIRE=6000,STORED_BUILD='p79_loaded_home_build_v1';
 const $=id=>root.document?.getElementById(id);
 let lastChecked=0,activeCheck=null,lastResult=null,nativeUpdateRunning=false;
@@ -29,6 +31,24 @@ async function read(url){
   if(!res.ok)throw Error('HTTP '+res.status);
   return await res.json();
  }finally{root.clearTimeout(timer);}
+}
+// Many logged-in browsers used to poll the same unauthenticated GitHub API
+// every five minutes. Cache PUBLIC release metadata across tabs to avoid
+// exhausting the shared per-IP API quota needed by old Windows installations.
+async function readRelease(){
+ let cached=null;
+ try{cached=JSON.parse(root.localStorage?.getItem(RELEASE_CACHE)||'null');}catch(_){}
+ if(cached&&Number.isFinite(cached.checked)&&Date.now()-cached.checked>=0&&
+    Date.now()-cached.checked<(cached.release?RELEASE_TTL_MS:RELEASE_ERROR_TTL_MS))
+  return cached.release;
+ try{
+  const release=await read(LATEST);
+  try{root.localStorage?.setItem(RELEASE_CACHE,JSON.stringify({checked:Date.now(),release}));}catch(_){}
+  return release;
+ }catch(_){
+  try{root.localStorage?.setItem(RELEASE_CACHE,JSON.stringify({checked:Date.now(),release:null}));}catch(_){}
+  return null;
+ }
 }
 function write(message){
  const el=$('p79LoginVersionStatus');
@@ -94,7 +114,7 @@ async function check(force=false){
  const work=(async()=>{
   if(!nativeUpdateRunning)write('🔎 正在檢查更新…');
   const [localResult,webResult,releaseResult]=await Promise.allSettled([
-   read(LOCAL),read(WEB),read(LATEST)
+   read(LOCAL),read(WEB),readRelease()
   ]);
   const local=localResult.status==='fulfilled'?normalized(localResult.value):null;
   const web=webResult.status==='fulfilled'?normalized(webResult.value):null;
