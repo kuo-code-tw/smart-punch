@@ -30,5 +30,5 @@ assert(download.includes('RELEASE_API'),'Website must independently resolve curr
 assert(download.includes('Release asset not verified'),'Website checks asset name, URL, size and digest');
 assert(!download.includes('releases/download/port79-windows-lite-20261120'),
  'Website never hands out old fixed release URLs');
-assert(homepage.includes('port79-windows-download.js?v=20261122-naming-v7'),'Old browser cached script must be bypassed');
+assert(homepage.includes('port79-windows-download.js?v=20261123-superadmin-cloud-v2'),'Old browser cached script must be bypassed');
 console.log('PASS version contract: immutable latest release, unique ZIP name, embedded source SHA, validated browser and EXE updater URLs');
