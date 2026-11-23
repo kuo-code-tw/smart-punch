@@ -4,7 +4,7 @@ const vm=require('node:vm');
 const assert=require('node:assert/strict');
 const source=fs.readFileSync('assets/port79-data-cache.js','utf8');
 const start=source.indexOf('// Browser/WebView2 quick warm-up:');
-const end=source.indexOf('let lastAllDownload=null;',start);
+const end=source.indexOf('async function downloadSystem(sys,onProgress,readOptions={})',start);
 assert(start>0&&end>start,'production quick-preload implementation must exist');
 new vm.Script(source);
 const quick=source.slice(start,end);
