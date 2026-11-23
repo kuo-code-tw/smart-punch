@@ -34,6 +34,17 @@ function setActive(view){
  }
 }
 function original(view){return d.querySelector('#adminContentOvertime '+(selectors[view]||'#no-such-action'));}
+function showOvertimePanel(){
+ const panel=d.getElementById('adminContentOvertime');
+ if(!panel)return false;
+ if(!panel.classList.contains('hidden'))return true;
+ // The shared homepage tab bar lives OUTSIDE this hidden panel. When the
+ // visitor starts on monthly attendance statistics, enter the existing
+ // authorized overtime tab before delegating to a modal/action.
+ if(typeof window==='undefined'||typeof window.switchAdminTab!=='function')return false;
+ window.switchAdminTab('overtime');
+ return !panel.classList.contains('hidden');
+}
 function openExisting(view){
  const button=original(view);
  if(button){button.click();return true;}
@@ -49,6 +60,7 @@ function closeMonthly(){
 }
 function activate(view){
  if(view==='overview'){
+  if(!showOvertimePanel())return;
   closeMonthly();
   setActive('overview');
   const heading=root?.querySelector('.p79-ot-ux-heading');
@@ -57,6 +69,7 @@ function activate(view){
   }
   return;
  }
+ if(!showOvertimePanel())return;
  const result=openExisting(view);
  if(!result)return;
  if(view==='monthly'){
@@ -97,7 +110,8 @@ function decorateMonthlyDialog(){
 }
 function init(){
  const host=d.getElementById('adminContentOvertime');
- if(!host||d.getElementById(KEY))return;
+ const workspace=host?.parentElement;
+ if(!host||!workspace||d.getElementById(KEY))return;
  const header=d.createElement('div');
  header.id=KEY;header.className='p79-ot-ux';
  const title=d.createElement('section');title.className='p79-ot-ux-heading';
@@ -105,7 +119,10 @@ function init(){
  const tabs=d.createElement('nav');tabs.className='p79-ot-ux-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','加班管理分頁與功能');
  for(const [view,label] of entries)tabs.append(makeButton(view,label));
  header.append(title,tabs);
- host.prepend(header);
+ // The landing-page navigation must NOT be a child of the hidden overtime
+ // content. The work-hours homepage can initially show the stats pane.
+ // Keep the original overtime cards/forms exactly where they already are.
+ workspace.insertBefore(header,host);
  // Mark ready only after the replacement controls exist. Original actions
  // remain available if JS fails before this point.
  host.dataset.p79UxReady='1';
