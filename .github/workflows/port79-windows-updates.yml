@@ -109,6 +109,10 @@ jobs:
         run: |
           & ./desktop-lite/tests/native-updater-safety.ps1
           if(-not $?){throw 'Native updater security/preservation regression failed'}
+          # Exact operator regression: BaseDirectory ends in a backslash, and
+          # the helper must parse every native argument before its first log.
+          & ./desktop-lite/tests/native-updater-trailing-root-smoke.ps1
+          if(-not $?){throw 'Native updater trailing slash argv regression failed'}
           & ./desktop-lite/tests/native-restart-smoke.ps1
           if(-not $?){throw 'Legacy recovery smoke failed'}
           & ./desktop-lite/tests/native-updater-restart-smoke.ps1
