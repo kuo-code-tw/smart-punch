@@ -6,7 +6,7 @@
 if(global.P79MonthlyRestDashboard)return;
 const $=(root,sel)=>root.querySelector(sel);
 const $$=(root,sel)=>Array.from(root.querySelectorAll(sel));
-const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','"':'&quot;'}[ch]));
+const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;' ,'"':'&quot;',"'":'&#39;'}[ch]));
 const text=(root,sel)=>$(root,sel)?.textContent?.trim()||'';
 const norm=value=>String(value||'').trim().toLowerCase();
 const hasDataRow=tr=>tr&&tr.hasAttribute('data-row');
@@ -46,7 +46,7 @@ function mount(el){
  #p79MonthlyRest{width:min(1560px,calc(100vw - 24px))!important;max-height:95dvh!important;border-radius:20px!important;overflow:hidden!important;background:#f8fbff!important;color:#172b4d!important}
  #p79MonthlyRest>.body{max-height:calc(95dvh - 92px)!important;padding:0!important;overflow:auto!important;display:block!important;background:#f8fbff}
  #p79MonthlyRest>.body>:not(#mrUxRoot){display:none!important}
- #p79MonthlyRest>header{padding:17px 24px!important;background:linear-gradient(108deg,#fff 65%,#e9f4ff)!important;min-height:77px}
+ #p79MonthlyRest>header{padding:17px 24px!important;background:linear-gradient(108deg,#fff 65%,#e9f4ff)!important;min-height:77px;display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px!important} #p79MonthlyRest>header [data-close]{grid-column:2;grid-row:1/span 2;align-self:center}
  #p79MonthlyRest>header>b{font-size:24px;color:#122b54}
  #p79MonthlyRest>header [data-close]{background:#e4edf8!important;color:#315072!important;font-weight:700}
  #p79MonthlyRest>footer:not(#mrUxFooter){display:none!important}
@@ -196,7 +196,8 @@ function mount(el){
    q('#mrUxTabPending').setAttribute('aria-selected',String(state.tab==='pending'));
    q('#mrUxTabDone').setAttribute('aria-selected',String(state.tab==='done'));
    q('#mrUxAll').disabled=state.tab!=='pending'||!shown.some(r=>!r.disabled&&['ready','plan'].includes(kind(r)));
-   q('#mrUxAll').checked=shown.length>0&&shown.filter(r=>!r.disabled&&['ready','plan'].includes(kind(r))).every(r=>r.checked);
+   const eligible=shown.filter(r=>!r.disabled&&['ready','plan'].includes(kind(r)));
+   q('#mrUxAll').checked=eligible.length>0&&eligible.every(r=>r.checked);
    const selected=data.ready.filter(r=>r.checked).length+data.planned.filter(r=>r.checked).length;
    q('#mrUxSelected').textContent='已勾選 '+selected+' 筆';
    const nativeSave=$(el,'#mrSave'),nativePlan=$(el,'#mrSavePlans');
