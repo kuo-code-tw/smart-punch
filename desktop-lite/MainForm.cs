@@ -743,8 +743,8 @@ namespace Port79Lite {
     // No pending patch means no restart is needed.
     bool restartSafe=!cloudWorkerJobActive&&!cacheInProgress&&
      (manual||!userInteractedSinceLaunch);
-    if((shell!=null||websitePending)&&manual&&!restartSafe){
-     var pendingType=shell!=null?"79號碼頭電腦版程式及網頁畫面":"79號碼頭網頁版畫面";
+    if(shell!=null&&manual&&!restartSafe){
+     var pendingType="79號碼頭電腦版程式及網頁畫面";
      var answer=MessageBox.Show(this,
       "已找到並驗證"+pendingType+"更新，但目前仍有雲端資料同步。\n\n"+
       "選「是」：中止尚未完成的背景同步，立即套用新版並重新啟動。已儲存的 local-data 快取保留；尚未儲存的表單可能遺失。\n\n"+
@@ -766,14 +766,11 @@ namespace Port79Lite {
      return;
     }
     if(websitePending){
-     if(!restartSafe){
-      UpdateStatus("79號碼頭網頁版更新檔已下載；同步進行中，等待下次手動套用。",manual);
-      Log("Website update staged; restart deferred until next explicit manual choice");
-      return;
-     }
-     UpdateStatus("79號碼頭網頁版更新檔已驗證，正在重新啟動電腦版套用新版畫面。",manual);
-     Log("Website update verified; restart to apply staged site without a prompt");
-     exit=true;Application.Restart();Close();
+     UpdateStatus("79號碼頭網頁更新已下載並驗證，下次正常開啟電腦版時套用。",manual);
+     Log("Website update verified; staged for next normal Windows launch");
+     if(manual)MessageBox.Show(this,
+      "網頁更新已準備完成。你可以繼續作業，下次正常開啟電腦版時會套用。",
+      "79號碼頭｜網頁更新已準備完成",MessageBoxButtons.OK,MessageBoxIcon.Information);
      return;
     }
     if(siteFailure!=null||shellFailure!=null){
