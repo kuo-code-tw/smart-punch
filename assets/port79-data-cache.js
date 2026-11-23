@@ -1029,32 +1029,6 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  if(targetSys==='attendance'||targetSys==='workhours')await applyAttendanceSnapshotToPage(snapshot,true);
  return snapshot;
 }
-async function downloadSystem(sys,onProgress,readOptions={}){
- const t=token(),m=ymNow();
- if(sys==='attendance'||sys==='workhours')return downloadAttendanceDatabase(sys,onProgress,readOptions);
- if(sys==='leave')return fetchJson('getLeaveData',{token:t},sys,readOptions);
- if(sys==='schedule')return fetchJson('getScheduleDataSecure',{token:t},sys,readOptions);
- if(sys==='efficiency')return fetchJson('gcGetData',{token:t,month:m,scope:'month'},sys,readOptions);
- if(sys==='hr')return fetchJson('hrGetEmployees',{token:t},sys,readOptions);
- if(sys==='history'){
-  // The seven-system startup is a catalog sync, not a bulk download of every
-  // historical category. Existing month snapshots remain intact and the
-  // History page fetches a requested month when opened. In particular,
-  // one slow vessel month may not turn a valid catalog into endless 6/7.
-  const catalog=await fetchJson('getHistoricalDataCatalog',{token:t},sys,readOptions);
-  if(!catalog||catalog.ok!==true)throw new Error('歷史月份目錄尚未取得');
-  if(readOptions?.prefetchHistoricalMonths===true){
-   for(const type of ['attendance','schedule','vessel']){
-    try{await fetchJson('historyGetMonthData',{token:t,type,month:m},'',readOptions)}
-    catch(e){
-     if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT'].includes(e?.code))throw e;
-    }
-   }
-  }
-  return catalog;
- }
- throw new Error('未知系統：'+sys);
-}
 // Browser/WebView2 quick warm-up: no executable, no external folder and no
 // automatic full-history download. The home screen may call preloadCurrent()
 // during login; by default it warms only already verified local snapshots.
@@ -1121,6 +1095,32 @@ async function preloadCurrent(options={}){
  try{return await task}finally{if(quickPreloadPromise===task)quickPreloadPromise=null}
 }
 window.addEventListener?.('port79-home-session-refreshed',()=>{void preloadCurrent().catch(()=>{});});
+async function downloadSystem(sys,onProgress,readOptions={}){
+ const t=token(),m=ymNow();
+ if(sys==='attendance'||sys==='workhours')return downloadAttendanceDatabase(sys,onProgress,readOptions);
+ if(sys==='leave')return fetchJson('getLeaveData',{token:t},sys,readOptions);
+ if(sys==='schedule')return fetchJson('getScheduleDataSecure',{token:t},sys,readOptions);
+ if(sys==='efficiency')return fetchJson('gcGetData',{token:t,month:m,scope:'month'},sys,readOptions);
+ if(sys==='hr')return fetchJson('hrGetEmployees',{token:t},sys,readOptions);
+ if(sys==='history'){
+  // The seven-system startup is a catalog sync, not a bulk download of every
+  // historical category. Existing month snapshots remain intact and the
+  // History page fetches a requested month when opened. In particular,
+  // one slow vessel month may not turn a valid catalog into endless 6/7.
+  const catalog=await fetchJson('getHistoricalDataCatalog',{token:t},sys,readOptions);
+  if(!catalog||catalog.ok!==true)throw new Error('歷史月份目錄尚未取得');
+  if(readOptions?.prefetchHistoricalMonths===true){
+   for(const type of ['attendance','schedule','vessel']){
+    try{await fetchJson('historyGetMonthData',{token:t,type,month:m},'',readOptions)}
+    catch(e){
+     if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT'].includes(e?.code))throw e;
+    }
+   }
+  }
+  return catalog;
+ }
+ throw new Error('未知系統：'+sys);
+}
 // Successfully downloaded independent systems are persisted in IndexedDB, not
 // just in lastAllDownload's page-local three-minute memory.
 const SYSTEM_REUSE_MAX_AGE_MS=30*60*1000;
