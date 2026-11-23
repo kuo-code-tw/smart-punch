@@ -57,7 +57,7 @@ assert(layout.includes("advanced.open=settings.autoPlan===true"),
  'explicit auto-planning entry remains expanded');
 assert(layout.includes("el.querySelector('#mrRows')?.closest('.scroll')"),
  'verified submit candidates are promoted to first action area');
-assert(layout.includes("details.id='mrAutoDetails'"),
+assert(layout.includes("autoDetails.id='mrAutoDetails'"),
  'nine-column employee detail must be optional');
 assert(!/(?:saveReport|updateSchedule|postToCloud|fetch\(|localStorage\.|sessionStorage\.)/.test(layout),
  'simplifying the layout must not submit or alter cloud/local data');
