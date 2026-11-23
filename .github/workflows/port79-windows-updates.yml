@@ -91,6 +91,16 @@ jobs:
           if($LASTEXITCODE -ne 0){throw 'Windows unit tests failed'}
           & ./desktop-lite/tests/shell-updater-safety.ps1
           if($LASTEXITCODE -ne 0){throw 'Updater preservation tests failed'}
+      - name: Validate trusted publisher signing helper syntax
+        shell: pwsh
+        working-directory: production
+        run: |
+          $tokens=$null
+          $errors=$null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            'desktop-lite/tests/repack-signed-release.ps1',
+            [ref]$tokens,[ref]$errors) | Out-Null
+          if($errors.Count -gt 0){throw "Signing helper PowerShell syntax error: $($errors[0].Message)"}
       - name: Build native Windows EXE and full production website
         shell: pwsh
         working-directory: production
