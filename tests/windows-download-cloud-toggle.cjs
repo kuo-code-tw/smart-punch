@@ -95,7 +95,7 @@ function build({ role = 'admin', enabled = false, missing = false, error = false
   ];
   for (const [name, opts, expected] of cases) {
     const h = build(opts);
-    assert.equal(h.link.hidden, true, name + ' must initially be hidden');
+    assert.equal(h.link.hasAttribute('href'), false, name + ' must not be clickable before live cloud verification');
     await h.settle();
     const manager=opts.role!=='employee'&&opts.token!=='';
     assert.equal(!h.link.hidden, manager, name + ' entry remains discoverable for managers');
