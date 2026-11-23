@@ -85,7 +85,7 @@ function setup(options={}){
  assert.throws(()=>c.p79ExcelFolder_('English'),/中文/);
  // The backend accepts numbered workbook parts but never accepts invalid
  // indices or bypasses the existing SHA-256 and XLSX checks.
- const savedParts=[],partProps=new Map(),partBytes=[80,75,3,4];
+ const savedParts=[],partProps=new Map(),partBytes=[80,75,3,4],originalExcelFolder=c.p79ExcelFolder_;
  Object.assign(c,{p79ExcelHash_:()=> 'part-hash',p79ExcelPeriod_:()=> '202611',p79ExcelStamp_:()=> '20261123',
    p79ExcelFolder_:()=>({createFile:blob=>{savedParts.push(blob.name);return {getId:()=> 'part-id',getBlob:()=>({getBytes:()=>partBytes})};}}),
    PropertiesService:{getScriptProperties:()=>({getProperty:k=>partProps.get(k)||null,setProperty:(k,v)=>partProps.set(k,v)})},
@@ -95,6 +95,7 @@ function setup(options={}){
  assert.throws(()=>c.p79BackupLocalExcel_({base64:'UEsDBA==',hash:'part-hash',partIndex:0,partTotal:129}),/分冊編號/);
  assert.equal(c.p79BackupLocalExcel_({base64:'UEsDBA==',hash:'part-hash',partIndex:0,partTotal:3}).verified,true);
  assert(savedParts[0].includes('第1份_共3份'),'Drive workbook name identifies its part number');
+ c.p79ExcelFolder_=originalExcelFolder;
 
  const claims=new Map();let core=0,lockOwned=false;
  Object.assign(c,{p79ExcelExisting_:()=>null,PropertiesService:{getScriptProperties:()=>({getProperty:k=>claims.get(k)||null,setProperty:(k,v)=>claims.set(k,v),deleteProperty:k=>claims.delete(k)})},LockService:{getUserLock:()=>({tryLock:()=>{lockOwned=true;return true;},releaseLock:()=>{lockOwned=false;}})},Utilities:{getUuid:()=> 'owner'},p79ExcelExportSourceCore_:()=>{assert.equal(lockOwned,false,'network export must not hold global lock');core++;return {ok:true};}});
