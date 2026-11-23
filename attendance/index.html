@@ -15482,21 +15482,86 @@ function getManualPairRecordAnchor(record) {
             const token=knownToken||getAttendanceEmployeeMasterToken();
             if(!token)return;
             const old=p79AttendanceOvertimeMonths.get(month);
-            if(old?.token===token && (old.pending || Date.now()-old.at<60000))return;
-            const state={token,at:Date.now(),pending:true,rows:[],covers:[]};
+            if(old?.token===token &&
+               (old.pending || (old.ready&&Date.now()-old.at<60000) ||
+                (!old.ready&&Date.now()<(old.retryAfter||0))))return;
+            const failures=old?.token===token?Number(old.failures||0):0;
+            const state={token,at:Date.now(),pending:true,ready:false,rows:[],covers:[],
+                failures,retryAfter:0,errorLabel:''};
             p79AttendanceOvertimeMonths.set(month,state);
-            const controller=new AbortController();
-            const timer=setTimeout(()=>controller.abort(),12000);
-            fetch(getActiveGasUrl()+'?action=getScheduleDataSecure&gcToken='+encodeURIComponent(token)+'&month='+encodeURIComponent(month)+'&_='+Date.now(),{cache:'no-store',signal:controller.signal})
-              .then(r=>r.json()).then(data=>{
-                if(!data.ok)throw new Error(data.error||'班表讀取失敗');
-                if(p79AttendanceOvertimeMonths.get(month)!==state || getAttendanceEmployeeMasterToken()!==token)return;
-                state.rows=Array.isArray(data.schedules)?data.schedules:[];
-                state.people=Array.isArray(data.employees)?data.employees:[];
-                state.covers=Array.isArray(data.leaveCoverAssignments)?data.leaveCoverAssignments:[];
-                state.ready=true;state.pending=false;
+            const current=()=>p79AttendanceOvertimeMonths.get(month)===state &&
+                getAttendanceEmployeeMasterToken()===token;
+            // A failed read must be visible, and automatically retried a
+            // bounded number of times. Never silently leave every employee
+            // at "未取得班表" when the schedule service times out.
+            const labelFor=error=>{
+                const message=String(error?.message||error||'');
+                if(/token|登入|驗證|授權|權限|permission|unauthori[sz]ed|forbidden|(?:HTTP )?(?:401|403)/i.test(message))
+                    return '班表權限待核對';
+                if(/aborted|abort|timeout|逾時|timed out|network|failed to fetch|load failed|(?:HTTP )?5\d\d/i.test(message))
+                    return '班表連線逾時，稍後重試';
+                return '班表讀取失敗，待核對';
+            };
+            (async()=>{
+                let error=null;
+                const url=getActiveGasUrl();
+                if(!url||typeof isValidGasWebAppUrl==='function'&&!isValidGasWebAppUrl(url)){
+                    error=new Error('GAS URL 未設定');
+                }else for(let attempt=0;attempt<2;attempt++){
+                    const controller=new AbortController();
+                    // Schedule's own diagnostics may take 25 seconds; the
+                    // previous 12-second timeout rejected valid slow replies.
+                    const timer=setTimeout(()=>controller.abort(),25000);
+                    try{
+                        const response=await fetch(url+'?action=getScheduleDataSecure&gcToken='+
+                            encodeURIComponent(token)+'&month='+encodeURIComponent(month)+'&_='+Date.now(),
+                            {cache:'no-store',redirect:'follow',signal:controller.signal});
+                        if(!response.ok)throw new Error('HTTP '+response.status);
+                        const data=await response.json();
+                        if(data?.ok!==true)throw new Error(String(data?.error||'班表讀取失敗'));
+                        if(!Array.isArray(data.schedules)||!Array.isArray(data.employees)||
+                           data.month&&String(data.month)!==month)
+                            throw new Error('班表資料或月份不完整');
+                        if(!current())return;
+                        state.rows=data.schedules;
+                        state.people=data.employees;
+                        state.covers=Array.isArray(data.leaveCoverAssignments)?data.leaveCoverAssignments:[];
+                        state.pending=false;state.ready=true;state.at=Date.now();
+                        state.failures=0;state.errorLabel='';
+                        p79QueueAttendanceOvertimeRepaint();
+                        return;
+                    }catch(err){
+                        error=err;
+                        if(!current())return;
+                        // Authentication/permission errors do not improve by
+                        // repeatedly hitting the same protected endpoint.
+                        if(labelFor(err)==='班表權限待核對')break;
+                        if(attempt===0)await new Promise(resolve=>setTimeout(resolve,700));
+                    }finally{clearTimeout(timer);}
+                }
+                if(!current())return;
+                state.pending=false;state.ready=false;
+                state.failures=failures+1;
+                state.errorLabel=labelFor(error);
+                state.retryAfter=Date.now()+Math.min(60000,10000*state.failures);
+                console.warn('考勤月統計班表讀取未完成',month,state.errorLabel);
+                // Show a specific actionable state instead of an endless
+                // placeholder, even when the user remains on this page.
                 p79QueueAttendanceOvertimeRepaint();
-              }).catch(()=>{state.pending=false;}).finally(()=>clearTimeout(timer));
+                if(state.failures<=2&&state.errorLabel!=='班表權限待核對'){
+                    setTimeout(()=>{
+                        if(current()&&document.visibilityState!=='hidden'&&!state.pending){
+                            p79LoadAttendanceOvertimeMonth(month,token);
+                        }
+                    },Math.max(0,state.retryAfter-Date.now())+30);
+                }
+            })().catch(error=>{
+                if(!current())return;
+                state.pending=false;state.ready=false;state.errorLabel='班表讀取失敗，待核對';
+                state.retryAfter=Date.now()+30000;
+                console.warn('考勤月統計班表讀取異常',month,String(error?.name||'Error'));
+                p79QueueAttendanceOvertimeRepaint();
+            });
         }
         // Refresh schedule/overtime metadata when returning from scheduling in another tab.
         // Prevent deleted overtime assignments lingering in the attendance table's 60s cache.
@@ -15541,14 +15606,18 @@ function getManualPairRecordAnchor(record) {
         function p79AttendanceOfficialRestCategory(row,employee,view){
             const date=p79AttendanceOvertimeDate(row),month=date.slice(0,7);
             const id=String(employee?.empId||'').trim().toUpperCase();
-            if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!id)
-                return {state:'missing',label:'未取得班表'};
+            if(!/^\d{4}-\d{2}-\d{2}$/.test(date))
+                return {state:'missing',label:'考勤日期待核對'};
+            if(!id)return {state:'missing',label:'員工身分待核對'};
             p79AttendanceLoadViewMonth(month,view);
             const state=p79AttendanceOvertimeMonths.get(month);
             const token=view?.token||getAttendanceEmployeeMasterToken();
-            if(!token||!state||state.token!==token||!state.ready)
-                return {state:state?.pending&&state.token===token?'loading':'missing',
-                    label:state?.pending&&state.token===token?'班表讀取中':'未取得班表'};
+            if(!token)return {state:'missing',label:'班表登入待核對'};
+            if(!state||state.token!==token)
+                return {state:'missing',label:'班表尚未載入'};
+            if(!state.ready)
+                return {state:state.pending?'loading':'missing',
+                    label:state.pending?'班表讀取中':state.errorLabel||'班表尚未載入'};
             const key=month+'|'+id;
             const cached=view?.restSummary?.get(key);
             if(cached)return cached;
