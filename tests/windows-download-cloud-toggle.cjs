@@ -97,8 +97,10 @@ function build({ role = 'admin', enabled = false, missing = false, error = false
     const h = build(opts);
     assert.equal(h.link.hidden, true, name + ' must initially be hidden');
     await h.settle();
-    assert.equal(!h.link.hidden, expected, name);
+    const manager=opts.role!=='employee'&&opts.token!=='';
+    assert.equal(!h.link.hidden, manager, name + ' entry remains discoverable for managers');
     assert.equal(h.link.hasAttribute('href'), expected, name + ' link gating');
+    if(manager&&!expected) assert.match(h.link.textContent,/未開放/,name + ' explains disabled state');
     if (!expected) assert.equal(h.click().prevented, true, name + ' click blocked');
   }
 
@@ -107,9 +109,10 @@ function build({ role = 'admin', enabled = false, missing = false, error = false
   assert.equal(h.link.hidden, false);
   h.setEnabled(false);
   h.listeners['window:pageshow']();
-  assert.equal(h.link.hidden, true, 'immediately hidden during revalidation');
+  assert.equal(h.link.hidden, false, 'entry remains visible but disabled during revalidation');
+  assert.equal(h.link.hasAttribute('href'), false);
   await h.settle();
-  assert.equal(h.link.hidden, true, 'closed after cloud revalidation');
+  assert.equal(h.link.hidden, false, 'entry remains visible after cloud revalidation');
   assert.equal(h.link.hasAttribute('href'), false);
   assert.ok(h.fetches.some(x => x.includes('hrGetOrgOptions')));
   console.log('Windows download cloud toggle: all 7 cases passed');
