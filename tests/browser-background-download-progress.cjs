@@ -53,6 +53,8 @@ async function executeWorker({role='admin',mode='all',session=true}={}){
   saved.set('port79_user_token','SECRET_ACCESS_TOKEN');}
  const win={addEventListener:(name,fn)=>events.set(name,fn),
   Port79DataCache:{viewerKey:()=> 'QA@'+role,
+   flushFolder:async()=>{},
+   getFolderSyncStatus:async()=>({state:'idle',label:'未連接'}),
    downloadAll:async callback=>{
     for(const [i,sys] of ['leave','schedule','efficiency','hr','attendance','workhours'].entries()){
      callback(sys,i,6,'loading',null,'正在讀取');
