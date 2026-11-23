@@ -192,7 +192,10 @@ function mount(el){
    q('#mrUxPendingTab').textContent=sourceLoaded?'('+pending.length+')':'';
    q('#mrUxDoneTab').textContent=sourceLoaded?'('+verified.length+')':'';
    const info=originalState.replace(/\s+/g,' ').slice(0,115);
-   q('#mrUxProgress').textContent=state.hint||info||'正在讀取正式雲端資料…';
+   const sourceFailed=!sourceLoaded&&/讀取失敗|核對失敗|錯誤|無法取得|無法載入/.test(info);
+   q('#mrUxProgress').textContent=sourceFailed?'資料讀取失敗｜'+(info||'請按右側重新讀取'):state.hint||info||'正在讀取正式雲端資料…';
+   q('#mrUxProgress').setAttribute('role',sourceFailed?'alert':'status');
+   q('#mrUxReload').title=sourceFailed?'重新讀取正式班表與考勤':'重新讀取雲端資料';
    q('#mrUxTabPending').setAttribute('aria-selected',String(state.tab==='pending'));
    q('#mrUxTabDone').setAttribute('aria-selected',String(state.tab==='done'));
    q('#mrUxAll').disabled=state.tab!=='pending'||!shown.some(r=>!r.disabled&&['ready','plan'].includes(kind(r)));
@@ -218,7 +221,7 @@ function mount(el){
       'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date)+'</td><td>'+esc(r.name)+'</td>'+
       '<td><span class="mr-ux-kind">'+esc(r.category)+'</span></td><td>'+esc(periodLabel(r.period))+'</td><td>'+esc(r.hours)+'</td>'+
       '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span></td><td>'+operations+'</td></tr>';
-   }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">目前篩選沒有資料；請確認月份、部門或雲端核對狀態。</td></tr>';
+   }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
    q('#mrUxListHint').textContent='顯示 '+shown.length+' 筆；預排建議須核對並儲存，正式申報僅接受符合現有8小時及雲端規則的項目。';
    q('#mrUxExport').disabled=!shown.length;
   }finally{state.rendering=false;}
@@ -337,7 +340,20 @@ function mount(el){
   observer.observe(node,options);
   observers.push(observer);
  }
- el.addEventListener('close',()=>{state.disposed=true;observers.forEach(o=>o.disconnect());},{once:true});
+ // If an upstream request remains unresolved, show a bounded diagnostic
+ // instead of an endless loading banner; do not assume zero reports or submit.
+ const slowCheck=global.setTimeout?.(()=>{
+  if(state.disposed||text(el,'#mrAuditSummary'))return;
+  const status=text(el,'#mrStatus');
+  if(!/讀取失敗|錯誤|無法|未完成/.test(status)){
+   state.hint='正式資料仍未讀取完成。請確認網路，或關閉視窗後重新開啟；未取得資料前不能申報。';
+   render();
+  }
+ },45000);
+ el.addEventListener('close',()=>{
+  state.disposed=true;observers.forEach(o=>o.disconnect());
+  if(slowCheck!=null)global.clearTimeout?.(slowCheck);
+ },{once:true});
  render();
 }
 global.P79MonthlyRestDashboard={mount,sourceRows,periodLabel};
