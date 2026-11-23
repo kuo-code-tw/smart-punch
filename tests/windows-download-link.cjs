@@ -91,8 +91,8 @@ function unit(options={}){
  assert(home.includes('id="loginBox"'),'Login remains');
  assert(home.includes('id="systems"'),'System homepage remains');
  assert(home.includes('assets/port79-windows-download.js?v=20261123-superadmin-cloud-v2'));
- assert(home.includes('assets/port79-home-compact-controls.css?v=20261121-v1'));
- assert(home.includes('assets/port79-home-compact-controls.js?v=20261121-v1'));
+ assert(home.includes('assets/port79-home-compact-controls.css?v=20261123-db-download-v2'));
+ assert(home.includes('assets/port79-home-compact-controls.js?v=20261123-db-download-v2'));
  assert(home.includes('p79-windows-download-link[hidden]{display:none!important}'));
  assert(!source.includes('window.open(')&&!source.includes('location.href='),
   'Download control must not silently open windows or redirect the homepage');
