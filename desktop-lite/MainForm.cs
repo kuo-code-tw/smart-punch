@@ -178,14 +178,9 @@ namespace Port79Lite {
    menu.Items.Add(syncDataMenu);
    systemUpdateStatusMenu=new ToolStripMenuItem("79號碼頭電腦版更新：啟動後自動檢查"){Enabled=false};
    cacheStatusMenu=new ToolStripMenuItem("資料同步狀態：尚未登入"){Enabled=false};
-   menu.Items.Add(systemUpdateStatusMenu);
-   menu.Items.Add(cacheStatusMenu);
    menu.Items.Add(new ToolStripSeparator());
    menu.Items.Add("開啟本機資料夾",null,(s,e)=>OpenLocalData());
    menu.Items.Add("開啟目前程式資料夾",null,(s,e)=>OpenCurrentProgramFolder());
-   menu.Items.Add(new ToolStripMenuItem("目前程式版本："+(displayVersion.Length>0?displayVersion:"版本待驗證")){
-    Enabled=false,ToolTipText=root
-   });
    menu.Items.Add("關閉程式",null,(s,e)=>ExitApp());
    tray.ContextMenuStrip=menu;
    tray.DoubleClick+=(s,e)=>ShowWindow();
