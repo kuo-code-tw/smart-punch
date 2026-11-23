@@ -5,7 +5,7 @@ const cache=fs.readFileSync('assets/port79-data-cache.js','utf8');
 const pages=['index.html','leave/index.html','schedule/index.html','aqc-efficiency/index.html','hr/index.html','history-data/index.html'];
 for(const path of pages){
  const html=fs.readFileSync(path,'utf8');
- assert(html.includes('port79-data-cache.js?v=20261121-history-on-demand-v2'),path+' must bypass old cached 7-system script');
+ assert(html.includes('port79-data-cache.js?v=20261123-quick-preload-shared-v1'),path+' must bypass old cached 7-system script');
 }
 assert(cache.includes('data-cache-action="all">下載六項基本資料（歷史按月）'),
  'Cache center must not promise seven downloads including optional history catalog');
