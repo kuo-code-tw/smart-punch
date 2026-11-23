@@ -14,6 +14,7 @@ namespace Port79Lite {
  public static class Updater {
   const string GitTree="https://api.github.com/repos/kuo-code-tw/smart-punch/git/trees/main?recursive=1";
   const string Published="https://kuo-code-tw.github.io/smart-punch/";
+  const string SiteManifest=Published+"port79-site-files.json";
   const int LimitFiles=400;
   const int LimitBytes=30*1024*1024;
   private static readonly HashSet<string> PublicFolders=new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
@@ -25,6 +26,7 @@ namespace Port79Lite {
   };
   public sealed class Entry {public string path {get;set;} public string sha {get;set;} public string type {get;set;} }
   public sealed class Tree {public bool truncated {get;set;} public Entry[] tree {get;set;} }
+  public sealed class SiteTree {public string commit {get;set;} public Entry[] files {get;set;} }
   public sealed class Manifest {public Entry[] files {get;set;} public string baseBundleVersion {get;set;} }
   // A staged website update is valid only for the bundle from which it was
   // downloaded. Otherwise it could downgrade a newly extracted official ZIP.
@@ -120,8 +122,32 @@ namespace Port79Lite {
    ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
    using(var client=new HttpClient {Timeout=TimeSpan.FromSeconds(35)}){
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Port79-WindowsLite/1.0");
-    var payload=await client.GetStringAsync(GitTree).ConfigureAwait(false);
-    var tree=Json.Deserialize<Tree>(payload);
+    Tree tree=null;
+    try{
+     // The same Pages deployment that serves the code publishes this
+     // exact-commit manifest. Normal checks no longer consume GitHub API quota.
+     var payload=await client.GetStringAsync(SiteManifest+"?checked="+
+      DateTimeOffset.UtcNow.ToUnixTimeSeconds()).ConfigureAwait(false);
+     if(payload.Length>180000)throw new InvalidDataException("正式網站程式清單過大");
+     var published=Json.Deserialize<SiteTree>(payload);
+     if(published==null||
+        !System.Text.RegularExpressions.Regex.IsMatch(published.commit??"",
+         "^[a-f0-9]{40}$")||
+        published.files==null||published.files.Length==0||
+        published.files.Length>LimitFiles||
+        published.files.Any(e=>e==null||e.type!="blob"||!Allowed(e.path)||
+         !System.Text.RegularExpressions.Regex.IsMatch(e.sha??"","^[a-f0-9]{40}$"))||
+        published.files.Select(e=>e.path).Distinct(StringComparer.Ordinal).Count()!=published.files.Length)
+      throw new InvalidDataException("正式網站程式清單校驗失敗");
+     tree=new Tree{truncated=false,tree=published.files};
+     log("已從79號碼頭正式網站核對程式清單，不使用 GitHub API 次數額度");
+    }catch(HttpRequestException e){
+     // A pre-manifest deployment may still be used; retain the historic
+     // GitHub API path ONLY as compatibility fallback.
+     log("網站更新清單暫無法連線，使用原有 GitHub 核對方式："+e.Message);
+     var payload=await client.GetStringAsync(GitTree).ConfigureAwait(false);
+     tree=Json.Deserialize<Tree>(payload);
+    }
     if(tree==null||tree.truncated||tree.tree==null)throw new InvalidDataException("官方目錄資料不完整");
     var matches=tree.tree.Where(e=>e!=null&&e.type=="blob"&&Allowed(e.path)&&e.sha!=null&&e.sha.Length==40).ToArray();
     if(matches.Length>LimitFiles)throw new InvalidDataException("更新檔案數量超過安全上限");
