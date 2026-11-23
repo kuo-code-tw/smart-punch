@@ -15556,20 +15556,27 @@ function getManualPairRecordAnchor(record) {
             const categoryFor=roster=>{
                 const raw=String(roster?.[date]??'').trim(),meta=roster?.__meta?.[date]||{};
                 const map={'例':'例','例假':'例','例假日':'例','休':'休','休息日':'休','國':'國','國假':'國','國定假日':'國'};
-                let category=map[raw]||'';
-                if(!category&&/^[例休國]\d{1,2}(?::\d{2})?[-－]\d{1,2}(?::\d{2})?$/.test(raw))category=raw[0];
-                // For a generic rest-day marker, use the roster's OWN rest
-                // classification, not a company-wide guess.
-                if(category==='休'){
-                    const specific=map[String(meta.restCategory||'').trim()];
-                    if(specific)category=specific;
-                }
+                // Display the exact employee/date's official roster. Do not infer
+                // statutory rest classifications from a weekday or another user.
+                const code=raw.replace(/\s+/g,'');
+                let category=map[code]||'';
+                if(!category&&/^[例休國]\d{1,2}(?::\d{2})?[-－]\d{1,2}(?::\d{2})?$/.test(code))category=code[0];
+                const split=/^20-24[＋+]([例休國])$/.exec(code);
+                if(!category&&split)category=split[1];
+                const specific=map[String(meta.restCategory||'').trim()]||'';
+                // A verified unused-rest/quota-worked day may retain 早/中/晚
+                // as the saved shift while its official rest type is in metadata.
+                // The plain restCategory attribute alone is NOT evidence.
+                if(!category&&specific&&meta.restQuotaOvertime===true)category=specific;
+                if(category==='休'&&specific)category=specific;
                 return {category,raw};
             };
             const values=found.map(r=>categoryFor(r.schedule));
             if(new Set(values.map(v=>v.category||('班:'+v.raw))).size>1)return {state:'conflict',label:'班表待核對'};
             const value=values[0];
-            if(!value.category)return {state:'normal',label:'—',raw:value.raw};
+            // A stored normal shift is meaningful schedule information; never
+            // replace every 早/中/晚 day with a blank dash.
+            if(!value.category)return {state:'normal',label:value.raw||'未排班',raw:value.raw};
             return {state:'rest',label:value.category,raw:value.raw,date};
         }
         function p79AttendanceRosterGroup(row,employee,view){
