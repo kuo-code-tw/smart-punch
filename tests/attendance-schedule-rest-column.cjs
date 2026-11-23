@@ -80,3 +80,62 @@ assert.equal(row.noteText,'備註原樣保留');
 assert.equal(row.locationText,'原始地點');
 assert(loaded.every(x=>x===month),'requests exact attendance accounting month only');
 console.log('PASS verified official monthly 例5/0 休4/0 國0/0 選1 counters, user/month isolation, read-only data');
+
+assert.equal(result().state,'conflict','source state remains immutable after duplicate check');
+assert.equal(ctx.p79AttendanceOfficialRestCategory({dateKey:'bad-date'},emp,view()).label,'考勤日期待核對');
+assert.equal(ctx.p79AttendanceOfficialRestCategory(row,null,view()).label,'員工身分待核對');
+states.set(month,{token:'session-1',ready:false,pending:false,errorLabel:'班表連線逾時，稍後重試'});
+assert.equal(result().label,'班表連線逾時，稍後重試','show the actual read failure, not an endless generic placeholder');
+
+const loaderStart=page.indexOf('        function p79LoadAttendanceOvertimeMonth(');
+const loaderEnd=page.indexOf('        // Refresh schedule/overtime metadata',loaderStart);
+assert(loaderStart>=0&&loaderEnd>loaderStart,'official schedule retry loader exists');
+const source=page.slice(loaderStart,loaderEnd);
+assert.match(source,/getScheduleDataSecure/,'use only the official secure schedule service');
+assert.match(source,/setTimeout\(\(\)=>controller\.abort\(\),25000\)/,
+ 'official secure schedule may be slower than the former twelve second limit');
+assert.match(source,/p79QueueAttendanceOvertimeRepaint\(\)/,
+ 'success and failure repaint the visible table');
+assert.match(source,/state\.retryAfter/,'failed reads are throttled');
+assert.match(source,/state\.failures<=2/,'automatic retries are bounded');
+assert(!source.includes('localStorage.setItem'),'loading never writes user attendance or roster data');
+
+(async()=>{
+ const stores=new Map(),calls=[],repaints=[];
+ let token='session-1',returnData={ok:true,month,schedules:[{empId:'E1',month,schedule:full()}],employees:[{empId:'E1'}]};
+ const fetchContext={
+  p79AttendanceOvertimeMonths:stores,
+  getAttendanceEmployeeMasterToken:()=>token,
+  getActiveGasUrl:()=> 'https://script.google.com/macros/s/verified/exec',
+  isValidGasWebAppUrl:()=>true,
+  fetch:async(url)=>{calls.push(url);return {ok:true,json:async()=>returnData};},
+  p79QueueAttendanceOvertimeRepaint:()=>repaints.push('updated'),
+  AbortController:class{constructor(){this.signal={};}abort(){}},
+  setTimeout:(fn,ms)=>{if(ms===700)Promise.resolve().then(fn);return 1;},
+  clearTimeout:()=>{}, console:{warn:()=>{}},
+  document:{visibilityState:'visible'},
+  Date,Map,Set,JSON,Math,Number,String,Promise,encodeURIComponent
+ };
+ vm.createContext(fetchContext);vm.runInContext(source,fetchContext);
+ const settle=async()=>{for(let i=0;i<5;i++)await new Promise(resolve=>setImmediate(resolve));};
+ fetchContext.p79LoadAttendanceOvertimeMonth(month,token);
+ await settle();
+ assert.equal(stores.get(month).ready,true,'successful secure read marks month ready');
+ assert.equal(stores.get(month).rows.length,1,'verified month rows retained');
+ assert.equal(repaints.length,1,'fresh rows repaint without pressing any extra button');
+ assert.match(calls[0],/month=2026-11/,'query is month-scoped');
+ const next='2026-10';returnData={ok:false,error:'權限不足'};
+ fetchContext.p79LoadAttendanceOvertimeMonth(next,token);
+ await settle();
+ assert.equal(stores.get(next).pending,false,'failed request no longer hangs in pending state');
+ assert.equal(stores.get(next).errorLabel,'班表權限待核對','auth failures are not mislabeled missing roster');
+ assert.equal(repaints.length,2,'failure also repaints with meaningful status');
+ assert.equal(calls.length,2,'authentication errors do not retry storm');
+ const other='2026-09';returnData={ok:true,month:other,schedules:[{empId:'E1',month:other}],employees:[]};
+ fetchContext.p79LoadAttendanceOvertimeMonth(other,token);
+ token='different-login';
+ await settle();
+ assert.equal(stores.get(other).ready,false,'stale response from previous login is not applied');
+ console.log('PASS official roster fetch: successful repaint, meaningful failure, bounded retry, token isolation');
+})().catch(error=>{console.error(error);process.exitCode=1;});
+
