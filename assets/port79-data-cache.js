@@ -1259,7 +1259,7 @@ function startBrowserBackgroundDownload(action,system){
  const key='p79BrowserCacheProgressV1';
  let prior=null;
  try{prior=JSON.parse(localStorage.getItem(key)||'null')}catch(_){}
- if(prior?.viewer===viewerKey()&&prior.phase==='downloading'&&
+ if(prior?.viewer===viewerKey()&&['downloading','starting'].includes(prior.phase)&&
    Date.now()-Number(prior.updatedAt||0)<90000){
   setProgress('背景下載仍在進行：'+String(prior.detail||'').slice(0,110)+'。請查看右下角進度並保留背景下載分頁。');
   return true;
@@ -1270,11 +1270,19 @@ function startBrowserBackgroundDownload(action,system){
  url.searchParams.set('mode',action);
  if(action==='current')url.searchParams.set('system',system);
  // The direct user click must synchronously open the tab or popup blockers win.
- const tab=window.open(url.href,'port79_browser_cache_download');
+ // Each run uses a new browsing context so it cannot reuse another login's
+ // sessionStorage from an earlier finished download.
+ const tab=window.open(url.href,'_blank');
  if(!tab){
   setProgress('瀏覽器封鎖了背景下載分頁。請允許此網站開啟彈出式視窗後再按一次下載。');
   return true;
  }
+ try{tab.opener=null}catch(_){}
+ try{const now=Date.now();localStorage.setItem(key,JSON.stringify({
+  phase:'starting',viewer:viewerKey(),startedAt:now,updatedAt:now,
+  completed:0,total:action==='all'?6:action==='current'?1:0,
+  detail:'已開啟獨立下載分頁，正在確認權限。'
+ }))}catch(_){}
  setProgress('下載已交給背景分頁；可關閉此視窗、切換排班或考勤。請保持背景下載分頁開啟，右下角會顯示目前進度。');
  return true;
 }
