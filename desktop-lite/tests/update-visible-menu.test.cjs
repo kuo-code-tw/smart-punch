@@ -6,6 +6,14 @@ const src=fs.readFileSync(path.join(root,'MainForm.cs'),'utf8');
 const release=fs.readFileSync(path.join(root,'ReleaseUpdater.cs'),'utf8');
 const updater=fs.readFileSync(path.join(root,'Updater.cs'),'utf8');
 assert.match(src,/ToolStripMenuItem\("檢查79號碼頭電腦版更新"/);
+assert.match(src,/a=>a=="--port79-verify-attendance-inline"/,'native test flag remains explicit');
+assert.match(src,/if\(!inlineSmoke\)_=CheckUpdates\(false\)/,
+ 'normal Windows startup still performs automatic updates; only the test isolated');
+assert.match(src,/ATTENDANCE INLINE CHECK: startup auto update deferred/,
+ 'verification mode records why it did not restart during an embedded iframe test');
+assert.match(src,/await ProbeAttendanceInlineChannel\(\)/,
+ 'same-origin attendance iframe handshake must still run and cannot be skipped');
+
 assert.match(src,/private bool manualUpdateQueued=false;/);
 assert.match(src,/if\(updateBusy\)\s*\{\s*if\(manual\)/,
  'Manual click during automatic check must be queued and acknowledged');
