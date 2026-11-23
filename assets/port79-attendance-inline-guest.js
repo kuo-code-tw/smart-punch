@@ -13,7 +13,7 @@ try{
 }catch(_){return;}
 const TYPE='p79-attendance-inline-v2',KEY='port79_attendance_audit_handoff_v1';
 const origin=root.location.origin;
-let initialized=false,opened=false,writing=0,everWrote=false,synced=false,closedAt=0,genericStarted=false,specific=false;
+let initialized=false,opened=false,writing=0,everWrote=false,synced=false,closedAt=0,genericStarted=false,specific=false,lastReadyAt=0;
 function send(action,message=''){
  try{root.parent.postMessage({type:TYPE,nonce,action,message:String(message).slice(0,450)},origin);}
  catch(_){}
@@ -91,8 +91,16 @@ root.addEventListener('message',event=>{
  }
 });
 function poll(){
+ if(!initialized){
+  // The parent may miss a one-shot ready while Windows WebView2 is
+  // loading the large attendance page. Retry without ever writing data.
+  if(Date.now()-lastReadyAt>=1000){
+   lastReadyAt=Date.now();
+   send('ready');
+  }
+  return;
+ }
  setupWriter();
- if(!initialized)return;
  if(!opened&&!specific&&!genericStarted){
   // Generic + button uses the original Add Record modal. Row-specific pencil
   // and yellow + are handled only by the original exact-row handoff.
@@ -121,5 +129,6 @@ function poll(){
 root.P79AttendanceInlineReport=send;
 const interval=root.setInterval(poll,300);
 root.addEventListener('pagehide',()=>root.clearInterval(interval),{once:true});
+lastReadyAt=Date.now();
 send('ready');
 })(typeof window!=='undefined'?window:globalThis);
