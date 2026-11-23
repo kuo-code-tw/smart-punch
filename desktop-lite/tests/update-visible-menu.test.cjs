@@ -51,4 +51,25 @@ assert.match(src,/MessageBoxDefaultButton\.Button2/,
 assert.doesNotMatch(src,/SetUpdateAvailable\(true\);\s*if\(manual\)/,
  'Manually checking must never itself set a false positive badge');
 
+const trayStart=src.indexOf('var menu=new ContextMenuStrip();');
+const trayEnd=src.indexOf('tray.ContextMenuStrip=menu;',trayStart);
+assert(trayStart>=0&&trayEnd>trayStart,'System tray menu exists');
+const trayMenu=src.slice(trayStart,trayEnd);
+assert.doesNotMatch(trayMenu,/menu\.Items\.Add\(systemUpdateStatusMenu\)/,
+ 'Hide duplicate, disabled updater status row');
+assert.doesNotMatch(trayMenu,/menu\.Items\.Add\(cacheStatusMenu\)/,
+ 'Hide duplicate, disabled sync status row');
+assert.doesNotMatch(trayMenu,/目前程式版本：/,
+ 'Hide disabled version row; the running version remains in title and tray tooltip');
+assert.match(trayMenu,/menu\.Items\.Add\("開啟系統"/);
+assert.match(trayMenu,/menu\.Items\.Add\("縮小到系統匣"/);
+assert.match(trayMenu,/menu\.Items\.Add\(checkUpdatesMenu\)/);
+assert.match(trayMenu,/menu\.Items\.Add\(syncDataMenu\)/);
+assert.match(trayMenu,/menu\.Items\.Add\("開啟本機資料夾"/);
+assert.match(trayMenu,/menu\.Items\.Add\("開啟目前程式資料夾"/);
+assert.match(trayMenu,/menu\.Items\.Add\("關閉程式"/);
+assert.match(src,/systemUpdateStatusMenu\.Text=/,
+ 'Status handling still works internally; only the duplicate menu text was removed');
+assert.match(src,/cacheStatusMenu\.Text=/,
+ 'Sync progress remains available in the original status UI');
 console.log('PASS visible manual update and verified-availability toolbar badge: no silent disabled clicks, queued action, safe synchronization prompt, true restart and explicit no-op/failure');
