@@ -28,9 +28,9 @@ namespace Port79Lite {
   static string Sha256(byte[] bytes){using(var h=SHA256.Create())return BitConverter.ToString(h.ComputeHash(bytes)).Replace("-","").ToLowerInvariant();}
   public static async Task<Prepared> PrepareAsync(string root,string data,Action<string> log){
    ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
-   var helper=Path.Combine(root,"app","Port79Updater.exe");
-   if(!File.Exists(helper))throw new FileNotFoundException(
-    "目前的79號碼頭電腦版缺少原生更新器 Port79Updater.exe。為保護 local-data，請只將最新版 ZIP 的程式檔更新一次；不用調整 PowerShell 安全設定。");
+   // Use the updater from the fully SHA-256 verified official release, never
+   // depend on a possibly broken or missing updater in the old installation.
+   // The running app downloads/releases internally. No manual ZIP is needed.
    using(var client=new HttpClient {Timeout=TimeSpan.FromSeconds(60)}){
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Port79-WindowsLite-Updater/1.0");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
@@ -81,7 +81,7 @@ namespace Port79Lite {
     // Before the previous app exits, verify paths cannot target local-data.
     using(var archive=ZipFile.OpenRead(zip)){
      if(archive.Entries.Count>2000)throw new InvalidDataException("Windows 更新檔包含過多項目");
-     bool shell=false,site=false;
+     bool shell=false,site=false,updater=false;
      foreach(var entry in archive.Entries){
       var n=entry.FullName.Replace('\\','/');
       if(n.Contains("../")||n.StartsWith("/")||n.Contains(":")||n.StartsWith("./"))throw new InvalidDataException("不安全的更新檔案路徑");
@@ -90,10 +90,11 @@ namespace Port79Lite {
       var relative=String.Join("/",parts.Skip(1));
       if(relative=="Port79WindowsLite.exe")shell=true;
       if(relative=="site/smart-punch/index.html")site=true;
+      if(relative=="app/Port79Updater.exe")updater=true;
       if(relative.StartsWith("local-data/",StringComparison.OrdinalIgnoreCase)&&entry.Length!=0)throw new InvalidDataException("程式更新檔不得包含已寫入的私人資料");
       if(entry.Length>15*1024*1024)throw new InvalidDataException("單一更新程式檔超過安全上限");
      }
-     if(!shell||!site)throw new InvalidDataException("下載 ZIP 缺少 Windows 主程式或原系統首頁");
+     if(!shell||!site||!updater)throw new InvalidDataException("下載 ZIP 缺少 Windows 主程式、原系統首頁或原生更新器");
      // A freshly unpacked official release has no installed-shell marker.
      // Compare all local shell/app files before treating it as an update;
      // site/ files have an independent updater and are intentionally excluded.
@@ -122,6 +123,23 @@ namespace Port79Lite {
       return null;
      }
     }
+    // Extract a fresh helper ONLY from the verified archive. This avoids a
+    // broken older Port79Updater.exe causing repeated one-click failures.
+    var helper=Path.Combine(updates,"verified-release-updater.exe");
+    var nextHelper=helper+".next";
+    try{
+     using(var archive=ZipFile.OpenRead(zip)){
+      var entry=archive.GetEntry("79號碼頭_Windows輕量版/app/Port79Updater.exe");
+      if(entry==null||entry.Length<=0||entry.Length>15*1024*1024)
+       throw new InvalidDataException("正式更新檔內缺少有效的原生更新器");
+      using(var source=entry.Open())
+      using(var target=new FileStream(nextHelper,FileMode.Create,FileAccess.Write,FileShare.None))
+       source.CopyTo(target);
+     }
+     if(File.Exists(helper))File.Delete(helper);
+     File.Move(nextHelper,helper);
+    }finally{try{if(File.Exists(nextHelper))File.Delete(nextHelper);}catch{}}
+    log("已從驗證完成的正式更新包準備原生更新工具，不需手動下載 ZIP");
     return new Prepared{Zip=zip,Digest=digest,Helper=helper};
    }
   }
@@ -143,75 +161,89 @@ namespace Port79Lite {
   public static async Task LaunchAsync(Prepared p,string root,int parentPid){
    if(p==null)throw new ArgumentNullException("p");
    if(parentPid<=0)throw new ArgumentOutOfRangeException("parentPid");
-   // Native .NET helper is used instead of PowerShell, so Group Policy,
-   // execution policy and blocked .ps1 files cannot silently prevent updates.
    if(!File.Exists(p.Helper))throw new FileNotFoundException(
-    "找不到79號碼頭電腦版更新工具，現有程式不會關閉；請先修復更新程式檔案。",p.Helper);
+    "找不到經正式更新檔驗證的79號碼頭更新工具；原程式保持執行。",p.Helper);
    var updateDir=Path.Combine(root,"local-data","updates");
    Directory.CreateDirectory(updateDir);
    var ready=Path.Combine(updateDir,"runner-ready-"+parentPid+".flag");
    var fail=Path.Combine(updateDir,"native-update-launch-error.txt");
-   if(File.Exists(ready))File.Delete(ready);
-   if(File.Exists(fail))File.Delete(fail);
-   // Running a verified copy prevents the helper itself from locking the
-   // app/Port79Updater.exe file while installing an updated helper version.
-   var launch=Path.Combine(updateDir,
-    "native-launch-"+parentPid+"-"+Guid.NewGuid().ToString("N")+".exe");
-   HandoffAudit(root,"HANDOFF_BEGIN helper="+p.Helper+" launch="+launch);
-   File.Copy(p.Helper,launch,false);
-   var psi=new ProcessStartInfo(launch){
-    Arguments="--archive "+Quote(p.Zip)+" --install-root "+Quote(root)+
-      " --parent-pid "+parentPid+" --expected-digest "+Quote(p.Digest)+
-      " --ready-file "+Quote(ready),
-    UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=root
+   // Some Windows configurations block running a helper from local-data,
+   // even when the same verified EXE is allowed beside the original app.
+   // Retry from the app directory without downloading the ZIP again.
+   var attempts=new[]{
+    Path.Combine(updateDir,"native-launch-"+parentPid+"-"+Guid.NewGuid().ToString("N")+".exe"),
+    Path.Combine(root,"app","native-recovery-"+parentPid+"-"+Guid.NewGuid().ToString("N")+".exe")
    };
-   Process process=null;
-   bool accepted=false;
-   int? exitCode=null;
-   try{
-    try{process=Process.Start(psi);}
-    catch(Exception startError){
-     HandoffAudit(root,"HANDOFF_PROCESS_START_FAILED type="+startError.GetType().Name+
-      " code="+startError.HResult+" message="+startError.Message);
-     throw;
-    }
-    if(process==null)throw new InvalidOperationException(
-     "無法啟動 Windows 原生更新器；目前程式與本機資料均未變更。");
-    var deadline=DateTime.UtcNow.AddSeconds(30);
-    while(DateTime.UtcNow<deadline){
-     if(File.Exists(ready)&&File.ReadAllText(ready).Trim()=="ready:"+parentPid){
-      accepted=!process.HasExited;
-      if(accepted)break;
+   var reasons=new List<string>();
+   for(int attempt=0;attempt<attempts.Length;attempt++){
+    var launch=attempts[attempt];
+    Process process=null;
+    bool accepted=false;
+    int? exitCode=null;
+    try{
+     if(File.Exists(ready))File.Delete(ready);
+     if(File.Exists(fail))File.Delete(fail);
+     Directory.CreateDirectory(Path.GetDirectoryName(launch));
+     File.Copy(p.Helper,launch,false);
+     HandoffAudit(root,"HANDOFF_BEGIN attempt="+(attempt+1)+" helper="+p.Helper+" launch="+launch);
+     var psi=new ProcessStartInfo(launch){
+      Arguments="--archive "+Quote(p.Zip)+" --install-root "+Quote(root)+
+       " --parent-pid "+parentPid+" --expected-digest "+Quote(p.Digest)+
+       " --ready-file "+Quote(ready),
+      UseShellExecute=false,CreateNoWindow=true,WorkingDirectory=root
+     };
+     process=Process.Start(psi);
+     if(process==null)throw new InvalidOperationException("Windows 原生更新器未能建立程序");
+     var deadline=DateTime.UtcNow.AddSeconds(30);
+     while(DateTime.UtcNow<deadline){
+      if(File.Exists(ready)&&File.ReadAllText(ready).Trim()=="ready:"+parentPid){
+       accepted=!process.HasExited;
+       if(accepted)break;
+      }
+      if(process.HasExited){exitCode=process.ExitCode;break;}
+      await Task.Delay(200).ConfigureAwait(true);
      }
-     if(process.HasExited){exitCode=process.ExitCode;break;}
-     await Task.Delay(200).ConfigureAwait(true);
-    }
-    if(!accepted){
-     if(!process.HasExited){
-      try{process.Kill();process.WaitForExit(3000);}catch{}
+     if(accepted){
+      HandoffAudit(root,"HANDOFF_READY_ACKNOWLEDGED parent="+parentPid+" attempt="+(attempt+1));
+      return;
      }
+     if(!process.HasExited){try{process.Kill();process.WaitForExit(3000);}catch{}}
      if(process.HasExited)exitCode=process.ExitCode;
-     var reason=File.Exists(fail)?File.ReadAllText(fail).Trim():"";
+     var nativeReason=File.Exists(fail)?File.ReadAllText(fail).Trim():"";
+     var bootstrap=launch+".bootstrap-error.txt";
+     var earlyReason=File.Exists(bootstrap)?File.ReadAllText(bootstrap).Trim():"";
      var log=Path.Combine(root,"local-data","logs","windows-upgrade.txt");
-     HandoffAudit(root,"HANDOFF_NO_READY exit="+(exitCode.HasValue?exitCode.Value.ToString():"timeout")+
-      " nativeReason="+(String.IsNullOrEmpty(reason)?"none":reason)+
+     HandoffAudit(root,"HANDOFF_NO_READY attempt="+(attempt+1)+" exit="+
+      (exitCode.HasValue?exitCode.Value.ToString():"timeout")+
+      " nativeReason="+(String.IsNullOrEmpty(nativeReason)?"none":SafeAudit(nativeReason))+
+      " bootstrapReason="+(String.IsNullOrEmpty(earlyReason)?"none":SafeAudit(earlyReason))+
       " helperLogExists="+File.Exists(log));
-     if(String.IsNullOrEmpty(reason))
-      reason="原生更新器沒有回覆接手訊號"+(exitCode.HasValue?"（結束代碼 "+exitCode.Value+"）":"（啟動逾時）");
-     throw new InvalidOperationException(
-      "79號碼頭電腦版更新工具未完成接手，原有程式與本機資料已保留。\n"+
-      reason+"\n"+
-      "請查看診斷紀錄：local-data\\logs\\windows-update-handoff.txt；原生紀錄：local-data\\logs\\windows-upgrade.txt"+
-      (File.Exists(log)?"":"（沒有原生紀錄；更新工具可能在開始執行前就結束，原因尚未確認）"));
+     reasons.Add("第"+(attempt+1)+"次接手失敗："+(String.IsNullOrEmpty(nativeReason)?
+      (String.IsNullOrEmpty(earlyReason)?"結束代碼 "+(exitCode.HasValue?exitCode.Value.ToString():"逾時"):earlyReason):nativeReason));
+    }catch(Exception error){
+     HandoffAudit(root,"HANDOFF_PROCESS_START_FAILED attempt="+(attempt+1)+
+      " type="+error.GetType().Name+" code="+error.HResult+
+      " message="+SafeAudit(error.Message));
+     reasons.Add("第"+(attempt+1)+"次啟動失敗："+error.GetType().Name);
+    }finally{
+     try{if(File.Exists(ready))File.Delete(ready);}catch{}
+     if(process!=null)process.Dispose();
+     // Never remove a live accepted updater. Failed attempts are disposable
+     // copies; all official/local data and the verified ZIP are preserved.
+     if(!accepted){
+      try{if(File.Exists(launch))File.Delete(launch);}catch{}
+     }
     }
-   }finally{
-    if(accepted)HandoffAudit(root,"HANDOFF_READY_ACKNOWLEDGED parent="+parentPid);
-    try{if(File.Exists(ready))File.Delete(ready);}catch{}
-    if(process!=null)process.Dispose();
-    // Do not delete the in-use helper; cleanup of old launcher copies occurs
-    // when the next app session starts, outside the active updater process.
-    if(!accepted){try{if(File.Exists(launch))File.Delete(launch);}catch{}}
    }
+   throw new InvalidOperationException(
+    "79號碼頭電腦版更新工具無法接手，已自動嘗試兩種原生啟動位置；舊程式、本機資料及已驗證的更新包均保留。\n"+
+    String.Join("；",reasons)+"\n"+
+    "更新紀錄：local-data\\logs\\windows-update-handoff.txt；"+
+    "原生紀錄：local-data\\logs\\windows-upgrade.txt（若沒有代表尚未進入原生程式）");
   }
- }
+  private static string SafeAudit(string value){
+   if(String.IsNullOrEmpty(value))return "";
+   var text=value.Replace("\r"," ").Replace("\n"," ");
+   return text.Length>220?text.Substring(0,220):text;
+  } }
 }

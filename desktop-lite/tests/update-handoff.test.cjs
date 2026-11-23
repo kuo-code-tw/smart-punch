@@ -12,18 +12,23 @@ const safety=fs.readFileSync(path.join(root,'tests','shell-updater-safety.ps1'),
 assert.match(native,/async Task LaunchAsync\(/);
 assert.match(native,/await Task\.Delay\(200\)/,'Handoff remains async');
 assert.match(main,/await ReleaseUpdater\.LaunchAsync\(/,'The old app waits for acknowledgement');
-assert.match(native,/app","Port79Updater\.exe"/,'New installs contain native helper');
+assert.match(native,/archive\.GetEntry\("79號碼頭_Windows輕量版\/app\/Port79Updater\.exe"\)/,
+ 'New installs recover a verified helper directly from the official release');
+assert.match(native,/verified-release-updater\.exe/,'Stage the freshly verified helper');
 assert.match(native,/new ProcessStartInfo\(launch\)/,'Run the native helper instead of PowerShell');
 assert.doesNotMatch(native,/new ProcessStartInfo\("powershell\.exe"\)/);
 assert.match(native,/native-update-launch-error\.txt/,'Show an actual native launch error');
 assert.match(native,/void HandoffAudit\(string root,string message\)/,'Parent must diagnose helper process exits before native logging');
 assert.match(native,/windows-update-handoff\.txt/,'Keep durable parent-side handoff diagnostics under local-data logs');
-assert.match(native,/HANDOFF_NO_READY exit=/,'Record exit code even when there is no native updater log');
+assert.match(native,/HANDOFF_NO_READY attempt=/,'Record failed attempt even if native logging never starts');
+assert.match(native,/exit=/,'Record actual exit code');
 assert.match(native,/HANDOFF_PROCESS_START_FAILED/,'Record process start exceptions safely');
 assert.match(native,/HANDOFF_READY_ACKNOWLEDGED/,'Record verified transfer completion');
-assert.match(native,/原因尚未確認/,'Do not guess antivirus or permissions without device evidence');
-assert.match(main,/https:\/\/github\.com\/kuo-code-tw\/smart-punch\/releases\/latest/,'Offer an official immutable-release recovery source');
-assert.match(main,/不要用舊版程式檔覆蓋新版/,'Tell operators to preserve local-data, not old program files');
+assert.match(native,/native-recovery-/,'Retry an isolated original-app-directory launch if needed');
+assert.match(native,/for\(int attempt=0;attempt<attempts\.Length;attempt\+\+\)/,'Try a bounded number of safe launch paths');
+assert.match(native,/String\.Join\("；",reasons\)/,'Report actual handoff errors');
+assert.match(main,/無須自行下載 ZIP/,'No manual ZIP step in the existing Update System dialog');
+assert.match(main,/windows-update-handoff\.txt/,'Preserve diagnostic instructions');
 
 assert.match(native,/runner-ready-/);
 assert.match(native,/accepted=!process\.HasExited/);
@@ -32,6 +37,7 @@ assert.match(native,/process\.Kill\(\)/);
 assert.match(native,/CreateNoWindow=true/);
 assert.match(native,/DateTime\.UtcNow\.AddSeconds\(30\)/);
 assert.match(helper,/UPDATER_READY parent=/);
+assert.match(helper,/bootstrap-error\.txt/,'Capture errors even before ordinary native logging');
 assert.match(helper,/File\.WriteAllText\(Ready,"ready:"\+ParentPid/);
 assert(helper.indexOf('NATIVE_ARCHIVE_SHA256_OK')<helper.indexOf('File.WriteAllText(Ready,'),
  'Never acknowledge an unverified release');
