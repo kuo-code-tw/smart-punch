@@ -67,7 +67,7 @@
  // metadata. A fixed legacy tag and a repeatedly named ZIP cannot distinguish
  // an old browser download from the current release.
  async function refreshOfficialRelease(){
-  if(!managerSession()||typeof window.fetch!=='function'||lookupBusy||
+  if(!managerSession()||!downloadAllowed||typeof window.fetch!=='function'||lookupBusy||
      Date.now()-lastLookup<60000)return;
   lastLookup=Date.now();lookupBusy=true;
   try{
@@ -93,14 +93,14 @@
    if(!chosen||chosen.browser_download_url!==expected||
       !/^sha256:[a-f0-9]{64}$/.test(String(chosen.digest||''))||
       !(Number(chosen.size)>0&&Number(chosen.size)<31457280))throw Error('Release asset not verified');
-   if(!managerSession())return;
+   if(!managerSession()||!downloadAllowed)return;
    link.href=expected;
    link.textContent='⬇ 電腦版下載 '+human;
    link.title='下載79號碼頭電腦版，版本 '+human+'（已核對發布檔案完整性）';
   }catch(_){
    // GitHub API can be rate limited. Its releases/latest redirect still tracks
    // the newest official package, never the mutable 2026-11-20 legacy tag.
-   if(!managerSession())return;
+   if(!managerSession()||!downloadAllowed)return;
    link.href=DOWNLOAD_URL;
    link.textContent='⬇ 電腦版下載（最新）';
    link.title='下載 GitHub 最新79號碼頭電腦版；版本查詢暫時不可用';
