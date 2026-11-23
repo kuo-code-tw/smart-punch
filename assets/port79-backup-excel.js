@@ -106,6 +106,52 @@ function workbook(data){
  if(long.length)append('長文字明細',[['來源','列號','欄號','分段','完整文字'],...long]);
  return new Uint8Array(X.write(book,{bookType:'xlsx',type:'array',compression:true}));
 }
+// GAS rejects a single oversized base64 workbook before reading its content.
+// Split an oversized readable workbook into multiple valid, smaller XLSX files;
+// never silently discard sheets, rows, or long-text continuations.
+const LOCAL_EXCEL_PART_LIMIT=4*1024*1024;
+function localWorkbookParts(source){
+ const original=source instanceof Uint8Array?source:new Uint8Array(source);
+ if(original.length<=LOCAL_EXCEL_PART_LIMIT)return [original];
+ const X=g.XLSX;
+ if(typeof X.read!=='function'||typeof X.utils.sheet_to_json!=='function')throw Error('Excel分冊元件尚未載入，未建立不完整備份');
+ const book=X.read(original,{type:'array'});
+ const pending=book.SheetNames.map(name=>({name,rows:X.utils.sheet_to_json(book.Sheets[name],{header:1,raw:true,defval:''})}));
+ if(!pending.length)throw Error('本機Excel沒有可核對的工作表');
+ const pieces=[];
+ function encode(group){
+  const part=X.utils.book_new(),used=new Set();
+  group.forEach((fragment,index)=>{
+   const base=String(fragment.name||'本機資料').replace(/[\[\]*?:/\\]/g,'_').slice(0,31);
+   let name=base,n=1;
+   while(used.has(name)){n++;name=base.slice(0,27)+'_'+n;}
+   used.add(name);
+   X.utils.book_append_sheet(part,X.utils.aoa_to_sheet(fragment.rows),name);
+  });
+  return new Uint8Array(X.write(part,{bookType:'xlsx',type:'array',compression:true}));
+ }
+ let scans=0;
+ while(pending.length){
+  if(++scans>1024)throw Error('本機Excel分冊超出安全處理上限，資料保留未上傳');
+  const frag=pending.shift(),file=encode([frag]);
+  if(file.length<=LOCAL_EXCEL_PART_LIMIT){pieces.push(frag);continue;}
+  // Every split repeats its column heading, and otherwise preserves every row.
+  if(frag.rows.length<=2)throw Error('本機Excel單列資料超過雲端上傳限制，資料保留未上傳');
+  const half=Math.floor((frag.rows.length-1)/2),header=frag.rows[0];
+  pending.unshift({name:frag.name,rows:[header,...frag.rows.slice(1+half)]});
+  pending.unshift({name:frag.name,rows:[header,...frag.rows.slice(1,1+half)]});
+ }
+ const parts=[];let current=[];
+ for(const piece of pieces){
+  if(!current.length){current=[piece];continue;}
+  const candidate=encode([...current,piece]);
+  if(candidate.length>LOCAL_EXCEL_PART_LIMIT){parts.push(encode(current));current=[piece];}
+  else current.push(piece);
+ }
+ if(current.length)parts.push(encode(current));
+ if(!parts.length||parts.length>128||parts.some(p=>p.length>LOCAL_EXCEL_PART_LIMIT))throw Error('本機Excel分冊數量或大小超出安全限制，資料保留未上傳');
+ return parts;
+}
 async function run(batch,c){
  if(!allowed()||!c.same())throw Error('僅超級管理員可取得Excel備份');
  const stateData=batch.excelState||(batch.excelState={zip:new g.JSZip(),completed:{},local:false,cloud:false});
@@ -115,9 +161,21 @@ async function run(batch,c){
   if(!stateData.local){
    state('雲端分類備份已確認；正在產生目前電腦的Excel…');
    if(!stateData.localBytes)stateData.localBytes=workbook(await localData(c));
-   const b=stateData.localBytes,digest=await hash(b);
-   zip.file('電腦端資料/本機資料.xlsx',b);
-   const receipt=await call(c,{phase:'local',base64:base64(b),hash:digest});if(receipt.verified!==true||receipt.hash!==digest)throw Error('本機Excel雲端回條不完整');
+   if(!stateData.localParts)stateData.localParts=localWorkbookParts(stateData.localBytes);
+   const parts=stateData.localParts,uploaded=stateData.localUploaded||(stateData.localUploaded={});
+   if(parts.length>1){
+    zip.file('備份說明/本機資料分冊說明.txt','本機Excel因資料量超過單一雲端檔案限制，已完整分為 '+parts.length+' 份 XLSX。請依「電腦端資料」內的檔案順序閱讀，分冊可能重複欄位標題，但原始資料列未刪除。');
+   }
+   for(let i=0;i<parts.length;i++){
+    const b=parts[i],name=i===0?'本機資料.xlsx':'本機資料_第'+(i+1)+'份_共'+parts.length+'份.xlsx';
+    zip.file('電腦端資料/'+name,b);
+    if(uploaded[i])continue;
+    state('雲端分類備份已確認；正在上傳目前電腦Excel（'+(i+1)+'/'+parts.length+'）…');
+    const digest=await hash(b);
+    const receipt=await call(c,{phase:'local',base64:base64(b),hash:digest,partIndex:i,partTotal:parts.length});
+    if(receipt.verified!==true||receipt.hash!==digest)throw Error('本機Excel第'+(i+1)+'份雲端回條不完整');
+    uploaded[i]=true;
+   }
    for(const item of await g.Port79AllBackup.getLocalOriginals())if(item.actor===c.actor){const name=String(item.name||'儲量原檔.xlsx').replace(/[\\/:*?"<>|]/g,'_');zip.file('電腦端資料/原始匯入檔/'+String(item.hash||item.id).replace(/[^a-z0-9]/gi,'').slice(-12)+'_'+name,item.bytes);}
    stateData.local=true;
   }
@@ -148,5 +206,5 @@ async function run(batch,c){
   batch.excelComplete=true;g.Port79SharedBackupStatus?.refresh?.();
  }catch(e){state((stateData.cloud?'雲端Excel：已保存':'雲端Excel：尚未全部完成')+'｜電腦端：尚未完成；'+(e.backupScope?e.backupScope+'｜':'')+rawError(e)+'。已完成項目保留，可按原按鈕繼續。');throw e;}
 }
-g.Port79BackupExcel={prepare,run,workbook,clean,allowed,localData,validateArchive,refreshDownload,clearDownload};
+g.Port79BackupExcel={prepare,run,workbook,localWorkbookParts,clean,allowed,localData,validateArchive,refreshDownload,clearDownload};
 })(window);

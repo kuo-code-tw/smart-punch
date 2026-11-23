@@ -1,0 +1,40 @@
+name: Verify large local Excel backup and safe resume
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-backup-excel.js'
+      - 'backend/backup-readable-excel.gs'
+      - 'tests/backup-readable-excel.cjs'
+      - '.github/workflows/verify-large-excel-backup.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-backup-excel.js'
+      - 'backend/backup-readable-excel.gs'
+      - 'tests/backup-readable-excel.cjs'
+      - '.github/workflows/verify-large-excel-backup.yml'
+permissions:
+  contents: read
+jobs:
+  excel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Existing broad integration job does not install jszip. This focused
+      # regression test must actually execute rather than fail on MODULE_NOT_FOUND.
+      - name: Install test-only archive reader
+        run: npm install --no-save --no-package-lock --ignore-scripts jszip@3.10.1
+      - name: Check syntax for local uploader and cloud-side validation
+        run: |
+          node --check assets/port79-backup-excel.js
+          node --check tests/backup-readable-excel.cjs
+          node -e "new (require('vm').Script)(require('fs').readFileSync('backend/backup-readable-excel.gs','utf8'))"
+      - name: Test full, oversized, and resumed XLSX backups
+        run: |
+          node tests/backup-readable-excel.cjs
+          node tests/all-systems-backup-client.cjs
+          node tests/all-systems-backup-receipt.cjs

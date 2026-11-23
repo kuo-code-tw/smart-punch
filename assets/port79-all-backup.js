@@ -169,7 +169,7 @@ function render(){
   (failed?' · 可重試':''));
 
  const btn=$('p79AllBackupButton');
- if(btn){btn.disabled=busy;btn.textContent=busy?'正在備份…':batch.restored?'接續備份':failed?'重試未完成項目':'備份資料庫';}
+ if(btn){btn.disabled=busy;btn.textContent=busy?'正在備份…':batch.items.every(i=>i.result)&&g.Port79BackupExcel&&!batch.excelComplete?'繼續完成Excel備份':batch.restored?'接續備份':failed?'重試未完成項目':'備份資料庫';}
 }
 // Sidebar navigation is a view action, not a request to create backup files.
 // Display homepage cards immediately as pending; real red/green receipts are only
