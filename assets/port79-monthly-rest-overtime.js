@@ -669,12 +669,119 @@ function auditText(model,empId){
  return lines.join('\n');
 }
 function styles(){if(document.getElementById('p79MonthlyRestStyle'))return;const el=document.createElement('style');el.id='p79MonthlyRestStyle';el.textContent=`#p79MonthlyRest{width:min(1080px,calc(100vw - 24px));max-height:90dvh;padding:0;border:0;border-radius:14px;color:#0f172a;background:#fff;box-shadow:0 20px 80px #0005;font:14px sans-serif}#p79MonthlyRest::backdrop{background:#0f172a88}#p79MonthlyRest header,#p79MonthlyRest footer{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;background:#f1f5f9}#p79MonthlyRest footer{flex-wrap:wrap}#p79MonthlyRest #mrResult{flex:1;min-width:150px;font-weight:700;color:#0369a1}#p79MonthlyRest .body{padding:12px 16px;overflow:auto;max-height:calc(90dvh - 120px)}#p79MonthlyRest .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:end}#p79MonthlyRest label{display:flex;flex-direction:column;gap:4px;font-size:12px}#p79MonthlyRest input,#p79MonthlyRest select{border:1px solid #cbd5e1;padding:6px;border-radius:7px;background:white;color:#0f172a;max-width:100%}#p79MonthlyRest button{padding:7px 12px;border:0;border-radius:8px;background:#e2e8f0;color:#0f172a;cursor:pointer}#p79MonthlyRest button.primary{background:#0369a1;color:white}#p79MonthlyRest button:disabled{opacity:.5;cursor:wait}#p79MonthlyRest table{width:100%;border-collapse:collapse;white-space:nowrap;font-size:12px}#p79MonthlyRest th,#p79MonthlyRest td{padding:7px 5px;border-bottom:1px solid #e2e8f0;text-align:center}#p79MonthlyRest .scroll{overflow:auto;margin-top:10px}#p79MonthlyRest .國{background:#fef3c7;color:#92400e}#p79MonthlyRest .休{background:#dbeafe;color:#1e40af}#p79MonthlyRest .例{background:#fee2e2;color:#991b1b}#p79MonthlyRest td.person{white-space:nowrap;min-width:170px}#p79MonthlyRest .person-progress{display:inline-block;padding:0;background:transparent;font-size:12px;color:#0369a1;white-space:nowrap}#p79MonthlyRest #mrPlanningModes{position:sticky;top:0;z-index:3;background:#eef2ff!important}#p79MonthlyRest #mrPlanningModes label{flex-direction:row;align-items:center;font-weight:700;cursor:pointer}#p79MonthlyRest input[type=checkbox]{appearance:auto!important;pointer-events:auto!important;width:24px!important;height:24px!important;min-height:24px!important;cursor:pointer;accent-color:#0369a1}#p79MonthlyRest #mrStatus{white-space:pre-line;line-height:1.6;margin:10px 0;color:#475569}#p79MonthlyRest .mr-compact-stats{margin:10px 0;padding:11px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#334155;font-size:13px;font-weight:700;line-height:1.7}#p79MonthlyRest .filters{gap:10px}#p79MonthlyRest #mrPlanningModes{gap:14px!important;flex-wrap:wrap}#p79MonthlyRest #mrPlannedSection>.scroll{margin-top:4px}`;document.head.appendChild(el);}
+// Visual-only simplification. Preserve every existing ID, input, source,
+// handler, approval restriction and save guard. This is NOT auto-submission.
+function simplifyMonthlyRestLayout(el,settings={}){
+ const body=el.querySelector('.body'),base=el.querySelector('.filters');
+ if(!body||!base||el.querySelector('#mrSimpleGuide'))return;
+ const guide=document.createElement('div');
+ guide.id='mrSimpleGuide';guide.className='mr-simple-guide';
+ guide.innerHTML='<strong>每月未休假加班：三步完成核對</strong><span>① 選月份、讀取資料　→　② 核對可申報出勤　→　③ 勾選後確認申報</span><small>自動核對及預排不等於正式申報；必須有真實出勤與雲端申報確認。</small>';
+ body.insertBefore(guide,base);
+
+ const filters=document.createElement('details');
+ filters.id='mrMoreFilters';filters.className='mr-simple-details';
+ filters.innerHTML='<summary>更多篩選：部門／職稱／人員</summary>';
+ const filterFields=document.createElement('div');filterFields.className='filters mr-simple-more-filters';
+ for(const id of ['mrDept','mrJob','mrEmp']){
+  const field=el.querySelector('#'+id)?.closest('label');
+  if(field)filterFields.appendChild(field);
+ }
+ filters.appendChild(filterFields);
+ base.after(filters);
+
+ // Make the verified attendance list the first main action after the
+ // official summary. The checked rows and save action retain their IDs.
+ const readyBody=el.querySelector('#mrRows')?.closest('.scroll');
+ const readyTitle=readyBody?.previousElementSibling;
+ const ready=document.createElement('section');ready.id='mrReadySection';
+ if(readyTitle?.tagName==='B')ready.appendChild(readyTitle);
+ if(readyBody)ready.appendChild(readyBody);
+ const summary=el.querySelector('#mrCompactStats');
+ if(summary)summary.after(ready);
+
+ const auto=el.querySelector('#mrAutomaticSupplement');
+ const autoDetails=document.createElement('details');
+ autoDetails.id='mrAutoDetails';autoDetails.className='mr-simple-details';
+ autoDetails.innerHTML='<summary>查看每位員工自動核對明細</summary>';
+ for(const item of [...auto.querySelectorAll(':scope > .scroll, :scope > small')])
+  autoDetails.appendChild(item);
+ auto.appendChild(autoDetails);
+ // Stay on the actual figures by default, not the 9-column diagnostic grid.
+ const autoTitle=auto.querySelector('b');
+ if(autoTitle)autoTitle.textContent='未休假核對摘要（全員）';
+
+ const advanced=document.createElement('details');
+ advanced.id='mrAdvancedPlanning';advanced.className='mr-simple-details';
+ advanced.innerHTML='<summary>進階：預排、逐週核對及待處理人員</summary>';
+ for(const selector of ['#mrPlanningModes','#mrNeedSection','#mrPlannedSection','#mrWeeklyDetails']){
+  const part=el.querySelector(selector);
+  if(part)advanced.appendChild(part);
+ }
+ const weekly=el.querySelector('#mrWeeklyDetails');
+ if(weekly)weekly.open=false;
+ advanced.open=settings.autoPlan===true;
+ auto.after(advanced);
+
+ const existing=el.querySelector('#mrExistingSection');
+ if(existing){
+  const previous=document.createElement('details');
+  previous.id='mrExistingDetails';previous.className='mr-simple-details';
+  previous.innerHTML='<summary>查看本月已申報紀錄（唯讀）</summary>';
+  existing.before(previous);previous.appendChild(existing);
+  advanced.after(previous);
+ }
+ const status=el.querySelector('#mrStatus');
+ if(status&&ready)summary?.before(status);
+ // These are read-only source and audit explanations, not first-step actions.
+ const diagnostics=document.createElement('details');
+ diagnostics.id='mrSourceDetails';diagnostics.className='mr-simple-details';
+ diagnostics.innerHTML='<summary>核對依據與資料來源說明</summary>';
+ for(const selector of ['#mrBackfill','#mrPhase','#mrAuditSummary']){
+  const element=el.querySelector(selector);
+  if(element){diagnostics.appendChild(element);element.hidden=false;}
+ }
+ const audit=el.querySelector('#mrAuditDetails')?.closest('details');
+ if(audit){diagnostics.appendChild(audit);audit.hidden=false;}
+ if(ready)ready.after(diagnostics);
+ const style=document.createElement('style');style.id='mrSimpleLayoutStyle';
+ style.textContent=`#p79MonthlyRest{width:min(1180px,calc(100vw - 20px));border-radius:16px}
+ #p79MonthlyRest .body{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+ #p79MonthlyRest .body>.filters{margin:0!important;align-items:flex-end}
+ #p79MonthlyRest .mr-simple-guide{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:11px 14px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;color:#1d4ed8}
+ #p79MonthlyRest .mr-simple-guide strong{font-size:15px;flex-basis:100%;color:#1e3a8a}
+ #p79MonthlyRest .mr-simple-guide span{font-size:13px;font-weight:700}
+ #p79MonthlyRest .mr-simple-guide small{font-size:11px;color:#475569;flex-basis:100%}
+ #p79MonthlyRest .mr-simple-details{border:1px solid #d9e3ef;border-radius:12px;background:#fff;overflow:hidden}
+ #p79MonthlyRest .mr-simple-details>summary{padding:12px 14px;font-size:13px;font-weight:800;color:#19416f;cursor:pointer;list-style:revert}
+ #p79MonthlyRest .mr-simple-details[open]>summary{background:#eef6ff;border-bottom:1px solid #dce8f5}
+ #p79MonthlyRest .mr-simple-details>.filters{padding:12px!important;background:#fff}
+ #p79MonthlyRest #mrReadySection{border:1px solid #d9e3ef;background:#fff;border-radius:12px;padding:13px 14px}
+ #p79MonthlyRest #mrReadySection>b{display:block;font-size:15px;margin:0 0 9px;color:#193d68}
+ #p79MonthlyRest #mrReadySection .scroll{max-height:300px;overflow:auto}
+ #p79MonthlyRest #mrAutomaticSupplement{margin:0!important;background:#f8fbff;border-color:#d9e3ef!important}
+ #p79MonthlyRest #mrAutoSupplementSummary{line-height:1.8;color:#274668!important}
+ #p79MonthlyRest #mrAutoDetails{margin-top:8px}
+ #p79MonthlyRest #mrAutoDetails>.scroll,#p79MonthlyRest #mrAutoDetails>small{margin:10px;display:block}
+ #p79MonthlyRest .p79-ot-ux-dialog-tabs{display:none!important} /* redundant sub-tabs: the dialog has a title and Close */
+ #p79MonthlyRest #mrAdvancedPlanning>#mrPlanningModes{margin:10px!important}
+ #p79MonthlyRest #mrAdvancedPlanning>#mrNeedSection,#p79MonthlyRest #mrAdvancedPlanning>#mrPlannedSection,#p79MonthlyRest #mrAdvancedPlanning>#mrWeeklyDetails{margin:10px!important}
+ #p79MonthlyRest #mrExistingDetails #mrExistingSection{margin:10px!important}
+ #p79MonthlyRest #mrStatus{border-radius:10px;background:#f1f5f9;padding:10px 12px;font-size:12px}
+ #p79MonthlyRest footer{gap:10px}
+ #p79MonthlyRest footer #mrSave{min-width:158px}
+ @media(max-width:760px){#p79MonthlyRest .body{padding:10px}#p79MonthlyRest .mr-simple-guide{padding:10px}
+ #p79MonthlyRest .body>.filters label{flex:1;min-width:130px}
+ #p79MonthlyRest footer{align-items:stretch}#p79MonthlyRest footer #mrResult{flex-basis:100%}}`;
+ el.appendChild(style);
+}
 async function open(settings={}){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
  const el=document.createElement('dialog');el.id='p79MonthlyRest';
  el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>加班歸屬月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}" max="${today().slice(0,7)}"></label><button type="button" id="mrPrior">補報上月</button><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休額度</button></div><div class="filters" id="mrPlanningModes" style="padding:12px;background:#eef2ff;border-radius:10px;margin:10px 0"><b>建立未休假預排</b><label><input id="mrManualMode" type="checkbox">手動預排</label><label><input id="mrAutoMode" type="checkbox">自動預排（今天至月底）</label><button id="mrNewPlan" type="button" class="primary">＋ 新增預排</button></div><div id="mrBackfill" hidden role="status" style="font-weight:800;color:#7c3aed;margin:6px 0"></div><div id="mrPhase" hidden role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" hidden role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details hidden style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><div id="mrCompactStats" role="status" aria-live="polite" class="mr-compact-stats">讀取資料後顯示核對摘要</div><section id="mrAutomaticSupplement" style="margin:10px 0;padding:10px;border:1px solid #cbd5e1;border-radius:10px"><b>全員未休假自動補算結果（不須逐人對表）</b><div id="mrAutoSupplementSummary" role="status" style="margin:7px 0;color:#334155;font-size:12px">正在核對全員來源…</div><div class="scroll" style="max-height:300px"><table><thead><tr><th>職稱</th><th>姓名</th><th>已自動配休</th><th>未休加班註記</th><th>已核對申報</th><th>申報出勤待核</th><th>註記缺申報</th><th>未休缺額</th><th>狀態</th></tr></thead><tbody id="mrAutoSupplementRows"></tbody></table></div><small style="display:block;margin-top:5px;color:#64748b">自動配休與加班註記不等於正式申報。只有正式申報編號及出勤核實完成才會列為已核對申報；資料來源未完成時不判定申報成功。</small></section><details id="mrWeeklyDetails" style="margin:8px 0 12px;border:1px solid #dbe4ee;border-radius:10px;padding:10px" open><summary style="cursor:pointer;font-weight:800">逐週例／休／國核對（依原班表）</summary><div class="scroll" style="max-height:230px"><table><thead><tr><th>週期</th><th>人數</th><th>例假</th><th>休息日</th><th>國定假日</th><th>預排建議</th><th>待確認</th></tr></thead><tbody id="mrWeeklyRows"></tbody></table></div><small style="display:block;color:#64748b;margin-top:6px">未設定員工約定七日週期或跨月班表不足時，只做參考核對，不會自行把普通工作日改為休假加班。</small></details><section id="mrNeedSection"><b hidden id="mrNeedSummary">各公司、單位、組別及職稱排班核對中…</b><div hidden id="mrScopeSummary" role="status"></div><details id="mrScopeDetails" style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">展開單位／職稱統計</summary><div class="scroll"><table><thead><tr><th>單位</th><th>組別</th><th>職稱</th><th>名冊</th><th>完成</th><th>未休／待核</th><th>班表缺漏</th><th>正式可申報</th><th>預排方式</th></tr></thead><tbody id="mrScopeRows"></tbody></table></div></details><div class="scroll"><table><thead><tr><th>預排勾選</th><th>員工編號</th><th>職稱</th><th>姓名</th><th>未休／待核額度</th><th>班表與考勤核對</th></tr></thead><tbody id="mrNeedRows"></tbody></table></div><div id="mrManualSelected" style="margin:10px 0;padding:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px" hidden><b id="mrManualSummary">手動預排尚未勾選人員</b><p style="font-size:12px">勾選後，逐人按「設定日期與時段」；確認後才儲存預排，不會自動申報。</p><div id="mrManualRows"></div></div></section><section id="mrPlannedSection"><b hidden id="mrPlannedSummary">自動預排建議核對中…</b><div class="scroll"><table><thead><tr><th><input id="mrPlanAll" type="checkbox" aria-label="全選自動預排建議"></th><th>日期</th><th>職稱</th><th>姓名</th><th>假別</th><th>原排班別／草案時段</th><th>狀態</th></tr></thead><tbody id="mrPlannedRows"></tbody></table></div><button id="mrSavePlans" type="button" class="primary" disabled>儲存勾選預排（0 筆）</button></section><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><section id="mrExistingSection" aria-label="本月已申報休假加班" style="margin:12px 0;border:1px solid #cbd5e1;border-radius:10px;padding:10px"><b>已申報的例／休／國加班（唯讀，不重複申報）</b><div id="mrExistingStatus" role="status" style="margin:6px 0;font-size:12px;color:#334155">讀取班表後顯示既有申報。</div><div class="scroll" style="max-height:310px"><table><thead><tr><th>日期</th><th>職稱</th><th>姓名</th><th>假別</th><th>申報時段</th><th>申報狀態</th><th>來源／說明</th><th>申報編號</th></tr></thead><tbody id="mrExistingRows"></tbody></table></div></section><b>已完成出勤・尚未申報（自行勾選後送出）</b><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  el.querySelector('#mrNeedSection').before(el.querySelector('#mrPlannedSection'));
+ simplifyMonthlyRestLayout(el,settings);
  document.body.appendChild(el);el.showModal();
  let autoPlan=settings.autoPlan===true,explicitPlanningMode=settings.autoPlan===true;
  const manualPeople=new Map(); // preserve picks across local filters; no implicit cloud writes
