@@ -697,7 +697,9 @@ namespace Port79Lite {
    if(updateBusy){
     if(manual){
      manualUpdateQueued=true;
-     UpdateStatus("背景版本檢查尚未完成；已記下你的手動更新要求，完成後會接著檢查。",true);
+     // The running verification will honor this request directly. Do not
+     // start an unnecessary second network scan after the first one ends.
+     UpdateStatus("已接收手動更新；目前正在完成正式版本核對，會由這一輪直接接續更新，不需重複按。",true);
     }
     return;
    }
@@ -710,25 +712,41 @@ namespace Port79Lite {
    try{
     var site=Path.Combine(root,"site","smart-punch");
     var pending=Path.Combine(DataRoot,"updates","pending.json");
-    UpdateStatus("正在比對正式版本與本機程式…",manual);
+    // The signed-by-digest, complete Windows package also contains every
+    // public website file. Check it FIRST: on most updates we can avoid
+    // scanning/downloading hundreds of individual site files before the
+    // operator even reaches the native updater. No business data is touched.
+    UpdateStatus("正在優先核對 Windows 正式完整更新包（包含網頁畫面）…",manual);
     try{
-     websitePending=File.Exists(pending);
-     if(!websitePending){
-      stagedSite=await Updater.StageFromOfficialAsync(site,DataRoot,Log);
-      websitePending=stagedSite>0;
-     }
-    }catch(Exception e){
-     siteFailure=e.Message;
-     Log("website auto update deferred: "+e.Message);
-    }
-    // Never make an explicit second ZIP download step mandatory for the user.
-    // A release is verified in the app, and kept staged until a safe restart.
-    try{
-     UpdateStatus(websitePending?"79號碼頭網頁版更新檔已驗證，繼續核對電腦版主程式…":"正在核對79號碼頭電腦版主程式及更新檔…",manual);
      shell=await ReleaseUpdater.PrepareAsync(root,DataRoot,Log);
     }catch(Exception e){
      shellFailure=e.Message;
      Log("Windows shell auto update deferred: "+e.Message);
+    }
+    websitePending=File.Exists(pending);
+    if(shell==null){
+     UpdateStatus("Windows 版本核對完成，正在檢查網頁畫面是否另有更新…",manual||manualUpdateQueued);
+     try{
+      if(!websitePending){
+       stagedSite=await Updater.StageFromOfficialAsync(site,DataRoot,Log);
+       websitePending=stagedSite>0;
+      }
+     }catch(Exception e){
+      siteFailure=e.Message;
+      Log("website auto update deferred: "+e.Message);
+     }
+    }else{
+     // A verified full Windows ZIP supersedes a separate website-only stage.
+     // Leave any existing pending.json untouched for recovery/rollback.
+     Log("Verified Windows release contains the entire site; skipped redundant website scan");
+    }
+    // If a person clicked while the background check was in progress, use
+    // this SAME completed verification for their requested update. A
+    // redundant second scan would appear hung, despite already being ready.
+    if(manualUpdateQueued){
+     manual=true;
+     manualUpdateQueued=false;
+     UpdateStatus("手動更新已接手完成版本核對，正在判斷是否安全套用…",true);
     }
     // Only show the persistent badge after the update has been downloaded and
     // verified (or a previously verified site stage is already pending).
