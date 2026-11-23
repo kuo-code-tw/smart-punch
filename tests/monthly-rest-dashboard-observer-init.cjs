@@ -11,7 +11,7 @@ new vm.Script(official);
 // Extract the actual installed observers so the test executes production code,
 // rather than only checking for the spelling of the fixed options.
 const start=src.indexOf(' const observers=[];');
-const end=src.indexOf(" el.addEventListener('close',",start);
+const end=src.indexOf(' // If an upstream request remains unresolved',start);
 assert(start>=0&&end>start,'observer installation is present');
 const fragment=src.slice(start,end);
 const seen=[];
