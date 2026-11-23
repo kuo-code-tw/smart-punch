@@ -16,6 +16,11 @@ assert.match(native,/archive\.GetEntry\("79號碼頭_Windows輕量版\/app\/Port
  'New installs recover a verified helper directly from the official release');
 assert.match(native,/verified-release-updater\.exe/,'Stage the freshly verified helper');
 assert.match(native,/new ProcessStartInfo\(launch\)/,'Run the native helper instead of PowerShell');
+assert.match(native,/new string\('\\\\',trailing\)/,'Escape trailing backslashes before the closing Windows argument quote');
+const trailingSmoke=fs.readFileSync(path.join(root,'tests','native-updater-trailing-root-smoke.ps1'),'utf8');
+assert.match(trailingSmoke,/native command quote smoke/,'Regression must exercise a real native helper');
+assert.match(trailingSmoke,/Port79PathQuoteProbe/,'Use the actual Windows handoff quoting method');
+assert.match(trailingSmoke,/NATIVE_UPDATER_STARTED/,'Verify child reached native Main, not only a process launch');
 assert.doesNotMatch(native,/new ProcessStartInfo\("powershell\.exe"\)/);
 assert.match(native,/native-update-launch-error\.txt/,'Show an actual native launch error');
 assert.match(native,/void HandoffAudit\(string root,string message\)/,'Parent must diagnose helper process exits before native logging');
