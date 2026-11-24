@@ -347,6 +347,21 @@ function confirmCloudDelete(id){
   return true;
 }
 
+
+// Legacy imports can create multiple physical rows carrying one punch ID.
+// They must never be picked arbitrarily for editing. If every matching official
+// row already equals the desired business values, an old edit is read-only ACK'd.
+function p79EveryDuplicateAttendanceRowAlreadySaved(payload,sameId){
+ if(!payload?.record||!Array.isArray(sameId)||sameId.length<2)return false;
+ const expected=payload.record;
+ const fullTime=/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/;
+ const expectedType=typeof getAttendanceRecordType==='function'?getAttendanceRecordType(expected):String(expected.status||'');
+ return sameId.every(row=>
+  p79PausedReviewIdentity(payload,row)&&
+  (typeof getAttendanceRecordType==='function'?getAttendanceRecordType(row):String(row.status||''))===expectedType&&
+  fullTime.test(String(row.timeStr||'').trim())&&
+  p79AttendanceEditAlreadySaved(payload,row));
+}
 async function p79ReadAttendanceEditCloud(id,signal,context=null){
  const url=gasUrl();if(!url)throw new Error('未設定 GAS URL');
  const expected=context?.record||context;
@@ -362,9 +377,12 @@ async function p79ReadAttendanceEditCloud(id,signal,context=null){
   const rows=batches.flat(),sameId=rows.filter(r=>String(r.id)===String(id));
   const matches=sameId.filter(r=>['empId','attNo'].every(k=>!String(expected[k]??'').trim()||normalizeCompareValue(r[k])===normalizeCompareValue(expected[k]))&&((typeof getAttendanceRecordType==='function')?getAttendanceRecordType(r)===getAttendanceRecordType(expected):String(r.status)===String(expected.status)));
   const unique=[...new Map(matches.map(r=>[JSON.stringify(r),r])).values()];
-  if(unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim()))return unique[0];
+  // Different employee or IN/OUT rows with the same ID are collisions.
+  if(sameId.length===1&&unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim()))return unique[0];
+  if(sameId.length>1&&p79EveryDuplicateAttendanceRowAlreadySaved(
+    context?.record?context:{record:expected},sameId))return unique[0];
   if(!sameId.length)throw Object.assign(new Error('正式月份主表已無此紀錄，舊修改已停止送出'),{retryable:false,recordAbsent:true,checkedMonths:months});
-  if(unique.length>1)throw Object.assign(new Error('正式主表有多筆相同編號及身分的考勤，無法唯一確認班次；修改草稿保留'),{retryable:false});
+  if(sameId.length>1)throw Object.assign(new Error('正式主表有多筆共用紀錄編號的考勤，時間或人員資料無法唯一對應。請在待同步明細查看各筆雲端時間，原修改草稿保留；不得強制重送'),{retryable:false,ambiguousRecords:true});
   throw Object.assign(new Error('正式主表找不到身分及完整時間相符的考勤，修改草稿已保留'),{retryable:false});
  }
  const response=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceWriteStatus&ids='+encodeURIComponent(id)+'&token='+encodeURIComponent(token())+'&t='+Date.now(),{cache:'no-store',signal});
@@ -491,7 +509,7 @@ async function p79AuditPausedAttendanceQueue(reportProgress){
  const candidates=readQueue()
   .filter(x=>x?.paused&&['updateRecord','editRecord'].includes(String(x.payload?.action||'')))
   .map(x=>({key:x.key,payload:JSON.parse(JSON.stringify(x.payload))}));
- const summary={total:candidates.length,checked:0,confirmed:0,archived:0,needsReview:0,errors:0,lastError:'',verifiedConflicts:[]};
+ const summary={total:candidates.length,checked:0,confirmed:0,archived:0,needsReview:0,errors:0,lastError:'',verifiedConflicts:[],ambiguousConflicts:[]};
  if(!candidates.length){try{reportProgress?.({...summary})}catch(_){ }return summary;}
  const base=gasUrl(),access=token();
  if(!base||!access){
@@ -540,8 +558,11 @@ async function p79AuditPausedAttendanceQueue(reportProgress){
       throw new Error('舊修改備份或佇列更新未確認，原資料保留');
     summary.archived++;continue;
    }
-   if(unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim())&&
-      p79PausedReviewIdentity(payload,unique[0])&&p79AttendanceEditAlreadySaved(payload,unique[0])){
+   // A single row can be ACK'd directly. Multiple rows require ALL
+   // corresponding official records to match the original intended edit.
+   const allDuplicatesSaved=p79EveryDuplicateAttendanceRowAlreadySaved(payload,sameId);
+   if((sameId.length===1&&unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim())&&
+      p79PausedReviewIdentity(payload,unique[0])&&p79AttendanceEditAlreadySaved(payload,unique[0]))||allDuplicatesSaved){
     p79PausedReviewItem(candidate.key,payload);
     if(typeof p79ConfirmWithdrawnAttendanceDrafts==='function')
      p79ConfirmWithdrawnAttendanceDrafts(unique[0]);
@@ -553,7 +574,7 @@ async function p79AuditPausedAttendanceQueue(reportProgress){
    // Expose verified one-row differences for a single explicit user choice.
    // Read-only: this NEVER archives or posts the user's conflicting draft.
    // Ambiguous ID, identity, direction or incomplete time remain individual-only.
-   if(unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim())&&
+   if(sameId.length===1&&unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim())&&
       p79PausedReviewIdentity(payload,unique[0])){
     p79PausedReviewItem(candidate.key,payload);
     const live=unique[0];
@@ -567,6 +588,22 @@ async function p79AuditPausedAttendanceQueue(reportProgress){
      desiredStatus:String(expected.status||''),
      cloudNote:String(live.note||''),
      desiredNote:String(expected.note||'')
+    });
+   }
+   if(sameId.length>1){
+    // Display only bounded comparison fields, not credentials or entire records.
+    p79PausedReviewItem(candidate.key,payload);
+    summary.ambiguousConflicts.push({
+     key:candidate.key,id,name:String(expected.name||expected.empId||''),
+     originalTimeStr:String(payload.originalTimeStr||''),
+     desiredTimeStr:String(expected.timeStr||''),
+     desiredStatus:String(expected.status||''),
+     candidates:sameId.map(row=>({
+      empId:String(row.empId||''),attNo:String(row.attNo||''),
+      name:String(row.name||''),timeStr:String(row.timeStr||''),
+      status:String(row.status||''),note:String(row.note||''),
+      source:String(row.source||''),manuallyEditedAt:String(row.manuallyEditedAt||'')
+     })).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)))
     });
    }
    // Unknown identity, duplicate IDs or changed values must remain visible
