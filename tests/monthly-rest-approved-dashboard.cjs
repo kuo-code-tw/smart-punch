@@ -64,6 +64,7 @@ assert(source.includes("el.p79OpenMonthlyRestPlan?.(row.id)"));
 assert(original.includes('manualRestPlanIssue(fresh,chosen,month,date,rule)'));
 assert(original.includes('visiblePlannedRows().filter(r=>r.checked&&!r.saved)'));
 assert(original.includes("result.report?.planned!==true"),'draft must be acknowledged as planned');
+assert(original.includes("manualPlan:true,preventReplace:false,note:'每月未休假加班預排"),'new drafts use create mode; native same-date ID/revision guard prevents replacing other reports');
 assert(source.includes("q('#mrUxBatch').onclick"));
 assert(source.includes("q('#mrUxSubmit').onclick"));
 assert(source.includes("q('#mrUxSavePlan').onclick"));

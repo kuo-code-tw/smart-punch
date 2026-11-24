@@ -1272,7 +1272,7 @@ async function open(settings={}){
     if(r.acknowledged)continue;
     if(stop)break;
     if(r.date<today())throw Error('預排日期已過，請重新讀取');
-    const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),manualPlan:true,preventReplace:true,note:'每月未休假加班預排（使用者勾選）',createdAt:Date.now()};
+    const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),manualPlan:true,preventReplace:false,note:'每月未休假加班預排（使用者勾選）',createdAt:Date.now()};
     r.attempted=true;r.status='儲存預排中／待雲端讀回';setStatus('正在儲存勾選預排：'+r.name+' '+r.date);paint();controls(true);
     const result=await a.saveReport(draft);
     if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==r.id||result.report?.planned!==true)throw Error('雲端未確認儲存為預排');
