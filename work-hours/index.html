@@ -6,7 +6,7 @@
 <!-- Official HR hidden job-title policy: selectors only; data and calculations unchanged. -->
 <script defer src="../assets/port79-hidden-job-titles.js?v=20261117-hr-hidden-v1&refresh=20261118-stable-v1"></script>
 <script defer src="../assets/port79-workhours-hidden-job-ui.js?v=20261117-hr-filter-v1&refresh=20261118-stable-v1"></script>
-<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v5-fast-direct"></script>
+<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v6-watchdog"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261124-planned-review-v3"></script>
 <script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
@@ -13650,6 +13650,18 @@ async function p79ExportOvertimeComparison(printMode){
             window.P79OvertimeStatus.open({state:'amended',month:date.slice(0,7),employee:row.empId});
         }
         let p79MainPlannedSubmittingKey='',p79MainPlannedStage='';
+        function p79RunDirectReport(task,operation,limit=45000){
+            let timer;
+            const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{
+                operation.stopped=true;
+                operation.controller.abort();
+                reject(Error(operation.writeStarted?'雲端寫入結果待確認，請重新讀取原報單；不要新增另一筆。':'雲端核對逾時，尚未送出申報，請重新讀取後再試。'));
+            },limit);});
+            return Promise.race([Promise.resolve().then(task),timeout]).finally(()=>clearTimeout(timer));
+        }
+        function p79AssertDirectReportActive(operation){
+            if(operation?.stopped)throw Error('本次核對已逾時，已停止後續送出');
+        }
         // Directly confirm an existing verified plan in its main-ledger row.
         // Use the same eligibility and authoritative cloud save as bulk review.
         async function p79OpenMainPlannedOvertimeRow(index,button){
@@ -13664,18 +13676,21 @@ async function p79ExportOvertimeComparison(printMode){
             if(button&&button.dataset.planKey!==item.key)return;
             p79PlannedBulkBusy=true;
             p79MainPlannedSubmittingKey=item.key;
-            const started=Date.now();
+            const started=Date.now(),operation={stopped:false,writeStarted:false,controller:new AbortController()};
+            let ticker,verified=false;
             const progress=stage=>{
+                if(operation.stopped)return;
                 p79MainPlannedStage=stage;
                 const label=stage+' '+Math.floor((Date.now()-started)/1000)+'秒';
                 const current=Array.from(document.querySelectorAll('button[data-plan-key]')).find(b=>b.dataset.planKey===item.key);
                 for(const target of new Set([button,current].filter(Boolean))){target.disabled=true;target.textContent=label;}
             };
-            progress('核對換算');
-            const ticker=setInterval(()=>progress(p79MainPlannedStage),1000);
-            p79RefreshPlannedBulkControls();
             try{
-                await p79ConfirmPlannedOvertimeCandidate(item,progress);
+                progress('核對換算');
+                ticker=setInterval(()=>progress(p79MainPlannedStage),1000);
+                try{p79RefreshPlannedBulkControls();}catch(error){console.warn('申報控制更新失敗',error);}
+                await p79RunDirectReport(()=>p79ConfirmPlannedOvertimeCandidate(item,progress,operation),operation);
+                verified=true;
                 p79PlannedBulkSelected.delete(item.key);
                 showToast((row.name||row.empId)+' '+item.date+' '+item.rule[1]+' 已申報','success');
             }catch(error){
@@ -13684,9 +13699,9 @@ async function p79ExportOvertimeComparison(printMode){
                 clearInterval(ticker);
                 p79MainPlannedSubmittingKey='';p79MainPlannedStage='';
                 p79PlannedBulkBusy=false;
-                // Let the verified result and toast paint before rebuilding all statistics.
+                if(button){button.disabled=verified;button.textContent=verified?'已申報':operation.writeStarted?'重新核對':'直接申報';}
                 p79OvertimeCalculationCache=null;
-                setTimeout(()=>{try{renderOvertimeStats();}finally{p79RefreshPlannedBulkControls();}},0);
+                setTimeout(()=>{try{renderOvertimeStats();}catch(error){console.warn('統計畫面更新失敗',error);}finally{try{p79RefreshPlannedBulkControls();}catch(error){console.warn(error);}}},0);
             }
         }
         // Identify old saved two-person night-cover plans whose second worker was
@@ -14588,7 +14603,7 @@ function p79OvertimePeriodLabel(report){
             });
             p79RefreshPlannedBulkControls();
         }
-        async function p79ConfirmPlannedOvertimeCandidate(item,progress){
+        async function p79ConfirmPlannedOvertimeCandidate(item,progress,operation){
             const api=window.P79Overtime,original=item.report,rule=api.report(item.rule);
             const draft={
                 id:String(original.id),empId:item.row.empId,date:item.date,rule,coverDate:original.coverDate||item.date,overtimeDate:original.overtimeDate||item.date,
@@ -14604,9 +14619,10 @@ function p79OvertimePeriodLabel(report){
             // conversion-table check as the individual report editor.
             // Only direct row confirmation gets the short bounded retry policy.
             // Bulk and legacy dialogs retain their established validation flow.
-            if(progress){draft.directRow=true;draft.onProgress=progress;}
+            if(progress){draft.directRow=true;draft.onProgress=progress;draft.directOperation=operation;}
             const policy=progress?{maxAttempts:2,maxDelay:1600,rulesTimeout:10000,contextTimeout:12000,onStage:progress}:{};
             const validation=await api.prepareSaveValidation(draft,true,progress?()=>progress('雲端忙碌，重試'):undefined,policy);
+            p79AssertDirectReportActive(operation);
             const active=api.activeReportRows(validation.rules.rows,validation.rules.config);
             if(!active.some(r=>JSON.stringify(api.report(r))===JSON.stringify(rule)))
                 throw Error('雲端加班時段或換算已變更，請重新讀取後核對');
@@ -14617,6 +14633,7 @@ function p79OvertimePeriodLabel(report){
                 String(saved.overtimeDate||draft.date)!==draft.overtimeDate||
                 (saved.forEmpId&&String(saved.forEmpId).trim().toUpperCase()!==draft.forEmpId.trim().toUpperCase()))
                 throw Error('原預排或代班關聯已變更，請重新讀取核對');
+            p79AssertDirectReportActive(operation);
             progress?.('正式寫入');
             const result=await p79SaveWorkOvertimeDraft(draft);
             api.verifySavedReport(draft,result);
@@ -17482,6 +17499,7 @@ function p79DirectAttendanceTimestamp(record){
  return getAttendanceTimestamp(record);
 }
 async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
+ p79AssertDirectReportActive(draft.directOperation);
  const token=currentPort79SsoToken();if(!token||!p79CanReportOvertime())throw Error('沒有申報權限');
  const month=draft.date.slice(0,7),url=getActiveGasUrl();
  const read=async (action,label)=>{
@@ -17508,6 +17526,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const reuse=batch?.token===token&&batch.month===month&&batch.ready===true&&batch.cloud?.revision!=null;
  const prepared=!reuse&&lockRetry===0?window.P79Overtime?.takeSaveContext?.(draft):null;
  const cloud=reuse?batch.cloud:prepared||await read('getOvertimeReportContext','出勤與班表核對'),attendance=cloud;
+ p79AssertDirectReportActive(draft.directOperation);
  const overtimeDate=String(draft.overtimeDate||draft.date);
  if(overtimeDate!==draft.date&&cloud?.capabilities?.nightCoverOvertimeAccountingV1!==true)throw Error('正式 GAS 尚未確認雙日期入帳，未送出申報');
  const employeeId=String(draft.empId).trim().toUpperCase();
@@ -17523,7 +17542,15 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const sameHours=Number(existingReport?.declaredHours)===Number(draft.rule.declaredHours)&&String(existingReport?.convertedHours??'')===String(draft.rule.convertedHours??'');
  const sameNote=String(existingReport?.note??'').trim()===String(draft.note??'').trim();
  // 同一張預排報單完成打卡後，時數/時段不變也必須真的寫回解除 planned。
-  if(existingReport?.id===draft.id&&(!draft.plannedReview||existingReport.planned!==true)&&existingReport.category===draft.rule.category&&existingReport.code===draft.rule.code&&sameHours&&sameNote&&String(existingReport.overtimeDate||draft.date)===overtimeDate)return {ok:true,directOvertimeSaved:true,id:draft.id,report:existingReport,cloudReadbackConfirmed:true};
+  if(existingReport?.id===draft.id&&(!draft.plannedReview||existingReport.planned!==true)&&existingReport.category===draft.rule.category&&existingReport.code===draft.rule.code&&sameHours&&sameNote&&String(existingReport.overtimeDate||draft.date)===overtimeDate){
+  const confirmed={ok:true,directOvertimeSaved:true,id:draft.id,report:existingReport,cloudReadbackConfirmed:true};
+  window.P79Overtime?.verifySavedReport?.(draft,confirmed);
+  const prior=p79WorkOvertimeMonths.get(month),merged=new Map((prior?.rows||[]).map(r=>[String(r.empId).trim().toUpperCase(),r]));
+  (cloud.schedules||[]).forEach(r=>merged.set(String(r.empId).trim().toUpperCase(),r));
+  p79WorkOvertimeMonths.set(month,{...prior,token,ready:true,pending:false,at:Date.now(),rows:[...merged.values()]});
+  p79OvertimeCalculationCache=null;
+  return confirmed;
+ }
  if(draft.preventReplace&&['approvalStatus','approvedBy','approvedAt','reviewedBy','reviewedAt'].some(key=>existingReport[key]!=null&&existingReport[key]!==''))throw Error('這筆申報已有審核紀錄，為避免覆蓋審核資料，請先完成正式審核變更程序。');
  const raw=(attendance.records||[]).filter(record=>String(record.empId||'').trim().toUpperCase()===employeeId);
  const pairs=buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
@@ -17567,12 +17594,22 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,workDate:draft.date,overtimeDate,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:finalNote,coverDate:draft.coverDate||draft.date,expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),draft.directRow?30000:45000);
  try{
+  p79AssertDirectReportActive(draft.directOperation);
   draft.onProgress?.('正式寫入');
-  const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();
+  const operation=draft.directOperation;
+  if(operation)operation.writeStarted=true;
+  const abortDirect=()=>ctl.abort();
+  operation?.controller.signal.addEventListener('abort',abortDirect,{once:true});
+  let response,result;
+  try{
+   response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});result=await response.json();
+  }finally{operation?.controller.signal.removeEventListener('abort',abortDirect);}
+  p79AssertDirectReportActive(operation);
   if(result?.ok===true&&overtimeDate!==draft.date&&(result.report?.workDate!==draft.date||result.report?.overtimeDate!==overtimeDate))throw Error('正式雙日期讀回不符，保留原ID待核對');
   // The GAS lock-contention reply occurs before writing. Re-read the report and
   // its revision before retrying; do not replay ambiguous network failures.
   if(response.ok&&result?.ok===false&&result?.retryable===true&&/雲端目前正在處理其他資料/.test(String(result.error||''))){
+   if(draft.directOperation)draft.directOperation.writeStarted=false;
    if(lockRetry>=(draft.directRow?1:3))throw Error('雲端仍忙碌，未取得寫入鎖；本次修改尚未儲存。請重新開啟原申報核對。');
    draft.onProgress?.('雲端忙碌，重試');
    await new Promise(resolve=>setTimeout(resolve,750*(lockRetry+1)));
