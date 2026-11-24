@@ -491,7 +491,7 @@ async function p79AuditPausedAttendanceQueue(reportProgress){
  const candidates=readQueue()
   .filter(x=>x?.paused&&['updateRecord','editRecord'].includes(String(x.payload?.action||'')))
   .map(x=>({key:x.key,payload:JSON.parse(JSON.stringify(x.payload))}));
- const summary={total:candidates.length,checked:0,confirmed:0,archived:0,needsReview:0,errors:0,lastError:''};
+ const summary={total:candidates.length,checked:0,confirmed:0,archived:0,needsReview:0,errors:0,lastError:'',verifiedConflicts:[]};
  if(!candidates.length){try{reportProgress?.({...summary})}catch(_){ }return summary;}
  const base=gasUrl(),access=token();
  if(!base||!access){
@@ -550,8 +550,27 @@ async function p79AuditPausedAttendanceQueue(reportProgress){
     lastDoneAt=Date.now();
     summary.confirmed++;continue;
    }
-   // Same ID but different person, multiple records, incomplete time or changed
-   // content must be shown to a human; do not rewrite or silently discard.
+   // Expose verified one-row differences for a single explicit user choice.
+   // Read-only: this NEVER archives or posts the user's conflicting draft.
+   // Ambiguous ID, identity, direction or incomplete time remain individual-only.
+   if(unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim())&&
+      p79PausedReviewIdentity(payload,unique[0])){
+    p79PausedReviewItem(candidate.key,payload);
+    const live=unique[0];
+    summary.verifiedConflicts.push({
+     key:candidate.key,id,
+     name:String(expected.name||live.name||expected.empId||live.empId||''),
+     originalTimeStr:String(payload.originalTimeStr||''),
+     cloudTimeStr:String(live.timeStr||''),
+     desiredTimeStr:String(expected.timeStr||''),
+     cloudStatus:String(live.status||''),
+     desiredStatus:String(expected.status||''),
+     cloudNote:String(live.note||''),
+     desiredNote:String(expected.note||'')
+    });
+   }
+   // Unknown identity, duplicate IDs or changed values must remain visible
+   // until explicitly reviewed; never silently discard intended corrections.
    summary.needsReview++;
   }catch(error){
    summary.errors++;summary.lastError=String(error?.message||error||'雲端核對失敗');
