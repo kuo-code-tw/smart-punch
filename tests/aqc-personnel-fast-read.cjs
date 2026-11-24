@@ -54,6 +54,7 @@ async function hr(){
  await assert.rejects(stale,/登入身分已變更/);
  pending[4].resolve({ok:true,employees:[{empId:'SAFE',name:'新帳號資料'}]});
  assert.equal((await newer).employees[0].empId,'SAFE');
+ await new Promise(resolve=>setImmediate(resolve)); // allow previous singleflight cleanup
  ctx.getHomeAdminSession=()=>({adminRole:'superadmin'});
  const hr=ctx.p79ReadOfficialAqcRoster(true);await Promise.resolve();await Promise.resolve();
  assert.equal(requests[5].action,'hrGetEmployees','HR-authorized accounts must read the same source as HR');
