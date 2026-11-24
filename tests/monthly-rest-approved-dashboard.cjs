@@ -69,7 +69,7 @@ assert(!/\b(?:saveReport|updateSchedule|saveConfig|hrGetOrgOptions)\s*\(/.test(s
  'New dashboard may not write cloud records or invoke extra backend actions');
 assert(original.includes("g.P79MonthlyRestDashboard?.mount(el)"),
  'Actual monthly modal must mount dashboard');
-assert(original.includes("port79-monthly-rest-dashboard.js?v=20261123-review-checkbox-v3"),
+assert(original.includes("port79-monthly-rest-dashboard.js?v=20261124-full-review-roster-v1"),
  'Production load path must bypass browser cache');
 assert(original.includes("if(!fullDayEvidence(fresh,r.empId,r.date,attendance[0]))"),
  'Official eight-hour attendance guard must remain');
