@@ -2130,11 +2130,13 @@
          // Only an explicit rejection BEFORE writing is safe to resend.
          // A timeout, transport error, or unverified POST is NOT retried.
          if(!rosterRefused&&!serverRefused)throw error;
-         if(attempt===4)throw Error('雲端仍忙碌，本次尚未寫入加班；已保留原申報資料與 ID，請稍後核對再申報。');
+         // An explicit roster editing lock requires the operator to release it; do not prolong that refusal.
+         const maxAttempts=rosterRefused?3:5;
+         if(attempt>=maxAttempts-1)throw Error(rosterRefused?'排班編輯鎖仍被占用，本次尚未寫入加班；已保留原申報資料與 ID，請待班表儲存完成後再申報。':'雲端仍忙碌，本次尚未寫入加班；已保留原申報資料與 ID，請稍後核對再申報。');
          if(!el.isConnected||selectionKey()!==selection)
           throw Error('申報視窗已關閉或內容已更動，停止自動重試；原申報內容已保留。');
          const waitMs=Math.min(6500,Math.max(1000,Number(error.retryAfterMs)||1200)*(attempt+1));
-         el.querySelector('#p79OtStatus').textContent='雲端正在處理其他資料（明確未寫入），自動重試 '+(attempt+1)+'/4…';
+         el.querySelector('#p79OtStatus').textContent='雲端正在處理其他資料（明確未寫入），自動重試 '+(attempt+1)+'/'+(maxAttempts-1)+'…';
          await new Promise(resolve=>setTimeout(resolve,waitMs));
         }
        }
