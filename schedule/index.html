@@ -7767,7 +7767,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const scheduledRest=['休','例','國','颱','年','特','事','病','公','喪','離','離職'].includes(rosterShift);
       const evidenceReady=ctx.attendanceEvidence?.complete===true;
       const ordinaryRest=['休','例','國'].includes(rosterShift);
-      const punchPending=(!scheduledRest||ordinaryRest)&&evidenceReady&&attendanceState==='missing'&&
+      // A generic unresolved state can be from adjacent-day matching. A saved rest
+      // is only pending when an actual single punch belongs to this date.
+      const restPunchKey=String(emp.id).trim().toUpperCase()+'|'+dayStr;
+      const restPunchConfirmed=ordinaryRest&&(ctx.attendanceEvidence?.pendingPunchDetails?.[restPunchKey]||[]).some(detail=>
+        detail.workday===dayStr&&String(detail.time||'').slice(0,10)===dayStr);
+      const punchPending=(!scheduledRest||restPunchConfirmed)&&evidenceReady&&attendanceState==='missing'&&
         dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
       const attendanceUnverified=!scheduledRest&&!evidenceReady&&
         dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;

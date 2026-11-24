@@ -43,19 +43,21 @@ assert(helperStart>=0&&helperEnd>helperStart);
 vm.runInContext(html.slice(helperStart,helperEnd),mock);
 vm.runInContext(html.slice(begin,end),mock);
 const emp={id,name:'黃亦輝'};
-function render(state,complete,shift,worked){
+function render(state,complete,shift,worked,pendingPunchDetails={}){
  mock.monthlyScheduleData[id][day]=shift;
  mock.window.P79RestAttendance.state=()=>state;
  mock.p79ScheduleHasVerifiedPunch=()=>worked;
  checkedAbsence={complete,absenceAuditReady:complete,
   absenceConfirmedDays:complete&&state==='rest'?{[id+'|'+day]:true}:{},
   days:{[id+'|'+day]:{state}}};
- const ctx={automaticRestMeta:{},restBalance:{ledger:[]},attendanceEvidence:{complete},
- attendanceSnapshot:{attendanceEvidence:{complete}},typhoonDays:new Set(),
+ const ctx={automaticRestMeta:{},restBalance:{ledger:[]},attendanceEvidence:{complete,pendingPunchDetails},
+ attendanceSnapshot:{attendanceEvidence:{complete,pendingPunchDetails}},typhoonDays:new Set(),
  electionDays:new Set(),typhoonToday:'2026-11-01'};
  return mock.p79ScheduleDisplayDay(emp,day,ctx);
 }
-assert.equal(render('missing',true,'休',false).visibleCode,'休','original rest survives an unrelated next-day single punch');
+assert.equal(render('missing',true,'休',false,{[id+'|'+day]:[{workday:day,time:'2026-11-01 07:31'}]}).visibleCode,'休','original rest survives an unrelated next-day single punch');
+assert.equal(render('missing',true,'休',false,{[id+'|'+day]:[{workday:day,time:'2026-10-31 08:04'}]}).visibleCode,'打卡待核','a real same-day rest punch must be reviewed');
+assert.equal(render('missing',true,'休',false).visibleCode,'休','an unproven adjacent-date ambiguity cannot relabel a saved rest');
 assert.equal(render('unknown',false,'休',false).visibleCode,'休','a known scheduled rest survives historical read unavailability');
 assert.equal(render('missing',true,'早',false).visibleCode,'打卡待核','lone real scheduled-work punch still needs reconciliation');
 assert.equal(render('unknown',false,'早',false).visibleCode,'早','without any verified punch evidence, show the original early roster provisionally, not a fabricated pending punch or rest');
