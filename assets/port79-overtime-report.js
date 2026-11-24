@@ -1199,7 +1199,7 @@
    // roster and punch checks must use the worker's actual (possibly next) day.
    if(date!==handoffDate)throw Error('代班實際出勤日應為 '+handoffDate+
     '；原請假／加班歸屬日為 '+(coverDate||handoffDate)+
-    '。兩者不可混用，請重新從請假紀錄開啟。');
+    '。代班實際出勤日不可變更，兩者不可混用，請重新從請假紀錄開啟。');
    if(coverDate&&allowedDates.length&&!allowedDates.includes(coverDate))
     throw Error('請假人員的核准請假日期不包含 '+coverDate+'；請回請假紀錄重新核對，不可改成代班出勤日。');
    return;
@@ -2081,8 +2081,7 @@
      const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&!prefill.leaveHandoffId&&chosen?.[0]==='延'&&
        String(prefill.empId||'')===String(empId)&&String(prefill.date||'')===date&&
        String(prefill.forEmpId||'')===String(forSelect.value||'');
-     if(!independentFiling&&!originalExtensionReview&&['代','延'].includes(chosen?.[0]))validateLeaveLinkedOvertimeDate(
-      date,forSelect.value,approvedDates,prefill.leaveHandoffId?String(prefill.workDate||prefill.date):'',
+     if(!independentFiling&&!originalExtensionReview&&['代','延'].includes(chosen?.[0]))validateLeaveLinkedOvertimeDate(date,forSelect.value,approvedDates,prefill.leaveHandoffId?String(prefill.workDate||prefill.date):'',
       prefill.leaveHandoffId?String(prefill.coverDate||prefill.overtimeDate||''):'');
      if(prefill.attendance&&String(prefill.empId)===String(empId)&&prefill.date===date){const issue=ruleAttendanceIssue(prefill.attendance.start,prefill.attendance.end,date,chosen);if(issue)throw Error(issue);}
      const editingExisting=Boolean(prefill.savedReport&&prefill.reportId&&String(prefill.empId)===String(empId)&&prefill.date===date);
