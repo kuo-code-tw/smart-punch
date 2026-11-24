@@ -226,14 +226,13 @@ body[data-p79-system="hr"]>header.top{display:none!important}
       <button class="btn" onclick="openEmploymentHistory()">🔄 異動紀錄</button>
     </div>
     <div class="filters">
-      <input id="q" class="wide-search" placeholder="搜尋工號、姓名、總公司、事業部、事業處、單位、職稱、原部門" oninput="render()">
+      <input id="q" class="wide-search" placeholder="搜尋工號、姓名、總公司、事業部、事業處、單位、職稱" oninput="render()">
       <select id="fStatus" onchange="render()"><option value="active">在職人員</option><option value="">全部狀態</option><option value="resigned">離職人員</option><option value="leave">留職停薪</option></select>
       <select id="fHQ" onchange="render()"><option value="">全部總公司</option></select>
       <select id="fDivision" onchange="render()"><option value="">全部事業部</option></select>
       <select id="fOffice" onchange="render()"><option value="">全部事業處</option></select>
       <select id="fUnit" onchange="render()"><option value="">全部單位</option></select>
       <select id="fJob" onchange="render()"><option value="">全部職稱</option></select>
-      <select id="fDept" onchange="render()"><option value="">全部原部門</option></select>
       <select id="fRole" onchange="render()"><option value="">全部角色</option><option value="employee">一般員工</option><option value="admin">管理員</option><option value="superadmin">超級管理員</option></select>
       <details id="hrDateRangePicker" style="position:relative">
         <summary id="hrDateRangeSummary" class="btn" style="list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:190px">📅 到職日期範圍 <span style="font-size:11px;color:var(--muted)">全部日期</span></summary>
@@ -251,7 +250,6 @@ body[data-p79-system="hr"]>header.top{display:none!important}
       <th><button class="thlink" onclick="focusFilter('fOffice')">事業處 🔎</button></th>
       <th><button class="thlink" onclick="focusFilter('fUnit')">單位 🔎</button></th>
       <th><button class="thlink" onclick="focusFilter('fJob')">職稱 🔎</button></th>
-      <th><button class="thlink" onclick="focusFilter('fDept')">原部門 🔎</button></th>
       <th>電話</th><th>到職日</th><th>離職日</th><th>生日</th><th>特休剩餘</th><th>裝置</th><th>綁定打卡 ☑</th><th>角色</th>
       <th><button class="thlink" onclick="openPermissionOverview('attendance')">考勤 🔎</button></th>
       <th><button class="thlink" onclick="openPermissionOverview('workhours')">工時統計 🔎</button></th>
@@ -301,13 +299,13 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <select id="permLevelFilter" onchange="renderPermissionOverview()">
       <option value="">全部權限</option><option value="manage">管理</option><option value="view">查看</option><option value="none">無權限</option>
     </select>
-    <input id="permSearch" placeholder="搜尋工號、姓名、原部門、單位、職稱" oninput="renderPermissionOverview()">
+    <input id="permSearch" placeholder="搜尋工號、姓名、總公司、事業部、事業處、單位、職稱" oninput="renderPermissionOverview()">
     <button class="btn" onclick="document.getElementById('permSearch').value='';document.getElementById('permLevelFilter').value='';renderPermissionOverview()">清除</button>
   </div>
   <div id="permissionCapabilities" class="permission-summary"></div>
   <div class="tablewrap" style="max-height:58vh;margin-top:10px">
     <table style="min-width:1250px">
-      <thead><tr><th>工號</th><th>姓名</th><th>原部門</th><th>單位</th><th>職稱</th><th>系統</th><th>權限</th><th>可以查看</th><th>可以修改／執行</th><th>操作</th></tr></thead>
+      <thead><tr><th>工號</th><th>姓名</th><th>總公司</th><th>事業部</th><th>事業處</th><th>單位</th><th>職稱</th><th>系統</th><th>權限</th><th>可以查看</th><th>可以修改／執行</th><th>操作</th></tr></thead>
       <tbody id="permissionBody"></tbody>
     </table>
   </div>
@@ -315,7 +313,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 
 <dialog id="orgDialog" class="org-dialog"><div class="modal">
   <div class="modalhead">
-    <div><b>⚙️ 組織管理（由大到小）</b><div class="muted">組織由大到小：① 總公司 → ② 事業部 → ③ 事業處 → ④ 單位；職稱另列。此處管理選單名稱，既有人員的舊部門歸屬不會被自動改寫；未填的層級顯示「—」。</div></div>
+    <div><b>⚙️ 組織管理（由大到小）</b><div class="muted">組織由大到小：① 總公司 → ② 事業部 → ③ 事業處 → ④ 單位；職稱另列。此處管理新版組織與職稱選項；未填的層級顯示「—」。</div></div>
     <button class="btn" onclick="orgDialog.close()">關閉</button>
   </div>
   <div class="orggrid">
@@ -325,14 +323,6 @@ body[data-p79-system="hr"]>header.top{display:none!important}
     <div class="orgbox"><h3>④ 🧭 單位</h3><div style="display:flex;gap:6px"><input id="newSection" placeholder="新增單位（課／組／室／中心）"><button class="btn primary" onclick="addOrgItem('sections','newSection')">新增</button></div><div id="sectionList" class="orglist"></div></div>
     <div class="orgbox"><h3>🎖️ 職稱（非組織層級）</h3><div class="muted" style="font-size:11px;margin-bottom:7px">勾選完成後按「儲存組織設定」統一套用；取消勾選可恢復顯示，不刪除員工或原始班表。</div><div style="display:flex;gap:6px"><input id="newJobTitle" placeholder="新增職稱"><button class="btn primary" onclick="addOrgItem('jobTitles','newJobTitle')">新增</button></div><div id="jobTitleList" class="orglist"></div></div>
   </div>
-  <details class="legacy-org-settings">
-    <summary>舊系統相容選項（原部門／單位）</summary>
-    <p class="muted">原七大系統仍有使用舊部門及單位欄位；保留其管理功能以免原有人員、考勤及排班篩選中斷。既有人員歸屬保持原值，組織選項與人員調動分開儲存。</p>
-    <div class="orggrid orggrid-legacy">
-      <div class="orgbox"><h3>原部門（舊欄位）</h3><div style="display:flex;gap:6px"><input id="newDepartment" placeholder="新增原部門"><button class="btn primary" onclick="addOrgItem('departments','newDepartment')">新增</button></div><div id="departmentList" class="orglist"></div></div>
-      <div class="orgbox"><h3>原單位（舊欄位）</h3><div style="display:flex;gap:6px"><input id="newUnit" placeholder="新增原單位"><button class="btn primary" onclick="addOrgItem('units','newUnit')">新增</button></div><div id="unitList" class="orglist"></div></div>
-    </div>
-  </details>
   <div id="orgSaveStatus" role="status" aria-live="polite" style="margin-top:12px;font-size:13px;line-height:1.6"></div>
   <div class="footer"><div class="muted">可一次勾選多個職稱，再按「儲存組織設定」統一儲存。隱藏不會刪除人員、排班與歷史資料。</div><button class="btn primary" id="saveOrgBtn" onclick="saveOrgSettings()">💾 儲存組織設定</button></div>
 </div></dialog>
@@ -349,11 +339,6 @@ body[data-p79-system="hr"]>header.top{display:none!important}
   <div class="field"><label>總公司</label><input id="personHQ" list="personHQOptions" placeholder="未設定"><datalist id="personHQOptions"></datalist></div>
   <div class="field"><label>事業部</label><input id="personDivision" list="personDivisionOptions" placeholder="未設定"><datalist id="personDivisionOptions"></datalist></div>
   <div class="field"><label>事業處</label><input id="personOffice" list="personOfficeOptions" placeholder="未設定"><datalist id="personOfficeOptions"></datalist></div>
-  <div class="field">
-    <label class="field-picker-label">原部門（舊雲端欄位） <button type="button" class="picker-btn" onclick="openMasterPicker('departments','dept')">點選／篩選</button></label>
-    <input id="dept" list="deptOptions" autocomplete="off" placeholder="可輸入原部門名稱">
-    <datalist id="deptOptions"></datalist>
-  </div>
   <div class="field">
     <label class="field-picker-label">單位 <button type="button" class="picker-btn" onclick="openMasterPicker('sections','unit')">點選／篩選</button></label>
     <input id="unit" list="unitOptions" autocomplete="off" placeholder="可輸入文字篩選單位">
@@ -867,16 +852,14 @@ function populateFilters(){
   fill('fDivision','事業部',[...mergedOrgValues('divisions'),...employees.map(e=>p79HrOrgValue(e,'divisions'))]);
   fill('fOffice','事業處',[...mergedOrgValues('offices'),...employees.map(e=>p79HrOrgValue(e,'offices'))]);
   fill('fUnit','單位',[...mergedOrgValues('sections'),...mergedOrgValues('sections'),...employees.map(e=>p79HrOrgValue(e,'sections'))]);
-  fill('fDept','原部門',[...mergedOrgValues('departments'),...employees.map(e=>e.dept)]);
   fill('fJob','職稱',mergedOrgValues('jobTitles'));
   const dl=(id,vals)=>{const el=$(id);if(el)el.innerHTML=uniqSorted(vals).map(v=>`<option value="${esc(v)}"></option>`).join('')};
-  dl('deptOptions',mergedOrgValues('departments'));
   dl('unitOptions',mergedOrgValues('sections'));
   dl('jobTitleOptions',mergedOrgValues('jobTitles'));
 }
 function updateHrDateRangeSummary(){const a=$('hrDateFrom')?.value||'',b=$('hrDateTo')?.value||'';if(a&&b&&a>b)$('hrDateTo').value=a;const aa=$('hrDateFrom')?.value||'',bb=$('hrDateTo')?.value||'',el=$('hrDateRangeSummary');if(el){const t=!aa&&!bb?'全部日期':aa&&bb?`${aa} ～ ${bb}`:aa?`${aa} 起`:`至 ${bb}`;el.innerHTML=`📅 到職日期範圍 <span style="font-size:11px;color:var(--muted)">${esc(t)}</span>`;}}
 function clearHrDateRange(){if($('hrDateFrom'))$('hrDateFrom').value='';if($('hrDateTo'))$('hrDateTo').value='';updateHrDateRangeSummary();render()}
-function resetFilters(){$('q').value='';$('fStatus').value='active';$('fHQ').value='';$('fDivision').value='';$('fOffice').value='';$('fDept').value='';$('fUnit').value='';$('fJob').value='';$('fRole').value='';if($('hrDateFrom'))$('hrDateFrom').value='';if($('hrDateTo'))$('hrDateTo').value='';updateHrDateRangeSummary();render()}
+function resetFilters(){$('q').value='';$('fStatus').value='active';$('fHQ').value='';$('fDivision').value='';$('fOffice').value='';$('fUnit').value='';$('fJob').value='';$('fRole').value='';if($('hrDateFrom'))$('hrDateFrom').value='';if($('hrDateTo'))$('hrDateTo').value='';updateHrDateRangeSummary();render()}
 function setStatusView(status){$('fStatus').value=status;render()}
 function openEmploymentHistory(){
   const clearBtn=$('clearEmployeeHistoryBtn');
@@ -987,7 +970,6 @@ function renderOrgSettings(){
     el.innerHTML=[...savedRows,...usedRows].join('')||'<div class="muted">雲端選項與目前人員資料均無此項</div>';
   };
   draw('headquarters','headquartersList');draw('divisions','divisionList');draw('offices','officeList');draw('sections','sectionList');draw('jobTitles','jobTitleList');
-  draw('departments','departmentList');draw('units','unitList');
 }
 function addOrgItem(kind,inputId){
   const input=$(inputId),v=String(input?.value||'').trim();
@@ -1042,7 +1024,7 @@ async function saveOrgSettings(keepOpen=false){if(!canHr('org.manage'))return al
     orgSettings=draft;
     populateFilters();if(!keepOpen)orgDialog.close();
     window.p79HrDashRender?.(); // A new title appears immediately, even if headcount is zero.
-    $('status').textContent='✅ 總公司／事業部／事業處／單位／職稱選項已儲存並完成雲端讀回；原部門與單位仍保持相容';
+    $('status').textContent='✅ 總公司／事業部／事業處／單位／職稱選項已儲存並完成雲端讀回';
     return true;
   }catch(e){p79OrgSaveStatus('尚未完成組織設定儲存：'+(e.message||e)+'。你的修改仍保留，請保留視窗並稍後再試。',true);return false;}
   finally{editingControls.forEach(([el,disabled])=>el.disabled=disabled);$('saveOrgBtn').disabled=false;$('saveOrgBtn').textContent=originalLabel||'💾 儲存組織設定'}
@@ -1218,7 +1200,7 @@ async function p79SaveEditorLeavePermission(empId,originalEmpId,selected,touched
 
 function openMasterPicker(kind,targetId){
   pickerKind=kind;pickerTarget=targetId;
-  const label=kind==='departments'?'原部門':['units','sections'].includes(kind)?'單位':'職稱';
+  const label=kind==='sections'?'單位':'職稱';
   $('pickerTitle').textContent='選擇'+label;
   $('pickerSearch').value='';
   renderMasterPicker();
@@ -1264,7 +1246,7 @@ function renderPermissionOverview(){
     const p=normalizePerms(e);
     systems.forEach(k=>{
       const level=p[k]||'none';
-      const hay=`${e.empId||''} ${e.name||''} ${e.dept||''} ${e.unit||''} ${e.jobTitle||e.deptDetail||''}`.toLowerCase();
+      const hay=`${e.empId||''} ${e.name||''} ${p79HrOrgValue(e,'headquarters')} ${p79HrOrgValue(e,'divisions')} ${p79HrOrgValue(e,'offices')} ${p79HrOrgValue(e,'sections')} ${e.jobTitle||e.deptDetail||''}`.toLowerCase();
       if(lev&&level!==lev)return;
       if(q&&!hay.includes(q))return;
       const d=systemPermissionDetails(k,level);
@@ -1278,7 +1260,7 @@ function renderPermissionOverview(){
     return org||(rank[a.level]-rank[b.level])||String(a.k).localeCompare(String(b.k));
   });
   $('permissionBody').innerHTML=rows.map(({e,k,level,d})=>`<tr>
-    <td><b>${esc(e.empId||'')}</b></td><td><b>${esc(e.name||'')}</b></td><td>${esc(e.dept||'')}</td><td>${esc(e.unit||'')}</td><td>${esc(e.jobTitle||e.deptDetail||'')}</td>
+    <td><b>${esc(e.empId||'')}</b></td><td><b>${esc(e.name||'')}</b></td><td>${esc(p79HrOrgValue(e,'headquarters')||'—')}</td><td>${esc(p79HrOrgValue(e,'divisions')||'—')}</td><td>${esc(p79HrOrgValue(e,'offices')||'—')}</td><td>${esc(p79HrOrgValue(e,'sections')||'—')}</td><td>${esc(e.jobTitle||e.deptDetail||'')}</td>
     <td>${LABEL[k]}</td><td><span class="perm ${level}">${permLabel(level)}</span></td>
     <td style="white-space:normal;min-width:250px;text-align:left">${d.see.map(x=>'• '+esc(x)).join('<br>')}</td>
     <td style="white-space:normal;min-width:280px;text-align:left">${d.edit.map(x=>'• '+esc(x)).join('<br>')}</td>
@@ -1287,14 +1269,14 @@ function renderPermissionOverview(){
 }
 
 function render(){
-  const q=$('q').value.trim().toLowerCase(),st=$('fStatus').value,hq=$('fHQ').value,div=$('fDivision').value,off=$('fOffice').value,d=$('fDept').value,u=$('fUnit').value,j=$('fJob').value,r=$('fRole').value;
+  const q=$('q').value.trim().toLowerCase(),st=$('fStatus').value,hq=$('fHQ').value,div=$('fDivision').value,off=$('fOffice').value,u=$('fUnit').value,j=$('fJob').value,r=$('fRole').value;
   const dateFrom=$('hrDateFrom')?.value||'',dateTo=$('hrDateTo')?.value||'';
   let list=employees.filter(e=>{
     const empStatus=normalizeEmploymentStatus(e.employmentStatus);
-    const txt=`${e.attNo||''} ${e.empId||''} ${e.name||''} ${p79HrOrgValue(e,'headquarters')} ${p79HrOrgValue(e,'divisions')} ${p79HrOrgValue(e,'offices')} ${p79HrOrgValue(e,'sections')} ${e.dept||''} ${e.jobTitle||''} ${normalizePhone(e.phone)} ${e.terminationReason||''}`.toLowerCase();
+    const txt=`${e.attNo||''} ${e.empId||''} ${e.name||''} ${p79HrOrgValue(e,'headquarters')} ${p79HrOrgValue(e,'divisions')} ${p79HrOrgValue(e,'offices')} ${p79HrOrgValue(e,'sections')} ${e.jobTitle||''} ${normalizePhone(e.phone)} ${e.terminationReason||''}`.toLowerCase();
     const empStart=String(e.startDate||'').slice(0,10).replace(/\//g,'-');
     const dateOk=(!dateFrom&&!dateTo)||!!empStart&&(!dateFrom||empStart>=dateFrom)&&(!dateTo||empStart<=dateTo);
-    return dateOk&&(!q||txt.includes(q))&&(!st||empStatus===st)&&(!hq||p79HrOrgValue(e,'headquarters')===hq)&&(!div||p79HrOrgValue(e,'divisions')===div)&&(!off||p79HrOrgValue(e,'offices')===off)&&(!d||e.dept===d)&&(!u||p79HrOrgValue(e,'sections')===u)&&(!j||(e.jobTitle||e.deptDetail)===j)&&(!r||String(e.adminRole||'employee')===r);
+    return dateOk&&(!q||txt.includes(q))&&(!st||empStatus===st)&&(!hq||p79HrOrgValue(e,'headquarters')===hq)&&(!div||p79HrOrgValue(e,'divisions')===div)&&(!off||p79HrOrgValue(e,'offices')===off)&&(!u||p79HrOrgValue(e,'sections')===u)&&(!j||(e.jobTitle||e.deptDetail)===j)&&(!r||String(e.adminRole||'employee')===r);
   });
   // 人資名冊優先按總公司、事業部、事業處、單位，再以職稱及工號排序。
   list.sort((a,b)=>p79HrCompareOrgPeople(a,b));
@@ -1305,7 +1287,7 @@ function render(){
       <td>${can?`<button class="btn" onclick="openEditor('${esc(e.empId)}')">編輯</button>`:'<span class="muted">查看</span>'}</td>
       <td>${i+1}</td><td><span class="empstatus ${employmentClass(stt)}">${employmentLabel(stt)}</span></td>
       <td>${esc(e.attNo||'')}</td><td><b>${esc(e.empId)}</b></td><td><b>${esc(e.name)}</b></td>
-      <td>${esc(p79HrOrgValue(e,'headquarters')||'—')}</td><td>${esc(p79HrOrgValue(e,'divisions')||'—')}</td><td>${esc(p79HrOrgValue(e,'offices')||'—')}</td><td>${esc(p79HrOrgValue(e,'sections')||'—')}</td><td>${esc(e.jobTitle||e.deptDetail||'')}</td><td>${esc(e.dept||'—')}</td><td><b>${esc(normalizePhone(e.phone)||'—')}</b></td>
+      <td>${esc(p79HrOrgValue(e,'headquarters')||'—')}</td><td>${esc(p79HrOrgValue(e,'divisions')||'—')}</td><td>${esc(p79HrOrgValue(e,'offices')||'—')}</td><td>${esc(p79HrOrgValue(e,'sections')||'—')}</td><td>${esc(e.jobTitle||e.deptDetail||'')}</td><td><b>${esc(normalizePhone(e.phone)||'—')}</b></td>
       <td>${esc(e.startDate||'')}${e.reportingDate?`<div class="muted">報到 ${esc(e.reportingDate)}</div>`:''}</td><td>${stt==='resigned'?esc(e.terminationDate||'—'):'—'}</td><td>${esc(e.birthday||'')}</td>
       <td><b>${lb.remaining==null?'—':esc(lb.remaining)+' 天'}</b></td>
       <td>${e.deviceBound?'<span class="pill">已綁定</span>':'—'}</td>
@@ -1323,7 +1305,7 @@ function render(){
       <td><span class="pill">${roleLabel(String(e.adminRole||'employee'))}</span></td>
       ${SYS.map(k=>`<td><button type="button" class="permclick ${p[k]}" onclick="openPermissionDetail('${esc(e.empId)}','${k}')" title="點擊查看${LABEL[k]}權限細項">${permLabel(p[k])}</button></td>`).join('')}
     </tr>`;
-  }).join('')||'<tr><td colspan="27" class="muted">沒有符合條件的人員</td></tr>';
+  }).join('')||'<tr><td colspan="26" class="muted">沒有符合條件的人員</td></tr>';
   const ps=employees.map(normalizePerms);
   $('stActive').textContent=employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)==='active').length;
   $('stResigned').textContent=employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)==='resigned').length;
@@ -1391,7 +1373,6 @@ function openEditor(id=''){
   $('attNo').value=editing?.attNo||'';
   $('empId').value=editing?.empId||'';
   $('name').value=editing?.name||'';
-  $('dept').value=editing?.dept||'';
   $('unit').value=p79HrOrgValue(editing||{},'sections');
   for(const [id,kind]of [['personHQ','headquarters'],['personDivision','divisions'],['personOffice','offices']]){$(id).value=p79HrOrgValue(editing||{},kind);$(id+'Options').innerHTML=(orgSettings[kind]||[]).map(v=>'<option value="'+esc(v)+'"></option>').join('');}
   $('jobTitle').value=editing?.jobTitle||editing?.deptDetail||'';
@@ -1439,7 +1420,7 @@ async function saveCurrent(){
   const employee={
     ...old,
     headquarters:$('personHQ').value.trim(),division:$('personDivision').value.trim(),office:$('personOffice').value.trim(),section:$('unit').value.trim(),
-    attNo:$('attNo').value.trim(),empId,name,dept:$('dept').value.trim(),unit:$('unit').value.trim(),
+    attNo:$('attNo').value.trim(),empId,name,dept:String(old.dept??''),unit:$('unit').value.trim(),
     jobTitle:$('jobTitle').value.trim(),deptDetail:$('jobTitle').value.trim(),
     phone:normalizePhone($('phone').value),startDate:$('startDate').value,reportingDate:$('reportingDate').value,birthday:$('birthday').value,
     password:role==='employee'?'':$('password').value,adminRole:role,systemPermissions:p,finePermissions,dataScope,dataScopeJobs,employeeListAccess:p.hr,
@@ -1652,7 +1633,7 @@ async function clearSessionLogs(){
 }
 
 async function exportEmployees() {
-  await window.p79EnsureXlsx();if(!canHr('people.export'))return alert('沒有匯出人員資料權限');if(typeof XLSX==='undefined')return alert('試算表 元件尚未載入');const rows=employees.slice().sort((a,b)=>p79HrCompareOrgPeople(a,b)).map(e=>{const p=normalizePerms(e),lb=e.leaveBalance||{};return{在職狀態:employmentLabel(e.employmentStatus),考勤號:e.attNo||'',工號:e.empId||'',姓名:e.name||'',總公司:p79HrOrgValue(e,'headquarters'),事業部:p79HrOrgValue(e,'divisions'),事業處:p79HrOrgValue(e,'offices'),單位:p79HrOrgValue(e,'sections'),職稱:e.jobTitle||e.deptDetail||'',原部門:e.dept||'',電話:normalizePhone(e.phone)||'',到職日:e.startDate||'',報到日期:e.reportingDate||'',離職日期:e.terminationDate||'',最後工作日:e.lastWorkDate||'',離職原因備註:e.terminationReason||'',生日:e.birthday||'',特休剩餘:lb.remaining??'',角色:roleLabel(String(e.adminRole||'employee')),考勤權限:permLabel(p.attendance),工時統計權限:permLabel(p.workhours),請假權限:permLabel(p.leave),排班權限:permLabel(p.schedule),效率權限:permLabel(p.efficiency),人資權限:permLabel(p.hr),歷史資料權限:permLabel(p.history),裝置綁定:e.deviceBound?'已綁定':'未綁定',免綁手機打卡:e.allowPunchWithoutDeviceBinding?'是':'否'}});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'人資主檔');XLSX.writeFile(wb,`人資主檔_${new Date().toISOString().slice(0,10)}.xlsx`)}
+  await window.p79EnsureXlsx();if(!canHr('people.export'))return alert('沒有匯出人員資料權限');if(typeof XLSX==='undefined')return alert('試算表 元件尚未載入');const rows=employees.slice().sort((a,b)=>p79HrCompareOrgPeople(a,b)).map(e=>{const p=normalizePerms(e),lb=e.leaveBalance||{};return{在職狀態:employmentLabel(e.employmentStatus),考勤號:e.attNo||'',工號:e.empId||'',姓名:e.name||'',總公司:p79HrOrgValue(e,'headquarters'),事業部:p79HrOrgValue(e,'divisions'),事業處:p79HrOrgValue(e,'offices'),單位:p79HrOrgValue(e,'sections'),職稱:e.jobTitle||e.deptDetail||'',電話:normalizePhone(e.phone)||'',到職日:e.startDate||'',報到日期:e.reportingDate||'',離職日期:e.terminationDate||'',最後工作日:e.lastWorkDate||'',離職原因備註:e.terminationReason||'',生日:e.birthday||'',特休剩餘:lb.remaining??'',角色:roleLabel(String(e.adminRole||'employee')),考勤權限:permLabel(p.attendance),工時統計權限:permLabel(p.workhours),請假權限:permLabel(p.leave),排班權限:permLabel(p.schedule),效率權限:permLabel(p.efficiency),人資權限:permLabel(p.hr),歷史資料權限:permLabel(p.history),裝置綁定:e.deviceBound?'已綁定':'未綁定',免綁手機打卡:e.allowPunchWithoutDeviceBinding?'是':'否'}});const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'人資主檔');XLSX.writeFile(wb,`人資主檔_${new Date().toISOString().slice(0,10)}.xlsx`)}
 init();
 </script>
 
