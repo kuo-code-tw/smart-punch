@@ -379,8 +379,8 @@ async function p79ReadAttendanceEditCloud(id,signal,context=null){
   const unique=[...new Map(matches.map(r=>[JSON.stringify(r),r])).values()];
   // Different employee or IN/OUT rows with the same ID are collisions.
   if(sameId.length===1&&unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim()))return unique[0];
-  if(sameId.length>1&&p79EveryDuplicateAttendanceRowAlreadySaved(
-    context?.record?context:{record:expected},sameId))return unique[0];
+  if(sameId.length>1&&typeof p79EveryDuplicateAttendanceRowAlreadySaved==='function'&&
+    p79EveryDuplicateAttendanceRowAlreadySaved(context?.record?context:{record:expected},sameId))return unique[0];
   if(!sameId.length)throw Object.assign(new Error('正式月份主表已無此紀錄，舊修改已停止送出'),{retryable:false,recordAbsent:true,checkedMonths:months});
   if(sameId.length>1)throw Object.assign(new Error('正式主表有多筆共用紀錄編號的考勤，無法唯一確認班次或時間。請在待同步明細查看各筆雲端時間，原修改草稿保留；不得強制重送'),{retryable:false,ambiguousRecords:true});
   throw Object.assign(new Error('正式主表找不到身分及完整時間相符的考勤，修改草稿已保留'),{retryable:false});
@@ -560,7 +560,7 @@ async function p79AuditPausedAttendanceQueue(reportProgress){
    }
    // A single row can be ACK'd directly. Multiple rows require ALL
    // corresponding official records to match the original intended edit.
-   const allDuplicatesSaved=p79EveryDuplicateAttendanceRowAlreadySaved(payload,sameId);
+   const allDuplicatesSaved=typeof p79EveryDuplicateAttendanceRowAlreadySaved==='function'&&p79EveryDuplicateAttendanceRowAlreadySaved(payload,sameId);
    if((sameId.length===1&&unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim())&&
       p79PausedReviewIdentity(payload,unique[0])&&p79AttendanceEditAlreadySaved(payload,unique[0]))||allDuplicatesSaved){
     p79PausedReviewItem(candidate.key,payload);
