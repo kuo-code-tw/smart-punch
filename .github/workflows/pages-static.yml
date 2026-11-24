@@ -45,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment_retry.outputs.page_url }}
     steps:
       - name: Checkout current main
         uses: actions/checkout@v4
@@ -138,7 +138,22 @@ jobs:
           done
           echo "::error::GitHub Pages artifact metadata unavailable; no deployment was attempted"
           exit 1
+      # The gh CLI can see the just-uploaded artifact before deploy-pages'
+      # separate metadata client can. The previous run showed count=1 but the
+      # immediate deploy-pages action saw zero. Give indexes time to converge.
+      - name: Allow Pages artifact metadata to propagate
+        run: sleep 15
       - name: Deploy to GitHub Pages
         id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      # Retry ONLY if the first deployment attempt actually failed. A hard
+      # failure here must still block production, never become a false green.
+      - name: Retry metadata propagation after deployment failure
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 20
+      - name: Retry GitHub Pages deployment
+        if: steps.deployment.outcome == 'failure'
+        id: deployment_retry
         uses: actions/deploy-pages@v4
 
