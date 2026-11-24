@@ -5074,7 +5074,7 @@ function operationGroupForRecord(r){
 }
 function operationScheduleErrorKind(error){
   const message=String(error?.message||error||'');
-  if(/permission|unauthor|forbidden|token|登入|權限|驗證/i.test(message))return {text:'登入或排班讀取權限驗證失敗，請重新登入後重試',retry:false};
+  if(/permission|unauthor|forbidden|token|HTTP (401|403)|登入|權限|驗證/i.test(message))return {text:'登入或排班讀取權限驗證失敗，請重新登入後重試',retry:false};
   if(/忙碌|稍後|同步中|timeout|abort|逾時|network|fetch|HTTP 5|連線/i.test(message))return {text:'排班服務忙碌或連線逾時',retry:true};
   if(/不完整|JSON|空白|格式|HTML/i.test(message))return {text:'排班回傳資料不完整或格式錯誤',retry:false};
   return {text:'排班服務未完成讀取，請按重新讀取',retry:false};
@@ -5085,7 +5085,7 @@ function renderOperationScheduleStatus(rows){
   if(months.length){
     if(!window.P79AqcScheduleGroups)text='排班組別元件尚未載入，請重新整理。';
     else if(!String(gcToken||''))text='尚未取得登入驗證，請重新登入後讀取排班組別。';
-    else text=months.map(month=>{const state=operationScheduleReads.get(month);return state?.status==='ready'?`${month} 已讀取排班 AQC 組別${state.historyUnverified?'（歷史分組待核對）':''}`:state?.status==='loading'?`${month} 正在讀取${state.historyLoading?'歷史':''}排班組別${state.retrying?'，服務忙碌後重試中':''}`:state?.status==='error'?`${month}：${state.error||'排班讀取失敗'}`:`${month} 尚未讀取排班組別`;}).join('；');
+    else text=months.map(month=>{const state=operationScheduleReads.get(month);return state?.status==='ready'?`${month} 已讀取排班 AQC 組別${state.historyUnverified?'（歷史分組待核對）':''}`:state?.status==='loading'?`${month} 正在讀取${state.historyLoading?'歷史':''}排班組別${state.retrying?'，服務忙碌後重試中':''}${state.cached?'（顯示上次組別，待核對）':''}`:state?.status==='error'?`${month}：${state.error||'排班讀取失敗'}${state.cached?'（顯示上次組別，非最新正式資料）':''}${state.autoRetry?'；將自動重試':''}`:`${month} 尚未讀取排班組別`;}).join('；');
   }
   ['driverVesselGroupState','workloadScheduleGroupState','weeklyScheduleGroupState','rankingScheduleGroupState','dispatchScheduleGroupState'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=text;});
 }
@@ -5093,7 +5093,7 @@ function operationRowsForActiveView(){
   const active=activeEfficiencyTabName();
   if(active==='dispatch'){const rows=window.P79PersonnelDispatch?.rows()||[];return rows.length?rows:[{workDate:(document.getElementById('dispatchMonth')?.value||'')+'-01'}];}
   if(active==='ranking'){const rows=monthlyRankingRecords();return rows.length?rows:[{workDate:(document.getElementById('rankingMonth')?.value||'')+'-01'}];}
-  if(active==='weekly')return weeklyFilteredRecords();
+  if(active==='weekly')return weeklyFilteredRecords(true);
   if(active==='records')return filteredRecords();
   if(active==='workload'){const pid=document.getElementById('personStatPerson')?.value||'';return workloadRowsInRange(buildWorkloadIndex().byPerson.get(pid)||[]);}
   if(active==='personstats'){const no=document.getElementById('driverVesselShip')?.value||'';return driverVesselReference(no,shipMasters,records).rows;}
@@ -5108,6 +5108,7 @@ function refreshOperationGroupView(){
   const active=activeEfficiencyTabName();
   if(active==='dispatch')window.P79PersonnelDispatch?.render();
   else if(active==='weekly'){renderWeeklyEfficiency();renderMonthlyRanking();}
+  else if(active==='ranking')renderMonthlyRanking();
   else if(active==='workload')renderPersonStats();
   else if(active==='personstats')renderVesselDriverView();
   else if(active==='records')renderRecords();
@@ -5118,14 +5119,24 @@ function pumpOperationScheduleGroups(){
     (async()=>{
       try{
         let data;
+        const priorStore=currentOperationScheduleStore();
+        // Use only the existing scope-checked read-only schedule preview. Do not assign groups from HR.
+        if(!priorStore?.has(task.month)&&window.Port79DataCache?.getSchedulePreview&&typeof p79AqcHeadcountVerified!=='undefined'&&p79AqcHeadcountVerified===true){
+          let timer;
+          try{
+            const preview=await Promise.race([window.Port79DataCache.getSchedulePreview(task.month,{strict:true}),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),1500);})]);
+            if(task.owner!==String(gcToken||''))return;
+            if(preview?.data){priorStore.apply(task.month,preview.data);operationScheduleReads.set(task.month,{at:Date.now(),status:'loading',cached:true});refreshOperationGroupView();}
+          }catch(error){console.warn('AQC 排班快取預覽無法讀取',error);}finally{if(timer)clearTimeout(timer);}
+        }
         for(let attempt=0;attempt<2;attempt++){
-          try{data=await apiGetQuick('getScheduleDataSecure',{month:task.month},25000);break;}
+          try{data=await apiGetQuick('getScheduleDataSecure',{month:task.month},attempt?45000:25000);break;}
           catch(error){
             if(task.owner!==String(gcToken||''))return;
             if(attempt||!operationScheduleErrorKind(error).retry)throw error;
-            operationScheduleReads.set(task.month,{at:Date.now(),status:'loading',retrying:true});
+            operationScheduleReads.set(task.month,{at:Date.now(),status:'loading',retrying:true,cached:currentOperationScheduleStore()?.has(task.month)===true});
             refreshOperationGroupView();
-            await new Promise(resolve=>setTimeout(resolve,1200));
+            await new Promise(resolve=>setTimeout(resolve,3000));
             if(task.owner!==String(gcToken||''))return;
           }
         }
@@ -5143,7 +5154,7 @@ function pumpOperationScheduleGroups(){
             const d=new Date(Date.UTC(parts[0],parts[1]-1-distance,1));
             const earlier=d.toISOString().slice(0,7);
             try{
-              const history=await apiGetQuick('getScheduleDataSecure',{month:earlier},10000);
+              const history=await apiGetQuick('getScheduleDataSecure',{month:earlier},25000);
               if(task.owner!==String(gcToken||''))return;
               store.applyHistory(task.month,earlier,history);
               refreshOperationGroupView();
@@ -5159,8 +5170,18 @@ function pumpOperationScheduleGroups(){
         operationScheduleReads.set(task.month,{at:Date.now(),status:'ready',historyUnverified});
       }catch(error){
         if(task.owner===String(gcToken||'')){
-          currentOperationScheduleStore()?.invalidate(task.month);
-          operationScheduleReads.set(task.month,{at:Date.now(),status:'error',error:operationScheduleErrorKind(error).text});
+          const kind=operationScheduleErrorKind(error),store=currentOperationScheduleStore();
+          // A transient transport failure is not evidence of a changed assignment.
+          // Authorization and malformed responses must never keep an old preview visible.
+          if(!kind.retry)store?.invalidate(task.month);
+          const autoRetry=kind.retry&&(task.round||0)<2&&typeof operationRowsForActiveView==='function';
+          const failed={at:Date.now(),status:'error',error:kind.text,cached:kind.retry&&store?.has(task.month)===true,autoRetry};
+          operationScheduleReads.set(task.month,failed);
+          if(autoRetry)setTimeout(()=>{
+            if(task.owner!==String(gcToken||'')||operationScheduleReads.get(task.month)!==failed)return;
+            const rows=operationRowsForActiveView().filter(r=>String(r.workDate||'').slice(0,7)===task.month);
+            if(rows.length)ensureOperationScheduleGroups(rows,true,(task.round||0)+1);
+          },15000*((task.round||0)+1));
         }
       }finally{
         operationScheduleRunning--;
@@ -5171,14 +5192,14 @@ function pumpOperationScheduleGroups(){
   }
 }
 
-function ensureOperationScheduleGroups(rows,force=false){
+function ensureOperationScheduleGroups(rows,force=false,retryRound=0){
   const store=currentOperationScheduleStore(),owner=String(gcToken||'');if(!store||!owner)return;
   const months=[...new Set((rows||[]).map(r=>String(r.workDate||'').slice(0,7)).filter(m=>/^20\d{2}-(0[1-9]|1[0-2])$/.test(m)))];
   months.forEach(month=>{
     const state=operationScheduleReads.get(month);
     if(state?.status==='loading')return;
     if(!force&&state&&Date.now()-state.at<(state.status==='ready'?300000:60000))return;
-    operationScheduleReads.set(month,{at:Date.now(),status:'loading'});operationScheduleQueue.push({month,owner});
+    operationScheduleReads.set(month,{at:Date.now(),status:'loading',cached:store.has(month)});operationScheduleQueue.push({month,owner,round:retryRound});
   });
   pumpOperationScheduleGroups();
   renderOperationScheduleStatus(rows);

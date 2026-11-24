@@ -559,13 +559,15 @@ function schedulePreviewData(data,month,scoped=false){
   leaveCoverAssignments:Array.isArray(data.leaveCoverAssignments)?data.leaveCoverAssignments:[],
   scheduleGroups:Array.isArray(data.scheduleGroups)?data.scheduleGroups:[]};
 }
-async function getSchedulePreview(month){
+async function getSchedulePreview(month,options={}){
  if(!/^\d{4}-\d{2}$/.test(month)||!token())return null;
- const viewer=viewerKey(),credential=token(),base=systemKey('schedule');
+ const viewer=viewerKey(),credential=token(),base=systemKey('schedule'),scope=displayScope(),endpoint=gasUrl();
  const rows=await Promise.all([get(base+'|'+month),get(base)].map(p=>p.catch(()=>null)));
- if(viewerKey()!==viewer||token()!==credential)return null;
+ if(viewerKey()!==viewer||token()!==credential||(options.strict&&(scope!==displayScope()||endpoint!==gasUrl())))return null;
  const candidates=rows.map(row=>{
   if(!row||!currentViewerRow(row)||row.kind!=='system'||row.system!=='schedule'||row.savedAt<=0||row.savedAt>Date.now()+60000)return null;
+  // AQC statistics may only reuse same-scope, same-endpoint, unmutated recent previews.
+  if(options.strict&&(row.displayScope!==scope||row.cacheEndpoint!==endpoint||row.savedAt<mutationStamp()||Date.now()-row.savedAt>86400000))return null;
   const scoped=row.key===base+'|'+month&&row.month===month;
   const data=schedulePreviewData(row.data,month,scoped);
   return data?{data,savedAt:row.savedAt}:null;
