@@ -14,7 +14,7 @@ const ctx={
 };
 vm.createContext(ctx);vm.runInContext(html.slice(from,to),ctx);
 const selected={例:[date(1),date(2),date(3),date(4)],休:[date(5),date(6),date(7)],國:[date(10),date(25)]};
-const render=(person=0,typhoon=[])=>ctx.p79ScheduleRestCountCells({id:'E'+person,name:person===1?'胡毓麒':'測試員工'+person},month,{},typhoon,[],selected);
+const render=(person=0,typhoon=[])=>ctx.p79ScheduleRestCountCells({id:'E'+person,name:person===1?'胡毓麒':'測試員工'+person},month,{},typhoon,[],selected,{typhoon:typhoon.length>0,election:false});
 const span=(html,category)=>html.match(new RegExp('data-rest-category="'+category+'"[^>]*><span>([^<]+)<\/span>'))?.[1];
 let output=render();
 assert.equal(span(output,'例'),'4/0');assert.equal(span(output,'休'),'3/2');assert.equal(span(output,'國'),'2/0','two visibly selected national dates must not show a phantom 2/1');

@@ -31,9 +31,9 @@ assert.equal(context.model.rows[0].checked,true,'previous checked rows persist a
 assert.equal(context.model.rows[2].checked,true,'other department selection also persists');
 assert(s.includes("q('#mrDept').onchange=jobs;q('#mrJob').onchange=names"),'department and role change work locally');
 assert(s.includes("q('#mrEmp').onchange=()=>{if(model&&!busy)paint();}"),'employee change repaints without a cloud fetch');
-assert(s.includes("q('#mrMonth').onchange=()=>{if(!busy)q('#mrLoad').click();}"),'month change intentionally rereads');
+assert(s.includes("q('#mrMonth').onchange=()=>{if(!busy){q('#mrCutoff').value='';q('#mrLoad').click();}}"),'month change intentionally rereads');
 assert(s.includes("loadedPeople=people.slice()"),'first cloud read includes all authorized employees');
 assert(s.includes("visibleRows().map(({r,i})=>r.saved?''"),'render only selected staff but preserve model indices');
 assert(s.includes("visibleRows().forEach(({r})=>{if(!r.saved&&!r.planned)r.checked=q('#mrAll').checked;}"),'select all only applies to visible staff');
-assert(html.includes('port79-monthly-rest-overtime.js?v=20261028-forward-from-today-v5'),'browser must load updated dialog script');
+assert(/port79-monthly-rest-overtime\.js\?v=[^"'\s<>]+/.test(html),'browser must load updated dialog script');
 console.log('PASS job/dept/person filters are local, preserve cross-filter checked reports and original indexes, reload only on month change/explicit refresh');

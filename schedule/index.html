@@ -8042,8 +8042,11 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const officialRemaining=verified?Math.max(0,ledger.remaining[category]):null;
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
         // Numbers only: actual allocated days / still available days.
-        const invalidNote=invalidNationalCount?
-          ' title="'+scheduleEscapeHtml('本月國定假日額度0；仍有'+invalidNationalCount+'筆歷史國假標記或正式申報須管理員核對。原始報單未修改。')+'"':'';
+        const auditNotes=[];
+        if(invalidNationalCount)auditNotes.push('本月國定假日額度0；仍有'+invalidNationalCount+'筆歷史國假標記或正式申報須管理員核對。原始報單未修改。');
+        if(extraReportedDates.length)auditNotes.push('雲端已確認'+category+'加班：'+extraReportedDates.join('、'));
+        if(verified&&officialRemaining!==rest)auditNotes.push('班格與正式帳本差異須核對（畫面剩餘 '+rest+'；帳本剩餘 '+officialRemaining+'）');
+        const invalidNote=auditNotes.length?' title="'+scheduleEscapeHtml(auditNotes.join('；'))+'"':'';
         // Keep each quota cell at the original one-line height. Genuine
         // over-quota days stay in the numeric count and manager audit, without
         // a second-row "超休" label or a taller calendar row.
