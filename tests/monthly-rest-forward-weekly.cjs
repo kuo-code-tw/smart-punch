@@ -46,4 +46,22 @@ assert(!plan.rows.some(r=>plan.plannedRows.some(p=>p.id===r.id)),'no leaked plan
 assert(!plan.plannedRows.some(r=>['2026-10-25','2026-10-31'].includes(r.date)),'regular/rest days never auto-converted to virtual overtime');
 assert(source.includes("const selected=model.rows.filter(r=>r.checked&&!r.saved)"),'save only processes verified rows');
 assert(source.includes("min=\"'+loadedMonth+'-01'"),'manual date edit permits original dates within the selected month');
+// Manual-mode read-only preview: a formally marked future working day,
+ // an established week cycle, remaining quota and a matching 8h rule.
+const future=JSON.parse(JSON.stringify(snapshot));
+future.schedules[0].schedule['2026-10-29']='中';
+future.schedules[0].schedule.__meta['2026-10-29']={restCategory:'休',restQuotaOvertime:true};
+g.p79RestQuota=()=>({days:31,slots:[{sourceDate:'2026-10-03',category:'休'},{sourceDate:'2026-10-10',category:'休'},{sourceDate:'2026-10-17',category:'休'},{sourceDate:'2026-10-24',category:'休'},{sourceDate:'2026-10-31',category:'休'},{sourceDate:'2026-10-30',category:'休'},{sourceDate:'2026-10-04',category:'例'},{sourceDate:'2026-10-11',category:'例'},{sourceDate:'2026-10-18',category:'例'},{sourceDate:'2026-10-25',category:'例'}]});
+const worker={...emp,weeklyCycleStart:'2026-10-25'};
+const futureRules=[...rules,['休','休16-24',8,8,'','','16','24','full']];
+const before=JSON.stringify(future);
+const manual=api.plan(future,[worker],'2026-10',futureRules,{manualOnly:true});
+assert.equal(manual.plannedRows.length,0,'opening manual mode creates no draft');
+assert(manual.previewRows.some(r=>r.date==='2026-10-29'&&r.rule[1]==='休16-24'&&r.previewOnly),'official future shift is visible as a read-only suggestion');
+const hint=api.personPeriodSuggestions(manual,'A',now);
+assert(hint.suggestions.some(r=>r.date==='2026-10-29'&&r.period==='休16-24'&&r.planned));
+assert.equal(JSON.stringify(future),before);
+const unconfirmed=api.plan(future,[emp],'2026-10',futureRules,{manualOnly:true});
+assert.equal(unconfirmed.previewRows.length,0,'missing cycle must not yield a recommended future shift');
+assert.match(api.personPeriodSuggestions(unconfirmed,'A',now).reason,/未設定約定七日週期|未找到符合/);
 console.log('PASS forward-only month-end reporting, separate future planning, protected rest-day schedule and weekly rest audit');

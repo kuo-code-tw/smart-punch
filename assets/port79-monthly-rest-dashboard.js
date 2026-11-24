@@ -51,7 +51,10 @@ function sourceRows(el){
   const reviewType=due===null?'missing':due>0?'deficit':'exception';
   // Zero remaining quota does not mean the source has no attendance exception.
   // The controller already excludes people with no deficit and no exceptions.
-  roster.set(id.toUpperCase(),{kind:'roster',id,date:'',name:td[3]?.textContent?.trim()||'',role:td[2]?.textContent?.trim()||'',category:reviewType==='missing'?'尚無法計算':reviewType==='exception'?'無缺額':quota,period:reviewType==='deficit'?'日期／時段待核':'—',hours:'—',reviewType,due,status:reviewType==='missing'?'缺資料':reviewType==='deficit'?'未休缺額':'出勤／申報待核對',source:reason,checked:false,disabled:true});
+  let suggestions=[];try{const parsed=JSON.parse(tr.dataset?.periodSuggestions||'[]');if(Array.isArray(parsed))suggestions=parsed.filter(x=>x&&typeof x.date==='string'&&typeof x.period==='string'&&x.period.trim());}catch{}
+  if(reviewType!=='deficit')suggestions=[];
+  const period=suggestions.length?suggestions.map(x=>x.date+' '+periodLabel(x.period)+'（'+x.note+'）').join('；'):reviewType==='deficit'?'尚無符合條件時段':'—';
+  roster.set(id.toUpperCase(),{kind:'roster',id,date:'',name:td[3]?.textContent?.trim()||'',role:td[2]?.textContent?.trim()||'',category:reviewType==='missing'?'尚無法計算':reviewType==='exception'?'無缺額':quota,period,suggestions,hours:'—',reviewType,due,status:reviewType==='missing'?'缺資料':reviewType==='deficit'?'未休缺額':'出勤／申報待核對',source:reason,checked:false,disabled:true});
  }
  return {ready,planned,prior,roster:[...roster.values()]};
 }
@@ -173,7 +176,7 @@ function mount(el){
  </div>
  <div class="mr-ux-table-scroll"><table class="mr-ux-table"><thead><tr>
  <th><input type="checkbox" id="mrUxAll" aria-label="全選目前可處理項目"></th>
- <th>日期</th><th>姓名</th><th>休假類型／缺額</th><th>建議時段</th><th>工時</th><th>狀態</th><th>操作</th>
+ <th>日期</th><th>姓名</th><th>休假類型／缺額</th><th>建議日期／時段</th><th>工時</th><th>狀態</th><th>操作</th>
  </tr></thead><tbody id="mrUxRows"></tbody></table></div>
  <p id="mrUxListHint" style="font-size:11px;color:#617e9f;margin:9px 3px 0">所有數字均取自當月正式來源，尚未核實的預排不等於已申報。</p>
  </section>
@@ -280,10 +283,10 @@ function mount(el){
      '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
       'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date||'本月')+'</td><td>'+esc(r.name)+(r.kind==='roster'?'<small style="display:block;color:#64748b">'+esc(r.role)+'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對')+'</small>':'')+'</td>'+
-      '<td><span class="mr-ux-kind">'+esc(r.category)+'</span></td><td>'+esc(periodLabel(r.period))+'</td><td>'+esc(r.hours)+'</td>'+
+      '<td><span class="mr-ux-kind">'+esc(r.category)+'</span></td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc(x.date.slice(5))+' '+esc(periodLabel(x.period))+'</b><small style="display:block;color:#64748b">'+esc(x.note)+'</small></div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
       '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+(r.kind==='roster'?'<small style="display:block;white-space:normal;max-width:220px;color:#64748b">'+esc(r.source)+'</small>':'')+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
-   q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+'；'+(state.tab==='audit'?'零缺額但有異常、缺資料與既有待核申報在此列示，不列為未休缺額人員。':state.tab==='done'?'已完成申報不重複申報。':'僅列剩餘例／休／國大於零的人員及日期候選；同一人可能有日期紀錄。零缺額異常另列。');
+   q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+'；'+(state.tab==='audit'?'零缺額但有異常、缺資料與既有待核申報在此列示，不列為未休缺額人員。':state.tab==='done'?'已完成申報不重複申報。':'僅列剩餘例／休／國大於零的人員及日期候選；時段建議僅供核對，預排不等於正式申報；無可用時段會說明原因。零缺額異常另列。');
    q('#mrUxExport').disabled=!shown.length;
   }finally{state.rendering=false;}
  }
@@ -394,7 +397,7 @@ function mount(el){
  q('#mrUxExport').onclick=()=>{
   const records=currentView().shown;if(!records.length)return;
   const clean=x=>{let v=String(x??'');if(/^[=+@\-]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';};
-  const rows=[['日期','姓名','職稱','假別／缺額','建議時段','工時','狀態','來源類型','核對原因'],...records.map(r=>[r.date,r.name,r.role||'',r.category,periodLabel(r.period),r.hours,label(r),r.kind==='roster'?(r.reviewType==='deficit'?'人員缺額核對':'人員異常核對'):r.kind,r.source||r.status])];
+  const rows=[['日期','姓名','職稱','假別／缺額','建議日期／時段','工時','狀態','來源類型','核對原因'],...records.map(r=>[r.date,r.name,r.role||'',r.category,periodLabel(r.period),r.hours,label(r),r.kind==='roster'?(r.reviewType==='deficit'?'人員缺額核對':'人員異常核對'):r.kind,r.source||r.status])];
   const csv='\uFEFF'+rows.map(r=>r.map(clean).join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
   const anchor=document.createElement('a');anchor.href=url;anchor.download='每月未休假加班-'+(originalMonth.value||'')+'.csv';
