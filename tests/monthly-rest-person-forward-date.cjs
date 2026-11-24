@@ -1,0 +1,30 @@
+'use strict';
+const fs=require('node:fs');
+function test(core){
+ const assert=(x,m)=>{if(!x)throw Error(m)};
+ const month='2026-11',now='2026-11-24',day=n=>month+'-'+String(n).padStart(2,'0');
+ let serial=0;
+ const window={Intl:{DateTimeFormat:function(){return{format:()=>now}}},crypto:{randomUUID:()=>String(++serial)},p79RestQuota:()=>({days:30,slots:[1,2,3,4,5,6].map(n=>({category:'休',sourceDate:day(n)}))}),p79AllocateRestMonth:()=>({meta:{}}),p79MonthlyRestContext:{employmentStart:()=>''},P79RestAttendance:{state:()=> 'worked',isLeaveDay:()=>false},P79Overtime:{inferRule:(s,e,d,r)=>r[0]||null}};
+ new Function('window','Intl','crypto',core)(window,window.Intl,window.crypto);
+ const api=window.P79MonthlyRest;
+ const report=(id,planned=false)=>({id,category:'休',code:'休08-16',planned,declaredHours:8});
+ const roster=Object.fromEntries(Array.from({length:30},(_,i)=>[day(i+1),'早']));
+ for(const n of [12,16,17,20,22])roster[day(n)]='休';
+ roster.__meta={[day(16)]:{overtimeReport:report('R16')},[day(22)]:{overtimeReport:report('P22',true)},[day(23)]:{overtimeReport:report('R23'),overtimeRevocations:[{confirmed:true,reportId:'R23'}]}};
+ assert(api.latestReportedDate(roster,month)===day(16),'planned/revoked not last formal');
+ assert(api.forwardReportStart(roster,month,now)===day(17),'start 17th');
+ assert(api.forwardReportStart(roster,month,'2026-12-01')===day(1),'prior-month audit preserved');
+ const staff=[{empId:'A',name:'A'},{empId:'B',name:'B'}];
+ const second={...roster,__meta:{[day(12)]:{overtimeReport:report('R12')}}};
+ const pair=(empId,n)=>({empId,date:day(n),start:Date.parse(day(n)+'T08:00:00+08:00'),end:Date.parse(day(n)+'T16:00:00+08:00')});
+ const snapshot={schedules:[{empId:'A',schedule:roster},{empId:'B',schedule:second}],pairs:[pair('A',12),pair('A',16),pair('A',17),pair('A',20),pair('B',12),pair('B',16),pair('B',17)],leaveDates:[],attendanceEvidence:{complete:true}};
+ const model=api.plan(snapshot,staff,month,[['休','休08-16',8,12.7,'','','08','16','full']]);
+ assert(model.rows.some(r=>r.empId==='A'&&r.date===day(17)),'A has next actual candidate '+JSON.stringify(model.unavailable));
+ assert(!model.rows.some(r=>r.empId==='A'&&r.date<day(17)),'no earlier A candidate');
+ assert(model.rows.some(r=>r.empId==='B'&&r.date===day(16)),'B has independent cutoff');
+ assert(api.personPeriodSuggestions(model,'A',now).nextReportDate===day(17),'visible cutoff');
+ assert(api.personPeriodSuggestions(model,'A',now).suggestions.every(r=>r.date>=day(17)),'all suggestions forward');
+ assert(model.balances.find(b=>b.emp.empId==='A').ledger.some(r=>r.date===day(12)&&r.kind==='workedRestUnreported'),'earlier work retained in audit');
+ return 'PASS per-employee cutoff, planned/revoked exclusion, independent dates, prior-month audit, preserved earlier attendance';
+}
+console.log(test(fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8')));
