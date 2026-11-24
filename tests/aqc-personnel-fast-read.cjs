@@ -56,10 +56,10 @@ async function hr(){
  assert.equal((await newer).employees[0].empId,'SAFE');
  ctx.getHomeAdminSession=()=>({adminRole:'superadmin'});
  const hr=ctx.p79ReadOfficialAqcRoster(true);await Promise.resolve();await Promise.resolve();
- assert.equal(requests[6].action,'hrGetEmployees','HR-authorized accounts must read the same source as HR');
- assert.equal(requests[6].timeout,30000);
- pending[6].resolve({ok:true,employees:[{empId:'FORMER',employmentStatus:'resigned'}]});
- assert.equal((await hr).employees[0].employmentStatus,'resigned');
+ assert.equal(requests[5].action,'hrGetEmployees','HR-authorized accounts must read the same source as HR');
+ assert.equal(requests[5].timeout,30000);
+ pending[5].resolve({ok:true,employees:[{empId:'FORMER',employmentStatus:'resigned',phone:'private'}]});
+ const hrResult=await hr;assert.equal(hrResult.employees[0].employmentStatus,'resigned');assert.equal(hrResult.employees[0].phone,undefined,'HR contact details are never cached by AQC');
 }
 function lazyRanking(){
  let observer=null,loadCount=0;
@@ -102,8 +102,15 @@ function rankingStoreInitialization(){
  assert.doesNotThrow(()=>c.renderMonthlyRanking(),'complete monthly ranking should not access an uninitialized store');
  assert.match(el('rankingCount').textContent,/2026-11/);
 }
+function employmentSelector(){
+ const select={value:'EMP:OLD',selectedOptions:[{textContent:'Former employee'}],innerHTML:''};
+ const idx={people:[{key:'EMP:LIVE',empId:'LIVE',name:'Active employee'},{key:'EMP:OLD',empId:'OLD',name:'Former employee'}],byPerson:new Map()};
+ const c={document:{getElementById:id=>id==='personStatPerson'?select:{value:'2026-11'}},activeEfficiencyTabName:()=> 'weekly',buildWorkloadIndex:()=>idx,workloadDateRange:()=>({start:'',end:''}),p79AqcHeadcountVerified:true,people:()=>[{empId:'LIVE',name:'Active employee'}],normalizePersonName:s=>s,displayPersonName:s=>s,esc:s=>s};
+ vm.createContext(c);vm.runInContext(fn('populatePersonStatPeople'),c);c.populatePersonStatPeople();
+ assert.match(select.innerHTML,/Active employee/);assert(!select.innerHTML.includes('Former employee'));assert.equal(select.value,'');
+}
 (async()=>{
- await hr();lazyRanking();rankingStoreInitialization();
+ await hr();lazyRanking();rankingStoreInitialization();employmentSelector();
  const weekly=fn('renderWeeklyEfficiency');
  assert(weekly.includes('const baseRows=weeklyFilteredRecords(true);'));
  assert(weekly.includes('refreshWeeklyGroupFilter(baseRows);'));

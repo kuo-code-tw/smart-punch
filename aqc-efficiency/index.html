@@ -2039,10 +2039,18 @@ function p79ReadOfficialAqcRoster(force=false){
  // For accounts with HR access, read the very same authority as the HR page.
  const session=typeof getHomeAdminSession==='function'?getHomeAdminSession():null;
  const role=String(session?.adminRole||session?.actualAdminRole||session?.role||'').toLowerCase();
- const hrAccess=role==='superadmin'||['view','manage'].includes(String(session?.systemPermissions?.hr||'').toLowerCase());
+ // Only the unrestricted superadmin uses the full HR endpoint here. Other
+ // roles retain the existing efficiency-scoped employee endpoint.
+ const hrAccess=role==='superadmin';
  const request=Promise.resolve().then(()=>hrAccess?apiGetQuick('hrGetEmployees',{},30000):apiGetQuick('gcGetEmployees',{},20000)).then(result=>{
   if(owner!==String(gcToken||''))throw Error('登入身分已變更，已取消舊人資查詢');
   if(!Array.isArray(result?.employees)||!result.employees.length)throw Error('人資 API 沒有回傳可核對的在職名冊');
+  // Do not persist unrelated HR data (contact details, salary, permissions, etc.)
+  // into the efficiency system's local employee cache.
+  if(hrAccess){
+    const fields=['empId','employeeId','id','工號','attNo','attendanceNo','attendanceId','考勤號碼','name','employeeName','姓名','dept','department','unit','部門','jobTitle','deptDetail','role','title','position','職務','職稱','group','employmentStatus','employeeStatus','employment_status','在職狀態','員工狀態','status','terminationDate','resignationDate','resignDate','離職日期','離職日','lastWorkDate','headquarters','headquarter','headOffice','division','businessDivision','divisions','office','businessOffice','offices','section','orgUnit','sections'];
+    result={ok:true,employees:result.employees.map(e=>Object.fromEntries(fields.filter(k=>e&&Object.prototype.hasOwnProperty.call(e,k)).map(k=>[k,e[k]])))};
+  }
   p79AqcRosterVerifiedResponse=result;p79AqcRosterVerifiedAt=Date.now();
   return result;
  });
