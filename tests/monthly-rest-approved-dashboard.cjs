@@ -54,10 +54,16 @@ assert.equal(JSON.stringify(root.querySelectorAll('#mrRows tr[data-row]')[0].dat
 
 for(const label of ['待處理','可正式申報','待核對','已完成','月份','部門','姓名','狀態',
  '一鍵自動編排','批次核對','匯出','待處理名單','待核對原因','日期','休假類型',
- '建議時段','工時','操作','儲存變更','正式申報'])
+ '建議時段','工時','操作','儲存預排','正式申報'])
  assert(source.includes(label),'Missing approved design control: '+label);
 assert(source.includes("q('#mrUxMonth').onchange"));
 assert(source.includes("q('#mrUxDept').onchange"));
+assert(source.includes('id="mrUxJob"'));
+assert(source.includes("originalJob.dispatchEvent(new Event('change',{bubbles:true}))"));
+assert(source.includes("el.p79OpenMonthlyRestPlan?.(row.id)"));
+assert(original.includes('manualRestPlanIssue(fresh,chosen,month,date,rule)'));
+assert(original.includes('visiblePlannedRows().filter(r=>r.checked&&!r.saved)'));
+assert(original.includes("result.report?.planned!==true"),'draft must be acknowledged as planned');
 assert(source.includes("q('#mrUxBatch').onclick"));
 assert(source.includes("q('#mrUxSubmit').onclick"));
 assert(source.includes("q('#mrUxSavePlan').onclick"));
@@ -69,7 +75,7 @@ assert(!/\b(?:saveReport|updateSchedule|saveConfig|hrGetOrgOptions)\s*\(/.test(s
  'New dashboard may not write cloud records or invoke extra backend actions');
 assert(original.includes("g.P79MonthlyRestDashboard?.mount(el)"),
  'Actual monthly modal must mount dashboard');
-assert(original.includes("port79-monthly-rest-dashboard.js?v=20261124-period-suggestions-v3"),
+assert(original.includes("port79-monthly-rest-dashboard.js?v=20261124-preplan-filing-v4"),
  'Production load path must bypass browser cache');
 assert(original.includes("if(!fullDayEvidence(fresh,r.empId,r.date,attendance[0]))"),
  'Official eight-hour attendance guard must remain');

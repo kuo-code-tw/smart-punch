@@ -1945,7 +1945,9 @@
    global.addEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.p79Cleanup=()=>global.removeEventListener?.('p79-overtime-options-saved',optionsSaved);
    el.onclose=()=>{el.p79Cleanup();el.remove();};
-   if(prefill.manualPlan===true){el.querySelector('#p79OtStage').textContent='儲存預排';el.querySelector('#p79OtDate').min=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());}
+   if(prefill.manualPlan===true){el.querySelector('#p79OtStage').textContent='儲存預排';el.querySelector('#p79OtDate').min=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+    if(prefill.monthlyRestPlanMonth){const [y,m]=prefill.monthlyRestPlanMonth.split('-').map(Number);dateInput.max=prefill.monthlyRestPlanMonth+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0');}
+   }
    if(prefill.readonlyWrongDate===true){
     const reason='原預排仍在 '+String(prefill.coverDate||'原請假日')+
      '，實際出勤日 '+String(prefill.date||'')+'、加班歸屬日 '+String(prefill.overtimeDate||prefill.coverDate||prefill.date||'')+
@@ -2084,11 +2086,16 @@
      const editingExisting=Boolean(prefill.savedReport&&prefill.reportId&&String(prefill.empId)===String(empId)&&prefill.date===date);
      if(editingOriginal&&!editingExisting)throw Error('修改正式申報不可更換員工或日期，請重新開啟原紀錄。');
      if(editingExisting&&!(prefill.attendance?.end>prefill.attendance?.start))throw Error('原申報需完成上下班打卡才能確認修改時段；目前只顯示暫估');
+     if(prefill.monthlyRestPlanMonth){
+      if(prefill.manualPlan!==true||typeof prefill.validateMonthlyRestPlan!=='function')throw Error('缺少未休預排核對程序');
+      await prefill.validateMonthlyRestPlan({empId,date,rule:chosen});
+      if(!el.isConnected||selectionKey()!==selection)throw Error('預排內容已變更，請重新核對');
+     }
      const selectedCategory=chosen[0];
      const pair=independentFiling?{forEmpId:'',forName:''}:editingOriginal&&!['代','延'].includes(selectedCategory)
       ?{forEmpId:String(prefill.forEmpId||''),forName:''}
       :reportPair(prefill.leaveHandoffId?'代':selectedCategory,empId,prefill.leaveHandoffId?prefill.forEmpId:forSelect.value,people);
-     const draft=Object.assign(validationRequest,{id:editingExisting?String(prefill.reportId):crypto.randomUUID(),manualPlan:prefill.manualPlan===true,preventReplace:editingExisting,plannedReview:editingExisting&&prefill.plannedReview===true,expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||''):'',expectedOriginalCategory:editingOriginal?String(prefill.originalReportCategory||''):'',expectedPunchStart:editingOriginal?Number(prefill.attendance?.start):null,expectedPunchEnd:editingOriginal?Number(prefill.attendance?.end):null,empId,date,rule:report(chosen),...pair,note:el.querySelector('#p79OtNote').value||(independentFiling&&prefill.leaveHandoffId?'本人加班（非代班）':''),createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:validationRequest.leaveHandoffId});
+     const draft=Object.assign(validationRequest,{id:editingExisting?String(prefill.reportId):crypto.randomUUID(),manualPlan:prefill.manualPlan===true,preventReplace:editingExisting||!!prefill.monthlyRestPlanMonth,plannedReview:editingExisting&&prefill.plannedReview===true,expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||''):'',expectedOriginalCategory:editingOriginal?String(prefill.originalReportCategory||''):'',expectedPunchStart:editingOriginal?Number(prefill.attendance?.start):null,expectedPunchEnd:editingOriginal?Number(prefill.attendance?.end):null,empId,date,rule:report(chosen),...pair,note:el.querySelector('#p79OtNote').value||(independentFiling&&prefill.leaveHandoffId?'本人加班（非代班）':''),createdAt:Date.now(),gasUrl:auth().url,autoSave:true,leaveHandoffId:validationRequest.leaveHandoffId});
      try{
       const pending=editingExisting?null:JSON.parse(sessionStorage.getItem(KEY)||'null');
       const matches=prior=>prior&&(!prior.gasUrl||prior.gasUrl===draft.gasUrl)&&
