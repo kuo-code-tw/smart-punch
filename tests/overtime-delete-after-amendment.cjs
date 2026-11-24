@@ -47,7 +47,7 @@ async function simulate(mode){
      })};
    }
  };
- context.globalThis=context;context.p79OvertimePlannedDisplayedRows=[row];vm.createContext(context);vm.runInContext(html.slice(html.indexOf('function p79WorkOvertimeIsUnconfirmedPlan('),html.indexOf('        function buildOvertimeStatisticsRows(')),context);vm.runInContext(fn,context);
+ context.globalThis=context;context.p79OvertimePlannedDisplayedRows=[row];context.p79PlannedBulkBusy=false;vm.createContext(context);vm.runInContext(html.slice(html.indexOf('function p79WorkOvertimeIsUnconfirmedPlan('),html.indexOf('        function buildOvertimeStatisticsRows(')),context);vm.runInContext(fn,context);
  if(mode==='planned'){const a=html.indexOf('        async function p79DeletePlannedOvertimeRow('),b=html.indexOf('        function p79OvertimePlannedVisibleRows(',a);vm.runInContext(html.slice(a,b),context);await context.p79DeletePlannedOvertimeRow(0,button);}else await context.p79DeleteWorkOvertimeRow(0,button);
  return{calls,messages,notice,button,state};
 }

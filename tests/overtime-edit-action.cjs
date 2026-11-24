@@ -8,7 +8,7 @@ const saved={id:'ORIGINAL-8H',category:'國',code:'國08-16',typeName:'國定假
 const original={empId:'EMP1',dateKey:'2026-10-15',rosterDate:'2026-10-15',timeCheckRequired:false,reportVerified:true,overtimeReport:saved,clockIn:{at:1000},clockOut:{at:2000},forEmpId:''};
 const pending={...original,reportVerified:false,overtimeReport:null};
 const opened=[],alerts=[],ctx={p79WorkOvertimeDisplayedRows:[original,pending],p79CanReportOvertime:()=>true,alert:message=>alerts.push(message),normalizeScheduleDateKey:x=>x,p79DirectAttendanceTimestamp:r=>r.at,p79WorkOvertimeRoster:()=>({'2026-10-15':'早'}),p79WorkOvertimePeriodReview:()=>null,P79Overtime:{reportRules:()=>[],suggestRule:()=>['國','國08-16'],ruleType:()=> '國定假日加班',openReport:args=>opened.push(args)}};
-ctx.globalThis=ctx;vm.createContext(ctx);vm.runInContext(html.slice(start,end),ctx);
+ctx.globalThis=ctx;ctx.p79PlannedBulkBusy=false;vm.createContext(ctx);vm.runInContext(html.slice(start,end),ctx);
 ctx.p79ReportWorkOvertimeRow(0,true);
 assert.equal(opened.length,1);
 assert.equal(opened[0].savedReport,true);

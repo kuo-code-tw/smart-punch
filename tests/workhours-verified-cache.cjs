@@ -146,7 +146,7 @@ await test('visible table joins startup instead of downloading another schedule 
  n.win.P79WorkhoursCacheContext.recentRoster=async()=>{const s=states.get(month);if(s?.cacheBundleLoad)return null;throw Error('missing shared-read guard')};
  n.win.P79WorkhoursCacheContext.applyBundle=(b,state)=>{if(!state)return;state.ready=true;state.pending=b.preview;state.rows=b.roster.schedules;b.preview?previewRows++:verifiedRows++};
  n.win.P79WorkhoursCacheContext.applyRoster=()=>{};
- vm.createContext(page);vm.runInContext(html.slice(start,end),page);page.p79LoadWorkOvertimeMonths([]);
+ page.p79OvertimeWritePriority=0;vm.createContext(page);vm.runInContext(html.slice(start,end),page);page.p79LoadWorkOvertimeMonths([]);
  const state=states.get(month);assert.equal(previewRows,1,'table displays the existing local rows while metadata is held');
  assert.equal(state.pending,true);assert.equal(legacyReads,0);
  held.resolve();await Promise.all([startup,state.promise]);
