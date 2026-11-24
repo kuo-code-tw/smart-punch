@@ -53,7 +53,7 @@ assert.equal(data.prior[0].status,'已核對出勤');
 assert.equal(JSON.stringify(root.querySelectorAll('#mrRows tr[data-row]')[0].dataset),snap,'render source is read only');
 
 for(const label of ['待處理','可正式申報','待核對','已完成','月份','部門','姓名','狀態',
- '一鍵自動編排','批次核對','匯出','待處理名單','待核對原因','日期','休假類型',
+ '自動配對日期','批次核對','匯出','待處理名單','待核對原因','日期','休假類型',
  '建議時段','工時','操作','儲存預排','正式申報'])
  assert(source.includes(label),'Missing approved design control: '+label);
 assert(source.includes("q('#mrUxMonth').onchange"));

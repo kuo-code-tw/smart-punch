@@ -44,7 +44,7 @@ assert(!plan.rows.some(r=>r.date==='2026-10-27'),'short work cannot be counted a
 assert(plan.plannedRows.every(r=>r.planned&&r.date>'2026-10-28'),'future plans are separate and never counted');
 assert(!plan.rows.some(r=>plan.plannedRows.some(p=>p.id===r.id)),'no leaked planning ID');
 assert(!plan.plannedRows.some(r=>['2026-10-25','2026-10-31'].includes(r.date)),'regular/rest days never auto-converted to virtual overtime');
-assert(source.includes("const selected=model.rows.filter(r=>r.checked&&!r.saved)"),'save only processes verified rows');
+assert(source.includes("const selected=visibleRows().map(({r})=>r).filter(r=>r.checked&&!r.saved&&!r.planned)"),'save only processes verified rows');
 assert(source.includes("min=\"'+loadedMonth+'-01'"),'manual date edit permits original dates within the selected month');
 // Manual-mode read-only preview: a formally marked future working day,
  // an established week cycle, remaining quota and a matching 8h rule.
