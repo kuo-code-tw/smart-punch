@@ -7,6 +7,7 @@ on:
       - 'tests/attendance-paused-conflict-workflow.cjs'
       - 'tests/attendance-paused-batch-decision.cjs'
       - 'tests/attendance-paused-batch-audit.cjs'
+      - 'tests/attendance-last-two-duplicate-resolution.cjs'
       - 'tests/attendance-paused-review.cjs'
       - 'tests/attendance-paused-batch-audit.cjs'
       - '.github/workflows/attendance-paused-conflict-review.yml'
@@ -37,3 +38,4 @@ jobs:
           node tests/attendance-paused-conflict-workflow.cjs
           node tests/attendance-paused-batch-decision.cjs
           node tests/attendance-inspector-live-audit.cjs
+          node tests/attendance-last-two-duplicate-resolution.cjs

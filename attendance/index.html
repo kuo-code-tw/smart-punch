@@ -24639,7 +24639,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 
 
 <script src="../assets/port79-punch-device-state.js?v=20261022-self-binding"></script>
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2&dup=20261124-final-two-v1"></script>
 
 
 
@@ -25433,6 +25433,7 @@ setInterval(()=>{
 },2000);
 let reviewBusy=false,auditBusy=false;
 let verifiedPausedBatch=[];
+let ambiguousPausedBatch=[];
 function p79ReviewNext(message){
  const el=document.getElementById('p79OutboxReview');if(!el)return;
  const remaining=shownDrafts.size;
@@ -25450,7 +25451,7 @@ async function auditAllPaused(){
  if(typeof window.p79V5AuditPausedQueue!=='function'){
   el.textContent='同步核對功能尚未載入，請強制重新整理此頁。';return;
  }
- auditBusy=true;verifiedPausedBatch=[];if(button)button.disabled=true;
+ auditBusy=true;verifiedPausedBatch=[];ambiguousPausedBatch=[];if(button)button.disabled=true;
  el.textContent='正在查詢正式月份主表，逐筆核對暫停修改；不會強制寫入。';
  let resolved=0;
  try{
@@ -25469,6 +25470,9 @@ async function auditAllPaused(){
   show(false);
   verifiedPausedBatch=(Array.isArray(result.verifiedConflicts)?result.verifiedConflicts:[])
    .filter(row=>row&&shownDrafts.has(row.key))
+   .map(row=>({...row,payload:JSON.parse(JSON.stringify(shownDrafts.get(row.key)))}));
+  ambiguousPausedBatch=(Array.isArray(result.ambiguousConflicts)?result.ambiguousConflicts:[])
+   .filter(row=>row&&shownDrafts.has(row.key)&&Array.isArray(row.candidates)&&row.candidates.length>1)
    .map(row=>({...row,payload:JSON.parse(JSON.stringify(shownDrafts.get(row.key)))}));
   const overview='核對完成：已確認同步 '+result.confirmed+' 筆；正式紀錄不存在、已備份 '+result.archived+
    ' 筆；仍需人工核對 '+result.needsReview+' 筆；讀取失敗 '+result.errors+' 筆。';
@@ -25489,8 +25493,28 @@ async function auditAllPaused(){
     (result.lastError?'<p>最近錯誤：'+safe(result.lastError)+'</p>':'');
   }else{
    el.textContent=overview+' 未確認的修改均已保留。'+
-    (result.needsReview?' 雲端紀錄無法唯一核對，請逐筆選擇「核對並處理」。':'')+
+    (result.needsReview?' 雲端紀錄尚需核對。遇到重複編號時請查看下方正式雲端的所有候選時間，切勿直接重送。':'')+
     (result.lastError?' 最近錯誤：'+result.lastError:'');
+  }
+  if(ambiguousPausedBatch.length){
+   const ambiguousHtml='<details open><summary>正式雲端同一紀錄編號有多個打卡｜'+ambiguousPausedBatch.length+' 筆待處理</summary>'+
+    '<p>以下是實際查到的不同正式紀錄，不是單純同步速度問題。已與草稿完全一致的重複紀錄會自動核銷；時間不同的不能選其中一筆強制寫入。</p>'+
+    ambiguousPausedBatch.map(item=>'<section style="margin:10px 0;padding:10px;background:#fff;border:1px solid #bfdbfe;border-radius:10px">'+
+     '<strong>待修改編號：'+safe(item.id)+'｜'+safe(item.name)+'</strong>'+
+     '<p>原編輯基準：'+safe(item.originalTimeStr||'未提供')+
+     '｜想修改成：'+safe(item.desiredTimeStr)+' '+safe(item.desiredStatus)+'</p>'+
+     '<table><thead><tr><th>正式雲端時間</th><th>上下班</th><th>人員／考勤號碼</th><th>來源／備註</th></tr></thead><tbody>'+
+     item.candidates.map(row=>'<tr><td>'+safe(row.timeStr||'無完整時間')+'</td>'+
+      '<td>'+safe(row.status)+'</td><td>'+safe(row.name||row.empId)+'／'+safe(row.attNo)+'</td>'+
+      '<td>'+safe(row.source||'—')+'／'+safe(row.note||'—')+'</td></tr>').join('')+
+     '</tbody></table></section>').join('')+
+    '<p><strong>若正式雲端是正確的：</strong>可一次備份並撤回以下舊草稿，不刪除也不修改正式考勤。'+
+    '<strong>若草稿的時間才正確：</strong>請先核對並修復正式主表的重複 ID，否則無法安全寫到指定班次。</p>'+
+    '<button type="button" class="p79-batch-decision" data-keep-cloud-ambiguous-batch>'+
+    '保留正式雲端，備份撤回這 '+ambiguousPausedBatch.length+' 筆重複編號的舊修改</button>'+
+    '<p><small>只有你按下並確認後才會撤回草稿；不會自動變更或刪除任何正式打卡。</small></p></details>';
+   if(verifiedPausedBatch.length)el.insertAdjacentHTML('beforeend',ambiguousHtml);
+   else el.innerHTML='<strong>'+safe(overview)+'</strong>'+ambiguousHtml;
   }
  }catch(error){
   el.textContent='自動核對未完成：'+String(error?.message||error)+'。原始修改仍保留，可按上方重新核對。';
@@ -25573,9 +25597,46 @@ async function keepVerifiedCloudBatch(button){
    '。未確認的草稿仍保留，請按「重新核對全部」再看最新差異。';
  }finally{reviewBusy=false;button.disabled=false;inspectorQueueSnapshot=queueSnapshot();}
 }
+async function keepAmbiguousCloudBatch(button){
+ if(reviewBusy||auditBusy||!ambiguousPausedBatch.length)return;
+ const snapshot=ambiguousPausedBatch.slice();
+ const status=document.getElementById('p79OutboxReview');
+ reviewBusy=true;button.disabled=true;
+ try{
+  status.textContent='正在重新讀取正式主表，確認重複考勤及原草稿均未變更…';
+  const refreshed=await window.p79V5AuditPausedQueue();
+  const latest=new Map((refreshed.ambiguousConflicts||[]).map(row=>[row.key,row]));
+  const queue=window.p79V5ReadPendingQueue?.()||[];
+  const selected=[];
+  for(const prior of snapshot){
+   const current=latest.get(prior.key);
+   const pending=queue.find(item=>item.key===prior.key&&item.paused&&
+    JSON.stringify(item.payload)===JSON.stringify(prior.payload));
+   if(!current||!pending||
+      ['id','name','originalTimeStr','desiredTimeStr','desiredStatus'].some(k=>
+       String(current[k]||'')!==String(prior[k]||''))||
+      JSON.stringify(current.candidates)!==JSON.stringify(prior.candidates))
+    throw new Error('正式主表的重複打卡或草稿內容已變更，沒有撤回任何修改；請重新核對全部');
+   selected.push({key:prior.key,payload:prior.payload});
+  }
+  if(!selected.length)throw new Error('沒有可核對的重複紀錄草稿');
+  if(!confirm('這 '+selected.length+' 筆仍有多筆相同編號的正式打卡，無法安全套用原修改。'+
+   '你確定目前以正式雲端資料為準，放棄這些尚未送出的修改嗎？系統會保留可恢復的草稿備份，並從待同步移出；正式打卡一筆也不會改。')){
+   status.textContent='已取消撤回，全部原修改均保留。';return;
+  }
+  const outcome=window.p79V5WithdrawPausedWrites(selected);
+  if(Number(outcome?.count)!==selected.length)throw new Error('草稿備份數量與預期不同，請重新查看明細');
+  ambiguousPausedBatch=[];show(false);
+  p79ReviewNext('✅ 已備份並撤回 '+outcome.count+' 筆重複編號草稿；雲端正式考勤維持原樣。');
+ }catch(error){
+  status.textContent='重複編號草稿整理未完成：'+String(error?.message||error)+
+   '。請重新核對正式時間，勿清除瀏覽器資料。';
+ }finally{reviewBusy=false;button.disabled=false;inspectorQueueSnapshot=queueSnapshot();}
+}
 async function handleInspectorClick(event){
  const button=event.target.closest('button');if(!button)return;
  if(button.hasAttribute('data-keep-cloud-verified-batch')){void keepVerifiedCloudBatch(button);return;}
+ if(button.hasAttribute('data-keep-cloud-ambiguous-batch')){void keepAmbiguousCloudBatch(button);return;}
  if(button.hasAttribute('data-review-next')){
   if(!reviewBusy&&!auditBusy){const next=shownDrafts.keys().next().value;if(next)void reviewEntry(next);}return;
  }
