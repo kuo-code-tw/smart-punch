@@ -27,8 +27,8 @@ for(const p of ['aqc-efficiency','history-data','hr','leave','schedule','work-ho
  const html=fs.readFileSync(p+'/index.html','utf8');
  assert(html.includes('port79-seven-top.css?v=20261024-unified-status-icons&menuhover=20261026a'),p+' must reload fixed shared menu style');
 }
-for(const p of ['hr','leave','schedule','work-hours']){
+for(const [p,version] of Object.entries({"hr":"20261104-save-preflight-sync-v1&recovery=20261113-r3","leave":"20261119-overtime-safe-queue-date-names-v2","schedule":"20261108-config-authority-v2&recovery=20261113-r3&monthlyPlan=20261124-v4","work-hours":"20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v7-write-priority"})){
  const html=fs.readFileSync(p+'/index.html','utf8');
- assert(/port79-overtime-report\.js\?v=[^"']*&role20261026=1/.test(html),p+' must reload auto job-role module');
+ assert(html.includes('port79-overtime-report.js?v='+version+'"'),p+' must load the current shared auto job-role module');
 }
 console.log('PASS overtime worker-role prefill, short label, shared seven-system function menu hover, and cache versions');

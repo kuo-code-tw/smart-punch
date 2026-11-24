@@ -19,8 +19,8 @@ assert.equal(c.chooseBetter(full,midnight).timeStr,midnight.timeStr,'genuine exp
 for(const other of [{...damaged,attNo:'other'},{...damaged,status:'OUT'},{...damaged,id:'other'}])assert.equal(c.p79AttendancePreciseVersion(full,other),null,'cannot infer from another event');
 const core=fs.readFileSync('assets/port79-attendance-core.js','utf8');
 const ds=core.indexOf('function mergeDeltaEvent(event){'),de=core.indexOf('\nasync function pollDelta(',ds);
-Object.assign(c,{records:[full],confirmCloudRecord:()=>{},pendingForId:()=>false});vm.runInContext(core.slice(ds,de),c);
-assert.equal(c.mergeDeltaEvent({kind:'upsert',record:damaged}),true);assert.equal(c.records[0].timeStr,full.timeStr);
+let acknowledgements=0;Object.assign(c,{records:[full],confirmCloudRecord:()=>{acknowledgements++},pendingForId:()=>false});vm.runInContext(core.slice(ds,de),c);
+assert.equal(c.mergeDeltaEvent({kind:'upsert',record:damaged}),false,'discarded date-only version does not trigger a redundant repaint');assert.equal(acknowledgements,1,'ignored delta is still acknowledged');assert.equal(c.records[0].timeStr,full.timeStr);
 c.mergeDeltaEvent({kind:'upsert',record:midnight});assert.equal(c.records[0].timeStr,midnight.timeStr);
 const engine=require('../attendance/v6-engine.js');
 assert.equal(engine.normalizeTime('2026/10/10'),'2026/10/10');
