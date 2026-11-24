@@ -3,7 +3,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const code=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
 const a=code.indexOf('function isReadOnlySource()'),b=code.indexOf('function visibleExistingRows()',a);
 assert(a>=0&&b>a,'automatic prior-month confirmation helpers exist');
-const ctx={snapshot:{provisional:false,readOnlyDueAttendance:false},
+const ctx={snapshot:{provisional:false,readOnlyDueAttendance:false,attendanceEvidence:{complete:true}},
  autoPlan:true,loadedMonth:'2026-10',today:()=> '2026-11-01',
  model:{rows:[
  {empId:'FL01',date:'2026-10-15',checked:false,saved:false,planned:false},
@@ -19,9 +19,9 @@ ctx.snapshot.readOnlyDueAttendance=true;ctx.model.rows[0].checked=false;
 ctx.autoSelectVerifiedHistory();assert.equal(ctx.model.rows[0].checked,false,'missing evidence prevents preselection');
 ctx.snapshot.readOnlyDueAttendance=false;ctx.snapshot.provisional=true;
 ctx.autoSelectVerifiedHistory();assert.equal(ctx.model.rows[0].checked,false,'provisional archive remains read-only');
-ctx.snapshot.provisional=false;ctx.loadedMonth='2026-11';
+ctx.snapshot.provisional=false;ctx.snapshot.attendanceEvidence.complete=false;ctx.autoSelectVerifiedHistory();assert.equal(ctx.model.rows[0].checked,false,'incomplete evidence without legacy flags prevents preselection');ctx.snapshot.attendanceEvidence.complete=true;ctx.loadedMonth='2026-11';
 assert.equal(ctx.autoHistoricalReady(),false,'no automatic current/future formal submission');
-assert(code.includes("if(autoPlan&&!autoHistoricalReady())return q('#mrSavePlans').onclick();"),
+assert(code.includes("if(!hasFormal&&autoPlan&&!autoHistoricalReady())return q('#mrSavePlans').onclick();"),
  'historical automatic selection must enter the existing formal verification flow');
 assert(code.includes('if(context.historical&&!confirm('),
  'cross-month formal submission requires one explicit approval');
@@ -31,6 +31,6 @@ assert(code.includes('if(meta.overtimeReport||meta.overtime||meta.forEmpId'),
  'existing declarations can never be duplicated');
 assert(code.includes('if(result?.ok!==true||result.directOvertimeSaved!==true'),
  'backend acknowledgment is checked');
-assert(code.includes("if(report?.id===r.id&&report.category===r.category"),
+assert(code.includes("if(report?.id===r.id&&report.planned!==true&&report.category===r.category"),
  'post-write confirmation requires cloud readback');
 console.log('PASS historical auto mode: all genuine candidates preselected, one existing batch submit, no implicit writes, verified readback and read-only guard');

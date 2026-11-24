@@ -1001,7 +1001,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v13';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v14';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1030,7 +1030,7 @@ async function open(settings={}){
  function isReadOnlySource(){return snapshot?.provisional===true||snapshot?.readOnlyDueAttendance===true;}
  function autoHistoricalReady(){return autoPlan&&loadedMonth<today().slice(0,7);}
  function autoSelectVerifiedHistory(){
-  if(!autoHistoricalReady()||isReadOnlySource())return;
+  if(!autoHistoricalReady()||isReadOnlySource()||snapshot?.attendanceEvidence?.complete!==true)return;
   for(const row of model?.rows||[])if(!row.saved&&!row.planned)row.checked=true;
  }
  function visibleExistingRows(){const ids=new Set(chosenPeople().map(e=>id(e.empId)));
@@ -1433,6 +1433,7 @@ async function open(settings={}){
   try{
    setStatus('正在重新核對未休額度與已申報紀錄…');
    const fresh=await a.snapshot(loadedMonth,false,false,true),available=new Map(),usage=new Map();batch=fresh.saveContext;
+   if(fresh?.provisional===true||fresh?.readOnlyDueAttendance===true||fresh?.attendanceEvidence?.complete!==true)throw Error('正式考勤尚未完整核對，本次未送出正式申報');
    for(const emp of loadedPeople.filter(emp=>selected.some(r=>id(r.empId)===id(emp.empId)))){const roster=fresh.schedules.find(x=>id(x.empId)===id(emp.empId))?.schedule;if(!roster)throw Error(emp.name+' 班表已變更，請重新讀取');available.set(id(emp.empId),balance(emp,roster,loadedMonth,fresh).remaining);}
    for(const r of selected){const roster=fresh.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule,meta=roster?.__meta?.[r.date]||{};
     if(meta.overtimeReport?.id===r.id&&meta.overtimeReport.planned!==true&&meta.overtimeReport.category===r.category&&meta.overtimeReport.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.checked=false;r.status='已核對儲存成功';continue;}
