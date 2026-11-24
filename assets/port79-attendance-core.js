@@ -382,7 +382,7 @@ async function p79ReadAttendanceEditCloud(id,signal,context=null){
   if(sameId.length>1&&p79EveryDuplicateAttendanceRowAlreadySaved(
     context?.record?context:{record:expected},sameId))return unique[0];
   if(!sameId.length)throw Object.assign(new Error('正式月份主表已無此紀錄，舊修改已停止送出'),{retryable:false,recordAbsent:true,checkedMonths:months});
-  if(sameId.length>1)throw Object.assign(new Error('正式主表有多筆共用紀錄編號的考勤，時間或人員資料無法唯一對應。請在待同步明細查看各筆雲端時間，原修改草稿保留；不得強制重送'),{retryable:false,ambiguousRecords:true});
+  if(sameId.length>1)throw Object.assign(new Error('正式主表有多筆共用紀錄編號的考勤，無法唯一確認班次或時間。請在待同步明細查看各筆雲端時間，原修改草稿保留；不得強制重送'),{retryable:false,ambiguousRecords:true});
   throw Object.assign(new Error('正式主表找不到身分及完整時間相符的考勤，修改草稿已保留'),{retryable:false});
  }
  const response=await fetch(url+(url.includes('?')?'&':'?')+'action=getAttendanceWriteStatus&ids='+encodeURIComponent(id)+'&token='+encodeURIComponent(token())+'&t='+Date.now(),{cache:'no-store',signal});
