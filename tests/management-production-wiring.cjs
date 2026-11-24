@@ -5,8 +5,8 @@ assert.equal(read('assets/port79-data-cache.js'),read('integration-test/data-cac
 for(const system of ['hr','attendance','leave','schedule','work-hours','aqc-efficiency','history-data']){
  const html=read(system+'/index.html');
  assert(html.includes('<script>window.P79ManagementOptimizationMode=true;</script>'),system+' opt-in');
- assert.equal((html.match(/assets\/port79-management-link\.js\?v=(?:20261017\.official1|20261019-group-explicit)/g)||[]).length,1,system+' one bridge');
- assert(/\/smart-punch\/assets\/port79-data-cache\.js\?v=[^"'\s<>]+/.test(html),system+' versioned cache');
+ assert.equal((html.match(/assets\/port79-management-link\.js\?v=(?:20261017\.official1|20261019-group-explicit|20261105\.1-20261017\.official1)[^"']*&syncfix=20261114-no-loop-v1"/g)||[]).length,1,system+' one current bridge');
+ assert.equal((html.match(/(?:\/smart-punch\/|\.\.\/)assets\/port79-data-cache\.js\?v=20261123-quick-preload-shared-v1&bg=20261123-progress-v1[^"']*"/g)||[]).length,1,system+' one current versioned cache');
  assert(!html.includes('window.P79ManagementTestMode=true'),system+' production transport');
  assert(!html.includes('stage-navigation.js'),system+' production navigation');
  for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(script[1].trim())new vm.Script(script[1],{filename:system});
