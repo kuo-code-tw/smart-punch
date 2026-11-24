@@ -33,7 +33,10 @@
   // Do not silently replace typhoon/election reports with ordinary 國 rules.
   if(/^[颱選]/.test(code))return candidate.startsWith(code[0]);
   if(String(report.category)==='國'&&/^[颱選]/.test(candidate))return false;
-  if(report.typeName&&row[9]&&String(report.typeName)!==String(row[9]))return false;
+  const api=g.P79Overtime;
+  const canonical=api?.canonicalType||((x)=>String(x||'').trim());
+  const effectiveType=api?.ruleType?.(row)||row[9]||'';
+  if(report.typeName&&effectiveType&&canonical(report.typeName)!==canonical(effectiveType))return false;
   return true;
  }
  function resolve(input){
@@ -56,11 +59,12 @@
      (!Number.isFinite(limit)||x.span.end<=limit)&&start<=x.span.start+TOL);
    if(category==='延'&&typeof g.P79Overtime?.inferRule==='function'){
     // Extended-day rules include normal-shift anchors. Reuse their validator.
-    const chosen=g.P79Overtime.inferRule(start,end,date,rows.filter(r=>r?.[0]==='延'),category);
-    if(chosen)ranked=eligible.filter(x=>x.row[0]===chosen[0]&&x.row[1]===chosen[1]&&
-     String(x.row[8])===String(chosen[8])&&
+    const chosen=g.P79Overtime.inferRule(start,end,date,eligible.map(x=>x.row),category);
+    ranked=chosen?eligible.filter(x=>x.row[0]===chosen[0]&&x.row[1]===chosen[1]&&
+     String(x.row[8])===String(chosen[8])&&minute(x.row[4])===minute(chosen[4])&&
+     minute(x.row[5])===minute(chosen[5])&&
      minute(x.row[6])===minute(chosen[6])&&minute(x.row[7])===minute(chosen[7]))
-      .map(x=>({...x,diff:0}));
+      .map(x=>({...x,diff:0})):[];
    }
   }else if(hasIn&&!hasOut&&input?.attendanceIssue!=='pairing'){
    ranked=eligible.map(x=>({...x,diff:Math.abs(start-x.span.start)}))

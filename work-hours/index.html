@@ -7,7 +7,7 @@
 <script defer src="../assets/port79-hidden-job-titles.js?v=20261117-hr-hidden-v1&refresh=20261118-stable-v1"></script>
 <script defer src="../assets/port79-workhours-hidden-job-ui.js?v=20261117-hr-filter-v1&refresh=20261118-stable-v1"></script>
 <script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v4"></script>
-<script src="../assets/port79-overtime-shift-match.js?v=20261027-all-overtime-periods-v2"></script>
+<script src="../assets/port79-overtime-shift-match.js?v=20261124-planned-review-v3"></script>
 <script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
 
@@ -14494,9 +14494,9 @@ function p79OvertimePeriodLabel(report){
                 p79OvertimeAttendanceIssue(row,start,end))return null;
             const match=p79ResolvePlannedOvertimePeriod(row);
             if(match?.state!=='completed'||match.confirmed!==true||!match.suggested)return null;
-            const rules=window.P79Overtime?.reportRules?.()||[];
-            const roster=p79WorkOvertimeRoster(row.empId,date);
             const api=window.P79Overtime,matcher=window.P79OvertimeShiftMatch;
+            const rules=api.activeReportRules();
+            const roster=p79WorkOvertimeRoster(row.empId,date);
             const matchedRules=rules.filter(rule=>{
                 if(rule?.[0]!==match.suggested.category||rule[1]!==match.suggested.code||
                    matcher.minute(rule[6])!==matcher.minute(match.suggested.overtimeStart)||
@@ -14580,7 +14580,7 @@ function p79OvertimePeriodLabel(report){
             p79RefreshPlannedBulkControls();
         }
         async function p79ConfirmPlannedOvertimeCandidate(item){
-            const original=item.report,rule=window.P79Overtime.report(item.rule);
+            const api=window.P79Overtime,original=item.report,rule=api.report(item.rule);
             const draft={
                 id:String(original.id),empId:item.row.empId,date:item.date,rule,coverDate:original.coverDate||item.date,overtimeDate:original.overtimeDate||item.date,
                 manualPlan:false,preventReplace:true,plannedReview:true,
@@ -14591,8 +14591,21 @@ function p79OvertimePeriodLabel(report){
                 leaveHandoffId:String(original.leaveId||''),
                 note:String(original.note||''),autoSave:true
             };
+            // Direct and batch review must follow the same fresh official
+            // conversion-table check as the individual report editor.
+            const validation=await api.prepareSaveValidation(draft,true);
+            const active=api.activeReportRows(validation.rules.rows,validation.rules.config);
+            if(!active.some(r=>JSON.stringify(api.report(r))===JSON.stringify(rule)))
+                throw Error('雲端加班時段或換算已變更，請重新讀取後核對');
+            const saved=validation.cloud.schedules.find(r=>String(r.empId).trim().toUpperCase()===String(draft.empId).trim().toUpperCase())?.schedule?.__meta?.[draft.date]?.overtimeReport;
+            if(!saved||String(saved.id)!==draft.id||
+                String(saved.leaveId||'')!==draft.leaveHandoffId||
+                String(saved.coverDate||draft.date)!==draft.coverDate||
+                String(saved.overtimeDate||draft.date)!==draft.overtimeDate||
+                (saved.forEmpId&&String(saved.forEmpId).trim().toUpperCase()!==draft.forEmpId.trim().toUpperCase()))
+                throw Error('原預排或代班關聯已變更，請重新讀取核對');
             const result=await p79SaveWorkOvertimeDraft(draft);
-            window.P79Overtime.verifySavedReport(draft,result);
+            api.verifySavedReport(draft,result);
             if(result?.ok!==true||result.directOvertimeSaved!==true||
                 String(result.id)!==draft.id||result.report?.planned!==false)
                 throw Error('雲端未確認原報單解除預排狀態');
