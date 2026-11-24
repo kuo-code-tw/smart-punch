@@ -24,7 +24,8 @@ c.switchRoleTab('AQC');assert.equal(c.isScheduleRoleRosterCollapsed('AQC'),false
 c.setScheduleRoleRosterCollapsed(true,'F/L');c=load();assert.equal(c.isScheduleRoleRosterCollapsed('F/L'),true,'reopen loads per-role collapse state');
 assert.equal(c.isScheduleRoleRosterCollapsed('AQC'),false,'each role persists independently');
 c.switchRoleTab('F/L');assert.equal(c.isScheduleRoleRosterCollapsed('F/L'),false,'selecting a role opens it');
-c.p79ScheduleHiddenJobTitles.add('AQC');c.switchRoleTab('AQC');assert.equal(c.activeRoleTab,'F/L','hidden titles do not open');
+c.p79ScheduleHiddenJobTitles.add('AQC');const beforeHidden=renders;c.switchRoleTab('AQC');assert.equal(c.activeRoleTab,'F/L','hidden titles do not open');assert.equal(renders,beforeHidden,'denied title must not cause a render');
+c.setScheduleRoleRosterCollapsed(true,'F/L');assert.equal(renders,beforeHidden+1,'explicit collapse renders once');
 stored.set(key,'{invalid');c=load();assert.equal(c.isScheduleRoleRosterCollapsed('ALL'),false,'malformed browser preference safely ignored');
 assert(renders>=8);
 console.log('PASS explicit role collapse persists; clicking roles opens roster; hidden titles blocked and corrupt storage is safe');
