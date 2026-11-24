@@ -14,7 +14,7 @@ async function check(page,matcher,report){
  const window={p79OvertimeContext:{config:()=>config}};
  new Function('window',report)(window);new Function('window',matcher)(window);
  const api=window.P79Overtime, rules=api.reportRules();
- let p79PlannedBulkBusy=false,p79OvertimeCalculationCache=null,p79PlannedBulkSelected=new Set(),p79OvertimePlannedFilteredRows=[],p79OvertimePlannedDisplayedRows=[],p79WorkOvertimeDisplayedRows=[];
+ let p79OvertimeWritePriority=0,p79PlannedBulkBusy=false,p79OvertimeCalculationCache=null,p79PlannedBulkSelected=new Set(),p79OvertimePlannedFilteredRows=[],p79OvertimePlannedDisplayedRows=[],p79WorkOvertimeDisplayedRows=[];
  const p79CanReportOvertime=()=>true,p79OvertimeCoverDateWarning=()=>null,p79OvertimePendingReason=()=>({code:'review'}),p79DirectAttendanceTimestamp=x=>Date.parse(x.timeStr),p79OvertimeAttendanceIssue=()=>'',p79WorkOvertimeRoster=()=>({}),normalizeScheduleDateKey=x=>x;
  const p79ResolvePlannedOvertimePeriod=row=>window.P79OvertimeShiftMatch.resolve({date,roster:{},report:row.overtimeReport,rules,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)});
  const document={querySelectorAll:()=>[],getElementById:()=>null};
