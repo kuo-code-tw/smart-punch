@@ -1,0 +1,35 @@
+name: Verify paused attendance conflict resolution
+on:
+  pull_request:
+    paths:
+      - 'attendance/index.html'
+      - 'assets/port79-attendance-core.js'
+      - 'tests/attendance-paused-conflict-workflow.cjs'
+      - 'tests/attendance-paused-review.cjs'
+      - 'tests/attendance-paused-batch-audit.cjs'
+      - '.github/workflows/attendance-paused-conflict-review.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'attendance/index.html'
+      - 'assets/port79-attendance-core.js'
+      - 'tests/attendance-paused-conflict-workflow.cjs'
+      - '.github/workflows/attendance-paused-conflict-review.yml'
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate safe stale-draft handling and visible conflict choices
+        run: |
+          node tests/attendance-edit-sync.cjs
+          node tests/attendance-paused-review.cjs
+          node tests/attendance-paused-batch-audit.cjs
+          node tests/attendance-withdraw-drafts.cjs
+          node tests/attendance-paused-conflict-workflow.cjs
