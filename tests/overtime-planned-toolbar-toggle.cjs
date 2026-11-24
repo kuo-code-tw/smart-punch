@@ -28,11 +28,12 @@ const dialog={
  showModal(){if(this.open)throw Error('already open');this.open=true;showCount++;},
  close(){if(!this.open)throw Error('already closed');this.open=false;closeCount++;}
 };
-const ctx={document:{getElementById:id=>id==='p79OvertimePlannedDialog'?dialog:id==='p79OvertimePlannedToggle'?button:null}};
+const notices=[];const ctx={p79PlannedBulkBusy:false,p79PlannedPunchNotice:(...args)=>notices.push(args),document:{getElementById:id=>id==='p79OvertimePlannedDialog'?dialog:id==='p79OvertimePlannedToggle'?button:null}};
 vm.createContext(ctx);vm.runInContext(code,ctx);
 ctx.p79ToggleOvertimePlanned();
 assert.equal(dialog.open,true,'toolbar opens centered native modal');
 assert.equal(attrs.get('aria-expanded'),'true','button shows modal-open state');
+ctx.p79PlannedBulkBusy=true;ctx.p79ToggleOvertimePlanned();assert.equal(dialog.open,true,'batch write cannot be interrupted by close');assert.equal(notices.length,1);let prevented=false;ctx.p79PlannedDialogCancel({preventDefault(){prevented=true}});assert.equal(prevented,true,'Escape cannot interrupt active batch write');ctx.p79PlannedBulkBusy=false;
 ctx.p79ToggleOvertimePlanned();
 assert.equal(dialog.open,false,'toolbar can close native modal');
 assert.equal(attrs.get('aria-expanded'),'false','button shows modal-closed state');
