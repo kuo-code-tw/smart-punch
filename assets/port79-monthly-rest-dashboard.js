@@ -30,6 +30,13 @@ function compactRosterStatus(row){
  if(!row.suggestions?.length)return '無建議';
  return [...new Set(row.suggestions.map(suggestionStatus))].join('／');
 }
+function quotaProgressLabel(progress,preview=false){
+ if(!progress)return '';
+ return ['例','休','國'].map(c=>{
+  const p=progress[c];if(!p)return c+'—';
+  return c+(preview?p.afterConfirmed:p.confirmed)+'/'+(preview?p.afterRemaining:p.remaining);
+ }).join('／');
+}
 function sourceRows(el){
  const ready=$$(el,'#mrRows tr[data-row]').map(tr=>{
   const td=tr.cells,pick=$(tr,'.pick');
@@ -66,10 +73,11 @@ function sourceRows(el){
   const reviewType=due===null?'missing':due>0?'deficit':'exception';
   // Zero remaining quota does not mean the source has no attendance exception.
   // The controller already excludes people with no deficit and no exceptions.
+  let quotaProgress=null;try{quotaProgress=JSON.parse(tr.dataset?.quotaProgress||'null');}catch{}
   let suggestions=[];try{const parsed=JSON.parse(tr.dataset?.periodSuggestions||'[]');if(Array.isArray(parsed))suggestions=parsed.filter(x=>x&&typeof x.date==='string'&&typeof x.period==='string'&&x.period.trim());}catch{}
   if(reviewType!=='deficit')suggestions=[];
   const period=suggestions.length?suggestions.map(suggestionText).join('；'):reviewType==='deficit'?'無建議時段':'—';
-  roster.set(id.toUpperCase(),{kind:'roster',id,date:'',lastReported:tr.dataset?.lastReported||'',nextReportDate:tr.dataset?.nextReportDate||'',name:td[3]?.textContent?.trim()||'',role:td[2]?.textContent?.trim()||'',category:reviewType==='missing'?'尚無法計算':reviewType==='exception'?'無缺額':quota,period,suggestions,canPreplan:reviewType==='deficit'&&tr.dataset?.canPreplan==='true',hours:'—',reviewType,due,status:reviewType==='missing'?'缺資料':reviewType==='deficit'?'未休缺額':'出勤／申報待核對',source:reason,checked:false,disabled:true});
+  roster.set(id.toUpperCase(),{kind:'roster',id,date:'',lastReported:tr.dataset?.lastReported||'',nextReportDate:tr.dataset?.nextReportDate||'',name:td[3]?.textContent?.trim()||'',role:td[2]?.textContent?.trim()||'',category:reviewType==='missing'?'尚無法計算':reviewType==='exception'?'無缺額':quota,quotaProgress,period,suggestions,canPreplan:reviewType==='deficit'&&tr.dataset?.canPreplan==='true',hours:'—',reviewType,due,status:reviewType==='missing'?'缺資料':reviewType==='deficit'?'未休缺額':'出勤／申報待核對',source:reason,checked:false,disabled:true});
  }
  return {ready,planned,prior,roster:[...roster.values()]};
 }
@@ -81,7 +89,7 @@ function dailyPendingRows(data){
  const dated=new Map(),result=[];
  for(const row of [...data.ready,...data.planned]){
   const person=people.get(String(row.empId||'').trim().toUpperCase());
-  const item={...row,role:person?.role||row.role||'',quota:person?.category||'',lastReported:person?.lastReported||''};
+  const item={...row,role:person?.role||row.role||'',quota:person?.category||'',quotaProgress:person?.quotaProgress||null,lastReported:person?.lastReported||''};
   // The real dated row takes precedence over the person's preview of it.
   const k=key(row.empId||row.audit||row.name,row.date);
   if(dated.has(k))continue;
@@ -95,7 +103,7 @@ function dailyPendingRows(data){
    if(dated.has(k))continue;
    const item={kind:'reference',id:person.id,empId:person.id,date:hint.date,name:person.name,role:person.role,
     category:hint.category||String(hint.period||'').match(/^[休例國]/)?.[0]||'',period:suggestionPeriod(hint),
-    quota:person.category,lastReported:person.lastReported,hours:'—',status:'待核對',source:hint.note||person.source,
+    quota:person.category,quotaProgress:person.quotaProgress||null,lastReported:person.lastReported,hours:'—',status:'待核對',source:hint.note||person.source,
     checked:false,disabled:true,reviewType:'deficit',canPreplan:false};
    covered.add(hint.date);dated.set(k,item);result.push(item);
   }
@@ -340,6 +348,8 @@ function mount(el){
    if(state.tab!=='pending'){q('#mrUxSavePlan').disabled=true;q('#mrUxSubmit').disabled=true;}
    q('#mrUxHint').textContent=state.tab==='audit'?'異常核對唯讀，不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
    q('#mrUxRows').innerHTML=shown.map(r=>{
+    const quota=r.quotaProgress,quotaNow=quotaProgressLabel(quota),quotaAfter=quotaProgressLabel(quota,true);
+    const hasPreview=quota&&Object.values(quota).some(p=>p.selected>0);
     const type=kind(r),status=label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
     const id=esc(r.id),kindKey=esc(r.kind),key=esc(selectionKey(r));
     const operations=r.kind==='roster'&&r.canPreplan&&!originalMonth.disabled?
@@ -348,7 +358,7 @@ function mount(el){
      '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
       'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.suggestions?.length===1?r.suggestions[0].date:r.date||(r.residualOnly?'未安排':'—'))+(r.lastReported?'<small style="display:block;color:#526e91">最近正式報單 '+esc(r.lastReported.slice(5))+'</small>':'')+'</td><td>'+esc(r.name)+(r.role?'<small style="display:block;color:#64748b">'+esc(r.role)+(r.kind==='roster'?'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對'):'')+'</small>':'')+'</td>'+
-      '<td><span class="mr-ux-kind">'+esc(r.category)+'</span>'+(r.quota?'<small style="display:block;color:#64748b;margin-top:4px">'+esc(r.quota)+'</small>':'')+'</td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>'+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
+      '<td><span class="mr-ux-kind">'+esc(r.category)+'</span>'+(quotaNow?'<small style="display:block;color:#475569;margin-top:4px" title="已正式申報／剩餘缺額（天）">'+esc(quotaNow)+'</small>'+(hasPreview?'<small style="display:block;color:#075985;font-weight:700" title="勾選項目成功申報後的預計數字">申報後 '+esc(quotaAfter)+'</small>':''):r.quota?'<small style="display:block;color:#64748b;margin-top:4px">'+esc(r.quota)+'</small>':'')+'</td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>'+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
       '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
    q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+(state.tab==='pending'&&audit.some(r=>r.residualOnly)?'｜尚無日期的缺額請見「已預排／待核對」':'');
@@ -496,5 +506,5 @@ function mount(el){
  },{once:true});
  render();
 }
-global.P79MonthlyRestDashboard={mount,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,dailyPendingRows};
+global.P79MonthlyRestDashboard={mount,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,dailyPendingRows,quotaProgressLabel};
 })(window,document);

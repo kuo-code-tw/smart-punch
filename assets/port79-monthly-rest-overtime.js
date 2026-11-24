@@ -202,7 +202,9 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  for(const c of cats){const excess=off[c]+reported[c]+reserved[c]-counts[c];if(excess>0)conflicts.push({date:'',reason:c+'已休、預排休與已申報合計超出額度'+excess+'天，請核對既有申報或排休'});}
  const remaining=Object.fromEntries(cats.map(c=>[c,Math.max(0,counts[c]-off[c]-reported[c]-reserved[c])]));
  const unused=Object.fromEntries(cats.map(c=>[c,Math.max(0,counts[c]-off[c]-reserved[c])]));
- return {quota:counts,off,reported,reserved,unused,remaining,dates,typhoonDates:[...typhoonProtected],conflicts,ledger:ledger.sort((a,b)=>a.date.localeCompare(b.date))};
+ // Distinguish saved plans and pending evidence from verified formal filings.
+ const formalReported=Object.fromEntries(cats.map(c=>[c,ledger.filter(x=>x.category===c&&x.kind==='reported'&&roster.__meta?.[x.date]?.overtimeReport?.planned!==true).length]));
+ return {quota:counts,off,reported,formalReported,reserved,unused,remaining,dates,typhoonDates:[...typhoonProtected],conflicts,ledger:ledger.sort((a,b)=>a.date.localeCompare(b.date))};
 }
 
  // 未休假加班只接受申報時數與時段均為 8 小時的正式規則。
@@ -714,7 +716,9 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
 function personPeriodSuggestions(model,empId,asOf=today()){
  const key=id(empId),balanceRow=model?.balances?.find(b=>id(b.emp.empId)===key);
  if(!balanceRow)return {suggestions:[],reason:'缺少正式班表，無法建議日期'};
- const remaining={...balanceRow.remaining},used=new Set(),suggestions=[];
+ const progress=reportProgress(model,empId);
+ const remaining=Object.fromEntries(cats.map(c=>[c,progress[c].remaining]));
+ const used=new Set((model.rows||[]).filter(r=>id(r.empId)===key&&r.saved).map(r=>r.date)),suggestions=[];
  const add=(r,planned)=>{
   if(id(r.empId)!==key||r.saved||r.date<(balanceRow.nextReportDate||'')||!(remaining[r.category]>0)||used.has(r.date)||!r.rule||!fullDayRule(r.rule))return;
   if(!planned&&r.status!=='可申報')return;
@@ -742,7 +746,8 @@ function rosterReviewRows(model,staff){
  return (staff||[]).map(emp=>{
   const key=id(emp.empId),b=balances.get(key),role=String(emp.jobTitle||emp.deptDetail||'未設定'),isFL=/F\s*[\/／]\s*L/i.test(role);
   if(!b)return unavailable.has(key)?{emp,role,isFL,missing:true,reason:unavailable.get(key),remaining:{例:0,休:0,國:0},eligible:0,unreported:0,pending:0}:null;
-  const remaining=Object.fromEntries(cats.map(c=>[c,Math.max(0,Number(b.remaining?.[c])||0)]));
+  const progress=reportProgress(model,emp.empId);
+  const remaining=Object.fromEntries(cats.map(c=>[c,progress[c].remaining]));
   const due=cats.reduce((n,c)=>n+remaining[c],0);
   const unreported=(b.ledger||[]).filter(x=>x.kind==='workedRestUnreported').length;
   const pending=(b.ledger||[]).filter(x=>x.kind==='reportedPendingAttendance').length;
@@ -810,11 +815,22 @@ function manualPlanSelectable(x,month,asOf=today()){
 function reportProgress(model,empId=null){
  const result=Object.fromEntries(cats.map(c=>[c,{remaining:0,selected:0,saved:0,after:0,over:0}]));
  for(const b of model.balances.filter(b=>empId==null||id(b.emp.empId)===id(empId)))for(const c of cats){
-  const rows=model.rows.filter(r=>id(r.empId)===id(b.emp.empId)&&r.category===c),saved=rows.filter(r=>r.saved).length,selected=rows.filter(r=>r.checked&&!r.saved).length;
-  const remaining=Math.max(0,b.remaining[c]-saved),t=result[c];
+  const rows=(model.rows||[]).filter(r=>id(r.empId)===id(b.emp.empId)&&r.category===c&&!r.planned),saved=rows.filter(r=>r.saved).length,selected=rows.filter(r=>r.checked&&!r.saved).length;
+  const remaining=Math.max(0,(Number(b.remaining?.[c])||0)-saved),t=result[c];
   t.remaining+=remaining;t.selected+=selected;t.saved+=saved;t.after+=Math.max(0,remaining-selected);t.over+=Math.max(0,selected-remaining);
  }
  return result;
+}
+// The displayed numerator is verified formal reports, not saved plans.
+function personQuotaProgress(model,empId){
+ const b=model?.balances?.find(b=>id(b.emp.empId)===id(empId));
+ if(!b)return null;
+ const p=reportProgress(model,empId);
+ return Object.fromEntries(['例','休','國'].map(c=>{
+  const confirmed=(Number((b.formalReported||b.reported)?.[c])||0)+p[c].saved;
+  const selected=Math.min(p[c].remaining,p[c].selected);
+  return [c,{confirmed,remaining:p[c].remaining,selected,afterConfirmed:confirmed+selected,afterRemaining:p[c].after}];
+ }));
 }
 function personSummary(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
@@ -981,7 +997,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-cutoff-references-v11';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v12';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1174,7 +1190,7 @@ async function open(settings={}){
      const canPreplan=canManual&&!unverifiedSource&&(Number(x.remaining.休)>0||Number(x.remaining.國)>0);
      const pick=autoPlan?'<input type="checkbox" class="need-plan" data-emp="'+esc(x.emp.empId)+'" aria-label="勾選 '+esc(x.emp.name)+' 的自動預排" '+(plans.length&&plans.every(r=>r.checked)?'checked ':'')+(!plans.length||busy?'disabled':'')+'>':
       '<input type="checkbox" class="need-plan manual-person-pick" data-emp="'+esc(x.emp.empId)+'" aria-label="手動預排勾選 '+esc(x.emp.name)+'" '+(manualPeople.has(id(x.emp.empId))?'checked ':'')+(!canManual||busy?'disabled':'')+' title="'+(canManual?'勾選後指定日期與時段；不會自動申報':'班表不完整、沒有剩餘額度或無可預排的未來日期')+'">';
-     return '<tr data-review-type="'+reviewType+'" data-period-suggestions="'+esc(JSON.stringify(hint.suggestions))+'" data-last-reported="'+esc(hint.lastReported||'')+'" data-next-report-date="'+esc(hint.nextReportDate||'')+'" data-can-preplan="'+String(canPreplan)+'"><td>'+pick+'</td><td>'+esc(x.emp.empId)+'</td><td>'+esc(x.role)+'</td><td>'+esc(x.emp.name)+'</td><td>'+esc(quota)+'</td><td>'+esc(status)+'</td></tr>';
+     return '<tr data-review-type="'+reviewType+'" data-quota-progress="'+esc(JSON.stringify(personQuotaProgress(model,x.emp.empId)))+'" data-period-suggestions="'+esc(JSON.stringify(hint.suggestions))+'" data-last-reported="'+esc(hint.lastReported||'')+'" data-next-report-date="'+esc(hint.nextReportDate||'')+'" data-can-preplan="'+String(canPreplan)+'"><td>'+pick+'</td><td>'+esc(x.emp.empId)+'</td><td>'+esc(x.role)+'</td><td>'+esc(x.emp.name)+'</td><td>'+esc(quota)+'</td><td>'+esc(status)+'</td></tr>';
     }).join('')||'<tr><td colspan="6">目前篩選內無未休額度或待核人員</td></tr>';
    const manualPicked=[...manualPeople.values()];
    q('#mrManualSummary').textContent='手動預排已勾選 '+manualPicked.length+' 人｜請逐人設定日期及時段後儲存';
@@ -1412,7 +1428,7 @@ async function open(settings={}){
    const fresh=await a.snapshot(loadedMonth,false,false,true),available=new Map(),usage=new Map();batch=fresh.saveContext;
    for(const emp of loadedPeople.filter(emp=>selected.some(r=>id(r.empId)===id(emp.empId)))){const roster=fresh.schedules.find(x=>id(x.empId)===id(emp.empId))?.schedule;if(!roster)throw Error(emp.name+' 班表已變更，請重新讀取');available.set(id(emp.empId),balance(emp,roster,loadedMonth,fresh).remaining);}
    for(const r of selected){const roster=fresh.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule,meta=roster?.__meta?.[r.date]||{};
-    if(meta.overtimeReport?.id===r.id&&meta.overtimeReport.category===r.category&&meta.overtimeReport.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.checked=false;r.status='已核對儲存成功';continue;}
+    if(meta.overtimeReport?.id===r.id&&meta.overtimeReport.planned!==true&&meta.overtimeReport.category===r.category&&meta.overtimeReport.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.checked=false;r.status='已核對儲存成功';continue;}
     if(r.date<forwardReportStart(loadedMonth,q('#mrCutoff').value))throw Error(r.name+' 早於你設定的本次申報起日，請重新讀取');
     // Genuine completed attendance remains on its ORIGINAL day even if reported later.
     // The existing-date/report, leave, verified-hours and single-rule checks below stay mandatory.
@@ -1428,7 +1444,7 @@ async function open(settings={}){
    }
    paint();controls(true);
    for(const r of selected){if(stop)break;if(r.saved)continue;setStatus('正在申報 '+(count+1)+'／'+selected.length+'：'+r.name+' '+r.date+' '+r.rule[1]);
-    const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),forEmpId:'',note:backfillContext(loadedMonth).note,preventReplace:true,createdAt:Date.now()};
+    const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),forEmpId:'',note:backfillContext(loadedMonth).note,preventReplace:false,createdAt:Date.now()};
     sessionStorage.setItem(KEY,JSON.stringify(draft));r.attempted=true;r.status='送出中／待雲端讀回';paint();controls(true);
     let result;try{result=await a.saveReport(draft,batch);}catch(error){r.status='未確認成功：'+error.message;paint();controls(true);throw error;}
     if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('雲端尚未確認接收此筆申報');
@@ -1442,7 +1458,7 @@ async function open(settings={}){
     try{
      const verified=await a.snapshot(loadedMonth,true,false,true);
      for(const r of pending){const report=verified.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date]?.overtimeReport;
-      if(report?.id===r.id&&report.category===r.category&&report.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.acknowledged=true;r.checked=false;r.status='雲端讀回已確認';}
+      if(report?.id===r.id&&report.planned!==true&&report.category===r.category&&report.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.acknowledged=true;r.checked=false;r.status='雲端讀回已確認';}
       else{r.checked=true;r.status='讀回未確認；保留原編號重試核對';}
      }
      if(!failure&&pending.every(r=>r.saved))sessionStorage.removeItem(KEY);
@@ -1471,6 +1487,6 @@ async function open(settings={}){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
 
 })(window);
