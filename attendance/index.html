@@ -25348,6 +25348,10 @@ html[data-p79-design=vessel] body #p79OutboxInspectCard :is(td,th){min-width:0!i
 #p79OutboxReview:not(:empty){flex:0 0 auto;max-height:min(40vh,420px);overflow-y:auto;padding:12px 14px;margin:8px 0 12px;border:2px solid #2563eb;border-radius:12px;background:#eff6ff;color:#1e3a8a;box-shadow:0 3px 12px #2563eb18}
 #p79OutboxReview table{margin:8px 0!important;background:#fff}
 #p79OutboxReview button{margin:5px 7px 5px 0!important}
+#p79OutboxReview details{border:1px solid #bfdbfe;border-radius:9px;background:#fff;padding:7px 10px;margin:10px 0}
+#p79OutboxReview summary{cursor:pointer;font-weight:800}
+#p79OutboxReview .p79-batch-decision{background:#dbeafe;border:1px solid #2563eb;border-radius:8px;padding:8px 12px;font-weight:800}
+#p79OutboxReview .p79-batch-decision:disabled{opacity:.5;cursor:wait}
 #p79OutboxInspectBody tr[data-paused-review-row]:focus-within{outline:2px solid #60a5fa;outline-offset:-2px}
 @media(max-width:700px){#p79OutboxReview:not(:empty){max-height:43dvh;padding:10px}#p79OutboxInspectBody{max-height:42dvh}}
 @media(max-width:700px){html[data-p79-design=vessel] body #p79OutboxInspectCard :is(td,th){font-size:11px!important;padding:6px 3px!important}#p79OutboxInspectCard{padding:12px;width:calc(100vw - 16px)}#p79OutboxInspectPanel{padding:8px}}
@@ -25428,6 +25432,7 @@ setInterval(()=>{
  if(!document.hidden)window.p79RefreshAttendanceSyncCompactStatus?.();
 },2000);
 let reviewBusy=false,auditBusy=false;
+let verifiedPausedBatch=[];
 function p79ReviewNext(message){
  const el=document.getElementById('p79OutboxReview');if(!el)return;
  const remaining=shownDrafts.size;
@@ -25445,7 +25450,7 @@ async function auditAllPaused(){
  if(typeof window.p79V5AuditPausedQueue!=='function'){
   el.textContent='同步核對功能尚未載入，請強制重新整理此頁。';return;
  }
- auditBusy=true;if(button)button.disabled=true;
+ auditBusy=true;verifiedPausedBatch=[];if(button)button.disabled=true;
  el.textContent='正在查詢正式月份主表，逐筆核對暫停修改；不會強制寫入。';
  let resolved=0;
  try{
@@ -25462,9 +25467,31 @@ async function auditAllPaused(){
     '｜核對失敗 '+progress.errors;
   });
   show(false);
-  el.textContent='核對完成：已確認同步 '+result.confirmed+' 筆；正式紀錄不存在、已安全備份 '+result.archived+
-   ' 筆；仍需人工核對 '+result.needsReview+' 筆；讀取失敗 '+result.errors+
-   ' 筆。未確認的修改全部保留，不會強制送出。'+(result.lastError?' 最近錯誤：'+result.lastError:'');
+  verifiedPausedBatch=(Array.isArray(result.verifiedConflicts)?result.verifiedConflicts:[])
+   .filter(row=>row&&shownDrafts.has(row.key))
+   .map(row=>({...row,payload:JSON.parse(JSON.stringify(shownDrafts.get(row.key)))}));
+  const overview='已與正式雲端核對：確認完成 '+result.confirmed+' 筆；正式紀錄不存在、已備份 '+result.archived+
+   ' 筆；仍有 '+result.needsReview+' 筆需決定；讀取失敗 '+result.errors+' 筆。';
+  if(verifiedPausedBatch.length){
+   el.innerHTML='<strong>'+safe(overview)+'</strong>'+
+    '<p>下列 '+verifiedPausedBatch.length+' 筆已核實為相同員工、相同打卡紀錄，但雲端與原修改內容不同。' +
+    '不會自動覆蓋。若確認以目前雲端為準，可以一次備份並撤回這些舊修改；若要保留你的修改，請按各筆「核對並處理」。</p>'+
+    '<details><summary>查看已核對的 '+verifiedPausedBatch.length+' 筆雲端與草稿時間差異</summary>'+
+    '<table><thead><tr><th>人員／紀錄 ID</th><th>當初依據</th><th>目前正式雲端</th><th>你要的修改</th></tr></thead><tbody>'+
+    verifiedPausedBatch.map(row=>'<tr><td>'+safe(row.name)+'<small>'+safe(row.id)+'</small></td>'+
+      '<td>'+safe(row.originalTimeStr||'—')+'</td>'+
+      '<td>'+safe(row.cloudTimeStr)+'<small>'+safe(row.cloudStatus)+'</small></td>'+
+      '<td>'+safe(row.desiredTimeStr)+'<small>'+safe(row.desiredStatus)+'</small></td></tr>').join('')+
+    '</tbody></table></details>'+
+    '<button type="button" class="p79-batch-decision" data-keep-cloud-verified-batch>'+
+    '保留正式雲端，備份撤回已核對的 '+verifiedPausedBatch.length+' 筆舊修改</button>'+
+    '<p><small>此操作不會修改正式考勤。未核對成功的其餘項目仍保留，不能混在一起清除。</small></p>'+
+    (result.lastError?'<p>最近錯誤：'+safe(result.lastError)+'</p>':'');
+  }else{
+   el.textContent=overview+' 未確認的修改均已保留。'+
+    (result.needsReview?' 雲端紀錄無法唯一核對，請逐筆選擇「核對並處理」。':'')+
+    (result.lastError?' 最近錯誤：'+result.lastError:'');
+  }
  }catch(error){
   el.textContent='自動核對未完成：'+String(error?.message||error)+'。原始修改仍保留，可按上方重新核對。';
  }finally{
@@ -25511,8 +25538,44 @@ async function reviewEntry(key){
  }catch(error){el.textContent='核對未完成：'+String(error.message||error)+'。修改草稿保留。';}
  finally{reviewBusy=false;}
 }
+async function keepVerifiedCloudBatch(button){
+ if(reviewBusy||auditBusy||!verifiedPausedBatch.length)return;
+ const original=verifiedPausedBatch.slice();
+ const status=document.getElementById('p79OutboxReview');
+ reviewBusy=true;button.disabled=true;
+ try{
+  status.textContent='正在再次核對這批考勤的正式雲端時間，不會修改考勤…';
+  // Re-read official months at the actual decision time. The first audit may
+  // already be old by the time the operator reads all the entries.
+  const refreshed=await window.p79V5AuditPausedQueue();
+  const latest=new Map((refreshed.verifiedConflicts||[]).map(row=>[row.key,row]));
+  const queue=window.p79V5ReadPendingQueue?.()||[];
+  const selected=[];
+  for(const snapshot of original){
+   const current=latest.get(snapshot.key);
+   const pending=queue.find(item=>item.key===snapshot.key&&item.paused&&
+    JSON.stringify(item.payload)===JSON.stringify(snapshot.payload));
+   if(!current||!pending||
+      ['id','originalTimeStr','cloudTimeStr','desiredTimeStr','cloudStatus','desiredStatus','cloudNote','desiredNote'].some(k=>
+       String(current[k]||'')!==String(snapshot[k]||'')))
+    throw new Error('核對期間有雲端時間或草稿變更，請重新核對全部；沒有撤回任何舊修改');
+   selected.push({key:snapshot.key,payload:snapshot.payload});
+  }
+  if(!selected.length)throw new Error('已沒有需要批次撤回的舊修改');
+  if(!confirm('已重新核對 '+selected.length+' 筆。確定以目前正式雲端考勤為準，放棄這些尚未生效的修改？每筆原草稿先備份到此瀏覽器，然後從待同步移除。正式雲端不會被修改。')){
+   status.textContent='已取消批次處理，全部草稿保留。';return;
+  }
+  const result=window.p79V5WithdrawPausedWrites(selected);
+  verifiedPausedBatch=[];show(false);
+  p79ReviewNext('✅ 已保存舊修改備份並從待同步清單移出 '+result.count+' 筆。正式雲端考勤完全未變更。');
+ }catch(error){
+  status.textContent='批次處理未完成：'+String(error?.message||error)+
+   '。未確認的草稿仍保留，請按「重新核對全部」再看最新差異。';
+ }finally{reviewBusy=false;button.disabled=false;inspectorQueueSnapshot=queueSnapshot();}
+}
 async function handleInspectorClick(event){
  const button=event.target.closest('button');if(!button)return;
+ if(button.hasAttribute('data-keep-cloud-verified-batch')){void keepVerifiedCloudBatch(button);return;}
  if(button.hasAttribute('data-review-next')){
   if(!reviewBusy&&!auditBusy){const next=shownDrafts.keys().next().value;if(next)void reviewEntry(next);}return;
  }
