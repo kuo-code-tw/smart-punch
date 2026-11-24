@@ -7,7 +7,9 @@ const sailing = fs.readFileSync('assets/port79-google-sheet-schedule.js','utf8')
 const marker = 'PORT79 2026-11-02 — Public WAN HAI ship schedule dialog readability';
 const begin = css.indexOf(marker);
 assert(begin >= 0, 'public Wan Hai dialog contrast patch exists');
-const patch = css.slice(begin);
+const end = css.indexOf('/* 2026-11-07:',begin);
+assert(end>begin,'isolate the contrast patch from subsequent unrelated styles');
+const patch = css.slice(begin,end);
 const scope = '#p79PublicShipScheduleDialog';
 assert(sailing.includes("dialog.id='p79PublicShipScheduleDialog'"), 'the patched ID is the actual public vessel dialog');
 assert(sailing.includes("['英文船名','中文船名','靠泊碼頭','靠泊時間 ETB','離岸時間 ETD']"), 'four required columns remain');

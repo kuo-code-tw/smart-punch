@@ -30,7 +30,7 @@ console.log(JSON.stringify({passed,failed:0}));
 
 const inverted=[{empId:'E1',clockIn:{empId:'E1',timeStr:'2026/10/09 23:36'}},{empId:'E1',clockOut:{empId:'E1',timeStr:'2026/10/09 07:48'}}];
 const marked=c.p79MarkAttendanceDateConflicts(inverted);
-assert(marked.every(r=>c.p79AttendanceRowAssessment(r).status==='補卡日期待核對'));
+const current=c.p79AttendanceRowAssessment(marked[0],c.getAttendanceTimestamp(marked[0].clockIn)+3600000);assert.equal(current.status,'補卡日期待核對');assert.equal(current.kind,'PENDING');const past=c.p79AttendanceRowAssessment(marked[0],c.getAttendanceTimestamp(marked[0].clockIn)+25*3600000);assert.equal(past.status,'缺少簽退');assert.equal(past.kind,'ABNORMAL');assert.equal(c.p79AttendanceRowAssessment(marked[1]).status,'缺少簽到');assert(marked.every(r=>r.dateConflict===true));
 assert(!inverted.some(r=>r.dateConflict),'source records must not mutate');
 assert.equal(marked[1].clockOut.timeStr,'2026/10/09 07:48');
 const unrelated=[inverted[0],{empId:'E2',clockOut:{empId:'E2',timeStr:'2026/10/09 07:48'}}];assert(!c.p79MarkAttendanceDateConflicts(unrelated).some(r=>r.dateConflict));
