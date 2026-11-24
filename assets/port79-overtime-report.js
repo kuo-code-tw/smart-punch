@@ -1199,7 +1199,7 @@
    // roster and punch checks must use the worker's actual (possibly next) day.
    if(date!==handoffDate)throw Error('代班實際出勤日應為 '+handoffDate+
     '；原請假／加班歸屬日為 '+(coverDate||handoffDate)+
-    '。兩者不可混用，請重新從請假紀錄開啟。');
+    '。代班實際出勤日不可變更，兩者不可混用，請重新從請假紀錄開啟。');
    if(coverDate&&allowedDates.length&&!allowedDates.includes(coverDate))
     throw Error('請假人員的核准請假日期不包含 '+coverDate+'；請回請假紀錄重新核對，不可改成代班出勤日。');
    return;
@@ -2081,8 +2081,7 @@
      const originalExtensionReview=editingOriginal&&prefill.plannedReview===true&&!prefill.leaveHandoffId&&chosen?.[0]==='延'&&
        String(prefill.empId||'')===String(empId)&&String(prefill.date||'')===date&&
        String(prefill.forEmpId||'')===String(forSelect.value||'');
-     if(!independentFiling&&!originalExtensionReview&&['代','延'].includes(chosen?.[0]))validateLeaveLinkedOvertimeDate(
-      date,forSelect.value,approvedDates,prefill.leaveHandoffId?String(prefill.workDate||prefill.date):'',
+     if(!independentFiling&&!originalExtensionReview&&['代','延'].includes(chosen?.[0]))validateLeaveLinkedOvertimeDate(date,forSelect.value,approvedDates,prefill.leaveHandoffId?String(prefill.workDate||prefill.date):'',
       prefill.leaveHandoffId?String(prefill.coverDate||prefill.overtimeDate||''):'');
      if(prefill.attendance&&String(prefill.empId)===String(empId)&&prefill.date===date){const issue=ruleAttendanceIssue(prefill.attendance.start,prefill.attendance.end,date,chosen);if(issue)throw Error(issue);}
      const editingExisting=Boolean(prefill.savedReport&&prefill.reportId&&String(prefill.empId)===String(empId)&&prefill.date===date);
@@ -2131,11 +2130,13 @@
          // Only an explicit rejection BEFORE writing is safe to resend.
          // A timeout, transport error, or unverified POST is NOT retried.
          if(!rosterRefused&&!serverRefused)throw error;
-         if(attempt===4)throw Error('雲端仍忙碌，本次尚未寫入加班；已保留原申報資料與 ID，請稍後核對再申報。');
+         // An explicit roster editing lock requires the operator to release it; do not prolong that refusal.
+         const maxAttempts=rosterRefused?3:5;
+         if(attempt>=maxAttempts-1)throw Error(rosterRefused?'排班編輯鎖仍被占用，本次尚未寫入加班；已保留原申報資料與 ID，請待班表儲存完成後再申報。':'雲端仍忙碌，本次尚未寫入加班；已保留原申報資料與 ID，請稍後核對再申報。');
          if(!el.isConnected||selectionKey()!==selection)
           throw Error('申報視窗已關閉或內容已更動，停止自動重試；原申報內容已保留。');
          const waitMs=Math.min(6500,Math.max(1000,Number(error.retryAfterMs)||1200)*(attempt+1));
-         el.querySelector('#p79OtStatus').textContent='雲端正在處理其他資料（明確未寫入），自動重試 '+(attempt+1)+'/4…';
+         el.querySelector('#p79OtStatus').textContent='雲端正在處理其他資料（明確未寫入），自動重試 '+(attempt+1)+'/'+(maxAttempts-1)+'…';
          await new Promise(resolve=>setTimeout(resolve,waitMs));
         }
        }
