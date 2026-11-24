@@ -23,12 +23,13 @@ assert.equal(ui.selectionMode(pendingPlan),'native','available plan must use off
 assert.equal(ui.selectionMode(completed),'none','already-verified existing records stay read-only');
 // Reproduce the operator's screen: 35 audited people and only 11 date rows.
 const cell=textContent=>({textContent});
-const makeRow=(id,missing=false,zero=false)=>({cells:[cell(''),cell(id),cell('F/L'),cell('測試'+id),cell(missing?'尚無法計算':zero?'例0／休0／國0':'例1／休2／國0'),cell(missing?'班表缺漏：沒有本月班表':zero?'既有申報待核打卡 1 天；無剩餘缺額':'預排需自行建立')],querySelector:sel=>sel==='.need-plan'?{dataset:{emp:id},disabled:true}:null});
+const makeRow=(id,missing=false,zero=false)=>({dataset:{periodSuggestions:JSON.stringify(id==='E1'?[{date:'2026-11-26',period:'休16-24',note:'預排草案，尚未出勤',planned:true}]:[])},cells:[cell(''),cell(id),cell('F/L'),cell('測試'+id),cell(missing?'尚無法計算':zero?'例0／休0／國0':'例1／休2／國0'),cell(missing?'班表缺漏：沒有本月班表':zero?'既有申報待核打卡 1 天；無剩餘缺額':'預排需自行建立')],querySelector:sel=>sel==='.need-plan'?{dataset:{emp:id},disabled:true}:null});
 const census=Array.from({length:35},(_,i)=>makeRow('E'+(i+1),i===34,i>=20&&i<34));
 const synthetic={querySelectorAll:sel=>sel==='#mrNeedRows tr'?[...census,census[0],{cells:[cell('空白')],querySelector:()=>null}]:[]};
 const audited=ui.sourceRows(synthetic);
 assert.equal(audited.roster.length,35,'all 35 authorized unresolved people are surfaced; no duplicate ID');
 assert.equal(audited.roster[34].status,'缺資料');
+assert.match(audited.roster[0].period,/2026-11-26 休 16:00 – 24:00/);assert.match(audited.roster[0].period,/預排草案/);assert.equal(audited.roster[1].period,'尚無符合條件時段');
 assert(audited.roster.every(r=>r.date===''&&r.hours==='—'&&ui.selectionMode(r)==='review'),'roster-only rows never become date applications or native submission picks');
 assert.equal(audited.roster.filter(r=>r.reviewType==='deficit').length,20);
 assert.equal(audited.roster.filter(r=>r.reviewType==='exception').length,14);
