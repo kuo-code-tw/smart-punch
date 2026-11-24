@@ -25470,8 +25470,8 @@ async function auditAllPaused(){
   verifiedPausedBatch=(Array.isArray(result.verifiedConflicts)?result.verifiedConflicts:[])
    .filter(row=>row&&shownDrafts.has(row.key))
    .map(row=>({...row,payload:JSON.parse(JSON.stringify(shownDrafts.get(row.key)))}));
-  const overview='已與正式雲端核對：確認完成 '+result.confirmed+' 筆；正式紀錄不存在、已備份 '+result.archived+
-   ' 筆；仍有 '+result.needsReview+' 筆需決定；讀取失敗 '+result.errors+' 筆。';
+  const overview='核對完成：已確認同步 '+result.confirmed+' 筆；正式紀錄不存在、已備份 '+result.archived+
+   ' 筆；仍需人工核對 '+result.needsReview+' 筆；讀取失敗 '+result.errors+' 筆。';
   if(verifiedPausedBatch.length){
    el.innerHTML='<strong>'+safe(overview)+'</strong>'+
     '<p>下列 '+verifiedPausedBatch.length+' 筆已核實為相同員工、相同打卡紀錄，但雲端與原修改內容不同。' +
