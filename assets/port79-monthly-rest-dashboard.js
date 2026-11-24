@@ -179,6 +179,8 @@ function mount(el){
  </div>
  <div class="mr-ux-tools">
  <label>月份 <input type="month" id="mrUxMonth"></label>
+ <label>已申報截止日 <input type="date" id="mrUxCutoff" title="自行設定已處理完畢的日期；留空核對整月"></label>
+ <span id="mrUxFrom" style="font-size:12px;color:#245077;font-weight:700"></span>
  <label>部門 <select id="mrUxDept"></select></label>
  <label>職稱 <select id="mrUxJob"><option value="">全部職稱</option></select></label>
  <label>姓名 <input type="search" id="mrUxName" placeholder="搜尋姓名" autocomplete="off"></label>
@@ -243,6 +245,11 @@ function mount(el){
    const originalState=text(el,'#mrStatus');
    const month=originalMonth.value;
    if(q('#mrUxMonth').value!==month)q('#mrUxMonth').value=month;
+   const nativeCutoff=$(el,'#mrCutoff'),cutoff=q('#mrUxCutoff');
+   if(nativeCutoff){cutoff.min=nativeCutoff.min;cutoff.max=nativeCutoff.max;cutoff.disabled=nativeCutoff.disabled;
+    if(cutoff.value!==nativeCutoff.value)cutoff.value=nativeCutoff.value;}
+   const from=global.P79MonthlyRest?.forwardReportStart(month,cutoff.value)||month+'-01';
+   q('#mrUxFrom').textContent=cutoff.value?(from.startsWith(month+'-')?'從 '+from.slice(5)+' 起申報':'本月已無後續日期'):'核對整月（未設定截止日）';
    const sourceOptions=originalDept.innerHTML;
    if(q('#mrUxDept').innerHTML!==sourceOptions)q('#mrUxDept').innerHTML=sourceOptions;
    if(q('#mrUxDept').value!==originalDept.value)q('#mrUxDept').value=originalDept.value;
@@ -308,7 +315,7 @@ function mount(el){
      '<button type="button" data-action="edit" data-kind="ready" data-id="'+id+'" data-key="'+key+'">✎ 編輯</button><button type="button" data-action="view" data-kind="ready" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>':
      '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
-      'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.suggestions?.length===1?r.suggestions[0].date:r.date||'—')+(r.lastReported&&r.nextReportDate&&r.nextReportDate>r.lastReported?'<small style="display:block;color:#526e91">已報至 '+esc(r.lastReported.slice(5))+'<br>自 '+esc(r.nextReportDate.slice(5))+' 起</small>':'')+'</td><td>'+esc(r.name)+(r.kind==='roster'?'<small style="display:block;color:#64748b">'+esc(r.role)+'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對')+'</small>':'')+'</td>'+
+      'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.suggestions?.length===1?r.suggestions[0].date:r.date||'—')+(r.lastReported?'<small style="display:block;color:#526e91">最近正式報單 '+esc(r.lastReported.slice(5))+'</small>':'')+'</td><td>'+esc(r.name)+(r.kind==='roster'?'<small style="display:block;color:#64748b">'+esc(r.role)+'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對')+'</small>':'')+'</td>'+
       '<td><span class="mr-ux-kind">'+esc(r.category)+'</span></td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>'+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
       '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
@@ -374,6 +381,10 @@ function mount(el){
   editor.showModal();
  }
  q('#mrUxMonth').onchange=e=>{if(!originalMonth.disabled){state.reviewSelected.clear();originalMonth.value=e.target.value;originalMonth.dispatchEvent(new Event('change',{bubbles:true}));}};
+ q('#mrUxCutoff').onchange=e=>{
+  const input=$(el,'#mrCutoff');if(!input||input.disabled)return;
+  state.reviewSelected.clear();state.hint='';input.value=e.target.value;input.dispatchEvent(new Event('change',{bubbles:true}));render();
+ };
  q('#mrUxDept').onchange=e=>{if(!originalDept.disabled){originalDept.value=e.target.value;originalDept.dispatchEvent(new Event('change',{bubbles:true}));}};
  q('#mrUxJob').onchange=e=>{if(!originalJob.disabled){state.reviewSelected.clear();originalJob.value=e.target.value;originalJob.dispatchEvent(new Event('change',{bubbles:true}));render();}};
  q('#mrUxName').oninput=e=>{state.name=e.target.value;render();};
