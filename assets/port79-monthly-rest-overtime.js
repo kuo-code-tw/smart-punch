@@ -657,14 +657,37 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
  const minute=x=>{const m=String(x||'').match(/^(\d{1,2})(?::(\d{2}))?$/);return m?Number(m[1])*60+Number(m[2]||0):NaN;};
  const days=(b.dates||[]).slice().sort(),out=[];
  const employee=id(emp.empId),blocked=new Set(snapshot.leaveDates||[]);
- const paired=new Set((snapshot.pairs||[]).filter(p=>id(p.empId)===employee).map(p=>p.date));
+ const pairsByDate=new Map();
+ for(const p of snapshot.pairs||[])if(id(p.empId)===employee){
+  if(!pairsByDate.has(p.date))pairsByDate.set(p.date,[]);
+  pairsByDate.get(p.date).push(p);
+ }
  const from=b.nextReportDate||month+'-01';
- const permitted=day=>{const m=roster.__meta?.[day]||{};return day>=from&&day>asOf&&day.startsWith(month+'-')&&
+ // When an operator chooses a cutoff, consider actual completed work from
+ // the following day, not only shifts after today's date.
+ const explicitRange=from>month+'-01';
+ const permitted=day=>{const m=roster.__meta?.[day]||{},pairs=pairsByDate.get(day)||[];
+  const actual=day<=asOf&&explicitRange&&pairs.length===1&&fullDayEvidence(snapshot,emp.empId,day,pairs[0]);
+  return day>=from&&(actual||day>asOf&&!pairs.length)&&day.startsWith(month+'-')&&
   !(b.typhoonDates||[]).includes(day)&&!m.overtimeReport&&!m.overtime&&!m.forEmpId&&!m.coverAssignmentId&&!m.overtimeExcluded&&
-  !blocked.has(employee+'|'+day)&&!paired.has(day)&&!g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,day,roster);};
+  !blocked.has(employee+'|'+day)&&!g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,day,roster);};
  for(const date of days.filter(permitted)){
   const original=String(roster[date]||'').trim(),m=roster.__meta?.[date]||{};
   const originalCategory=automaticRestCategory(roster,date,month);
+  if(date<=asOf){
+   const pair=pairsByDate.get(date)[0];
+   // Reference only: a complete ordinary workday is not proof of rest-day
+   // overtime. The formal model still requires original category and quota.
+   if(!shifts[original]&&!originalCategory)continue;
+   for(const category of ['休','國']){
+    if(!(b.remaining[category]>0)||originalCategory&&originalCategory!==category)continue;
+    const rule=ruleFor(date,roster,pair,category,rules);
+    if(!rule||!fullDayRule(rule))continue;
+    if(g.P79Overtime.ruleAttendanceIssue?.(pair.start,pair.end,date,rule,roster))continue;
+    out.push({date,category,period:String(rule[1]),note:originalCategory?'已核對完整出勤；正式申報資格仍待核對':'已核對完整出勤；原排正常班，須核對假別後才能正式申報',referenceOnly:true,eligible:false,actualReference:true,rank:originalCategory?1:2});
+   }
+   continue;
+  }
   let period=shifts[original],source=period?'原班表'+original+'班':'';
   if(!period&&['休','國'].includes(original)){
    if(Number.isFinite(minute(m.overtimeStart))&&Number.isFinite(minute(m.overtimeEnd))&&(minute(m.overtimeEnd)-minute(m.overtimeStart)+1440)%1440===480){
@@ -686,7 +709,7 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
    out.push({date,category,period:period.map(v=>String(v).includes(':')?String(v):String(v).padStart(2,'0')+':00').join(' – '),note,referenceOnly:true,eligible,rank:eligible?0:originalCategory===category?1:2});
   }
  }
- return out.sort((a,b)=>a.rank-b.rank||a.date.localeCompare(b.date));
+ return out.sort((a,b)=>Number(!!b.actualReference)-Number(!!a.actualReference)||a.rank-b.rank||a.date.localeCompare(b.date));
 }
 function personPeriodSuggestions(model,empId,asOf=today()){
  const key=id(empId),balanceRow=model?.balances?.find(b=>id(b.emp.empId)===key);
@@ -958,7 +981,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-daily-rows-v10';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-cutoff-references-v11';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);

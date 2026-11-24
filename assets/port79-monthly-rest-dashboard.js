@@ -26,6 +26,7 @@ function suggestionPeriod(x){
 function suggestionText(x){return x.date+' '+suggestionPeriod(x);}
 function compactRosterStatus(row){
  if(row.reviewType!=='deficit')return row.status;
+ if(row.residualOnly)return '尚缺 '+row.due+' 天';
  if(!row.suggestions?.length)return '無建議';
  return [...new Set(row.suggestions.map(suggestionStatus))].join('／');
 }
@@ -100,8 +101,8 @@ function dailyPendingRows(data){
   }
   // Preserve unresolved deficits without inventing dates or grouping dated rows.
   const remaining=Math.max(0,Number(person.due||0)-covered.size);
-  if(!covered.size||remaining>0)result.push({...person,suggestions:[],period:'無建議時段',due:remaining||person.due,
-   category:person.category,canPreplan:!covered.size&&person.canPreplan});
+  if(!covered.size||remaining>0)result.push({...person,suggestions:[],period:'尚缺 '+(remaining||person.due)+' 天，未找到其他可用日期',due:remaining||person.due,
+   category:person.category,canPreplan:!covered.size&&person.canPreplan,residualOnly:true});
  }
  return result.sort((a,b)=>String(a.date||'9999').localeCompare(String(b.date||'9999'))||
   String(a.name||'').localeCompare(String(b.name||''),'zh-Hant')||String(a.id).localeCompare(String(b.id)));
@@ -254,8 +255,9 @@ function mount(el){
   const verified=data.prior.filter(r=>r.status==='已核對出勤'&&!/已取消|歷史版本/.test(r.status));
   const deficits=data.roster.filter(r=>r.reviewType==='deficit');
   const exceptions=data.roster.filter(r=>r.reviewType!=='deficit');
-  const pending=dailyPendingRows(data);
-  const audit=[...pendingReports,...exceptions];
+  const daily=dailyPendingRows(data);
+  const pending=daily.filter(r=>!r.residualOnly);
+  const audit=[...pendingReports,...exceptions,...daily.filter(r=>r.residualOnly)];
   return {data,pending,audit,verified,deficits,exceptions};
  }
  function kind(row){
@@ -307,7 +309,7 @@ function mount(el){
    q('#mrUxReview').textContent=sourceLoaded?needs+' 人':'—';
    q('#mrUxDone').textContent=sourceLoaded?verified.length+' 筆':'—';
    q('#mrUxPendingTab').textContent=sourceLoaded?'('+pendingTotal+' 筆／'+needs+' 人)':'';
-   q('#mrUxAuditTab').textContent=sourceLoaded?'('+audit.filter(r=>r.kind!=='roster').length+' 筆／'+exceptions.length+' 人)':'';
+   q('#mrUxAuditTab').textContent=sourceLoaded?'('+audit.filter(r=>r.kind!=='roster').length+' 筆／'+new Set(audit.filter(r=>r.kind==='roster').map(r=>r.id)).size+' 人)':'';
    q('#mrUxDoneTab').textContent=sourceLoaded?'('+verified.length+')':'';
    const info=originalState.replace(/\s+/g,' ').slice(0,115);
    const sourceFailed=!sourceLoaded&&/讀取失敗|核對失敗|錯誤|無法取得|無法載入/.test(info);
@@ -345,11 +347,11 @@ function mount(el){
      '<button type="button" data-action="edit" data-kind="ready" data-id="'+id+'" data-key="'+key+'">✎ 編輯</button><button type="button" data-action="view" data-kind="ready" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>':
      '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
-      'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.suggestions?.length===1?r.suggestions[0].date:r.date||'—')+(r.lastReported?'<small style="display:block;color:#526e91">最近正式報單 '+esc(r.lastReported.slice(5))+'</small>':'')+'</td><td>'+esc(r.name)+(r.role?'<small style="display:block;color:#64748b">'+esc(r.role)+(r.kind==='roster'?'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對'):'')+'</small>':'')+'</td>'+
+      'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.suggestions?.length===1?r.suggestions[0].date:r.date||(r.residualOnly?'未安排':'—'))+(r.lastReported?'<small style="display:block;color:#526e91">最近正式報單 '+esc(r.lastReported.slice(5))+'</small>':'')+'</td><td>'+esc(r.name)+(r.role?'<small style="display:block;color:#64748b">'+esc(r.role)+(r.kind==='roster'?'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對'):'')+'</small>':'')+'</td>'+
       '<td><span class="mr-ux-kind">'+esc(r.category)+'</span>'+(r.quota?'<small style="display:block;color:#64748b;margin-top:4px">'+esc(r.quota)+'</small>':'')+'</td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>'+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
       '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
-   q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+'｜詳細原因請按檢視';
+   q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+(state.tab==='pending'&&audit.some(r=>r.residualOnly)?'｜尚無日期的缺額請見「已預排／待核對」':'');
    q('#mrUxExport').disabled=!shown.length;
   }finally{state.rendering=false;}
  }

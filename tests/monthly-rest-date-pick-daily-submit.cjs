@@ -12,6 +12,6 @@ assert(core.includes('if(selected.some(r=>r.planned||r.date>today()))'));
 assert(core.includes('attendance.length!==1'));
 assert(core.includes('fullDayEvidence(fresh,r.empId,r.date,attendance[0])'));
 assert(core.includes("if(!hasFormal&&autoPlan&&!autoHistoricalReady())"));
-assert(ui.includes("const pending=dailyPendingRows(data)"));
+assert(ui.includes("const daily=dailyPendingRows(data)"));
 assert(!ui.includes("nativePick(child,checked)"),'one date per selection, no person-wide checkbox');
 console.log('PASS daily completed-attendance submission, future blocked, person picks link real dated candidates, existing guards retained');
