@@ -70,6 +70,12 @@ function setup(items,cloudRecords,{failRead=false,failArchive=false}={}){
  assert.deepEqual([x.total,x.checked,x.confirmed,x.archived,x.needsReview,x.errors],[5,5,1,1,3,0]);
  assert.equal(a.reads,1,'a single month is downloaded once for all five edits');
  assert.deepEqual(a.queue.map(q=>q.key),['KC','KD','KE'],'conflicts, identity mismatch and duplicate IDs remain untouched');
+ assert.equal(x.verifiedConflicts.length,1,'Only the same verified employee, direction and unique ID can be offered for batch decision');
+ assert.equal(x.verifiedConflicts[0].key,'KC');
+ assert.equal(x.verifiedConflicts[0].cloudTimeStr,'2026/09/05 08:00');
+ assert.equal(x.verifiedConflicts[0].desiredTimeStr,'2026/09/05 09:00');
+ assert.equal(x.verifiedConflicts[0].originalTimeStr,'2026/09/05 07:30');
+ assert.equal(a.posts,0,'A read-only batch audit never overwrites official punches');
  assert.equal(a.archives.length,1,'missing original is backed up before exiting the queue');
  assert.equal(a.archives[0].key,'KB');
  assert.equal(a.progress.length,5,'each entry emits immediate UI progress');
