@@ -821,20 +821,24 @@ function reportProgress(model,empId=null){
  }
  return result;
 }
-// The displayed numerator is verified formal reports, not saved plans.
+// Display the complete quota already occupied by the official roster/ledger,
+// not just overtime declarations. Existing reserved dates are already included
+// in remaining; only a confirmed new save can consume an additional day.
 function personQuotaProgress(model,empId){
  const b=model?.balances?.find(b=>id(b.emp.empId)===id(empId));
  if(!b)return null;
  const p=reportProgress(model,empId);
  return Object.fromEntries(['例','休','國'].map(c=>{
-  const confirmed=(Number((b.formalReported||b.reported)?.[c])||0)+p[c].saved;
+  const count=value=>Math.max(0,Number(value)||0);
+  const confirmed=count((b.formalReported||b.reported)?.[c])+p[c].saved;
+  const used=count(b.off?.[c])+count(b.reported?.[c])+count(b.reserved?.[c])+p[c].saved;
   const selected=Math.min(p[c].remaining,p[c].selected);
-  return [c,{confirmed,remaining:p[c].remaining,selected,afterConfirmed:confirmed+selected,afterRemaining:p[c].after}];
+  return [c,{used,confirmed,remaining:p[c].remaining,selected,afterUsed:used+selected,afterConfirmed:confirmed+selected,afterRemaining:p[c].after}];
  }));
 }
 function quotaProgressText(progress){
  if(!progress)return '尚無法計算';
- return ['例','休','國'].map(c=>c+progress[c].confirmed+'/'+progress[c].remaining).join('／');
+ return ['例','休','國'].map(c=>c+progress[c].used+'/'+progress[c].remaining).join('／');
 }
 function personSummary(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
@@ -1001,7 +1005,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v13';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v15';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
