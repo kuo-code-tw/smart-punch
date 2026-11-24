@@ -28,7 +28,7 @@ assert.equal(byId['FL-TYPHOON'].typhoon,true,'typhoon cannot count as ordinary u
 assert.equal(byId.REVOKED.cancelled,true,'revocation cannot reappear as current report');
 assert.equal(ctx.existingRestOvertimeRows({schedules:[actual]},[employee],'2026-11').length,0);
 assert.match(file,/id="mrExistingRows"/);
-assert.match(file,/existingRestOvertimeRows\(snapshot,loadedPeople,loadedMonth\)/);
+assert.match(file,/existingRestOvertimeRows\(snapshot,a\.employees\(\),loadedMonth\)/);
 assert.match(file,/現行申報/);
 assert.match(file,/沒有已保存的例／休／國申報編號/);
 console.log('PASS: 10月 F\/L saved declarations visible read-only; dedupe, cancelled, historical, typhoon separated; no writes');

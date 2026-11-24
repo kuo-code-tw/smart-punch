@@ -15,7 +15,7 @@ vm.runInContext(fs.readFileSync('assets/port79-schedule-rest-summary.js','utf8')
 vm.runInContext(html.slice(start,end),c);
 const selected={例:[],休:[day(5),day(11),day(22)],國:[day(6),day(24)]};
 const spans=(s,category)=>s.match(new RegExp('data-rest-category="'+category+'"[^>]*><span>([^<]+)</span>'))?.[1];
-const render=(id='E1',typhoon=[])=>c.p79ScheduleRestCountCells({id,name:'測試'},month,null,typhoon,[],selected);
+const render=(id='E1',typhoon=[])=>c.p79ScheduleRestCountCells({id,name:'測試'},month,null,typhoon,[],selected,{typhoon:typhoon.length>0,election:false});
 const makeRow=(id='E1',options={})=>{
  const schedule=Object.fromEntries(Array.from({length:31},(_,i)=>[day(i+1),'早']));
  schedule[day(5)]='休';schedule[day(11)]='休';schedule[day(22)]='早';schedule[day(28)]='中';

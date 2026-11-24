@@ -41,7 +41,7 @@ const extract=name=>{
 for(const name of ['p79ScheduleHasVerifiedPunch','p79RestAutomaticExcludedDates','p79RestAutomaticPlan',
  'p79AutomaticRestMetadata','p79VisibleRestKind','p79ScheduleDisplayContext',
  'p79ScheduleDisplayDay','p79VisibleRestDayAudit','p79DailyRestCount',
- 'p79ScheduleRestCountCells','p79ScheduleExportDay'])
+ 'p79ScheduleSpecialSummaryColumns','p79ScheduleElectionSummaryDates','p79ScheduleRestCountCells','p79ScheduleExportDay'])
  vm.runInContext(extract(name),c);
 c.p79ScheduleNoPunchRest=()=>false;
 const snapshot={attendanceEvidence:evidence,leaveDates:[],leaveCoverAssignments:[]};

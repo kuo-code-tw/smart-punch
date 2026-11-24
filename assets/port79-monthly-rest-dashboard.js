@@ -472,7 +472,7 @@ function mount(el){
   if(state.tab!=='pending')return;
   const submit=$(el,'#mrSave');
   if(!submit||!sourceRows(el).ready.some(r=>r.checked&&!r.disabled))return;
-  if(!submit.disabled&&/申報/.test(submit.textContent||''))submit.click();
+  if(!submit.disabled&&/申報/.test(submit.textContent||'')&&!/預排/.test(submit.textContent||''))submit.click();
   else{state.hint='請先核對實際出勤與申報日期。';render();}
  };
  q('#mrUxExport').onclick=()=>{

@@ -69,7 +69,7 @@ for(const scenario of ['revoked','excluded','idless','notOwnRest','typhoon','pur
 const g2={window:null};g2.window=g2;vm.createContext(g2);
 vm.runInContext(fs.readFileSync('assets/port79-overtime-application.js','utf8'),g2);
 const app=fs.readFileSync('assets/port79-overtime-application.js','utf8');
-assert(app.includes("report.planned===true&&date>=today()"),'Past reported dates should not remain in the future-only application list');
+assert(app.includes("report.planned===true&&workDate>=today()"),'Past reported dates should not remain in the future-only application list');
 const hours=fs.readFileSync('work-hours/index.html','utf8');
 assert(hours.includes("planned:meta.overtimeReport.planned===true&&date>=todayTaipei"),
  'Past 10/22 stored report cannot still be displayed as a future-only planned claim');

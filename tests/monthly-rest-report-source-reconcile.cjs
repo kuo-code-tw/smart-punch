@@ -23,7 +23,7 @@ const c={
 Object.defineProperty(c,'port79ScheduleDirty',{get:()=>dirty});c.window=c;
 vm.createContext(c);vm.runInContext(html.slice(i,j),c);
 const shown={例:[day(2),day(9),day(16),day(23)],休:[day(5),day(11),day(22)],國:[day(6),day(24)]};
-const render=(id='E1',typhoon=[])=>c.p79ScheduleRestCountCells({id},month,null,typhoon,[],shown);
+const render=(id='E1',typhoon=[])=>c.p79ScheduleRestCountCells({id},month,null,typhoon,[],shown,{typhoon:typhoon.length>0,election:false});
 const value=(id,category)=>render(id).match(new RegExp('data-rest-category="'+category+'"[^>]*><span>([^<]+)</span>'))?.[1];
 a.equal(value('E1','休'),'3/2','only three visible cells before a confirmed source is present');
 official=true;

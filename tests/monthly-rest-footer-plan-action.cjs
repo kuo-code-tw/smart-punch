@@ -2,7 +2,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),s=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
 assert(s.includes("el.querySelector('#mrNeedSection').before(el.querySelector('#mrPlannedSection'))"),'suggestions appear before summary');
 assert(s.includes('<th>員工編號</th>'));assert(!s.includes('<th>公司</th>'));
-let called=0;const button={},context={autoPlan:true,busy:false,model:{},q:selector=>selector==='#mrSave'?button:{onclick:async()=>called++}};
+let called=0;const button={},context={autoPlan:true,busy:false,model:{rows:[]},isReadOnlySource:()=>false,autoHistoricalReady:()=>false,manualPeople:new Map(),q:selector=>selector==='#mrSave'?button:{onclick:async()=>called++}};
 const start=s.indexOf(" q('#mrSave').onclick=async()=>{"),end=s.indexOf("  if(!workflowStage",start);
 vm.createContext(context);vm.runInContext(s.slice(start,end)+' };',context);
 const pickStart=s.indexOf(" q('#mrNeedRows').onchange="),pickEnd=s.indexOf(" q('#mrPlannedRows').onchange=",pickStart);

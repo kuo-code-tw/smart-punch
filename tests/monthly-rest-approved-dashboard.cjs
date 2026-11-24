@@ -61,7 +61,7 @@ assert(source.includes("q('#mrUxDept').onchange"));
 assert(source.includes('id="mrUxJob"'));
 assert(source.includes("originalJob.dispatchEvent(new Event('change',{bubbles:true}))"));
 assert(source.includes("el.p79OpenMonthlyRestPlan?.(row.id)"));
-assert(original.includes('manualRestPlanIssue(fresh,chosen,month,date,rule)'));
+assert(original.includes('manualRestPlanIssue(fresh,chosen,month,date,rule,today(),q(\'#mrCutoff\').value)'));
 assert(original.includes('visiblePlannedRows().filter(r=>r.checked&&!r.saved)'));
 assert(original.includes("result.report?.planned!==true"),'draft must be acknowledged as planned');
 assert(original.includes("manualPlan:true,preventReplace:false,note:'每月未休假加班預排"),'new drafts use create mode; native same-date ID/revision guard prevents replacing other reports');
@@ -70,13 +70,13 @@ assert(source.includes("q('#mrUxSubmit').onclick"));
 assert(source.includes("q('#mrUxSavePlan').onclick"));
 assert(source.includes("q('#mrUxExport').onclick"));
 assert(source.includes("nativePick("));
-assert(source.includes("if(/預排/.test(submit.textContent||''))"),
+assert(source.includes("if(!submit.disabled&&/申報/.test(submit.textContent||'')&&!/預排/.test(submit.textContent||''))"),
  'Formal button must never accidentally submit a plan via existing mode-dependent save');
 assert(!/\b(?:saveReport|updateSchedule|saveConfig|hrGetOrgOptions)\s*\(/.test(source),
  'New dashboard may not write cloud records or invoke extra backend actions');
 assert(original.includes("g.P79MonthlyRestDashboard?.mount(el)"),
  'Actual monthly modal must mount dashboard');
-assert(original.includes("port79-monthly-rest-dashboard.js?v=20261124-compact-period-v6"),
+assert(/port79-monthly-rest-dashboard\.js\?v=20261124-quota-progress-v\d+/.test(original),
  'Production load path must bypass browser cache');
 assert(original.includes("if(!fullDayEvidence(fresh,r.empId,r.date,attendance[0]))"),
  'Official eight-hour attendance guard must remain');
