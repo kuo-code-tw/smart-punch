@@ -23,7 +23,7 @@ async function fixture(page,mode='fresh'){
  const html=fs.readFileSync(page+'/index.html','utf8'),name=page==='schedule'?'p79SaveScheduleOvertimeDraft':'p79SaveWorkOvertimeDraft';
  const start=html.indexOf('async function '+name+'(');
  const end=html.indexOf(page==='leave'?'let p79LeaveOvertimeConfig=':page==='schedule'?'    async function p79OpenScheduleOvertimeOptions':'window.p79OvertimeContext=',start);
- assert(start>0&&end>start);vm.runInContext(html.slice(start,end),c);
+ assert(start>0&&end>start);if(page==='work-hours'){const a=html.indexOf('function p79AssertDirectReportActive('),b=html.indexOf('\n        }',a);assert(a>=0&&b>a);vm.runInContext(html.slice(a,b+10),c);}vm.runInContext(html.slice(start,end),c);
  const draft={id:'REPORT',empId:'E1',date,rule,forEmpId:'',leaveHandoffId:'',note:''};
  await c.P79Overtime.prepareSaveValidation(draft,false);
  if(mode==='expired')now+=15001;

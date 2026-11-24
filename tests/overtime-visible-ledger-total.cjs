@@ -4,7 +4,7 @@ const html=fs.readFileSync('work-hours/index.html','utf8');
 const start=html.indexOf('        function p79OvertimeDisplaySummary(rows,officialSummary){');
 const end=html.indexOf('        function renderOvertimeStats() {',start);
 assert(start>=0&&end>start,'displayed overtime aggregation helper exists');
-const c={Map,Set,Number,String,Array,Math};vm.createContext(c);
+const c={Map,Set,Number,String,Array,Math};c.window=c;vm.createContext(c);
 vm.runInContext(html.slice(start,end),c);
 const people=[{empId:'A',jobTitle:'F/L'},{empId:'B',jobTitle:'F/L'}];
 const empty={groups:[{jobTitle:'F/L',staffCount:2,people:0,count:0,raw:0,converted:0,missing:0,invalid:0,rawAverage:0,convertedAverage:0}],totals:{raw:0,converted:0,count:0,missing:0,staffCount:2,people:0,rawAverage:0,convertedAverage:0},invalidHours:0,missingConversion:0};

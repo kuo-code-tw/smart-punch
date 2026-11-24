@@ -5,7 +5,7 @@ function excluded({system='',shown=false,session=null,classes=[]}){
  let creations=0;const active=new Set();const classList={toggle(k,on){on?active.add(k):active.delete(k)},remove(...ks){ks.forEach(k=>active.delete(k))}};
  const body={dataset:system?{p79System:system}:{},classList};
  const document={body,documentElement:{classList:{contains:k=>classes.includes(k)}},readyState:'complete',getElementById:id=>id==='systems'?{classList:{contains:()=>shown}}:null,createElement(){creations++;throw Error('employee/login DOM must not be rebuilt')},addEventListener(){}};
- const context={document,sessionStorage:{getItem:()=>session?JSON.stringify(session):null},MutationObserver:class{observe(){}},window:{addEventListener(){}},requestAnimationFrame(){throw Error('no layout mutation is scheduled by this fixture')}};
+ const context={URL,document,sessionStorage:{getItem:()=>session?JSON.stringify(session):null},MutationObserver:class{observe(){}},window:{addEventListener(){}},requestAnimationFrame(){throw Error('no layout mutation is scheduled by this fixture')}};
  vm.runInNewContext(js,context);assert.equal(creations,0);assert(!active.has('p79-workspace'));
 }
 excluded({});excluded({shown:true,session:{adminRole:'employee'}});excluded({shown:true,session:{adminRole:'admin',punchOnly:true}});excluded({system:'attendance'});excluded({system:'attendance',classes:['p79-punch-only','p79-attendance-management-chrome']});

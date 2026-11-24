@@ -31,7 +31,7 @@ const helperStart=html.indexOf('function p79ResolvePlannedOvertimePeriod(');
 const helperEnd=html.indexOf('\n        }',helperStart);
 assert(helperStart>=0&&helperEnd>helperStart,'shared planned-period resolver exists');
 vm.runInContext(html.slice(helperStart,helperEnd+10),ctx);
-vm.runInContext(html.slice(start,end+10),ctx);
+ctx.p79WorkOvertimeMonths=new Map();const warningStart=html.indexOf('function p79OvertimeCoverDateWarning('),warningEnd=html.indexOf('\n        }',warningStart);assert(warningStart>=0&&warningEnd>warningStart);vm.runInContext(html.slice(warningStart,warningEnd+10),ctx);vm.runInContext(html.slice(start,end+10),ctx);
 const outcome=ctx.p79OpenPlannedOvertimeReview(0);
 assert.equal(opened.length,1,'click opens one review form');
 assert.equal(outcome.reportId,'R-501','existing cloud report ID reused');
