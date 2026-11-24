@@ -63,7 +63,13 @@ for(const name of ['p79ScheduleHasVerifiedPunch','p79VisibleRestKind','p79Schedu
  }
  const unpaired=c.p79ScheduleDisplayDay(people[2],day(11));
  assert.equal(unpaired.verifiedRestAttendance,false);
- assert.equal(unpaired.shownShift,'例','one IN cannot overwrite original rest category');
+ assert.equal(unpaired.shownShift,'打卡待核','verified single IN on that date is pending, not paired attendance');
+ assert.equal(unpaired.punchPending,true);
+ assert.equal(unpaired.actualShift,'','one IN cannot infer a working shift');
+ assert.equal(unpaired.visibleRestKind,'','pending evidence must not count as confirmed rest');
+ assert.equal(unpaired.dayMeta.restCategory,'例','original statutory rest classification remains available for review');
+ assert.equal(rosters.E3[day(11)],'休');
+ assert.equal(rosters.E3.__meta[day(11)].restCategory,'例','no overwrite of the original rest category');
  const attendancePairs=[
   {empId:'E1',date:day(11),start:ts(recs[0]),end:ts(recs[1])},
   {empId:'E2',date:day(27),start:ts(recs[2]),end:ts(recs[3])}

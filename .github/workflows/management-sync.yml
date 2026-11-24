@@ -26,7 +26,14 @@ permissions:
   contents: read
 jobs:
   verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4]
+    name: Full regression (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    env:
+      SHARD: ${{ matrix.shard }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
@@ -39,8 +46,20 @@ jobs:
         run: npm install --no-save --no-package-lock --ignore-scripts jszip@3.10.1
       - name: Run all integration tests and report every failure
         run: |
+          set -euo pipefail
           failed=0
+          total=0
           for test_file in tests/*.cjs; do
+            # The expensive 18,000-row comparison has its own runner. Other tests
+            # are assigned by stable filename checksum, identically for main and PR.
+            if [ "$test_file" = "tests/vessel-speed.cjs" ]; then
+              lane=0
+            else
+              checksum=$(printf '%s' "$test_file" | cksum | cut -d' ' -f1)
+              lane=$((1 + checksum % 4))
+            fi
+            [ "$lane" -eq "$SHARD" ] || continue
+            total=$((total+1))
             echo "::group::${test_file}"
             # The dedicated 18,000-row legacy comparison is a CPU benchmark, not a normal unit test.
             limit=30s
@@ -53,5 +72,7 @@ jobs:
             fi
             echo "::endgroup::"
           done
+          echo "Shard ${SHARD}: ${total} tests / ${failed} failed"
+          test "$total" -gt 0
           echo "Total failing tests: ${failed}"
           test "${failed}" -eq 0
