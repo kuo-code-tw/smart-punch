@@ -42,7 +42,10 @@ jobs:
           failed=0
           for test_file in tests/*.cjs; do
             echo "::group::${test_file}"
-            if timeout --signal=TERM --kill-after=5s 30s node "$test_file"; then
+            # The dedicated 18,000-row legacy comparison is a CPU benchmark, not a normal unit test.
+            limit=30s
+            if [ "$test_file" = "tests/vessel-speed.cjs" ]; then limit=180s; fi
+            if timeout --signal=TERM --kill-after=5s "$limit" node "$test_file"; then
               :
             else
               echo "::error file=${test_file}::Integration regression failed"

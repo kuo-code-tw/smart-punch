@@ -34,7 +34,10 @@ jobs:
             pushd "$folder" >/dev/null
             for test_file in tests/*.cjs; do
               n=$((n+1))
-              if NODE_PATH="$GITHUB_WORKSPACE/node_modules" timeout --signal=TERM --kill-after=5s 30s node "$test_file" >/tmp/p79-parity-last-test.log 2>&1; then
+              # The dedicated 18,000-row legacy comparison is a CPU benchmark, not a normal unit test.
+              limit=30s
+              if [ "$test_file" = "tests/vessel-speed.cjs" ]; then limit=180s; fi
+              if NODE_PATH="$GITHUB_WORKSPACE/node_modules" timeout --signal=TERM --kill-after=5s "$limit" node "$test_file" >/tmp/p79-parity-last-test.log 2>&1; then
                 :
               else
                 failed=$((failed+1))
