@@ -13519,6 +13519,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
         async function p79DeleteOvertimeRecord(row,button){
             if(!row||!p79CanDeleteOvertime())return;
+            if(p79PlannedBulkBusy){showToast('正在核對申報，完成後再刪除','warning');return;}
             const estimateOnly=p79CanExcludeOvertimeEstimate(row);
             if(!row.reportVerified&&!row.coverCandidate&&!row.coverAlreadyArranged&&!estimateOnly)
                 return alert('這筆不是可以直接刪除的正式加班申報，且可能有班表或代班連結，請先核對原始紀錄。');
@@ -13648,23 +13649,36 @@ async function p79ExportOvertimeComparison(printMode){
             const date=normalizeScheduleDateKey(row.rosterDate||row.dateKey);
             window.P79OvertimeStatus.open({state:'amended',month:date.slice(0,7),employee:row.empId});
         }
-        function p79OpenMainPlannedOvertimeRow(index){
+        let p79MainPlannedSubmittingKey='';
+        // Directly confirm an existing verified plan in its main-ledger row.
+        // Use the same eligibility and authoritative cloud save as bulk review.
+        async function p79OpenMainPlannedOvertimeRow(index,button){
+            if(p79PlannedBulkBusy||!p79CanReportOvertime())return;
             const row=p79WorkOvertimeDisplayedRows[Number(index)];
-            if(!row||!p79WorkOvertimeIsUnconfirmedPlan(row)||
-               !row.reportVerified||!String(row.overtimeReport?.id||'').trim())return;
-            const dialog=document.getElementById('p79OvertimePlannedDialog');
-            if(!dialog)return alert('預排詳情視窗尚未載入，請重新整理');
-            if(!dialog.open)dialog.showModal();
-            const key=p79PlannedBulkKey(row);
-            const found=p79OvertimePlannedFilteredRows.findIndex(candidate=>
-                p79PlannedBulkKey(candidate)===key);
-            if(found>=0){
-                p79OvertimePlannedPage=Math.floor(found/50)+1;
-                renderOvertimeStats();
-                const tr=document.getElementById('p79OvertimePlannedBody')?.rows?.[found%50];
-                tr?.scrollIntoView?.({block:'center',behavior:'smooth'});
+            const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
+            const item=p79PlannedBulkCandidate(row,today);
+            if(!item){
+                showToast('此筆尚未符合直接申報條件，請核對打卡與原預排時段','warning');
+                return;
             }
-            p79SyncOvertimePlannedDialogState();
+            if(button&&button.dataset.planKey!==item.key)return;
+            p79PlannedBulkBusy=true;
+            p79MainPlannedSubmittingKey=item.key;
+            if(button){button.disabled=true;button.textContent='申報中…';}
+            p79RefreshPlannedBulkControls();
+            try{
+                await p79ConfirmPlannedOvertimeCandidate(item);
+                p79PlannedBulkSelected.delete(item.key);
+                showToast((row.name||row.empId)+' '+item.date+' '+item.rule[1]+' 已申報','success');
+            }catch(error){
+                showToast((row.name||row.empId)+'：'+String(error?.message||error),'warning');
+            }finally{
+                p79MainPlannedSubmittingKey='';
+                p79PlannedBulkBusy=false;
+                p79OvertimeCalculationCache=null;
+                renderOvertimeStats();
+                p79RefreshPlannedBulkControls();
+            }
         }
         // Identify old saved two-person night-cover plans whose second worker was
         // incorrectly booked on the leave date instead of the next early workday.
@@ -13712,6 +13726,7 @@ async function p79ExportOvertimeComparison(printMode){
         }
         function p79ReportWorkOvertimeRow(index,editExisting=false){
             const row=p79WorkOvertimeDisplayedRows[index];if(!row||!p79CanReportOvertime())return;
+            if(p79PlannedBulkBusy){showToast('正在核對申報，完成後再修改','warning');return;}
             const wrongWorkday=p79OvertimeCoverDateWarning(row);
             if(wrongWorkday){alert(wrongWorkday.message+' 此日的正常出勤不能核為加班。');return;}
             if(editExisting&&(!row.reportVerified||!String(row.overtimeReport?.id||'').trim())){alert('此筆沒有可修改的正式申報，請重新讀取後核對。');return;}
@@ -14564,6 +14579,25 @@ function p79OvertimePeriodLabel(report){
             });
             p79RefreshPlannedBulkControls();
         }
+        async function p79ConfirmPlannedOvertimeCandidate(item){
+            const original=item.report,rule=window.P79Overtime.report(item.rule);
+            const draft={
+                id:String(original.id),empId:item.row.empId,date:item.date,rule,coverDate:original.coverDate||item.date,overtimeDate:original.overtimeDate||item.date,
+                manualPlan:false,preventReplace:true,plannedReview:true,
+                expectedOriginalCode:String(original.code||''),
+                expectedOriginalCategory:String(original.category||''),
+                expectedPunchStart:item.start,expectedPunchEnd:item.end,
+                forEmpId:String(original.forEmpId||item.row.forEmpId||''),
+                leaveHandoffId:String(original.leaveId||''),
+                note:String(original.note||''),autoSave:true
+            };
+            const result=await p79SaveWorkOvertimeDraft(draft);
+            window.P79Overtime.verifySavedReport(draft,result);
+            if(result?.ok!==true||result.directOvertimeSaved!==true||
+                String(result.id)!==draft.id||result.report?.planned!==false)
+                throw Error('雲端未確認原報單解除預排狀態');
+            return result;
+        }
         async function p79BatchConfirmPlannedOvertime(){
             if(p79PlannedBulkBusy||!p79CanReportOvertime())return;
             const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
@@ -14586,25 +14620,11 @@ function p79OvertimePeriodLabel(report){
             let completed=0,failed=[];
             try{
                 for(let i=0;i<selected.length;i++){
-                    const item=selected[i],original=item.report,rule=window.P79Overtime.report(item.rule);
+                    const item=selected[i];
                     p79PlannedPunchNotice('批次核對進行中 '+(i+1)+' / '+selected.length+
                         '：'+(item.row.name||item.row.empId)+' '+item.date);
-                    const draft={
-                        id:String(original.id),empId:item.row.empId,date:item.date,rule,coverDate:original.coverDate||item.date,overtimeDate:original.overtimeDate||item.date,
-                        manualPlan:false,preventReplace:true,plannedReview:true,
-                        expectedOriginalCode:String(original.code||''),
-                        expectedOriginalCategory:String(original.category||''),
-                        expectedPunchStart:item.start,expectedPunchEnd:item.end,
-                        forEmpId:String(original.forEmpId||item.row.forEmpId||''),
-                        leaveHandoffId:String(original.leaveId||''),
-                        note:String(original.note||''),autoSave:true
-                    };
                     try{
-                        const result=await p79SaveWorkOvertimeDraft(draft);
-                        window.P79Overtime.verifySavedReport(draft,result);
-                        if(result?.ok!==true||result.directOvertimeSaved!==true||
-                            String(result.id)!==draft.id||result.report?.planned!==false)
-                            throw Error('雲端未確認原報單解除預排狀態');
+                        await p79ConfirmPlannedOvertimeCandidate(item);
                         p79PlannedBulkSelected.delete(item.key);
                         completed++;
                     }catch(error){
@@ -15043,8 +15063,13 @@ function p79OvertimePeriodLabel(report){
             const pageRows = rows.slice(startIndex, startIndex + OVERTIME_PAGE_SIZE);
             const allowAttendanceEdit = canPerformAdminAction(currentEmp, 'attendanceEdit');
             p79WorkOvertimeDisplayedRows=pageRows;
+            const mainReviewToday=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
             const overtimeRowsHtml = pageRows.length ? pageRows.map((row,rowIndex) => {
                 const savedPlan=p79WorkOvertimeIsUnconfirmedPlan(row);
+                const inlineCandidate=savedPlan&&row.reportVerified?p79PlannedBulkCandidate(row,mainReviewToday):null;
+                const inlineBusy=inlineCandidate&&p79MainPlannedSubmittingKey===inlineCandidate.key;
+                const inlineReason=savedPlan?p79OvertimePendingReason(row,mainReviewToday):null;
+                const inlineBlockedLabel=inlineReason?.code==='review'?'時段待核':inlineReason?.label||'待核對';
                 const noPunchRest=row.reportVerified&&row.overtimeReport?.attendanceState==='rest';
                 const periodReview=!noPunchRest?p79WorkOvertimePeriodReview(row):null;
                 // Auto-reconcile the DISPLAY for every employee and configured overtime period.
@@ -15129,7 +15154,7 @@ function p79OvertimePeriodLabel(report){
                     row.specialOvertimeMinutes>0?'特殊日'+(row.specialReportMinutes===null?'待核':String(row.specialReportMinutes/60)+'h'):'',
                     !row.overtimeReport&&pendingPunchOvertime?'出勤加班'+formatDurationMinutes(row.overtimeMinutes):'',
                     !row.overtimeReport&&history?'歷史待核':'',
-                    changingPeriod?'時段待核':''
+                    inlineCandidate?'可申報 '+inlineCandidate.rule[1]+' '+inlineCandidate.rule[2]+'h':changingPeriod?'時段待核':''
                 ].filter(Boolean).join('｜')||'—';
                 const overtimeFullTitle=[
                     row.timeCheckRequired?String(row.attendanceIssue||'出勤待核對'):'',
@@ -15154,7 +15179,7 @@ function p79OvertimePeriodLabel(report){
                     <td data-label="上班簽到" class="px-3 py-3 font-mono whitespace-nowrap">${clockInCell}</td>
                     <td data-label="下班簽退" class="px-3 py-3 font-mono whitespace-nowrap">${clockOutCell}</td>
                     <td data-label="出勤時數" class="px-3 py-3 font-bold whitespace-nowrap">${savedPlan&&!(row.clockIn&&row.clockOut)?(row.clockIn?'待簽退':'—'):formatDurationMinutes(row.totalMinutes)}${row.timeCheckRequired?'<span class="block text-xs text-rose-700">原始區間／待核對</span>':''}</td>
-                    <td data-label="申報加班" class="px-3 py-3"><div class="p79-overtime-inline"><div class="p79-overtime-detail"><span class="p79-overtime-single-text" tabindex="0" title="${escapeHtml(overtimeFullTitle)}" aria-label="${escapeHtml(overtimeFullTitle)}">${escapeHtml(overtimeShortText)}</span></div><div class="p79-overtime-row-actions">${p79CanReportOvertime()?(savedPlan&&row.reportVerified?`<button type="button" onclick="p79OpenMainPlannedOvertimeRow(${rowIndex})" class="px-2 py-1 rounded bg-indigo-100 text-indigo-900 font-bold">預排／申報</button>`:row.reportVerified?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex},true)" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-violet-100 text-violet-900 font-bold disabled:opacity-40">修改</button>`:`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold disabled:opacity-40">申報</button>`):'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>'}${p79CanDeleteOvertime()?(p79CanExcludeOvertimeEstimate(row)
+                    <td data-label="申報加班" class="px-3 py-3"><div class="p79-overtime-inline"><div class="p79-overtime-detail"><span class="p79-overtime-single-text" tabindex="0" title="${escapeHtml(overtimeFullTitle)}" aria-label="${escapeHtml(overtimeFullTitle)}">${escapeHtml(overtimeShortText)}</span></div><div class="p79-overtime-row-actions">${p79CanReportOvertime()?(savedPlan&&row.reportVerified?`<button type="button" data-plan-key="${escapeHtml(inlineCandidate?.key||'')}" onclick="p79OpenMainPlannedOvertimeRow(${rowIndex},this)" ${!inlineCandidate||p79PlannedBulkBusy?'disabled':''} title="${escapeHtml(inlineCandidate?'依完整打卡直接申報 '+inlineCandidate.rule[1]+' '+inlineCandidate.rule[2]+' 小時，保留原預排編號':inlineReason?.detail||'原預排時段尚未符合直接申報條件，請核對考勤或使用預排／待核對管理')}" class="px-2 py-1 rounded bg-indigo-100 text-indigo-900 font-bold disabled:opacity-50">${inlineBusy?'申報中…':inlineCandidate?'直接申報':escapeHtml(inlineBlockedLabel)}</button>`:row.reportVerified?`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex},true)" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-violet-100 text-violet-900 font-bold disabled:opacity-40">修改</button>`:`<button type="button" onclick="p79ReportWorkOvertimeRow(${rowIndex})" ${row.timeCheckRequired?'disabled title="請先核對原始打卡時間"':''} class="px-2 py-1 rounded bg-cyan-100 text-cyan-900 font-bold disabled:opacity-40">申報</button>`):'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>'}${p79CanDeleteOvertime()?(p79CanExcludeOvertimeEstimate(row)
                     ?`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" class="px-2 py-1 rounded bg-amber-100 text-amber-900 font-bold" title="刪除這筆未正式申報的加班顯示；原始打卡保留">刪除</button>`
                     :`<button type="button" onclick="p79DeleteWorkOvertimeRow(${rowIndex},this)" ${row.reportVerified||row.coverCandidate||row.coverAlreadyArranged?'':'disabled title="沒有正式加班申報；須先核對代班或舊班表註記"'} class="px-2 py-1 rounded bg-rose-100 text-rose-800 font-bold disabled:opacity-40">刪除</button>`)
                     :'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>' }${amendmentBadge||'<span class="p79-overtime-action-placeholder" aria-hidden="true"></span>'}</div></div></td>
