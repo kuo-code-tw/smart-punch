@@ -376,9 +376,10 @@ function ruleFor(date,roster,pair,category,rules){
  const start=minute(period[0]),end=minute(period[1]);
  return allowed.find(r=>minute(r[6])===start&&minute(r[7])===end)||null;
 }
+const filingPriority=['例','休','國'];
 function sortRows(rows){
  const rank=r=>r.saved?2:(!r.planned&&r.status==='可申報'?0:1);
- return rows.sort((a,b)=>rank(a)-rank(b)||cats.indexOf(a.category)-cats.indexOf(b.category)||String(a.date).localeCompare(String(b.date))||String(a.name).localeCompare(String(b.name),'zh-Hant-u-co-stroke')||id(a.empId).localeCompare(id(b.empId)));
+ return rows.sort((a,b)=>rank(a)-rank(b)||String(a.date).localeCompare(String(b.date))||filingPriority.indexOf(a.category)-filingPriority.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'zh-Hant-u-co-stroke')||id(a.empId).localeCompare(id(b.empId)));
 }
 // 例／休／國只採用既有排班與雲端申報規則；不自造時數或申報紀錄。
 function workflowStage(month,asOf=today()){
@@ -408,7 +409,6 @@ function plan(snapshot,people,month,rules,options={}){
  const workflow=workflowStage(month),rows=[],plannedRows=[],balances=[],issues=[],unavailable=[],states=[],reviewNotes=Object.create(null),rosters=new Map((snapshot.schedules||[]).map(r=>[id(r.empId),r.schedule])),pairsByKey=new Map();
  for(const pair of snapshot.pairs||[]){const key=id(pair.empId)+'|'+pair.date;if(!pairsByKey.has(key))pairsByKey.set(key,[]);pairsByKey.get(key).push(pair);}
  const leaveDates=new Set(snapshot.leaveDates||[]),currentDate=today(),historical=backfillContext(month,currentDate).historical;
- const weekOf=date=>Number(date.slice(8))<=21?0:Number(date.slice(8))<=28?1:2;
  for(const emp of monthlyPlanPeople(people,snapshot,month)){
   const roster=rosters.get(id(emp.empId));
   if(!roster){
@@ -432,7 +432,7 @@ function plan(snapshot,people,month,rules,options={}){
   const manualRuleByDate=new Map(manualRefs.map(ref=>[ref.date,rules.find(r=>r[0]===ref.category&&fullDayRule(r)&&ref.period===fmtPeriod(r[6])+' – '+fmtPeriod(r[7]))]));
   reviewNotes[id(emp.empId)]=notes;
   const blocked=(date,category,reason)=>{if(b.remaining[category]>0)notes.push({date,category,reason});};
-  if(!workflow.canSuggest){states.push({emp,b,candidates,used:new Set(),weekCount:[0,0,0],remaining:{...b.remaining}});continue;}
+  if(!workflow.canSuggest){states.push({emp,b,candidates,used:new Set(),weeklyPlanned:new Set(),remaining:{...b.remaining}});continue;}
   for(const date of b.dates){
    const m=roster.__meta?.[date]||{};
    if(date<nextReportDate)continue; // Earlier unresolved attendance stays in the audit ledger.
@@ -472,32 +472,43 @@ function plan(snapshot,people,month,rules,options={}){
     candidates.push({date,pair,byCategory,restProtected,week:weeklyCycleWindow(date,cycleStart)?.start||''});
    }
   }
-  states.push({emp,b,candidates,used:new Set(),weekCount:[0,0,0],weeklyPlanned:new Set(),remaining:{...b.remaining}});
+  states.push({emp,b,candidates,used:new Set(),weeklyPlanned:new Set(),remaining:{...b.remaining}});
  }
- // Schedule the whole group together rather than finishing one person first.
- // Consume every available quota in one pass, taking dates from today forward.
- // Actual eligible attendance precedes drafts; one person can use each date once.
- for(const category of cats)for(const planned of (historical||options.manualOnly===true?[false]:[false,true])){
-  while(true){
-   const byDate=new Map();
-   for(const state of states){
-    if(!state.remaining[category])continue;
-    const available=state.candidates.filter(c=>!state.used.has(c.date)&&(!c.pair)===planned&&c.byCategory.has(category)&&(!planned||category!=='休'||!state.weeklyPlanned.has(c.week+'|休')));
-    if(!available.length)continue;
-    for(const candidate of available){
-     if(!byDate.has(candidate.date))byDate.set(candidate.date,[]);
-     byDate.get(candidate.date).push({state,candidate});
+ // Spend monthly quota only after the complete balance has reserved existing
+ // and future roster rest. Prefer verified original dates over all drafts.
+ // Within each employee's agreed seven-day cycle, first spread each category
+ // over different weeks, then fill remaining capacity from genuine dates.
+ // An unknown cycle is only a Sunday-based ordering reference, not legal approval.
+ for(const planned of (historical||options.manualOnly===true?[false]:[false,true])){
+  for(const category of filingPriority){
+   for(const spread of [true,false]){
+    // Never create multiple future rest drafts in one cycle.
+    if(planned&&category==='休'&&!spread)continue;
+    while(true){
+     const byDate=new Map();
+     for(const state of states){
+      if(!state.remaining[category])continue;
+      const anchor=weeklyCycleAnchor(state.emp);
+      const occupied=new Set((state.b.ledger||[]).filter(x=>x.category===category&&['off','reserved','reported','reportedPendingAttendance'].includes(x.kind)).map(x=>weeklyCycleWindow(x.date,anchor)?.start).filter(Boolean));
+      const available=state.candidates.filter(c=>!state.used.has(c.date)&&(!c.pair)===planned&&c.byCategory.has(category)&&
+       (!spread||!occupied.has(c.week)&&!state.weeklyPlanned.has(c.week+'|'+category))&&
+       (!planned||category!=='休'||!state.weeklyPlanned.has(c.week+'|休')));
+      for(const candidate of available){
+       if(!byDate.has(candidate.date))byDate.set(candidate.date,[]);
+       byDate.get(candidate.date).push({state,candidate});
+      }
+     }
+     if(!byDate.size)break;
+     const [date,group]=[...byDate].sort((a,b)=>a[0].localeCompare(b[0])||b[1].length-a[1].length)[0];
+     for(const {state,candidate} of group){
+      const rule=candidate.byCategory.get(category);
+      (planned?plannedRows:rows).push({id:crypto.randomUUID(),empId:state.emp.empId,name:state.emp.name,date,category,rule:rule.slice(),checked:false,
+       status:planned?(candidate.restProtected?'預排草案（未申報）':'預排草案｜例休週期待核（未申報）'):'可申報',
+       needsWeeklyReview:planned&&!candidate.restProtected,planned});
+      if(planned&&!candidate.restProtected)issues.push(state.emp.name+' '+date+'：預排草案有原排例休週期待核，不得直接視為可加班或正式申報');
+      state.used.add(date);state.weeklyPlanned.add(candidate.week+'|'+category);state.remaining[category]--;
+     }
     }
-   }
-   if(!byDate.size)break;
-   const [date,group]=[...byDate].sort((a,b)=>a[0].localeCompare(b[0])||b[1].length-a[1].length)[0];
-   for(const {state,candidate} of group){
-    const rule=candidate.byCategory.get(category);
-    (planned?plannedRows:rows).push({id:crypto.randomUUID(),empId:state.emp.empId,name:state.emp.name,date,category,rule:rule.slice(),checked:false,
-      status:planned?(candidate.restProtected?'預排草案（未申報）':'預排草案｜例休週期待核（未申報）'):'可申報',
-      needsWeeklyReview:planned&&!candidate.restProtected,planned});
-     if(planned&&!candidate.restProtected)issues.push(state.emp.name+' '+date+'：預排草案有原排例休週期待核，不得直接視為可加班或正式申報');
-    state.used.add(date);state.weekCount[weekOf(date)]++;state.weeklyPlanned.add(candidate.week+'|'+category);state.remaining[category]--;
    }
   }
  }
@@ -1005,7 +1016,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v19';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v20';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
