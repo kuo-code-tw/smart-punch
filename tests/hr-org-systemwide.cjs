@@ -36,14 +36,19 @@ assert.deepEqual(ordered.map(e=>e.empId),['2','4','5','7','8','9','3','0'],
 
 
 const hr=fs.readFileSync('hr/index.html','utf8');
-for(const name of ['fHQ','fDivision','fOffice','fUnit','fDept','fJob'])
+for(const name of ['fHQ','fDivision','fOffice','fUnit','fJob'])
  assert(hr.includes('id="'+name+'"'),'missing HR filter: '+name);
-for(const label of ['總公司','事業部','事業處','單位','原部門','職稱'])
+for(const label of ['總公司','事業部','事業處','單位','職稱'])
  assert(hr.includes('<th><button class="thlink"')&&hr.includes('>'+label+' 🔎</button>'),'missing HR column: '+label);
 assert(hr.includes("p79HrOrgValue(e,'sections')"));
 assert(hr.includes('單位數'));
+for(const id of ['fDept','newDepartment','newUnit','departmentList','unitList','dept','deptOptions'])assert(!hr.includes('id="'+id+'"'),'obsolete HR control: '+id);
+assert(!hr.includes('舊系統相容選項'));assert(!hr.includes('全部原部門'));
+assert(hr.includes("dept:String(old.dept??'')"),'editing preserves old department value for other systems');
+assert(hr.includes('const legacy={departments:draft.departments,units:draft.units,jobTitles:draft.jobTitles}'),'legacy backend config remains intact');
+for(const m of hr.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)){if(!/\bsrc=/.test(m[1])&&m[2].trim())new vm.Script(m[2]);}
 assert(hr.includes('① 🏛️ 總公司')&&hr.includes('② 🏢 事業部')&&hr.includes('③ 🏬 事業處')&&hr.includes('④ 🧭 單位'));
-const names=['總公司 🔎','事業部 🔎','事業處 🔎','單位 🔎','職稱 🔎','原部門 🔎'].map(x=>hr.indexOf('>'+x+'</button>'));
+const names=['總公司 🔎','事業部 🔎','事業處 🔎','單位 🔎','職稱 🔎'].map(x=>hr.indexOf('>'+x+'</button>'));
 assert(names.every(x=>x>=0)&&names.every((x,i)=>!i||x>names[i-1]),'table columns follow hierarchy largest to smallest');
 assert(hr.includes('list.sort((a,b)=>p79HrCompareOrgPeople(a,b)'),'HR list sorting follows hierarchy');
 assert(hr.includes('employees.slice().sort((a,b)=>p79HrCompareOrgPeople(a,b)'),'export sorted by hierarchy');
