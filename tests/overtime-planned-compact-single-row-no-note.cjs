@@ -29,7 +29,15 @@ const c={console,Number,String,Array,Set,Map,Math,Date,
  document:{getElementById:id=>nodes[id]||null},
  escapeHtml:s=>String(s??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])),
  p79OvertimePlannedPage:1};
+// Mirror the production globals used by the extracted rendering functions.
+Object.assign(c,{employees:[],p79OvertimeUnitIndexSource:null,p79OvertimeUnitIndexLength:-1,p79OvertimeUnitIndex:null,
+ window:{Port79OrgContext:{value:(person,kind)=>kind==='sections'?person.dept:''}},
+ p79OvertimePlannedFilteredRows:[],p79PlannedBulkSelected:new Set(),p79PlannedBulkBusy:false,
+ p79CanReportOvertime:()=>true,p79OvertimeCoverDateWarning:()=>null,
+ normalizeScheduleDateKey:x=>String(x||'').replaceAll('/','-'),p79DirectAttendanceTimestamp:x=>Date.parse(x.timeStr),p79OvertimeAttendanceIssue:()=>''});
+c.document.querySelectorAll=()=>[];
 vm.createContext(c);
+for(const name of ['p79OvertimeUnitOfPerson','p79OvertimeUnitForRow','p79PlannedBulkKey','p79PlannedBulkCandidate','p79RefreshPlannedBulkControls','p79WorkOvertimeOfficialReport','p79OvertimeMainLedgerRows'])vm.runInContext(extract(name),c);
 for(const name of ['p79WorkOvertimeIsUnconfirmedPlan','p79OvertimePlannedVisibleRows',
  'p79OvertimePendingReason','p79OvertimePendingPunchCell','p79RenderOvertimePlannedRows'])
  vm.runInContext(extract(name),c);

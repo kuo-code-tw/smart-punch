@@ -11,8 +11,9 @@ assert(html.includes('id="p79OvertimePlannedBody"'),'planned section gets its ow
 assert(html.includes('id="p79OvertimePlannedCount"'),'planned count displayed independently');
 assert(html.includes('id="overtimeTableBody"'),'main confirmed overtime table remains');
 assert(html.includes('rows:confirmedPageRows, plannedRows:plannedPageRows'),'source splits confirmed and planned once');
-assert(html.includes('p79RenderOvertimePlannedRows(p79OvertimeCalculationCache?.plannedRows||[],month,dept,jobTitle,employeeId)'),'render planned section with filters, not source filter');
-assert(html.includes("const allOvertimeRows = buildOvertimeStatisticsRows().filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))"),'official rows stay unplanned');
+assert(html.includes('const plannedRows=p79OvertimeCalculationCache?.plannedRows||[];')&&html.includes('p79RenderOvertimePlannedRows(plannedRows,month,dept,jobTitle,employeeId)'),'render planned section with filters, not source filter');
+assert(html.includes('const formalRows=buildOvertimeStatisticsRows();')&&html.includes('const allOvertimeRows=p79OvertimeMainLedgerRows(formalRows,plannedRows)'), 'main ledger merges saved plans with separately calculated official rows');
+assert(html.includes('const completedRows=rows.filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))'),'confirmed totals still exclude planned entries');
 const element={innerHTML:'',textContent:''},nodes={
  p79OvertimePlannedBody:{...element},p79OvertimePlannedCount:{...element},p79OvertimePlannedPagination:{...element}};
 const ctx={console,Number,String,Array,Set,Map,Math,Date,
@@ -25,13 +26,24 @@ const ctx={console,Number,String,Array,Set,Map,Math,Date,
  document:{getElementById:x=>nodes[x]||null},
  escapeHtml:s=>String(s??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])),
  p79OvertimePlannedPage:1};
+// Mirror the production globals used by the extracted rendering functions.
+Object.assign(ctx,{employees:[],p79OvertimeUnitIndexSource:null,p79OvertimeUnitIndexLength:-1,p79OvertimeUnitIndex:null,
+ window:{Port79OrgContext:{value:(person,kind)=>kind==='sections'?person.dept:''}},
+ p79OvertimePlannedFilteredRows:[],p79PlannedBulkSelected:new Set(),p79PlannedBulkBusy:false,
+ p79CanReportOvertime:()=>true,p79OvertimeCoverDateWarning:()=>null,
+ normalizeScheduleDateKey:x=>String(x||'').replaceAll('/','-'),p79DirectAttendanceTimestamp:x=>Date.parse(x.timeStr),p79OvertimeAttendanceIssue:()=>''});
+ctx.document.querySelectorAll=()=>[];
 vm.createContext(ctx);
+for(const name of ['p79OvertimeUnitOfPerson','p79OvertimeUnitForRow','p79PlannedBulkKey','p79PlannedBulkCandidate','p79RefreshPlannedBulkControls','p79WorkOvertimeOfficialReport','p79OvertimeMainLedgerRows'])vm.runInContext(extract(name),ctx);
 for(const name of ['p79WorkOvertimeIsUnconfirmedPlan','p79OvertimePlannedVisibleRows','p79OvertimePendingReason','p79OvertimePendingPunchCell','p79RenderOvertimePlannedRows'])vm.runInContext(extract(name),ctx);
 const report={id:'P123',planned:true,code:'休24-08',declaredHours:8};
 const planned={empId:'A',name:'測試甲',dateKey:'2026-10-28',monthKey:'2026-10',dept:'第一事業處',jobTitle:'ARMG',overtimeReport:report,planned:true,reportVerified:true};
 const official={empId:'B',name:'測試乙',dateKey:'2026-10-28',monthKey:'2026-10',dept:'第一事業處',jobTitle:'F/L',overtimeReport:{id:'R123',planned:false,code:'休08-16',declaredHours:8}};
 const another={empId:'C',name:'測試丙',dateKey:'2026-10-30',monthKey:'2026-10',dept:'第二事業處',jobTitle:'ARMG',reportVerified:true,overtimeReport:{id:'P124',planned:true,code:'休16-24',declaredHours:8}};
 const rows=[planned,official,another];
+const ledger=ctx.p79OvertimeMainLedgerRows([official],[planned,another,planned,{...planned,reportVerified:false,empId:'X'},{...planned,p79RestDraft:true,empId:'Y'}]);
+assert.deepEqual(Array.from(ledger,x=>x.empId).sort(),['A','B','C'],'main ledger retains distinct official and verified saved plans only');
+assert.deepEqual(Array.from(ledger.filter(row=>!ctx.p79WorkOvertimeIsUnconfirmedPlan(row)),x=>x.empId),['B'],'confirmed ledger subset excludes saved plans');
 const visible=(month='ALL',dept='ALL',title='ALL',emp='ALL')=>Array.from(ctx.p79OvertimePlannedVisibleRows(rows,month,dept,title,emp),x=>x.empId);
 assert.deepEqual(visible(),['A','C'],'only planned records belong to planned section');
 assert.deepEqual(visible('2026-10','第一事業處','ARMG'),['A'],'filters apply to the planned section');
@@ -70,4 +82,4 @@ assert(nodes.p79OvertimePlannedBody.innerHTML.includes('修改上班打卡時間
 ctx.p79RenderOvertimePlannedRows(rows,'2026-10','ALL','ALL','B');
 assert(nodes.p79OvertimePlannedBody.innerHTML.includes('沒有預排'),'empty state remains clear');
 for(const match of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(match[1].trim())new vm.Script(match[1]);
-console.log('PASS planned overtime appears in its own page section, uses same filters, retains report details, never leaks into confirmed totals or rows, scripts parse');
+console.log('PASS planned overtime appears in its own page section, uses same filters, retains report details, never leaks into confirmed totals, scripts parse');
