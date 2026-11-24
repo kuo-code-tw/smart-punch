@@ -20,6 +20,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install test-only archive reader
+        run: npm install --no-save --no-package-lock --ignore-scripts jszip@3.10.1
       - name: Run full test suite on clean main and candidate, block new failures
         shell: bash
         run: |
@@ -32,7 +34,7 @@ jobs:
             pushd "$folder" >/dev/null
             for test_file in tests/*.cjs; do
               n=$((n+1))
-              if timeout --signal=TERM --kill-after=5s 30s node "$test_file" >/tmp/p79-parity-last-test.log 2>&1; then
+              if NODE_PATH="$GITHUB_WORKSPACE/node_modules" timeout --signal=TERM --kill-after=5s 30s node "$test_file" >/tmp/p79-parity-last-test.log 2>&1; then
                 :
               else
                 failed=$((failed+1))

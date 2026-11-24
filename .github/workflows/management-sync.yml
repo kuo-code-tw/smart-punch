@@ -35,6 +35,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install test-only archive reader
+        run: npm install --no-save --no-package-lock --ignore-scripts jszip@3.10.1
       - name: Run all integration tests and report every failure
         run: |
           failed=0
