@@ -39,7 +39,7 @@ function sourceRows(el){
  // have no eligible date or existing report. Surface these person-level rows
  // separately from dated declarations; never manufacture a date or hours.
  const roster=new Map();
- for(const tr of $(el,'#mrNeedRows tr')){
+ for(const tr of $$(el,'#mrNeedRows tr')){
   const pick=$(tr,'.need-plan'),td=tr.cells;
   if(!pick||td.length!==6)continue;
   const id=String(pick.dataset.emp||td[1]?.textContent||'').trim();
