@@ -294,23 +294,23 @@
   error.rejectedBeforeWrite=data?.rejectedBeforeWrite===true;
   return error;
  }
- async function retryCloudRead(task,onRetry){
+ async function retryCloudRead(task,onRetry,policy={}){
   for(let attempt=0;attempt<5;attempt++){
    try{return await task();}
    catch(error){
     const transient=retryableCloudRead(error),busy=/雲端目前正在處理其他資料|正在處理其他資料|雲端忙碌|班表正在編輯|稍後自動重試/i.test(String(error?.message||''));
-    const maxAttempts=busy?5:3;
+    const maxAttempts=policy.maxAttempts|| (busy?5:3);
     if(!transient||attempt+1>=maxAttempts)throw error;
-    const delay=Math.min(5500,Math.max(900,Number(error.retryAfterMs)||900)*Math.pow(1.6,attempt));
+    const delay=Math.min(policy.maxDelay||5500,Math.max(900,Number(error.retryAfterMs)||900)*Math.pow(1.6,attempt));
     onRetry?.(attempt+1,maxAttempts-1,Math.ceil(delay/1000));
     await new Promise(resolve=>setTimeout(resolve,delay));
    }
   }
  }
- async function rpc(action,payload,onRetry){
+ async function rpc(action,payload,onRetry,policy={}){
   const {url,token}=auth();
   const execute=async()=>{
-   const ctl=new AbortController(),timeoutMs=payload?45000:12000;let timer;
+   const ctl=new AbortController(),timeoutMs=payload?45000:(policy.rulesTimeout||12000);let timer;
    const deadline=new Promise((_,reject)=>{timer=setTimeout(()=>{
     ctl.abort();reject(Error(payload?'雲端儲存逾時，尚未確認成功；請保留修改':'雲端讀取逾時，將在安全範圍內自動重試'));
    },timeoutMs);});
@@ -325,17 +325,17 @@
     return data;
    })(),deadline]);}finally{clearTimeout(timer);}
   };
-  return payload?execute():retryCloudRead(execute,onRetry);
+  return payload?execute():retryCloudRead(execute,onRetry,policy);
  }
  // A preflight belongs to one button press, never to persisted browser drafts.
  const saveValidationContexts=new WeakMap();
- async function prepareSaveValidation(request,checkRules=true,onRetry){
+ async function prepareSaveValidation(request,checkRules=true,onRetry,policy={}){
   const credentials=auth(),{url,token}=credentials;
   const scope={empId:String(request.empId).trim().toUpperCase(),date:request.date,
    overtimeDate:String(request.overtimeDate||request.date),coverDate:String(request.coverDate||request.date),
    leaveHandoffId:String(request.leaveHandoffId||'')};
   const read=()=>retryCloudRead(async()=>{
-   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),policy.contextTimeout||25000);
    try{
     const query='?action=getOvertimeReportContext&gcToken='+encodeURIComponent(token)+'&token='+encodeURIComponent(token)+
      '&empId='+encodeURIComponent(scope.empId)+'&date='+encodeURIComponent(scope.date)+
@@ -349,10 +349,12 @@
      throw Error('雲端出勤或正式班表資料不完整，尚未送出申報');
     return {cloud,checkedAt:Date.now()};
    }finally{clearTimeout(timer);}
-  },onRetry);
+  },onRetry,policy);
   // Two simultaneous GETs can compete with the GAS data lock. Sequence
   // them so one filing does not generate its own cloud contention.
-  const rules=checkRules?await loadRules(onRetry):null;
+  policy.onStage?.('核對換算');
+  const rules=checkRules?await loadRules(onRetry,policy):null;
+  policy.onStage?.('核對出勤');
   const context=await read();
   const current=auth();
   if(current.url!==url||current.token!==token)throw Error('登入或資料來源已變更，請重新核對申報');
@@ -511,7 +513,7 @@
     roleDefaults:normalizeRoleTypeDefaults(snapshot)};
   }catch(error){return null;}
  }
- async function loadRules(onRetry){const d=await rpc('getOvertimeConfig',null,onRetry);if(!d.config||typeof d.config!=='object')throw Error('雲端設定不完整，未使用預設值覆蓋');const rows=validate(normalizeStored(d.config[CONFIG]));rememberOvertimeOptions(d.config,'getOvertimeConfig');return {config:d.config,rows};}
+ async function loadRules(onRetry,policy={}){const d=await rpc('getOvertimeConfig',null,onRetry,policy);if(!d.config||typeof d.config!=='object')throw Error('雲端設定不完整，未使用預設值覆蓋');const rows=validate(normalizeStored(d.config[CONFIG]));rememberOvertimeOptions(d.config,'getOvertimeConfig');return {config:d.config,rows};}
  // Replace ONLY the cloud-owned overtime fields. Shallow Object.assign leaves
  // old archive flags behind when the authoritative cloud no longer has them.
  // Other context settings, such as permissions or local page data, stay intact.
