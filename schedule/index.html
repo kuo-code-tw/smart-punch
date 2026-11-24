@@ -7766,13 +7766,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
       // may display 打卡待核; a verified no-punch day still becomes 休.
       const scheduledRest=['休','例','國','颱','年','特','事','病','公','喪','離','離職'].includes(rosterShift);
       const evidenceReady=ctx.attendanceEvidence?.complete===true;
-      const punchPending=!scheduledRest&&evidenceReady&&attendanceState==='missing'&&
+      const ordinaryRest=['休','例','國'].includes(rosterShift);
+      const punchPending=(!scheduledRest||ordinaryRest)&&evidenceReady&&attendanceState==='missing'&&
         dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
       const attendanceUnverified=!scheduledRest&&!evidenceReady&&
         dayStr<scheduleTaipeiTodayKey()&&!ownApprovedLeave;
       const shiftVal=noPunchRest?'休':actualShift||
         (verifiedRestAttendance||pairedWork&&rosterShift==='待排班'||pairedWork&&['休','例','國'].includes(rosterShift)?'已出勤':
-        scheduledRest?rosterShift:
         punchPending?'打卡待核':rosterShift);
       // Prefer the checked monthly ledger; if it is not ready yet, retain the
       // shared automatic allocation instead of resetting a valid 國 to 休.

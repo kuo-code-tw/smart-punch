@@ -28,12 +28,18 @@ const client=ctx.window.P79ScheduleRestEvidence.create({
  assert.equal(evidence.actualShifts['E1|2026-10-25'],'中','Sunday cross-midnight OUT yields Sunday work shift');
  assert.equal(evidence.actualShifts['E2|2026-10-24'],undefined,'lone punch never auto-assigns a shift');
  assert.equal(ctx.window.P79RestAttendance.state({attendanceEvidence:evidence},'E1','2026-10-24'),'worked');
- assert(html.includes("const shiftVal=noPunchRest?'休':actualShift||((verifiedRestAttendance||pairedWork&&rosterShift==='待排班')?'已出勤':rosterShift);"),'complete paired short work displays 已出勤');
- assert(html.includes("visibleRestKind:(ctx.typhoonDays.has(dayStr)||rosterShift==='颱')?''")&&
-  html.includes(':p79VisibleRestKind(shownShift,visibleSubstituteLabel)};')&&
-  html.includes("return /^(例|休|國)(?=$|[0-9])/.exec(value)?.[1]||'';"),
-  'actual early/middle/night display is not classified as used 例休國');
- assert(html.includes('punchShifts?.[String(emp.id).trim().toUpperCase()+\'|\'+date]'),'summary skips proven work as taken rest');
+ // Exercise actual production cell selection with the real attendance evidence.
+ const extract=name=>{const a=html.indexOf('    function '+name+'('),b=html.indexOf('\n    }',a);assert(a>=0&&b>a,name);return html.slice(a,b+6);};
+ Object.assign(ctx,{monthlyScheduleData:Object.fromEntries(schedule.map(r=>[r.empId,r.schedule])),monthlyScheduleMeta:{},p79EmployeeDateEligible:()=>true,approvedLeaveForEmployee:()=>null,p79LeaveCoverOnDay:()=>[],p79CoverageShift:()=>'',p79SubstituteShiftLabel:()=>'',p79ScheduleSpecialNoPunchCode:()=>'',scheduleTaipeiTodayKey:()=> '2026-10-27',p79ScheduleRestClient:()=>({status:()=>({evidence})})});
+ for(const name of ['p79ScheduleHasVerifiedPunch','p79VisibleRestKind','p79ScheduleNoPunchRest','p79ScheduleDisplayDay'])vm.runInContext(extract(name),ctx);
+ const render=(emp,day,ev=evidence)=>ctx.p79ScheduleDisplayDay(emp,day,{automaticRestMeta:{},restBalance:{ledger:[]},attendanceEvidence:ev,attendanceSnapshot:{attendanceEvidence:ev},typhoonDays:new Set(),electionDays:new Set(),typhoonToday:'2026-10-27'});
+ assert.equal(render(people[0],'2026-10-24').visibleCode,'早');
+ assert.equal(render(people[0],'2026-10-25').visibleCode,'中');
+ assert.equal(render(people[0],'2026-10-24').visibleRestKind,'','actual work never counts as taken rest');
+ assert.equal(render(people[0],'2026-10-24',{...evidence,actualShifts:{}}).visibleCode,'已出勤','paired short work with unresolved shift displays actual attendance');
+ assert.equal(render(people[1],'2026-10-24').visibleCode,'打卡待核','single punch on a rest day is pending, not confirmed rest');
+ assert.equal(render(people[1],'2026-10-24',{complete:false,days:{}}).visibleCode,'休','unread attendance does not invent missing punches');
+ assert.equal(ctx.monthlyScheduleData.E1['2026-10-24'],'休','display does not overwrite source roster');
  assert(html.includes('allowUnmarked:true'),'legacy incorrect roster fixed automatically, not by manual button');
  assert(!html.includes('補卡後修正排班'),'manual button removed');
  assert(!html.includes('p79RecheckCorrectedAttendance'),'manual workflow removed');
