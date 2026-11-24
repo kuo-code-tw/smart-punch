@@ -25343,13 +25343,20 @@ html[data-p79-design=vessel] body #p79OutboxInspectCard :is(td,th){min-width:0!i
 #p79OutboxInspectCard button{max-width:100%;white-space:normal!important;padding:7px 9px;border:1px solid #93c5fd;border-radius:8px;background:#eff6ff;color:#1d4ed8;font-weight:700}
 #p79OutboxInspectCard small{display:block;overflow-wrap:anywhere}
 #p79OutboxReview{overflow-wrap:anywhere}
+#p79OutboxInspectCard{display:flex;flex-direction:column;overflow:hidden!important}
+#p79OutboxInspectBody{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:0 4px}
+#p79OutboxReview:not(:empty){flex:0 0 auto;max-height:min(40vh,420px);overflow-y:auto;padding:12px 14px;margin:8px 0 12px;border:2px solid #2563eb;border-radius:12px;background:#eff6ff;color:#1e3a8a;box-shadow:0 3px 12px #2563eb18}
+#p79OutboxReview table{margin:8px 0!important;background:#fff}
+#p79OutboxReview button{margin:5px 7px 5px 0!important}
+#p79OutboxInspectBody tr[data-paused-review-row]:focus-within{outline:2px solid #60a5fa;outline-offset:-2px}
+@media(max-width:700px){#p79OutboxReview:not(:empty){max-height:43dvh;padding:10px}#p79OutboxInspectBody{max-height:42dvh}}
 @media(max-width:700px){html[data-p79-design=vessel] body #p79OutboxInspectCard :is(td,th){font-size:11px!important;padding:6px 3px!important}#p79OutboxInspectCard{padding:12px;width:calc(100vw - 16px)}#p79OutboxInspectPanel{padding:8px}}
 </style>
 <div id="p79OutboxInspectPanel" role="dialog" aria-modal="true" aria-label="待同步明細">
 <div id="p79OutboxInspectCard">
 <div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><strong style="font-size:18px">考勤待同步明細</strong><div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" id="p79OutboxInspectRefresh" style="padding:7px 12px;border-radius:8px;border:1px solid #93c5fd;background:#eff6ff;color:#1d4ed8;font-weight:700">重新核對全部</button><button type="button" id="p79OutboxInspectClose" style="padding:7px 12px;border-radius:8px;border:1px solid #cbd5e1">關閉</button></div></div>
 <p style="color:#64748b;margin:10px 0">此處只列尚未完成的待傳修改。撤回後即結束處理，保留雲端考勤，不再要求核對撤回草稿。</p>
-<div id="p79OutboxInspectBody"></div><div id="p79OutboxReview" role="status" aria-live="polite"></div>
+<div id="p79OutboxReview" role="status" aria-live="polite"></div><div id="p79OutboxInspectBody"></div>
 </div></div>
 <script id="p79-outbox-inspector">
 (function(){
@@ -25421,6 +25428,13 @@ setInterval(()=>{
  if(!document.hidden)window.p79RefreshAttendanceSyncCompactStatus?.();
 },2000);
 let reviewBusy=false,auditBusy=false;
+function p79ReviewNext(message){
+ const el=document.getElementById('p79OutboxReview');if(!el)return;
+ const remaining=shownDrafts.size;
+ el.innerHTML='<strong>'+safe(message)+'</strong><p>仍有 '+remaining+' 筆暫停修改需要核對。</p>'+
+  (remaining?'<button type="button" data-review-next>核對下一筆</button>':'<p>目前沒有其他暫停修改；請以正式雲端資料確認結果。</p>');
+}
+
 // The former opening action checked only the first paused item. Audit the whole
 // queue with one official read per month, and repaint without closing this dialog.
 async function auditAllPaused(){
@@ -25460,24 +25474,37 @@ async function auditAllPaused(){
 }
 document.getElementById('p79OutboxInspectRefresh')?.addEventListener('click',()=>{void auditAllPaused();});
 async function reviewEntry(key){
- if(auditBusy)return;
+ const el=document.getElementById('p79OutboxReview');
+ if(auditBusy){if(el)el.textContent='正在核對全部雲端正式紀錄，完成後即可逐筆處理。';return;}
  if(reviewBusy)return;reviewBusy=true;
- const el=document.getElementById('p79OutboxReview');el.textContent='正在讀取雲端正式時間並核對舊修改…';
+ el.textContent='正在讀取雲端正式時間並核對舊修改…';
+ el.scrollIntoView?.({block:'nearest',behavior:'smooth'});
  try{
   if(!window.p79V5ReviewPausedWrite)throw new Error('核對功能尚未載入，請重新整理');
   const review=await window.p79V5ReviewPausedWrite(key);
-  if(review.state==='saved'){show(false);el.textContent='✅ 雲端已是這份修改，已確認完成並解除待同步狀態。';return;}
-  if(review.state==='obsolete'){show(false);el.textContent='✅ 正式主表已無這筆紀錄，舊修改已備份並結束待同步；不會重新新增或改寫考勤。';return;}
+  if(review.state==='saved'){show(false);p79ReviewNext('✅ 雲端已是這份修改，已確認完成並解除待同步狀態。');return;}
+  if(review.state==='obsolete'){show(false);p79ReviewNext('✅ 正式主表已無這筆紀錄，舊修改已備份並結束待同步；不會重新新增或改寫考勤。');return;}
   const cloud=review.cloud,draft=review.payload.record;
-  el.innerHTML='<h3 style="margin-top:16px;font-weight:800">核對 '+safe(draft.name||cloud.name||draft.empId)+' 的修改</h3><table><tr><th>項目</th><th>目前雲端</th><th>你要的修改</th></tr>'+['timeStr','status','note'].map((field,i)=>'<tr><td>'+['時間','上下班','備註'][i]+'</td><td>'+safe(cloud[field]||'—')+'</td><td>'+safe(draft[field]||'—')+'</td></tr>').join('')+'</table><p>原修改依據的舊時間：'+safe(review.payload.originalTimeStr||'未記錄')+'</p><button id="p79ApplyPausedReview" type="button" style="margin-top:10px;padding:10px;background:#2563eb;color:white;border-radius:8px">確認套用我的修改</button><button id="p79ReloadPausedReview" type="button" style="margin-left:10px;padding:10px">重新核對</button><p id="p79PausedReviewResult"></p>';
+  el.innerHTML='<h3 style="margin-top:16px;font-weight:800">核對 '+safe(draft.name||cloud.name||draft.empId)+' 的修改</h3><table><tr><th>項目</th><th>目前雲端</th><th>你要的修改</th></tr>'+['timeStr','status','note'].map((field,i)=>'<tr><td>'+['時間','上下班','備註'][i]+'</td><td>'+safe(cloud[field]||'—')+'</td><td>'+safe(draft[field]||'—')+'</td></tr>').join('')+'</table><p><strong>原修改依據的舊時間：</strong>'+safe(review.payload.originalTimeStr||'未記錄')+'</p><p>雲端時間已與草稿原依據不同。請確認要保留正式雲端，還是採用這份修改；未選擇前不會自動寫入。</p><button id="p79ApplyPausedReview" type="button" style="margin-top:10px;padding:10px;background:#2563eb;color:white;border-radius:8px">確認套用我的修改</button><button id="p79KeepCloudPausedReview" type="button">保留目前雲端（備份舊修改）</button><button id="p79ReloadPausedReview" type="button" style="margin-left:10px;padding:10px">重新核對</button><p id="p79PausedReviewResult"></p>';
   document.getElementById('p79ReloadPausedReview').onclick=()=>reviewEntry(key);
+  document.getElementById('p79KeepCloudPausedReview').onclick=function(){
+   if(reviewBusy)return;
+   if(!confirm('確定保留雲端正式時間、不套用這筆草稿？系統會先備份原修改，再從待同步佇列撤回；不會改寫正式考勤。'))return;
+   reviewBusy=true;this.disabled=true;
+   try{
+    window.p79V5WithdrawPausedWrites([{key:review.key,payload:review.payload}]);
+    show(false);p79ReviewNext('✅ 保留雲端正式考勤，這份修改已備份並從待同步移除。');
+   }catch(error){document.getElementById('p79PausedReviewResult').textContent='撤回未完成：'+String(error?.message||error);this.disabled=false;}
+   finally{reviewBusy=false;}
+  };
   document.getElementById('p79ApplyPausedReview').onclick=async function(){
    if(reviewBusy)return;reviewBusy=true;this.disabled=true;
    const status=document.getElementById('p79PausedReviewResult');status.textContent='正在再次核對並送出修改…';
    try{
     const result=await window.p79V5ApplyPausedReview(review);
     show(false);
-    el.textContent=result?.ok&&!result.queued?'✅ 修改已核對並由雲端確認完成。':'尚未完成：'+String(result?.error||'已保留修改等待同步，請再次查看明細');
+    if(result?.ok&&!result.queued)p79ReviewNext('✅ 修改已再次核對，並由雲端確認完成。');
+    else el.textContent='尚未完成：'+String(result?.error||'修改草稿已保留，等待雲端確認；請再次查看明細');
    }catch(error){status.textContent=String(error.message||error);this.disabled=false;}
    finally{reviewBusy=false;}
   };
@@ -25486,7 +25513,10 @@ async function reviewEntry(key){
 }
 async function handleInspectorClick(event){
  const button=event.target.closest('button');if(!button)return;
- if(button.dataset.reviewKey){if(!auditBusy)void reviewEntry(decodeURIComponent(button.dataset.reviewKey));return;}
+ if(button.hasAttribute('data-review-next')){
+  if(!reviewBusy&&!auditBusy){const next=shownDrafts.keys().next().value;if(next)void reviewEntry(next);}return;
+ }
+ if(button.dataset.reviewKey){void reviewEntry(decodeURIComponent(button.dataset.reviewKey));return;}
  if(reviewBusy||auditBusy)return;
  const status=document.getElementById('p79OutboxReview');
  try{
