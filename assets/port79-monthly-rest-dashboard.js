@@ -35,13 +35,26 @@ function sourceRows(el){
     category:td[3]?.textContent?.trim()||'',period:td[4]?.textContent?.trim()||'',hours:'—',
     status:td[5]?.textContent?.trim()||'',source:td[6]?.textContent?.trim()||''};
  });
- return {ready,planned,prior};
+ // The controller audits the full authorized roster, including employees who
+ // have no eligible date or existing report. Surface these person-level rows
+ // separately from dated declarations; never manufacture a date or hours.
+ const roster=new Map();
+ for(const tr of $(el,'#mrNeedRows tr')){
+  const pick=$(tr,'.need-plan'),td=tr.cells;
+  if(!pick||td.length!==6)continue;
+  const id=String(pick.dataset.emp||td[1]?.textContent||'').trim();
+  if(!id||roster.has(id.toUpperCase()))continue;
+  const quota=td[4]?.textContent?.trim()||'尚無法計算',reason=td[5]?.textContent?.trim()||'須核對正式班表與考勤';
+  roster.set(id.toUpperCase(),{kind:'roster',id,date:'',name:td[3]?.textContent?.trim()||'',role:td[2]?.textContent?.trim()||'',category:quota,period:'日期／時段待核',hours:'—',status:quota==='尚無法計算'||/班表缺漏/.test(reason)?'缺資料':'未休待核對',source:reason,checked:false,disabled:true});
+ }
+ return {ready,planned,prior,roster:[...roster.values()]};
 }
 // Selection for inspection is independent of the official submit checkbox.
  // Pending/uncertain rows may be inspected even when cloud rules block filing.
 function selectionKey(row){return JSON.stringify([row.kind,row.id,row.date,row.name,row.category,row.period]);}
 function selectionMode(row){
  if(!row)return 'none';
+ if(row.kind==='roster')return 'review';
  if(row.kind==='existing')return row.status==='已核對出勤'?'none':'review';
  if(row.kind==='plan')return row.disabled?'review':'native';
  if(row.kind==='ready')return !row.disabled&&/可申報/.test(row.status)&&
@@ -131,9 +144,9 @@ function mount(el){
  shell.innerHTML=`
  <div class="mr-ux-banner"><span class="mr-ux-info">i</span><span id="mrUxProgress">正在核對正式班表、出勤及申報資料…</span><button type="button" id="mrUxReload" class="mr-ux-outline" title="重新讀取雲端資料">↻</button></div>
  <div class="mr-ux-stats">
- <div class="mr-ux-stat"><span class="mr-ux-symbol">⌛</span><div><span>待處理</span><strong id="mrUxPending">—</strong></div></div>
+ <div class="mr-ux-stat"><span class="mr-ux-symbol">⌛</span><div><span>待處理日期</span><strong id="mrUxPending">—</strong></div></div>
  <div class="mr-ux-stat"><span class="mr-ux-symbol">✓</span><div><span>可正式申報</span><strong id="mrUxReady">—</strong></div></div>
- <div class="mr-ux-stat"><span class="mr-ux-symbol">⚲</span><div><span>待核對</span><strong id="mrUxReview">—</strong></div></div>
+ <div class="mr-ux-stat"><span class="mr-ux-symbol">⚲</span><div><span>未休／待核對人員</span><strong id="mrUxReview">—</strong></div></div>
  <div class="mr-ux-stat"><span class="mr-ux-symbol">✓</span><div><span>已完成</span><strong id="mrUxDone">—</strong></div></div>
  </div>
  <div class="mr-ux-tools">
@@ -153,7 +166,7 @@ function mount(el){
  </div>
  <div class="mr-ux-table-scroll"><table class="mr-ux-table"><thead><tr>
  <th><input type="checkbox" id="mrUxAll" aria-label="全選目前可處理項目"></th>
- <th>日期</th><th>姓名</th><th>休假類型</th><th>建議時段</th><th>工時</th><th>狀態</th><th>操作</th>
+ <th>日期</th><th>姓名</th><th>休假類型／缺額</th><th>建議時段</th><th>工時</th><th>狀態</th><th>操作</th>
  </tr></thead><tbody id="mrUxRows"></tbody></table></div>
  <p id="mrUxListHint" style="font-size:11px;color:#617e9f;margin:9px 3px 0">所有數字均取自當月正式來源，尚未核實的預排不等於已申報。</p>
  </section>
@@ -174,10 +187,11 @@ function mount(el){
   const pendingReports=data.prior.filter(r=>r.status!=='已核對出勤'&&!/已取消|歷史版本/.test(r.status));
   const verified=data.prior.filter(r=>r.status==='已核對出勤'&&!/已取消|歷史版本/.test(r.status));
   const suggestions=data.planned.filter(r=>!r.disabled||r.checked);
-  const pending=[...data.ready,...suggestions,...pendingReports];
+  const pending=[...data.ready,...suggestions,...pendingReports,...data.roster];
   return {data,pending,verified};
  }
  function kind(row){
+  if(row.kind==='roster')return row.status==='缺資料'?'missing':'review';
   if(row.kind==='existing')return row.status==='已核對出勤'?'done':'review';
   if(row.kind==='plan')return 'plan';
   if(/缺|不足|無法|失敗|錯誤/.test(row.status))return 'missing';
@@ -207,15 +221,15 @@ function mount(el){
    const selectedPending=pending.filter(isPicked);
    const selectedReview=selectedPending.filter(r=>selectionMode(r)==='review');
    const selectedNative=selectedPending.length-selectedReview.length;
-   const needs=$$(el,'#mrNeedRows tr').filter(x=>$(x,'.need-plan')).length;
+   const needs=data.roster.length;
    const ready=data.ready.filter(r=>kind(r)==='ready').length;
    const sourceLoaded=!!text(el,'#mrAuditSummary');
-   const pendingTotal=data.ready.length+data.planned.length+data.prior.filter(r=>kind(r)==='review').length;
+   const pendingTotal=pending.filter(r=>r.kind!=='roster').length;
    q('#mrUxPending').textContent=sourceLoaded?pendingTotal+' 筆':'—';
    q('#mrUxReady').textContent=sourceLoaded?ready+' 筆':'—';
    q('#mrUxReview').textContent=sourceLoaded?needs+' 人':'—';
    q('#mrUxDone').textContent=sourceLoaded?verified.length+' 筆':'—';
-   q('#mrUxPendingTab').textContent=sourceLoaded?'('+pending.length+')':'';
+   q('#mrUxPendingTab').textContent=sourceLoaded?'('+pendingTotal+' 筆／'+needs+' 人)':'';
    q('#mrUxDoneTab').textContent=sourceLoaded?'('+verified.length+')':'';
    const info=originalState.replace(/\s+/g,' ').slice(0,115);
    const sourceFailed=!sourceLoaded&&/讀取失敗|核對失敗|錯誤|無法取得|無法載入/.test(info);
@@ -228,13 +242,14 @@ function mount(el){
    q('#mrUxAll').disabled=eligible.length===0;
    q('#mrUxAll').checked=eligible.length>0&&eligible.every(isPicked);
    q('#mrUxAll').indeterminate=eligible.some(isPicked)&&!q('#mrUxAll').checked;
-   q('#mrUxSelected').textContent='已勾選 '+selectedPending.length+' 筆（待核對 '+selectedReview.length+'／可處理 '+selectedNative+'）';
+   const countLabel=list=>{const people=list.filter(r=>r.kind==='roster').length;return (list.length-people)+' 筆'+(people?'／'+people+' 人':'');};
+   q('#mrUxSelected').textContent='已勾選 '+countLabel(selectedPending)+'（待核對 '+countLabel(selectedReview)+'／可處理 '+selectedNative+' 筆）';
    q('#mrUxReviewSummary').innerHTML=selectedPending.length?
-     '<b>已選取 '+selectedPending.length+' 筆供核對（其中 '+selectedReview.length+' 筆尚未符合申報條件）</b>'+
+     '<b>已選取 '+countLabel(selectedPending)+' 供核對（其中 '+countLabel(selectedReview)+' 僅供檢視）</b>'+
      selectedPending.slice(0,8).map(r=>'<div style="border-top:1px solid #dbe8f9;margin-top:7px;padding-top:7px">'+
-       esc(r.date)+'｜'+esc(r.name)+'｜'+esc(label(r))+
+       esc(r.date||'本月')+'｜'+esc(r.name)+'｜'+esc(label(r))+
        '<small style="display:block;color:#657b95">'+esc(r.source||r.status||'需核對正式班表及出勤')+'</small></div>').join('')+
-     (selectedPending.length>8?'<small>另有 '+(selectedPending.length-8)+' 筆已勾選</small>':''):
+     (selectedPending.length>8?'<small>另有 '+(selectedPending.length-8)+' 項已勾選</small>':''):
      '勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。';
    const nativeSave=$(el,'#mrSave'),nativePlan=$(el,'#mrSavePlans');
    q('#mrUxSavePlan').disabled=!!nativePlan?.disabled||!data.planned.some(r=>r.checked);
@@ -251,11 +266,11 @@ function mount(el){
      '<button type="button" data-action="edit" data-kind="ready" data-id="'+id+'" data-key="'+key+'">✎ 編輯</button><button type="button" data-action="view" data-kind="ready" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>':
      '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
-      'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date)+'</td><td>'+esc(r.name)+'</td>'+
+      'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date||'本月')+'</td><td>'+esc(r.name)+(r.kind==='roster'?'<small style="display:block;color:#64748b">'+esc(r.role)+'｜人員缺額核對</small>':'')+'</td>'+
       '<td><span class="mr-ux-kind">'+esc(r.category)+'</span></td><td>'+esc(periodLabel(r.period))+'</td><td>'+esc(r.hours)+'</td>'+
       '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span></td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
-   q('#mrUxListHint').textContent='顯示 '+shown.length+' 筆；預排建議須核對並儲存，正式申報僅接受符合現有8小時及雲端規則的項目。';
+   q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+'；人員缺額核對與日期申報是不同統計，同一人可能同時出現。未指定日期的核對人員不可直接申報。正式申報須符合原有8小時及雲端規則。';
    q('#mrUxExport').disabled=!shown.length;
   }finally{state.rendering=false;}
  }
@@ -265,7 +280,7 @@ function mount(el){
   if(selectionMode(row)==='native')nativePick(row,checked);
  }
  function nativePick(row,checked){
-  if(!row||row.kind==='existing')return;
+  if(!row||!['ready','plan'].includes(row.kind))return;
   const input=row.kind==='plan'?
     $(el,'#mrPlannedRows .plan-pick[data-plan-index="'+row.id+'"]'):
     $(el,'#mrRows tr[data-row="'+row.id+'"] .pick');
@@ -329,7 +344,7 @@ function mount(el){
    state.hint='請先勾選待核對資料；可以勾選灰色狀態的項目查看原因，但不會直接申報。';
   }else{
    const blocked=selected.filter(r=>selectionMode(r)==='review').length;
-   state.hint='已選取 '+selected.length+' 筆核對資料，其中 '+blocked+' 筆待查核；右側顯示所選項目，尚未修改正式申報狀態。';
+   state.hint='已選取 '+selected.length+' 項核對資料，其中 '+blocked+' 項待查核；右側顯示所選項目，尚未修改正式申報狀態。';
   }
   render();
  };
@@ -363,7 +378,7 @@ function mount(el){
  q('#mrUxExport').onclick=()=>{
   const records=currentView().shown;if(!records.length)return;
   const clean=x=>{let v=String(x??'');if(/^[=+@\-]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';};
-  const rows=[['日期','姓名','假別','建議時段','工時','狀態','來源'],...records.map(r=>[r.date,r.name,r.category,periodLabel(r.period),r.hours,label(r),r.kind])];
+  const rows=[['日期','姓名','職稱','假別／缺額','建議時段','工時','狀態','來源類型','核對原因'],...records.map(r=>[r.date,r.name,r.role||'',r.category,periodLabel(r.period),r.hours,label(r),r.kind==='roster'?'人員缺額核對':r.kind,r.source||r.status])];
   const csv='\uFEFF'+rows.map(r=>r.map(clean).join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
   const anchor=document.createElement('a');anchor.href=url;anchor.download='每月未休假加班-'+(originalMonth.value||'')+'.csv';

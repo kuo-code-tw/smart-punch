@@ -21,7 +21,20 @@ for(const row of [review,blocked,old,blockedPlan])
 assert.equal(ui.selectionMode(candidate),'native','verified candidate must use official checkbox');
 assert.equal(ui.selectionMode(pendingPlan),'native','available plan must use official checkbox');
 assert.equal(ui.selectionMode(completed),'none','already-verified existing records stay read-only');
+// Reproduce the operator's screen: 35 audited people and only 11 date rows.
+const cell=textContent=>({textContent});
+const makeRow=(id,missing=false)=>({cells:[cell(''),cell(id),cell('F/L'),cell('測試'+id),cell(missing?'尚無法計算':'例1／休2／國0'),cell(missing?'班表缺漏：沒有本月班表':'預排需自行建立')],querySelector:sel=>sel==='.need-plan'?{dataset:{emp:id},disabled:true}:null});
+const census=Array.from({length:35},(_,i)=>makeRow('E'+(i+1),i===34));
+const synthetic={querySelectorAll:sel=>sel==='#mrNeedRows tr'?[...census,census[0],{cells:[cell('空白')],querySelector:()=>null}]:[]};
+const audited=ui.sourceRows(synthetic);
+assert.equal(audited.roster.length,35,'all 35 authorized unresolved people are surfaced; no duplicate ID');
+assert.equal(audited.roster[34].status,'缺資料');
+assert(audited.roster.every(r=>r.date===''&&r.hours==='—'&&ui.selectionMode(r)==='review'),'roster-only rows never become date applications or native submission picks');
+assert.match(src,/const pending=\[\.\.\.data\.ready,\.\.\.suggestions,\.\.\.pendingReports,\.\.\.data\.roster\]/);
+assert.match(src,/const pendingTotal=pending\.filter\(r=>r\.kind!=='roster'\)\.length/);
+assert.match(src,/const needs=data\.roster\.length/);
 const set=new Set();
+assert.equal(ui.markForReview(set,audited.roster[0],true),true);assert.equal(ui.reviewSelected(set,audited.roster[0]),true);set.clear();
 const source=JSON.stringify({review,old,completed});
 assert.equal(ui.reviewSelected(set,review),false);
 assert.equal(ui.markForReview(set,review,true),true);
