@@ -18,7 +18,17 @@ function test(core,ui){
  assert(core.includes('meta.overtimeReport.planned!==true')&&core.includes('report.planned!==true'),'plan is not formal readback');
  assert(core.includes('note:backfillContext(loadedMonth).note,preventReplace:false'),'new report can be created');
  assert(core.includes('if(meta.overtimeReport||meta.overtime||meta.forEmpId'),'existing day guard retained');
- assert(ui.includes('申報後 '),'visible preview');
+ assert(!ui.includes('申報後 '),'no second visible preview line');
+ const single=(expected,allowPreview=true)=>{const html=view.quotaDisplayMarkup(api.personQuotaProgress(model,'A'),allowPreview);assert((html.match(/<small\b/g)||[]).length===1,'exactly one quota line');assert(html.includes('>'+expected+'</small>'),'rendered quota '+expected);return html;};
+ // Current model was refreshed after one verified save: 2/2.
+ single('例5/0／休2/2／國2/0');
+ const next={id:'NEXT',empId:'A',category:'休',date:'2026-11-18',checked:true};model.rows.push(next);
+ single('例5/0／休3/1／國2/0');single('例5/0／休2/2／國2/0',false);
+ assert(!view.quotaDisplayMarkup(api.personQuotaProgress(model,'A')).includes('例5/0／休2/2／國2/0'),'selected preview replaces original rather than appending');
+ model.quotaPreviewSuppressed=true;single('例5/0／休2/2／國2/0');
+ model.quotaPreviewSuppressed=false;next.checked=false;single('例5/0／休2/2／國2/0');
+ next.checked=true;next.saved=true;single('例5/0／休3/1／國2/0');model.rows.pop();
+ assert(core.includes('model.quotaPreviewSuppressed=!!failure||!!stop||unverified>0'),'failed or stopped writes restore actual display while retaining retry selection');
  const progress=api.personQuotaProgress(model,'A');
  const zero=api.personQuotaProgress({balances:[{emp:{empId:'Z'},quota:{例:5,休:4,國:2},off:{例:5,休:1,國:2},remaining:{例:0,休:0,國:0},reported:{例:0,休:3,國:0},formalReported:{例:0,休:3,國:0},reserved:{例:0,休:0,國:0}}],rows:[]},'Z');
  assert(api.quotaProgressText(progress)==='例5/0／休2/2／國2/0','native display matches dashboard');

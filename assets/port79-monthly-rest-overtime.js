@@ -833,7 +833,7 @@ function personQuotaProgress(model,empId){
   const confirmed=count((b.formalReported||b.reported)?.[c])+p[c].saved;
   const used=count(b.off?.[c])+count(b.reported?.[c])+count(b.reserved?.[c])+p[c].saved;
   const selected=Math.min(p[c].remaining,p[c].selected);
-  return [c,{used,confirmed,remaining:p[c].remaining,selected,afterUsed:used+selected,afterConfirmed:confirmed+selected,afterRemaining:p[c].after}];
+  return [c,{used,confirmed,remaining:p[c].remaining,selected,afterUsed:used+selected,afterConfirmed:confirmed+selected,afterRemaining:p[c].after,previewAllowed:!model.quotaPreviewSuppressed}];
  }));
 }
 function quotaProgressText(progress){
@@ -1005,7 +1005,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v15';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v16';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1225,13 +1225,13 @@ async function open(settings={}){
  }
  q('#mrRows').onclick=e=>{const button=e.target.closest('[data-audit]');if(button&&model)alert(auditText(model,button.dataset.audit));};
  q('#mrRows').onchange=e=>{const tr=e.target.closest('[data-row]');if(!tr)return;const r=model.rows[Number(tr.dataset.row)];if(r.saved)return;if(!e.target.classList.contains('pick'))r.id=crypto.randomUUID();
-  if(e.target.classList.contains('pick'))r.checked=e.target.checked;
+  if(e.target.classList.contains('pick')){r.checked=e.target.checked;model.quotaPreviewSuppressed=false;}
   if(e.target.classList.contains('date')){r.date=e.target.value;r.status='日期已改，儲存時重新核對出勤';}
   if(e.target.classList.contains('category')){r.category=e.target.value;const roster=snapshot.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule||{},pair=snapshot.pairs.find(p=>id(p.empId)===id(r.empId)&&p.date===r.date);r.rule=(ruleFor(r.date,roster,pair,r.category,rules)||rules.find(x=>x[0]===r.category&&fullDayRule(x))).slice();r.status='假別已改，申報前會重新核對未休額度';}
   if(e.target.classList.contains('rule')){r.rule=rules[Number(e.target.value)].slice();r.status='時段已改，儲存時重新核對出勤';}
   paint();
  };
- q('#mrAll').onchange=()=>{if(!model?.workflow?.canSubmit)return;visibleRows().forEach(({r})=>{if(!r.saved&&!r.planned)r.checked=q('#mrAll').checked;});paint();};
+ q('#mrAll').onchange=()=>{if(!model?.workflow?.canSubmit)return;model.quotaPreviewSuppressed=false;visibleRows().forEach(({r})=>{if(!r.saved&&!r.planned)r.checked=q('#mrAll').checked;});paint();};
  q('#mrLoad').onclick=async()=>{
   if(busy)return;invalidate();busy=true;controls(true);setStatus('正在同時讀取班表、出勤及雲端加班選項…');
   try{const requestedMonth=q('#mrMonth').value;
@@ -1478,7 +1478,7 @@ async function open(settings={}){
    }
    const confirmed=model.rows.filter(r=>r.saved).length,unverified=model.rows.filter(r=>r.attempted&&!r.saved).length;
    setStatus('本次已核對成功 '+confirmed+' 筆。'+(unverified?'另有 '+unverified+' 筆待核對。':'')+(stop?'已停止，其餘未送出。':'')+(failure?'後續停止：'+failure:'成功項目已移出待報清單。'));
-   lastFailure=failure;busy=false;paint();controls(false);a.refresh?.();
+   lastFailure=failure;model.quotaPreviewSuppressed=!!failure||!!stop||unverified>0;busy=false;paint();controls(false);a.refresh?.();
    // 成功申報後立即用最新雲端重新建立建議，已完成項目直接消失，不需關閉重開。
    if(confirmed&&!failure&&!stop){
     try{
