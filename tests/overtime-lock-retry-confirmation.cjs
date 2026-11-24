@@ -7,7 +7,7 @@ const draft={id:old.id,empId:'E9',date,preventReplace:true,rule:{category:'休',
 async function run(mode){
  let revision=1,gets=0,posts=0,confirmed=false;const ledger={...old};
  const mock={console,Date,Map,Promise,Number,String,JSON,Intl,AbortController,TypeError,Error,
-  currentPort79SsoToken:()=> 'token',p79CanReportOvertime:()=>true,getActiveGasUrl:()=> 'https://fixture.invalid',
+  p79AssertDirectReportActive:op=>{if(op?.stopped)throw Error('stopped');},currentPort79SsoToken:()=> 'token',p79CanReportOvertime:()=>true,getActiveGasUrl:()=> 'https://fixture.invalid',
   setTimeout:(fn,ms)=>ms>=45000?1:(fn(),2),clearTimeout:()=>{},
   buildDailyAttendanceRows:()=>[],p79WorkOvertimeMonths:new Map(),p79OvertimeCalculationCache:null,
   renderOvertimeStats:()=>{},localStorage:{setItem(){}},P79Overtime:{overtimeMinutes:()=>0}};

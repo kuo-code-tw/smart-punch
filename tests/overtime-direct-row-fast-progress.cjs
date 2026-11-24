@@ -11,7 +11,7 @@ async function test(page,report){
  assert(attempts===5,'legacy busy policy unchanged');
  assert(page.includes('if(!batch&&!draft.directRow)setTimeout'),'single render for direct confirmation');
  assert(page.includes('draft.directRow?30000:45000'),'bounded write wait');
- assert(page.includes('draft.directRow?1:3'),'bounded write lock retries');
+ assert(page.includes('if(lockRetry>=3)'),'bounded write lock retries');
  assert(page.includes("draft.onProgress?.('正式寫入')"),'write phase');
  assert(page.includes('expectedPunchStart:item.start,expectedPunchEnd:item.end'),'attendance unchanged');
  assert(page.includes('expectedRevision:cloud.revision'),'revision protection unchanged');

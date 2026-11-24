@@ -6,7 +6,7 @@
 <!-- Official HR hidden job-title policy: selectors only; data and calculations unchanged. -->
 <script defer src="../assets/port79-hidden-job-titles.js?v=20261117-hr-hidden-v1&refresh=20261118-stable-v1"></script>
 <script defer src="../assets/port79-workhours-hidden-job-ui.js?v=20261117-hr-filter-v1&refresh=20261118-stable-v1"></script>
-<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v6-watchdog"></script>
+<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v7-write-priority"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261124-planned-review-v3"></script>
 <script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
@@ -3158,10 +3158,11 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                document.getElementById('editRecordModal')?.getClientRects?.().length)return true;
             return false;
         }
+        var p79OvertimeWritePriority=0;
         function p79WorkhoursIsEditing(){
             // Only protect the brief blur interval after a real form edit;
             // the old 90-second blanket lock falsely blocked month refresh.
-            return p79WorkhoursHasOpenEditor()||Date.now()-p79LastUnsavedFormInteractionAt<6000;
+            return p79OvertimeWritePriority>0||p79WorkhoursHasOpenEditor()||Date.now()-p79LastUnsavedFormInteractionAt<6000;
         }
         function p79ShowAppVersionNotice(latestVersion){
             if(!latestVersion||latestVersion===APP_VERSION)return;
@@ -5463,6 +5464,7 @@ const now = new Date();
         window.p79PollAttendanceDelta = pollAttendanceDelta;
 
         async function checkAttendanceCloudRevision() {
+            if(p79OvertimeWritePriority>0)return;
             if (window.p79AttendanceDeltaEnabled) {
                 await pollAttendanceDelta(true);
                 return;
@@ -13346,6 +13348,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             });
         }
         function p79LoadWorkOvertimeMonths(sourceRecords,requestedMonth='',force=false){
+            if(p79OvertimeWritePriority>0)return;
             const token=currentPort79SsoToken();if(!token)return;
             const monthFilter=document.getElementById('overtimeMonthFilter');
             const selectedMonth=requestedMonth||(monthFilter?.dataset.p79MonthInitialized==='1'?monthFilter.value:new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date()));
@@ -13365,6 +13368,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 }
                 const state={...(previous?.token===token&&previous.ready?previous:{}),token,at:Date.now(),pending:true,ready:previous?.token===token&&previous.ready===true,revision:previous?.revision||null,rows:previous?.token===token?previous.rows||[]:[],covers:previous?.token===token?previous.covers||[]:[],leaveRecords:previous?.token===token?previous.leaveRecords||[]:[],attendanceEvidence:previous?.token===token?previous.attendanceEvidence:null,error:'',restEvidenceError:'',officialPayload:null,cacheMutationStamp:typeof sessionStorage==='undefined'?'':String(sessionStorage.getItem('port79_cache_mutated_at')||'')};p79WorkOvertimeMonths.set(month,state);
                 const load=async()=>{
+                    if(p79OvertimeWritePriority>0){state.pending=false;state.at=0;return;}
                     if(currentPort79SsoToken()!==token){state.pending=false;return;}
                     // Use the same account/month read as startup. A local bundle
                     // paints immediately; cloud roster rows paint before raw evidence.
@@ -13650,7 +13654,7 @@ async function p79ExportOvertimeComparison(printMode){
             window.P79OvertimeStatus.open({state:'amended',month:date.slice(0,7),employee:row.empId});
         }
         let p79MainPlannedSubmittingKey='',p79MainPlannedStage='';
-        function p79RunDirectReport(task,operation,limit=45000){
+        function p79RunDirectReport(task,operation,limit=90000){
             let timer;
             const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{
                 operation.stopped=true;
@@ -13674,7 +13678,7 @@ async function p79ExportOvertimeComparison(printMode){
                 return;
             }
             if(button&&button.dataset.planKey!==item.key)return;
-            p79PlannedBulkBusy=true;
+            p79PlannedBulkBusy=true;p79OvertimeWritePriority++;
             p79MainPlannedSubmittingKey=item.key;
             const started=Date.now(),operation={stopped:false,writeStarted:false,controller:new AbortController()};
             let ticker,verified=false;
@@ -13698,7 +13702,7 @@ async function p79ExportOvertimeComparison(printMode){
             }finally{
                 clearInterval(ticker);
                 p79MainPlannedSubmittingKey='';p79MainPlannedStage='';
-                p79PlannedBulkBusy=false;
+                p79PlannedBulkBusy=false;p79OvertimeWritePriority=Math.max(0,p79OvertimeWritePriority-1);
                 if(button){button.disabled=verified;button.textContent=verified?'已申報':operation.writeStarted?'重新核對':'直接申報';}
                 p79OvertimeCalculationCache=null;
                 setTimeout(()=>{try{renderOvertimeStats();}catch(error){console.warn('統計畫面更新失敗',error);}finally{try{p79RefreshPlannedBulkControls();}catch(error){console.warn(error);}}},0);
@@ -14620,7 +14624,7 @@ function p79OvertimePeriodLabel(report){
             // Only direct row confirmation gets the short bounded retry policy.
             // Bulk and legacy dialogs retain their established validation flow.
             if(progress){draft.directRow=true;draft.onProgress=progress;draft.directOperation=operation;}
-            const policy=progress?{maxAttempts:2,maxDelay:1600,rulesTimeout:10000,contextTimeout:12000,onStage:progress}:{};
+            const policy=progress?{maxAttempts:3,maxDelay:2500,rulesTimeout:10000,contextTimeout:12000,onStage:progress}:{};
             const validation=await api.prepareSaveValidation(draft,true,progress?()=>progress('雲端忙碌，重試'):undefined,policy);
             p79AssertDirectReportActive(operation);
             const active=api.activeReportRows(validation.rules.rows,validation.rules.config);
@@ -14659,10 +14663,10 @@ function p79OvertimePeriodLabel(report){
             if(!window.confirm('確定依完整實際打卡，核對以下 '+selected.length+
                 ' 筆原預排並逐筆儲存為正式申報？\n'+details+
                 '\n這不等於主管核准或薪資結算，若某筆雲端資料改變會停止該筆。'))return;
-            p79PlannedBulkBusy=true;
-            p79RefreshPlannedBulkControls();
+            p79PlannedBulkBusy=true;p79OvertimeWritePriority++;
             let completed=0,failed=[];
             try{
+                p79RefreshPlannedBulkControls();
                 for(let i=0;i<selected.length;i++){
                     const item=selected[i];
                     p79PlannedPunchNotice('批次核對進行中 '+(i+1)+' / '+selected.length+
@@ -14677,7 +14681,7 @@ function p79OvertimePeriodLabel(report){
                     }
                 }
             }finally{
-                p79PlannedBulkBusy=false;
+                p79PlannedBulkBusy=false;p79OvertimeWritePriority=Math.max(0,p79OvertimeWritePriority-1);
                 p79OvertimeCalculationCache=null;
                 renderOvertimeStats();
                 p79RefreshPlannedBulkControls();
@@ -17536,7 +17540,11 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  // 原申報在開窗後若已被別處更新，不可用本機舊 16-24 蓋掉雲端新 08-16。
  if(draft.plannedReview&&draft.expectedOriginalCode&&
      (String(existingReport?.code||'')!==String(draft.expectedOriginalCode)||
-      String(existingReport?.category||'')!==String(draft.expectedOriginalCategory||'')))
+      String(existingReport?.category||'')!==String(draft.expectedOriginalCategory||'')||
+      String(existingReport?.leaveId||'')!==String(draft.leaveHandoffId||'')||
+      String(existingReport?.coverDate||draft.date)!==String(draft.coverDate||draft.date)||
+      String(existingReport?.overtimeDate||draft.date)!==String(draft.overtimeDate||draft.date)||
+      (existingReport?.forEmpId&&String(existingReport.forEmpId).trim().toUpperCase()!==String(draft.forEmpId||'').trim().toUpperCase())))
      throw Error('原加班申報時段已由別處更新，已停止舊資料回寫。請重新讀取核對。');
  if(draft.manualPlan===true&&existingReport?.id&&String(existingReport.id)!==String(draft.id))throw Error('此人當日已有申報或預排，請開啟原紀錄處理，不能覆蓋。');
  const sameHours=Number(existingReport?.declaredHours)===Number(draft.rule.declaredHours)&&String(existingReport?.convertedHours??'')===String(draft.rule.convertedHours??'');
@@ -17610,9 +17618,11 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
   // its revision before retrying; do not replay ambiguous network failures.
   if(response.ok&&result?.ok===false&&result?.retryable===true&&/雲端目前正在處理其他資料/.test(String(result.error||''))){
    if(draft.directOperation)draft.directOperation.writeStarted=false;
-   if(lockRetry>=(draft.directRow?1:3))throw Error('雲端仍忙碌，未取得寫入鎖；本次修改尚未儲存。請重新開啟原申報核對。');
-   draft.onProgress?.('雲端忙碌，重試');
-   await new Promise(resolve=>setTimeout(resolve,750*(lockRetry+1)));
+   if(lockRetry>=3)throw Error('雲端寫入鎖仍被占用，本次修改尚未儲存；原預排保留，可直接再次申報。');
+   draft.onProgress?.('等待寫入鎖 '+(lockRetry+1)+'/3');
+   const delay=draft.directRow?Math.min(7500,Math.max(2500*(lockRetry+1),Number(result.retryAfterMs)||0)):750*(lockRetry+1);
+   await new Promise(resolve=>setTimeout(resolve,delay));
+   p79AssertDirectReportActive(draft.directOperation);
    return p79SaveWorkOvertimeDraft(draft,null,lockRetry+1);
   }
   if(!response.ok||result.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id||(draft.preventReplace&&result.report?.id!==draft.id))throw Error(result.error||'原申報身分或加班寫入尚未確認');
