@@ -25597,9 +25597,46 @@ async function keepVerifiedCloudBatch(button){
    '。未確認的草稿仍保留，請按「重新核對全部」再看最新差異。';
  }finally{reviewBusy=false;button.disabled=false;inspectorQueueSnapshot=queueSnapshot();}
 }
+async function keepAmbiguousCloudBatch(button){
+ if(reviewBusy||auditBusy||!ambiguousPausedBatch.length)return;
+ const snapshot=ambiguousPausedBatch.slice();
+ const status=document.getElementById('p79OutboxReview');
+ reviewBusy=true;button.disabled=true;
+ try{
+  status.textContent='正在重新讀取正式主表，確認重複考勤及原草稿均未變更…';
+  const refreshed=await window.p79V5AuditPausedQueue();
+  const latest=new Map((refreshed.ambiguousConflicts||[]).map(row=>[row.key,row]));
+  const queue=window.p79V5ReadPendingQueue?.()||[];
+  const selected=[];
+  for(const prior of snapshot){
+   const current=latest.get(prior.key);
+   const pending=queue.find(item=>item.key===prior.key&&item.paused&&
+    JSON.stringify(item.payload)===JSON.stringify(prior.payload));
+   if(!current||!pending||
+      ['id','name','originalTimeStr','desiredTimeStr','desiredStatus'].some(k=>
+       String(current[k]||'')!==String(prior[k]||''))||
+      JSON.stringify(current.candidates)!==JSON.stringify(prior.candidates))
+    throw new Error('正式主表的重複打卡或草稿內容已變更，沒有撤回任何修改；請重新核對全部');
+   selected.push({key:prior.key,payload:prior.payload});
+  }
+  if(!selected.length)throw new Error('沒有可核對的重複紀錄草稿');
+  if(!confirm('這 '+selected.length+' 筆仍有多筆相同編號的正式打卡，無法安全套用原修改。'+
+   '你確定目前以正式雲端資料為準，放棄這些尚未送出的修改嗎？系統會保留可恢復的草稿備份，並從待同步移出；正式打卡一筆也不會改。')){
+   status.textContent='已取消撤回，全部原修改均保留。';return;
+  }
+  const outcome=window.p79V5WithdrawPausedWrites(selected);
+  if(Number(outcome?.count)!==selected.length)throw new Error('草稿備份數量與預期不同，請重新查看明細');
+  ambiguousPausedBatch=[];show(false);
+  p79ReviewNext('✅ 已備份並撤回 '+outcome.count+' 筆重複編號草稿；雲端正式考勤維持原樣。');
+ }catch(error){
+  status.textContent='重複編號草稿整理未完成：'+String(error?.message||error)+
+   '。請重新核對正式時間，勿清除瀏覽器資料。';
+ }finally{reviewBusy=false;button.disabled=false;inspectorQueueSnapshot=queueSnapshot();}
+}
 async function handleInspectorClick(event){
  const button=event.target.closest('button');if(!button)return;
  if(button.hasAttribute('data-keep-cloud-verified-batch')){void keepVerifiedCloudBatch(button);return;}
+ if(button.hasAttribute('data-keep-cloud-ambiguous-batch')){void keepAmbiguousCloudBatch(button);return;}
  if(button.hasAttribute('data-review-next')){
   if(!reviewBusy&&!auditBusy){const next=shownDrafts.keys().next().value;if(next)void reviewEntry(next);}return;
  }
