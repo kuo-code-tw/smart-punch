@@ -15,6 +15,20 @@ function periodLabel(value){
  const match=raw.match(/^(.*?)(\d{2})-(\d{2})$/);
  return match?match[1]+' '+match[2]+':00 – '+match[3]+':00':raw||'時段待核';
 }
+function suggestionStatus(x){
+ if(x.referenceOnly)return x.eligible?'可預排':'待核對';
+ return x.planned?'預排建議':'待申報';
+}
+function suggestionPeriod(x){
+ const period=periodLabel(x.period);
+ return (x.category&&!period.startsWith(x.category)?x.category+' ':'')+period;
+}
+function suggestionText(x){return x.date+' '+suggestionPeriod(x);}
+function compactRosterStatus(row){
+ if(row.reviewType!=='deficit')return row.status;
+ if(!row.suggestions?.length)return '無建議';
+ return [...new Set(row.suggestions.map(suggestionStatus))].join('／');
+}
 function sourceRows(el){
  const ready=$$(el,'#mrRows tr[data-row]').map(tr=>{
   const td=tr.cells,pick=$(tr,'.pick');
@@ -53,7 +67,7 @@ function sourceRows(el){
   // The controller already excludes people with no deficit and no exceptions.
   let suggestions=[];try{const parsed=JSON.parse(tr.dataset?.periodSuggestions||'[]');if(Array.isArray(parsed))suggestions=parsed.filter(x=>x&&typeof x.date==='string'&&typeof x.period==='string'&&x.period.trim());}catch{}
   if(reviewType!=='deficit')suggestions=[];
-  const period=suggestions.length?suggestions.map(x=>x.date+' '+periodLabel(x.period)+'（'+x.note+'）').join('；'):reviewType==='deficit'?'無可參考的月底班表時段':'—';
+  const period=suggestions.length?suggestions.map(suggestionText).join('；'):reviewType==='deficit'?'無建議時段':'—';
   roster.set(id.toUpperCase(),{kind:'roster',id,date:'',name:td[3]?.textContent?.trim()||'',role:td[2]?.textContent?.trim()||'',category:reviewType==='missing'?'尚無法計算':reviewType==='exception'?'無缺額':quota,period,suggestions,canPreplan:reviewType==='deficit'&&tr.dataset?.canPreplan==='true',hours:'—',reviewType,due,status:reviewType==='missing'?'缺資料':reviewType==='deficit'?'未休缺額':'出勤／申報待核對',source:reason,checked:false,disabled:true});
  }
  return {ready,planned,prior,roster:[...roster.values()]};
@@ -212,7 +226,7 @@ function mount(el){
   if(!row.disabled&&/可申報/.test(row.status))return 'ready';
   return 'review';
  }
- function label(row){if(row.kind==='roster')return row.status;if(row.kind==='existing'&&/^預排/.test(row.status))return row.status;const type=kind(row);return {ready:'可申報',review:'待核對',missing:'缺資料',plan:'預排建議',done:'已完成'}[type];}
+ function label(row){if(row.kind==='roster')return compactRosterStatus(row);if(row.kind==='existing'&&/^預排/.test(row.status))return row.status;const type=kind(row);return {ready:'可申報',review:'待核對',missing:'缺資料',plan:'預排建議',done:'已完成'}[type];}
  function currentView(){const data=rows();let shown=state.tab==='done'?data.verified:state.tab==='audit'?data.audit:data.pending;
   if(state.name)shown=shown.filter(r=>norm(r.name).includes(norm(state.name)));
   if(state.status&&state.tab!=='done')shown=shown.filter(r=>kind(r)===state.status);
@@ -267,7 +281,7 @@ function mount(el){
      '<b>已選取 '+countLabel(selectedPending)+' 供核對（其中 '+countLabel(selectedReview)+' 僅供檢視）</b>'+
      selectedPending.slice(0,8).map(r=>'<div style="border-top:1px solid #dbe8f9;margin-top:7px;padding-top:7px">'+
        esc(r.date||'本月')+'｜'+esc(r.name)+'｜'+esc(label(r))+
-       '<small style="display:block;color:#657b95">'+esc(r.source||r.status||'需核對正式班表及出勤')+'</small></div>').join('')+
+       '<small style="display:block;color:#657b95">'+esc(r.kind==='roster'?r.period:r.status||'待核對')+'</small></div>').join('')+
      (selectedPending.length>8?'<small>另有 '+(selectedPending.length-8)+' 項已勾選</small>':''):
      '勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。';
    const nativeSave=$(el,'#mrSave'),nativePlan=$(el,'#mrSavePlans');
@@ -288,11 +302,11 @@ function mount(el){
      '<button type="button" data-action="edit" data-kind="ready" data-id="'+id+'" data-key="'+key+'">✎ 編輯</button><button type="button" data-action="view" data-kind="ready" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>':
      '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
-      'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date||'本月')+'</td><td>'+esc(r.name)+(r.kind==='roster'?'<small style="display:block;color:#64748b">'+esc(r.role)+'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對')+'</small>':'')+'</td>'+
-      '<td><span class="mr-ux-kind">'+esc(r.category)+'</span></td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc(x.date.slice(5))+' '+esc(periodLabel(x.period))+'</b><small style="display:block;color:'+(x.referenceOnly&&!x.eligible?'#9a6700':'#64748b')+'">'+(x.referenceOnly?(x.eligible?'預排可核對｜':'班表參考｜'):'')+esc(x.note)+'</small></div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
-      '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+(r.kind==='roster'?'<small style="display:block;white-space:normal;max-width:220px;color:#64748b">'+esc(r.source)+'</small>':'')+'</td><td>'+operations+'</td></tr>';
+      'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.suggestions?.length===1?r.suggestions[0].date:r.date||'—')+'</td><td>'+esc(r.name)+(r.kind==='roster'?'<small style="display:block;color:#64748b">'+esc(r.role)+'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對')+'</small>':'')+'</td>'+
+      '<td><span class="mr-ux-kind">'+esc(r.category)+'</span></td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+(r.suggestions.length>1?'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>':'')+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
+      '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
-   q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+'；'+(state.tab==='audit'?'零缺額但有異常、缺資料與既有待核申報在此列示，不列為未休缺額人員。':state.tab==='done'?'已完成申報不重複申報。':'僅列剩餘例／休／國大於零的人員及日期候選；可按個別預排申報設定日期與時段，或勾選自動編排建議後儲存預排；實際出勤後才可正式申報。零缺額異常另列。');
+   q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+'｜詳細原因請按檢視';
    q('#mrUxExport').disabled=!shown.length;
   }finally{state.rendering=false;}
  }
@@ -313,7 +327,7 @@ function mount(el){
   if(!row)return;
   const source=row.kind==='ready'?$(el,'#mrRows tr[data-row="'+row.id+'"] [data-audit]'):null;
   if(source){source.click();return;}
-  global.alert([row.name,row.date,row.category,periodLabel(row.period),row.status,row.source||''].filter(Boolean).join(' ｜ '));
+  global.alert([row.name,row.date,row.category,periodLabel(row.period),row.status,...(row.suggestions||[]).map(x=>suggestionText(x)+'｜'+(x.note||suggestionStatus(x))),row.source||''].filter(Boolean).join('\n'));
  }
  function edit(row){
   if(!row||row.kind!=='ready')return;
@@ -405,7 +419,7 @@ function mount(el){
  q('#mrUxExport').onclick=()=>{
   const records=currentView().shown;if(!records.length)return;
   const clean=x=>{let v=String(x??'');if(/^[=+@\-]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"';};
-  const rows=[['日期','姓名','職稱','假別／缺額','建議日期／時段','工時','狀態','來源類型','核對原因'],...records.map(r=>[r.date,r.name,r.role||'',r.category,periodLabel(r.period),r.hours,label(r),r.kind==='roster'?(r.reviewType==='deficit'?'人員缺額核對':'人員異常核對'):r.kind,r.source||r.status])];
+  const rows=[['日期','姓名','職稱','假別／缺額','建議日期／時段','工時','狀態','來源類型','核對原因'],...records.map(r=>[r.suggestions?.length===1?r.suggestions[0].date:r.date,r.name,r.role||'',r.category,periodLabel(r.period),r.hours,label(r),r.kind==='roster'?(r.reviewType==='deficit'?'人員缺額核對':'人員異常核對'):r.kind,r.source||r.status])];
   const csv='\uFEFF'+rows.map(r=>r.map(clean).join(',')).join('\r\n');
   const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
   const anchor=document.createElement('a');anchor.href=url;anchor.download='每月未休假加班-'+(originalMonth.value||'')+'.csv';
