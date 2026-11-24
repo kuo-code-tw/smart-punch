@@ -72,8 +72,11 @@ console.log('PASS original-date rest-day attendance, no invented future work, sa
  assert.equal(new Set(balanced.rows.map(r=>r.date)).size,4);
  now='2026-10-12';
  schedule[day(18)]='例';schedule[day(19)]='休';
+ schedule.__meta[day(19)]={restCategory:'休',restCategoryLocked:true};
  // Future scheduled holidays with no punches must reserve monthly capacity.
  const protectedPlan=api.plan(source,[worker],'2026-10',rules);
+ assert.equal(protectedPlan.balances[0].reserved.例,1);
+ assert.equal(protectedPlan.balances[0].reserved.休,1);
  assert.equal(protectedPlan.balances[0].remaining.例,1);
  assert.equal(protectedPlan.balances[0].remaining.休,1);
  assert.equal(protectedPlan.rows.length,2);

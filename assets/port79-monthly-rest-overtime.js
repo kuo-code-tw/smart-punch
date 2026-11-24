@@ -111,7 +111,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  // Only scheduled rest belongs in the holiday ledger; absence is not rest.
  const observedOffDates=partialNightDates;
  const allocated=g.p79AllocateRestMonth(roster,roster.__meta||{},month,excluded,start,end,
-   [...nonQuotaDates],[...nonQuotaDates],observedOffDates,[...exemptReportDates]).meta;
+   [...nonQuotaDates],[...nonQuotaDates],observedOffDates,[...exemptReportDates],weeklyCycleAnchor(emp)).meta;
  const ledger=[],extraRestDates=[];
  for(const d of dates){const m=roster.__meta?.[d]||{},r=m.overtimeReport,allocation=allocated[d];
   const actual=g.P79RestAttendance?.state(snapshot,emp.empId,d)||'unknown';
@@ -187,7 +187,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
    // turn an allocated rest day into an extra, unreported overtime entitlement;
    // a confirmed report above replaces that allocation exactly once.
    if(scheduledRest){
-    const kind=actual==='open'||actual==='missing'||actual==='unknown'&&snapshot?.attendanceEvidence?.complete===true?'reserved':'off';
+    const kind=d>today()||actual==='open'||actual==='missing'||actual==='unknown'&&snapshot?.attendanceEvidence?.complete===true?'reserved':'off';
     (kind==='reserved'?reserved:off)[allocation.restCategory]++;
     ledger.push({date:d,kind,category:allocation.restCategory,actual});
    }else if(actual==='rest'&&!storedReport(r)&&['早','中','晚'].includes(String(roster[d]||'').trim())){
@@ -265,7 +265,8 @@ function weeklyCycleWindow(date,anchor=''){
  const day=Date.parse(String(date)+'T00:00:00Z');
  if(!Number.isFinite(day))return null;
  const base=anchor?Date.parse(anchor+'T00:00:00Z'):day-new Date(day).getUTCDay()*86400000;
- const start=base+Math.floor((day-base)/604800000)*604800000;
+ const shared=typeof g.p79RestWeekStart==='function'?g.p79RestWeekStart(date,anchor):'';
+ const start=shared?Date.parse(shared+'T00:00:00Z'):base+Math.floor((day-base)/604800000)*604800000;
  const iso=ms=>new Date(ms).toISOString().slice(0,10);
  return {start:iso(start),end:iso(start+6*86400000),confirmed:!!anchor};
 }
@@ -376,7 +377,7 @@ function ruleFor(date,roster,pair,category,rules){
  const start=minute(period[0]),end=minute(period[1]);
  return allowed.find(r=>minute(r[6])===start&&minute(r[7])===end)||null;
 }
-const filingPriority=['例','休','國'];
+const filingPriority=typeof g.p79RestCategoryPriority==='function'?g.p79RestCategoryPriority():['例','休','國'];
 function sortRows(rows){
  const rank=r=>r.saved?2:(!r.planned&&r.status==='可申報'?0:1);
  return rows.sort((a,b)=>rank(a)-rank(b)||String(a.date).localeCompare(String(b.date))||filingPriority.indexOf(a.category)-filingPriority.indexOf(b.category)||String(a.name).localeCompare(String(b.name),'zh-Hant-u-co-stroke')||id(a.empId).localeCompare(id(b.empId)));
@@ -1016,7 +1017,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v20';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v21';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);

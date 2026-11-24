@@ -23,7 +23,15 @@ function p79RestVisibleCategory(month,category) {
   return category==='國'&&!p79RestQuota(month).slots.some(slot=>slot.category==='國')?'休':category;
 }
 
-function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[],typhoonDates=[],observedOffDates=[],quotaExemptReportDates=[]) {
+function p79RestWeekStart(date,anchor=''){
+  const day=Date.parse(String(date)+'T00:00:00Z');
+  if(!Number.isFinite(day))return '';
+  const parsed=Date.parse(String(anchor)+'T00:00:00Z');
+  const base=Number.isFinite(parsed)?parsed:day-new Date(day).getUTCDay()*86400000;
+  return new Date(base+Math.floor((day-base)/604800000)*604800000).toISOString().slice(0,10);
+}
+function p79RestCategoryPriority(){return ['例','休','國'];}
+function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentStart='',employmentEnd='',nationalExcludedDates=[],typhoonDates=[],observedOffDates=[],quotaExemptReportDates=[],cycleStart='') {
   const quota=p79RestQuota(month), result=JSON.parse(JSON.stringify(meta||{})), excluded=new Set(excludedDates),nationalBlocked=new Set(nationalExcludedDates),typhoonProtected=new Set(typhoonDates);
   // A fully checked no-punch work shift is shown as 休 in the roster. Reconcile it
   // with the SAME quota allocator instead of letting the UI count an extra 休
@@ -249,7 +257,7 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
       ...(preference?{restPreferredCategory:preference}:{})};
     used.add(date);
   };
-  const priority={'例':0,'休':1,'國':2};
+  const priority=Object.fromEntries(p79RestCategoryPriority().map((c,i)=>[c,i]));
   slots.sort((a,b)=>priority[a.category]-priority[b.category]||a.sourceDate.localeCompare(b.sourceDate));
   for(const slot of slots){
     const pool=available.filter(date=>!used.has(date)&&
@@ -266,7 +274,15 @@ function p79AllocateRestMonth(schedule,meta,month,excludedDates=[],employmentSta
             String(schedule[date]).trim()==='休'?0:1)
           :0;
       const x=rank(a),y=rank(b);
-      return Number(nightSplit(b))-Number(nightSplit(a))||x-y||
+      // Preserve monthly priority, then spread each category across the
+      // employee's known continuous cycles, without changing protected days.
+      const occupied=date=>{
+        if(!cycleStart||slot.category==='國')return 0;
+        const week=p79RestWeekStart(date,cycleStart);
+        return Number([...used].some(d=>p79RestWeekStart(d,cycleStart)===week&&
+          (verifiedRestReport(result[d])?result[d].overtimeReport.category:result[d]?.restCategory)===slot.category));
+      };
+      return Number(nightSplit(b))-Number(nightSplit(a))||occupied(a)-occupied(b)||x-y||
         Math.abs(Number(a.slice(8))-Number(slot.sourceDate.slice(8)))-
         Math.abs(Number(b.slice(8))-Number(slot.sourceDate.slice(8)))||a.localeCompare(b);
     });
