@@ -34,13 +34,13 @@ function quotaProgressLabel(progress,preview=false){
  if(!progress)return '';
  return ['例','休','國'].map(c=>{
   const p=progress[c];if(!p)return c+'—';
-  return c+(preview?p.afterConfirmed:p.confirmed)+'/'+(preview?p.afterRemaining:p.remaining);
+  return c+(preview?p.afterUsed:p.used)+'/'+(preview?p.afterRemaining:p.remaining);
  }).join('／');
 }
 function rowQuotaProgress(tr){
  try{
   const p=JSON.parse(tr?.dataset?.quotaProgress||'null');
-  return p&&['例','休','國'].every(c=>p[c]&&Number.isFinite(p[c].confirmed)&&Number.isFinite(p[c].remaining))?p:null;
+  return p&&['例','休','國'].every(c=>p[c]&&Number.isFinite(p[c].used)&&Number.isFinite(p[c].remaining))?p:null;
  }catch{return null;}
 }
 function sourceRows(el){
@@ -248,7 +248,7 @@ function mount(el){
  </div>
  <div class="mr-ux-table-scroll"><table class="mr-ux-table"><thead><tr>
  <th><input type="checkbox" id="mrUxAll" aria-label="全選目前可處理項目"></th>
- <th>日期</th><th>姓名</th><th>休假類型／缺額</th><th>建議日期／時段</th><th>工時</th><th>狀態</th><th>操作</th>
+ <th>日期</th><th>姓名</th><th>休假類型／額度</th><th>建議日期／時段</th><th>工時</th><th>狀態</th><th>操作</th>
  </tr></thead><tbody id="mrUxRows"></tbody></table></div>
  <p id="mrUxListHint" style="font-size:11px;color:#617e9f;margin:9px 3px 0">所有數字均取自當月正式來源，尚未核實的預排不等於已申報。</p>
  </section>
@@ -365,7 +365,7 @@ function mount(el){
      '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
       'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.suggestions?.length===1?r.suggestions[0].date:r.date||(r.residualOnly?'未安排':'—'))+(r.lastReported?'<small style="display:block;color:#526e91">最近正式報單 '+esc(r.lastReported.slice(5))+'</small>':'')+'</td><td>'+esc(r.name)+(r.role?'<small style="display:block;color:#64748b">'+esc(r.role)+(r.kind==='roster'?'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對'):'')+'</small>':'')+'</td>'+
-      '<td><span class="mr-ux-kind">'+esc(r.category)+'</span>'+(quotaNow?'<small style="display:block;color:#475569;margin-top:4px" title="已正式申報／剩餘缺額（天）">'+esc(quotaNow)+'</small>'+(hasPreview?'<small style="display:block;color:#075985;font-weight:700" title="勾選項目成功申報後的預計數字">申報後 '+esc(quotaAfter)+'</small>':''):r.quota?'<small style="display:block;color:#64748b;margin-top:4px">'+esc(r.quota)+'</small>':'')+'</td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>'+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
+      '<td><span class="mr-ux-kind">'+esc(r.category)+'</span>'+(quotaNow?'<small style="display:block;color:#475569;margin-top:4px" title="已使用額度（含原班表已休、帳本已占用及已確認補報）／剩餘缺額（天）">'+esc(quotaNow)+'</small>'+(hasPreview?'<small style="display:block;color:#075985;font-weight:700" title="勾選項目成功申報後的預計數字">申報後 '+esc(quotaAfter)+'</small>':''):r.quota?'<small style="display:block;color:#64748b;margin-top:4px">'+esc(r.quota)+'</small>':'')+'</td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>'+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
       '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
    q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+(state.tab==='pending'&&audit.some(r=>r.residualOnly)?'｜尚無日期的缺額請見「已預排／待核對」':'');
