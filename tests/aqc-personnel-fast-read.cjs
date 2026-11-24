@@ -54,6 +54,12 @@ async function hr(){
  await assert.rejects(stale,/登入身分已變更/);
  pending[4].resolve({ok:true,employees:[{empId:'SAFE',name:'新帳號資料'}]});
  assert.equal((await newer).employees[0].empId,'SAFE');
+ ctx.getHomeAdminSession=()=>({adminRole:'superadmin'});
+ const hr=ctx.p79ReadOfficialAqcRoster(true);await Promise.resolve();await Promise.resolve();
+ assert.equal(requests[6].action,'hrGetEmployees','HR-authorized accounts must read the same source as HR');
+ assert.equal(requests[6].timeout,30000);
+ pending[6].resolve({ok:true,employees:[{empId:'FORMER',employmentStatus:'resigned'}]});
+ assert.equal((await hr).employees[0].employmentStatus,'resigned');
 }
 function lazyRanking(){
  let observer=null,loadCount=0;
