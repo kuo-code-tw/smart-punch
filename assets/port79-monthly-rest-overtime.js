@@ -1005,7 +1005,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v18';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v19';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1037,8 +1037,8 @@ async function open(settings={}){
   if(!autoPlan||isReadOnlySource()||snapshot?.attendanceEvidence?.complete!==true||model?.workflow?.canSubmit!==true)return;
   const current=today();
   for(const row of model?.rows||[]){
-   // Regular-day exceptions still require an explicit individual selection.
-   if(!row.saved&&!row.planned&&!row.attempted&&row.status==='可申報'&&row.category!=='例'&&row.date<=current)row.checked=true;
+   // All three categories can be paired; formal submission retains the explicit regular-day legal exception confirmation.
+   if(!row.saved&&!row.planned&&!row.attempted&&row.status==='可申報'&&cats.includes(row.category)&&row.date<=current)row.checked=true;
   }
  }
  function visibleExistingRows(){const ids=new Set(chosenPeople().map(e=>id(e.empId)));
