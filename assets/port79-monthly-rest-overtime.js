@@ -832,6 +832,10 @@ function personQuotaProgress(model,empId){
   return [c,{confirmed,remaining:p[c].remaining,selected,afterConfirmed:confirmed+selected,afterRemaining:p[c].after}];
  }));
 }
+function quotaProgressText(progress){
+ if(!progress)return '尚無法計算';
+ return ['例','休','國'].map(c=>c+progress[c].confirmed+'/'+progress[c].remaining).join('／');
+}
 function personSummary(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
  const p=reportProgress(model,empId);
@@ -997,7 +1001,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v12';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v13';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1072,7 +1076,10 @@ async function open(settings={}){
   q('#mrNewPlan').textContent='＋ 新增預排'+(!autoPlan&&manualPeople.size?'（已勾 '+manualPeople.size+' 人）':'');
   sortRows(model.rows);
   const progress=reportProgress(model),sum=key=>cats.reduce((n,c)=>n+progress[c][key],0);
-  const personLabels=new Map(model.balances.map(b=>[id(b.emp.empId),personSummary(model,b.emp.empId)]));
+  const personProgress=new Map(model.balances.map(b=>[id(b.emp.empId),personQuotaProgress(model,b.emp.empId)]));
+  const quotaFor=empId=>personProgress.get(id(empId))||null;
+  const quotaAttr=empId=>' data-quota-progress="'+esc(JSON.stringify(quotaFor(empId)))+'"';
+  const personLabels=new Map([...personProgress].map(([empId,p])=>[empId,quotaProgressText(p)]));
   const pendingRows=visibleRows().map(({r})=>r).filter(r=>!r.saved&&!r.planned);
    const chosen=chosenPeople(),supplement=automaticSupplementReviewRows(snapshot,chosen,loadedMonth,model);
    const allSupplement=automaticSupplementReviewRows(snapshot,loadedPeople,loadedMonth,model);
@@ -1102,7 +1109,7 @@ async function open(settings={}){
     (provisional?' ⚠️ 此份歷史備援非月底核薪定稿。':'')+
     (attendanceUnavailable?' ⚠️ 考勤讀取未完成，僅展示既有申報，不判定實際出勤。':'');
    q('#mrExistingRows').innerHTML=existing.map(r=>
-    '<tr><td>'+esc(r.date)+'</td><td>'+esc(r.role)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.category)+'</td><td>'+esc(r.code||'時段待核')+
+    '<tr data-emp="'+esc(r.empId)+'"'+quotaAttr(r.empId)+'><td>'+esc(r.date)+'</td><td>'+esc(r.role)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.category)+'</td><td>'+esc(r.code||'時段待核')+
     '</td><td>'+esc(r.status)+'</td><td>'+esc(r.typhoon?'颱風加班（另核額度）':r.monthlyRest?'每月未休假加班':r.source||'一般例休國申報')+
     '</td><td><small>'+esc(r.reportId)+'</small></td></tr>').join('')||
     '<tr><td colspan="8">'+(scheduleCount?'這個篩選沒有已保存的例／休／國申報編號，其他加班仍需另查。':'本月來源尚未讀到，不能當作零申報。')+'</td></tr>';
@@ -1152,7 +1159,7 @@ async function open(settings={}){
       ' 筆（尚未建立）｜未能安排 '+unfilled+' 天'+(weeklyReview?'｜例休週期待核 '+weeklyReview+' 筆':'')+'；尚未發生或尚未核實，不計入正式申報';
     q('#mrPlannedRows').innerHTML=upcoming.map(r=>{
       const emp=loadedPeople.find(e=>id(e.empId)===id(r.empId))||{};
-      return '<tr data-emp="'+esc(r.empId)+'" data-hours="'+esc(r.rule?.[2]||'')+' 小時"><td><input type="checkbox" class="plan-pick" data-plan-index="'+model.plannedRows.indexOf(r)+'" '+(r.checked?'checked':'')+' '+(r.saved?'disabled':'')+' aria-label="預排 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date)+'</td><td>'+esc(job(emp))+'</td><td>'+esc(r.name)+'</td><td class="'+esc(r.category)+'">'+
+      return '<tr data-emp="'+esc(r.empId)+'"'+quotaAttr(r.empId)+' data-hours="'+esc(r.rule?.[2]||'')+' 小時"><td><input type="checkbox" class="plan-pick" data-plan-index="'+model.plannedRows.indexOf(r)+'" '+(r.checked?'checked':'')+' '+(r.saved?'disabled':'')+' aria-label="預排 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date)+'</td><td>'+esc(job(emp))+'</td><td>'+esc(r.name)+'</td><td class="'+esc(r.category)+'">'+
         esc(r.category)+'</td><td>'+esc(r.rule?.[1])+'</td><td>'+esc(r.status)+'</td></tr>';
     }).join('')||'<tr><td colspan="7">目前沒有可產生的月底預排草案；請查看各單位缺額和班表限制</td></tr>';
     const review=rosterReviewRows(model,chosenPeople());
@@ -1178,7 +1185,7 @@ async function open(settings={}){
     q('#mrNeedRows').innerHTML=review.map(x=>{
      const due=x.missing?null:cats.reduce((n,k)=>n+Math.max(0,Number(x.remaining[k])||0),0);
      const reviewType=x.missing?'missing':due>0?'deficit':'exception';
-     const quota=x.missing?'尚無法計算':'例'+x.remaining.例+'／休'+x.remaining.休+'／國'+x.remaining.國;
+     const quota=x.missing?'尚無法計算':quotaProgressText(quotaFor(x.emp.empId));
      const hint=reviewType==='deficit'?(unverifiedSource?{suggestions:[],reason:'正式考勤尚未完整核對，不能建議申報時段'}:personPeriodSuggestions(model,x.emp.empId)):{suggestions:[],reason:''};
      const status=x.missing?'班表缺漏：'+x.reason:
        (x.unreported?'排休日有出勤未申報 '+x.unreported+' 天；':'')+
@@ -1190,7 +1197,7 @@ async function open(settings={}){
      const canPreplan=canManual&&!unverifiedSource&&(Number(x.remaining.休)>0||Number(x.remaining.國)>0);
      const pick=autoPlan?'<input type="checkbox" class="need-plan" data-emp="'+esc(x.emp.empId)+'" aria-label="勾選 '+esc(x.emp.name)+' 的自動預排" '+(plans.length&&plans.every(r=>r.checked)?'checked ':'')+(!plans.length||busy?'disabled':'')+'>':
       '<input type="checkbox" class="need-plan manual-person-pick" data-emp="'+esc(x.emp.empId)+'" aria-label="手動預排勾選 '+esc(x.emp.name)+'" '+(manualPeople.has(id(x.emp.empId))?'checked ':'')+(!canManual||busy?'disabled':'')+' title="'+(canManual?'勾選後指定日期與時段；不會自動申報':'班表不完整、沒有剩餘額度或無可預排的未來日期')+'">';
-     return '<tr data-review-type="'+reviewType+'" data-quota-progress="'+esc(JSON.stringify(personQuotaProgress(model,x.emp.empId)))+'" data-period-suggestions="'+esc(JSON.stringify(hint.suggestions))+'" data-last-reported="'+esc(hint.lastReported||'')+'" data-next-report-date="'+esc(hint.nextReportDate||'')+'" data-can-preplan="'+String(canPreplan)+'"><td>'+pick+'</td><td>'+esc(x.emp.empId)+'</td><td>'+esc(x.role)+'</td><td>'+esc(x.emp.name)+'</td><td>'+esc(quota)+'</td><td>'+esc(status)+'</td></tr>';
+     return '<tr data-review-type="'+reviewType+'" data-quota-progress="'+esc(JSON.stringify(quotaFor(x.emp.empId)))+'" data-period-suggestions="'+esc(JSON.stringify(hint.suggestions))+'" data-last-reported="'+esc(hint.lastReported||'')+'" data-next-report-date="'+esc(hint.nextReportDate||'')+'" data-can-preplan="'+String(canPreplan)+'"><td>'+pick+'</td><td>'+esc(x.emp.empId)+'</td><td>'+esc(x.role)+'</td><td>'+esc(x.emp.name)+'</td><td>'+esc(quota)+'</td><td>'+esc(status)+'</td></tr>';
     }).join('')||'<tr><td colspan="6">目前篩選內無未休額度或待核人員</td></tr>';
    const manualPicked=[...manualPeople.values()];
    q('#mrManualSummary').textContent='手動預排已勾選 '+manualPicked.length+' 人｜請逐人設定日期及時段後儲存';
@@ -1207,7 +1214,7 @@ async function open(settings={}){
    autoHistoricalReady()?'已選 '+sum('selected')+' 筆核實出勤；須雲端回讀確認':
    autoPlan?'已選預排 '+selectedPlans.length+' 筆（非正式申報）':
    '已勾選 '+sum('selected')+' 筆；請確認日期與時段後送出';
-  q('#mrRows').innerHTML=visibleRows().map(({r,i})=>r.saved?'':'<tr data-row="'+i+'" data-emp="'+esc(r.empId)+'"><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved||r.planned||!model.workflow.canSubmit?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+loadedMonth+'-01'+'" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td class="person">'+esc(r.name)+' <button type="button" class="person-progress" data-audit="'+esc(r.empId)+'" title="查看此人逐日額度核對">'+esc(personLabels.get(id(r.empId)))+'</button></td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c&&fullDayRule(rule))).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category&&fullDayRule(rule)?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時'+'</td><td>'+esc(r.status)+'</td></tr>').join('');
+  q('#mrRows').innerHTML=visibleRows().map(({r,i})=>r.saved?'':'<tr data-row="'+i+'" data-emp="'+esc(r.empId)+'"'+quotaAttr(r.empId)+'><td><input class="pick" type="checkbox" '+(r.checked?'checked':'')+' '+(r.saved||r.planned||!model.workflow.canSubmit?'disabled':'')+' aria-label="申報 '+esc(r.name)+' '+r.date+'"></td><td><input class="date" type="date" value="'+r.date+'" min="'+loadedMonth+'-01'+'" max="'+loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0')+'" '+(r.saved?'disabled':'')+'></td><td class="person">'+esc(r.name)+' <button type="button" class="person-progress" data-audit="'+esc(r.empId)+'" title="查看此人逐日額度核對">'+esc(personLabels.get(id(r.empId)))+'</button></td><td class="'+r.category+'"><select class="category" '+(r.saved?'disabled':'')+'>'+cats.filter(c=>rules.some(rule=>rule[0]===c&&fullDayRule(rule))).map(c=>'<option '+(c===r.category?'selected':'')+'>'+c+'</option>').join('')+'</select></td><td><select class="rule" '+(r.saved?'disabled':'')+'>'+rules.map((rule,k)=>rule[0]===r.category&&fullDayRule(rule)?'<option value="'+k+'" '+(JSON.stringify(rule)===JSON.stringify(r.rule)?'selected':'')+'>'+esc(rule[1])+'</option>':'').join('')+'</select></td><td>'+esc(r.rule[2])+' 小時'+'</td><td>'+esc(r.status)+'</td></tr>').join('');
   if(busy)q('#mrResult').textContent=q('#mrStatus').textContent;
   q('#mrSave').disabled=busy||isReadOnlySource()||!(selectedFormal||
     (autoPlan&&!autoHistoricalReady()?selectedPlans.length:manualPeople.size&&!autoPlan));
@@ -1487,6 +1494,6 @@ async function open(settings={}){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
 
 })(window);

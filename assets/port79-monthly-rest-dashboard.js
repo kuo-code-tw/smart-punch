@@ -37,23 +37,29 @@ function quotaProgressLabel(progress,preview=false){
   return c+(preview?p.afterConfirmed:p.confirmed)+'/'+(preview?p.afterRemaining:p.remaining);
  }).join('／');
 }
+function rowQuotaProgress(tr){
+ try{
+  const p=JSON.parse(tr?.dataset?.quotaProgress||'null');
+  return p&&['例','休','國'].every(c=>p[c]&&Number.isFinite(p[c].confirmed)&&Number.isFinite(p[c].remaining))?p:null;
+ }catch{return null;}
+}
 function sourceRows(el){
  const ready=$$(el,'#mrRows tr[data-row]').map(tr=>{
   const td=tr.cells,pick=$(tr,'.pick');
   return {kind:'ready',id:tr.dataset.row,empId:tr.dataset.emp||'',date:$(tr,'.date')?.value||'',name:$(tr,'.person')?.firstChild?.textContent?.trim()||'',
    category:$(tr,'.category')?.value||'',period:$(tr,'.rule')?.selectedOptions?.[0]?.textContent||'',hours:td[5]?.textContent?.trim()||'—',
    status:td[6]?.textContent?.trim()||'',checked:!!pick?.checked,disabled:!!pick?.disabled,
-   audit:$(tr,'[data-audit]')?.dataset.audit||''};
+   quotaProgress:rowQuotaProgress(tr),audit:$(tr,'[data-audit]')?.dataset.audit||''};
  }).filter(r=>r.date);
  const planned=$$(el,'#mrPlannedRows tr').filter(tr=>$(tr,'.plan-pick')).map(tr=>{
   const td=tr.cells,pick=$(tr,'.plan-pick');
   return {kind:'plan',id:pick.dataset.planIndex,empId:tr.dataset?.emp||'',date:td[1]?.textContent?.trim()||'',name:td[3]?.textContent?.trim()||'',
     category:td[4]?.textContent?.trim()||'',period:td[5]?.textContent?.trim()||'',hours:tr.dataset?.hours||'—',
-    status:td[6]?.textContent?.trim()||'預排待核',checked:!!pick.checked,disabled:!!pick.disabled};
+    quotaProgress:rowQuotaProgress(tr),status:td[6]?.textContent?.trim()||'預排待核',checked:!!pick.checked,disabled:!!pick.disabled};
  });
  const prior=$$(el,'#mrExistingRows tr').filter(tr=>tr.cells.length===8).map(tr=>{
   const td=tr.cells;
-  return {kind:'existing',id:td[7]?.textContent?.trim()||'',date:td[0]?.textContent?.trim()||'',name:td[2]?.textContent?.trim()||'',
+  return {kind:'existing',id:td[7]?.textContent?.trim()||'',empId:tr.dataset?.emp||'',quotaProgress:rowQuotaProgress(tr),date:td[0]?.textContent?.trim()||'',name:td[2]?.textContent?.trim()||'',
     category:td[3]?.textContent?.trim()||'',period:td[4]?.textContent?.trim()||'',hours:'—',
     status:td[5]?.textContent?.trim()||'',source:td[6]?.textContent?.trim()||''};
  });
@@ -69,11 +75,12 @@ function sourceRows(el){
   const quota=td[4]?.textContent?.trim()||'尚無法計算',reason=td[5]?.textContent?.trim()||'須核對正式班表與考勤';
   const missing=tr.dataset?.reviewType==='missing'||quota==='尚無法計算'||/班表缺漏/.test(reason);
   const counts=quota.match(/^例(\d+(?:\.\d+)?)／休(\d+(?:\.\d+)?)／國(\d+(?:\.\d+)?)$/);
-  const due=missing?null:counts?counts.slice(1).reduce((sum,n)=>sum+Number(n),0):null;
+  const quotaProgress=rowQuotaProgress(tr);
+  const splitCounts=quota.match(/^例\d+\/(\d+)／休\d+\/(\d+)／國\d+\/(\d+)$/);
+  const due=missing?null:quotaProgress?['例','休','國'].reduce((sum,c)=>sum+quotaProgress[c].remaining,0):(splitCounts||counts)?(splitCounts||counts).slice(1).reduce((sum,n)=>sum+Number(n),0):null;
   const reviewType=due===null?'missing':due>0?'deficit':'exception';
   // Zero remaining quota does not mean the source has no attendance exception.
   // The controller already excludes people with no deficit and no exceptions.
-  let quotaProgress=null;try{quotaProgress=JSON.parse(tr.dataset?.quotaProgress||'null');}catch{}
   let suggestions=[];try{const parsed=JSON.parse(tr.dataset?.periodSuggestions||'[]');if(Array.isArray(parsed))suggestions=parsed.filter(x=>x&&typeof x.date==='string'&&typeof x.period==='string'&&x.period.trim());}catch{}
   if(reviewType!=='deficit')suggestions=[];
   const period=suggestions.length?suggestions.map(suggestionText).join('；'):reviewType==='deficit'?'無建議時段':'—';
@@ -89,7 +96,7 @@ function dailyPendingRows(data){
  const dated=new Map(),result=[];
  for(const row of [...data.ready,...data.planned]){
   const person=people.get(String(row.empId||'').trim().toUpperCase());
-  const item={...row,role:person?.role||row.role||'',quota:person?.category||'',quotaProgress:person?.quotaProgress||null,lastReported:person?.lastReported||''};
+  const item={...row,role:person?.role||row.role||'',quota:person?.category||'',quotaProgress:row.quotaProgress||person?.quotaProgress||null,lastReported:person?.lastReported||''};
   // The real dated row takes precedence over the person's preview of it.
   const k=key(row.empId||row.audit||row.name,row.date);
   if(dated.has(k))continue;
@@ -348,7 +355,7 @@ function mount(el){
    if(state.tab!=='pending'){q('#mrUxSavePlan').disabled=true;q('#mrUxSubmit').disabled=true;}
    q('#mrUxHint').textContent=state.tab==='audit'?'異常核對唯讀，不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
    q('#mrUxRows').innerHTML=shown.map(r=>{
-    const quota=r.quotaProgress,quotaNow=quotaProgressLabel(quota),quotaAfter=quotaProgressLabel(quota,true);
+    const quota=r.quotaProgress,quotaNow=quotaProgressLabel(quota)||'額度待核對',quotaAfter=quotaProgressLabel(quota,true);
     const hasPreview=quota&&Object.values(quota).some(p=>p.selected>0);
     const type=kind(r),status=label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
     const id=esc(r.id),kindKey=esc(r.kind),key=esc(selectionKey(r));

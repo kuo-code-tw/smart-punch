@@ -18,6 +18,19 @@ function test(core,ui){
  assert(core.includes('note:backfillContext(loadedMonth).note,preventReplace:false'),'new report can be created');
  assert(core.includes('if(meta.overtimeReport||meta.overtime||meta.forEmpId'),'existing day guard retained');
  assert(ui.includes('申報後 '),'visible preview');
+ const progress=api.personQuotaProgress(model,'A');
+ const zero=api.personQuotaProgress({balances:[{emp:{empId:'Z'},remaining:{例:0,休:0,國:0},formalReported:{例:0,休:3,國:0}}],rows:[]},'Z');
+ assert(api.quotaProgressText(progress)==='例0/0／休2/2／國0/0','native display matches dashboard');
+ assert(api.quotaProgressText(zero)==='例0/0／休3/0／國0/0','completed employee retains totals');
+ assert(api.quotaProgressText(null)==='尚無法計算','unknown quota never becomes zero');
+ const cell=textContent=>({textContent});
+ const ready={dataset:{row:'17',emp:'A',quotaProgress:JSON.stringify(progress)},cells:[cell(''),cell(''),cell(''),cell(''),cell(''),cell('8'),cell('可申報')],querySelector(s){return {'.pick':{checked:false,disabled:false},'.date':{value:'2026-11-17'},'.person':{firstChild:cell('A')},'.category':{value:'休'},'.rule':{selectedOptions:[cell('休08-16')]}}[s]||null;}};
+ const plan={dataset:{emp:'A',quotaProgress:JSON.stringify(progress)},cells:['','2026-11-18','F/L','A','休','休08-16','預排'].map(cell),querySelector(s){return s==='.plan-pick'?{dataset:{planIndex:'1'},checked:false,disabled:false}:null;}};
+ const prior={dataset:{emp:'Z',quotaProgress:JSON.stringify(zero)},cells:['2026-11-19','F/L','Z','休','休08-16','已核對出勤','每月未休假加班','Z19'].map(cell)};
+ const parsed=view.sourceRows({querySelectorAll(s){return {'#mrRows tr[data-row]':[ready],'#mrPlannedRows tr':[plan],'#mrExistingRows tr':[prior],'#mrNeedRows tr':[]}[s]||[];}});
+ assert(view.quotaProgressLabel(parsed.prior[0].quotaProgress)==='例0/0／休3/0／國0/0','completed row independent of deficit roster');
+ assert(view.dailyPendingRows(parsed).every(r=>view.quotaProgressLabel(r.quotaProgress)==='例0/0／休2/2／國0/0'),'ready and planned dates always retain same person quota');
+ assert(core.includes('quotaAttr(r.empId)'),'controller emits quota data on dated rows');
  return 'PASS existing 1/3, checked 2/2 preview, confirmed 2/2, uncheck, refresh, employee isolation, new report guard';
 }
 console.log(test(fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8'),fs.readFileSync('assets/port79-monthly-rest-dashboard.js','utf8')));
