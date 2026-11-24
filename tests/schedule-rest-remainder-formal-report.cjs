@@ -2,8 +2,8 @@
 const fs=require('node:fs'),vm=require('node:vm'),a=require('node:assert/strict');
 const c={window:null,Date,Intl,console};c.window=c;vm.createContext(c);
 for(const name of ['rest-allocation','rest-attendance','overtime-reason','monthly-rest-overtime','schedule-rest-summary'])vm.runInContext(fs.readFileSync('assets/port79-'+name+'.js','utf8'),c);
-const html=fs.readFileSync('schedule/index.html','utf8'),start=html.indexOf('    function p79ScheduleRestCountCells('),end=html.indexOf('    function p79RefreshScheduleRestCounts(',start);
-c.scheduleEscapeHtml=x=>String(x||'');vm.runInContext(html.slice(start,end),c);
+const html=fs.readFileSync('schedule/index.html','utf8'),start=html.indexOf('    function p79ScheduleSpecialSummaryColumns('),end=html.indexOf('    function p79RefreshScheduleRestCounts(',start);
+Object.assign(c,{employees:[],monthlyScheduleData:{},monthlyScheduleMeta:{},p79TyphoonDates:()=>[]});c.scheduleEscapeHtml=x=>String(x||'');vm.runInContext(html.slice(start,end),c);
 const month='2026-10',dates=Array.from({length:31},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
 for(let i=0;i<83;i++)for(const nationalOff of [0,1]){
  const emp={id:'E'+i,name:'測試'+i,jobTitle:['F/L','AQC','ARMG','領班','指揮手'][i%5]};
@@ -11,6 +11,7 @@ for(let i=0;i<83;i++)for(const nationalOff of [0,1]){
  dates.slice(0,4).forEach(d=>roster[d]='例');dates.slice(4,9).forEach(d=>roster[d]='休');
  if(nationalOff)roster[dates[9]]='國';
  const meta={};for(let n=0;n<2-nationalOff;n++)meta[dates[11+n]]={overtimeReport:{id:emp.id+'-R'+n,category:'國',code:'國08-16'}};
+ c.employees=[emp];c.monthlyScheduleData[emp.id]=roster;c.monthlyScheduleMeta[emp.id]=meta;
  const snapshot={attendanceEvidence:{complete:true,days:Object.fromEntries(dates.map(d=>[emp.id+'|'+d,{state:['例','休','國'].includes(roster[d])?'rest':'worked'}]))}};
  const selected={例:dates.slice(0,4),休:dates.slice(4,9),國:nationalOff?[dates[9]]:[]};
  c.p79DailyRestCount=()=>({counts:{例:4,休:5,國:nationalOff},dates:{例:['01','02','03','04'],休:['05','06','07','08','09'],國:nationalOff?['10']:[]}});
@@ -20,7 +21,7 @@ for(let i=0;i<83;i++)for(const nationalOff of [0,1]){
  const rendered=c.p79ScheduleRestCountCells(emp,month,meta,[],[],selected);
  const national=rendered.match(/<td data-rest-category="國"[\s\S]*?<\/td>/)[0];
  a.match(national,/<span>2\/0<\/span>/,'visible dates and formally reported dates share the category numerator, without double counting');
- a.match(national,new RegExp('正式已報 '+(2-nationalOff)+' 天'));
+ for(const date of Object.keys(meta))a(national.includes(date),'confirmed report date remains in the audit tooltip');
  a.equal(JSON.stringify({roster,meta,snapshot}),before,'counter does not edit attendance, roster or reports');
  c.P79ScheduleRestSummary.clear();
  const unknown=c.p79ScheduleRestCountCells(emp,month,meta,[],[],selected);
