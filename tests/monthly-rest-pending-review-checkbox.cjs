@@ -30,7 +30,7 @@ const audited=ui.sourceRows(synthetic);
 assert.equal(audited.roster.length,35,'all 35 authorized unresolved people are surfaced; no duplicate ID');
 assert.equal(audited.roster[34].status,'缺資料');
 assert.equal(audited.roster[0].canPreplan,true);assert(audited.roster.filter(r=>r.reviewType!=='deficit').every(r=>!r.canPreplan));
-assert.match(audited.roster[0].period,/2026-11-26 休 16:00 – 24:00/);assert.match(audited.roster[0].period,/預排草案/);assert.equal(audited.roster[1].period,'尚無符合條件時段');
+assert.match(audited.roster[0].period,/2026-11-26 休 16:00 – 24:00/);assert.match(audited.roster[0].period,/預排草案/);assert.equal(audited.roster[1].period,'無可參考的月底班表時段');
 assert(audited.roster.every(r=>r.date===''&&r.hours==='—'&&ui.selectionMode(r)==='review'),'roster-only rows never become date applications or native submission picks');
 assert.equal(audited.roster.filter(r=>r.reviewType==='deficit').length,20);
 assert.equal(audited.roster.filter(r=>r.reviewType==='exception').length,14);

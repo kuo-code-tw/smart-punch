@@ -74,4 +74,18 @@ assert.match(api.manualRestPlanIssue(manualFuture,emp,'2026-10','2026-10-30',res
 manualFuture.pairs=manualFuture.pairs.filter(p=>p.date!=='2026-10-30');
 assert.equal(api.manualRestPlanIssue(manualFuture,worker,'2026-10','2026-10-30',restRule,now),'');
 assert.match(api.manualRestPlanIssue({...manualFuture,attendanceEvidence:{complete:false}},worker,'2026-10','2026-10-30',restRule,now),/尚未完整/);
+// A normal working roster without overtime tags still provides an honest
+// planning reference, but must NOT create an actual or saved overtime row.
+const ordinary=JSON.parse(JSON.stringify(future));
+ordinary.schedules[0].schedule.__meta={};
+ordinary.schedules[0].schedule['2026-10-29']='中';
+ordinary.schedules[0].schedule['2026-10-30']='中';
+const originalOrdinary=JSON.stringify(ordinary);
+const ordinaryModel=api.plan(ordinary,[emp],'2026-10',futureRules,{manualOnly:true});
+const refHint=api.personPeriodSuggestions(ordinaryModel,'A',now);
+assert(refHint.suggestions.some(r=>r.referenceOnly&&r.date==='2026-10-29'&&r.period==='16:00 – 24:00'&&!r.eligible&&r.note.includes('原排正常班')));
+assert.equal(ordinaryModel.plannedRows.length,0);
+assert.equal(ordinaryModel.previewRows.length,0);
+assert.equal(JSON.stringify(ordinary),originalOrdinary);
+assert(!api.rosterPeriodReferences({...ordinary,attendanceEvidence:{complete:false}},emp,ordinaryModel.balances[0],'2026-10',futureRules,now).length);
 console.log('PASS forward-only month-end reporting, separate future planning, protected rest-day schedule and weekly rest audit');

@@ -484,6 +484,8 @@ function plan(snapshot,people,month,rules,options={}){
  const unfilled=states.map(state=>({empId:state.emp.empId,name:state.emp.name,remaining:{...state.remaining}}));
  // Manual mode is still read-only: offer the same guarded future candidates
  // without selecting, saving, decrementing quota, or changing the formal model.
+ const rosterReferences=Object.create(null);
+ for(const state of states)if(cats.some(k=>state.b.remaining[k]>0))rosterReferences[id(state.emp.empId)]=rosterPeriodReferences(snapshot,state.emp,state.b,month,rules,currentDate);
  const previewRows=[];
  if(options.manualOnly===true&&!historical&&snapshot?.attendanceEvidence?.complete===true){
   for(const state of states){
@@ -499,7 +501,7 @@ function plan(snapshot,people,month,rules,options={}){
    }
   }
  }
- return {rows:sortRows(rows),plannedRows:sortRows(plannedRows),balances,issues,unavailable,unfilled,workflow,previewRows,reviewNotes};
+ return {rows:sortRows(rows),plannedRows:sortRows(plannedRows),balances,issues,unavailable,unfilled,workflow,previewRows,reviewNotes,rosterReferences};
 }
 // Read-only view of records with a real saved report ID. Already filed dates
 // are excluded from the new-candidate model but MUST remain visible here.
@@ -625,6 +627,46 @@ function manualRestPlanIssue(snapshot,emp,month,date,rule,asOf=today()){
  if(!b.dates.includes(date)||b.typhoonDates.includes(date)||!(b.remaining[category]>0))return '該日不在可用額度或本月已無此假別缺額';
  return '';
 }
+// Read-only roster references are deliberately separate from formal candidates.
+ // Missing overtime metadata must not hide the employee's known working shift.
+function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
+ if(month!==asOf.slice(0,7)||snapshot?.provisional===true||snapshot?.readOnlyDueAttendance===true||snapshot?.attendanceEvidence?.complete!==true)return [];
+ const roster=snapshot.schedules?.find(r=>id(r.empId)===id(emp.empId))?.schedule;
+ if(!roster||!b)return [];
+ const shifts={早:['08:00','16:00'],中:['16:00','24:00'],晚:['24:00','08:00']};
+ const minute=x=>{const m=String(x||'').match(/^(\d{1,2})(?::(\d{2}))?$/);return m?Number(m[1])*60+Number(m[2]||0):NaN;};
+ const days=(b.dates||[]).slice().sort(),out=[];
+ const employee=id(emp.empId),blocked=new Set(snapshot.leaveDates||[]);
+ const paired=new Set((snapshot.pairs||[]).filter(p=>id(p.empId)===employee).map(p=>p.date));
+ const permitted=day=>{const m=roster.__meta?.[day]||{};return day>asOf&&day.startsWith(month+'-')&&
+  !(b.typhoonDates||[]).includes(day)&&!m.overtimeReport&&!m.overtime&&!m.forEmpId&&!m.coverAssignmentId&&!m.overtimeExcluded&&
+  !blocked.has(employee+'|'+day)&&!paired.has(day)&&!g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,day,roster);};
+ for(const date of days.filter(permitted)){
+  const original=String(roster[date]||'').trim(),m=roster.__meta?.[date]||{};
+  const originalCategory=automaticRestCategory(roster,date,month);
+  let period=shifts[original],source=period?'原班表'+original+'班':'';
+  if(!period&&['休','國'].includes(original)){
+   if(Number.isFinite(minute(m.overtimeStart))&&Number.isFinite(minute(m.overtimeEnd))&&(minute(m.overtimeEnd)-minute(m.overtimeStart)+1440)%1440===480){
+    period=[m.overtimeStart,m.overtimeEnd];source='原班表註記時段';
+   }else{
+    const prior=days.filter(d=>d<date&&shifts[roster[d]]).at(-1),next=days.find(d=>d>date&&shifts[roster[d]]);
+    // A neighboring shift is an estimate, not actual attendance. Do not guess
+    // when the two sides of the rest day disagree.
+    if(prior&&next&&roster[prior]===roster[next]){period=shifts[roster[prior]];source='前後班表同為'+roster[prior]+'班（推估）';}
+   }
+  }
+  if(!period)continue;
+  for(const category of ['休','國']){
+   if(!(b.remaining[category]>0)||originalCategory&&originalCategory!==category)continue;
+   const rule=rules.find(r=>r[0]===category&&fullDayRule(r)&&minute(r[6])===minute(period[0])&&minute(r[7])===minute(period[1]));
+   const issue=rule&&['休','國'].includes(original)?manualRestPlanIssue(snapshot,emp,month,date,rule,asOf):'';
+   const eligible=!!rule&&['休','國'].includes(original)&&!issue&&!source.includes('推估');
+   const note=eligible?source+'；可進入預排核對':shifts[original]?(originalCategory?source+'；加班條件待核，不可直接申報':source+'；原排正常班，假別須先核對，不可直接申報'):source+'；'+(issue||(!rule?'無相符正式加班規則':'班別尚需確認'))+'，不可直接申報';
+   out.push({date,category,period:period.map(v=>String(v).includes(':')?String(v):String(v).padStart(2,'0')+':00').join(' – '),note,referenceOnly:true,eligible,rank:eligible?0:originalCategory===category?1:2});
+  }
+ }
+ return out.sort((a,b)=>a.rank-b.rank||a.date.localeCompare(b.date));
+}
 function personPeriodSuggestions(model,empId,asOf=today()){
  const key=id(empId),balanceRow=model?.balances?.find(b=>id(b.emp.empId)===key);
  if(!balanceRow)return {suggestions:[],reason:'缺少正式班表，無法建議日期'};
@@ -639,11 +681,16 @@ function personPeriodSuggestions(model,empId,asOf=today()){
  for(const r of model.rows||[])add(r,false);
  for(const r of model.plannedRows||[])add(r,true);
  for(const r of model.previewRows||[])add(r,true);
+ const references=[];
+ for(const ref of model.rosterReferences?.[key]||[]){
+  if(!(remaining[ref.category]>0)||used.has(ref.date))continue;
+  references.push(ref);used.add(ref.date);remaining[ref.category]--;
+ }
  const left=cats.filter(c=>remaining[c]>0);
  const notes=(model.reviewNotes?.[key]||[]).filter(n=>left.includes(n.category));
  const unique=[...new Map(notes.map(n=>[n.category+'|'+n.reason,n])).values()].sort((a,b)=>Number(b.date>=asOf)-Number(a.date>=asOf)||b.date.localeCompare(a.date));
  const reason=left.length?'仍缺 '+left.map(c=>c+remaining[c]+'天').join('／')+'；'+(unique.length?unique.slice(0,3).map(n=>n.date.slice(5)+' '+n.category+'：'+n.reason).join('；'):'未找到符合原假別及正式8小時條件的日期，請核對原班表與考勤'):'';
- return {suggestions,reason};
+ return {suggestions:[...suggestions,...references],reason:[references.some(r=>!r.eligible)?'班表參考時段尚未取得申報資格，不能直接儲存為正式加班。':'',reason].filter(Boolean).join('；')};
 }
 function rosterReviewRows(model,staff){
  const balances=new Map((model?.balances||[]).map(b=>[id(b.emp.empId),b]));
@@ -890,7 +937,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-preplan-filing-v4';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-roster-period-v5';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1373,6 +1420,6 @@ async function open(settings={}){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,personPeriodSuggestions,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
 
 })(window);
