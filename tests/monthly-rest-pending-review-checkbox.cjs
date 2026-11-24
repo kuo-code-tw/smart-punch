@@ -39,7 +39,7 @@ assert.equal(audited.roster.filter(r=>r.reviewType==='deficit').length,20);
 assert.equal(audited.roster.filter(r=>r.reviewType==='exception').length,14);
 assert.equal(audited.roster.filter(r=>r.reviewType==='missing').length,1);
 assert(audited.roster.filter(r=>r.reviewType==='exception').every(r=>r.due===0&&r.category==='無缺額'&&r.source.includes('待核打卡')));
-assert.match(src,/const pending=\[\.\.\.data\.ready,\.\.\.suggestions,\.\.\.deficits\]/);
+assert.match(src,/const pending=dailyPendingRows\(data\)/);
 assert.match(src,/const audit=\[\.\.\.pendingReports,\.\.\.exceptions\]/);
 assert.match(src,/const pendingTotal=pending\.filter\(r=>r\.kind!=='roster'\)\.length/);
 assert.match(src,/const needs=deficits\.length/);
