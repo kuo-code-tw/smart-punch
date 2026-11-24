@@ -54,7 +54,7 @@ function sourceRows(el){
   let suggestions=[];try{const parsed=JSON.parse(tr.dataset?.periodSuggestions||'[]');if(Array.isArray(parsed))suggestions=parsed.filter(x=>x&&typeof x.date==='string'&&typeof x.period==='string'&&x.period.trim());}catch{}
   if(reviewType!=='deficit')suggestions=[];
   const period=suggestions.length?suggestions.map(x=>x.date+' '+periodLabel(x.period)+'（'+x.note+'）').join('；'):reviewType==='deficit'?'無可參考的月底班表時段':'—';
-  roster.set(id.toUpperCase(),{kind:'roster',id,date:'',name:td[3]?.textContent?.trim()||'',role:td[2]?.textContent?.trim()||'',category:reviewType==='missing'?'尚無法計算':reviewType==='exception'?'無缺額':quota,period,suggestions,canPreplan:reviewType==='deficit'&&tr.dataset?.canPreplan==='true',hours:suggestions.length?'8 小時／筆（建議）':'—',reviewType,due,status:reviewType==='missing'?'缺資料':reviewType==='deficit'?'未休缺額':'出勤／申報待核對',source:reason,checked:false,disabled:true});
+  roster.set(id.toUpperCase(),{kind:'roster',id,date:'',name:td[3]?.textContent?.trim()||'',role:td[2]?.textContent?.trim()||'',category:reviewType==='missing'?'尚無法計算':reviewType==='exception'?'無缺額':quota,period,suggestions,canPreplan:reviewType==='deficit'&&tr.dataset?.canPreplan==='true',hours:'—',reviewType,due,status:reviewType==='missing'?'缺資料':reviewType==='deficit'?'未休缺額':'出勤／申報待核對',source:reason,checked:false,disabled:true});
  }
  return {ready,planned,prior,roster:[...roster.values()]};
 }
