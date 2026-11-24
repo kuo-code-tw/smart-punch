@@ -44,6 +44,34 @@ function quotaDisplayMarkup(progress,allowPreview=true){
  const title=preview?'目前勾選的預計額度；正式申報成功後才實際扣除':'已使用額度／剩餘缺額（天）';
  return '<small class="mr-ux-quota" style="display:block;color:'+(preview?'#075985':'#475569')+';margin-top:4px" title="'+esc(title)+'">'+esc(label)+'</small>';
 }
+// Date colours describe the actual report, never an inferred range of completed days.
+function filingDateState(row,cutoff=''){
+ const status=String(row.status||''),date=String(row.date||'');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return 'neutral';
+ if(row.kind==='existing'&&status==='已核對出勤'&&!row.cancelled&&!row.historical)return 'done';
+ if(/已取消|歷史版本|撤銷|作廢/.test(status))return 'neutral';
+ if(/失敗|錯誤|未確認成功/.test(status))return 'failed';
+ if(row.kind==='ready'&&!row.disabled&&status==='可申報')return cutoff&&date<=cutoff?'locked':'ready';
+ return 'review';
+}
+const filingColours={done:['#166534','#dcfce7','已正式申報'],ready:['#1d4ed8','#dbeafe','尚未申報'],review:['#92400e','#fef3c7','待核對／預排'],failed:['#b91c1c','#fee2e2','申報失敗'],locked:['#475569','#e2e8f0','截止日內，尚未確認申報'],neutral:['#475569','#f1f5f9','無正式申報確認']};
+function filingDateMarkup(row,cutoff='',latest=''){
+ const date=row.suggestions?.length===1?row.suggestions[0].date:row.date;
+ const state=filingDateState({...row,date},cutoff),[fg,bg,label]=filingColours[state];
+ const value=date||(row.residualOnly?'未安排':'—');
+ const actual='<span class="mr-ux-filing-date" data-date-state="'+state+'" style="display:inline-block;padding:3px 6px;border-radius:5px;color:'+fg+';background:'+bg+';font-weight:700;white-space:nowrap" title="'+esc(label)+'" aria-label="'+esc(value+' '+label)+'">'+esc(value)+'</span>';
+ const previous=latest&&latest!==date?'<small style="display:block;margin-top:4px;color:#166534;font-weight:700;white-space:nowrap" title="最近已核對的正式申報日期，不代表之前每一天均已申報">已報 '+esc(latest.slice(5))+'</small>':'';
+ return actual+previous;
+}
+function latestConfirmedDates(prior){
+ const dates=new Map();
+ for(const r of prior||[]){
+  const key=norm(r.empId);
+  if(!key||filingDateState(r)!=='done')continue;
+  if(!dates.has(key)||r.date>dates.get(key))dates.set(key,r.date);
+ }
+ return dates;
+}
 function rowQuotaProgress(tr){
  try{
   const p=JSON.parse(tr?.dataset?.quotaProgress||'null');
@@ -307,6 +335,11 @@ function mount(el){
     if(cutoff.value!==nativeCutoff.value)cutoff.value=nativeCutoff.value;}
    const from=global.P79MonthlyRest?.forwardReportStart(month,cutoff.value)||month+'-01';
    q('#mrUxFrom').textContent=cutoff.value?(from.startsWith(month+'-')?'從 '+from.slice(5)+' 起申報':'本月已無後續日期'):'核對整月（未設定截止日）';
+   cutoff.style.backgroundColor=cutoff.value?'#fef3c7':'';
+   cutoff.style.color=cutoff.value?'#92400e':'';
+   cutoff.style.borderColor=cutoff.value?'#d97706':'';
+   cutoff.title='自行設定截止日；不代表截止日前每一天均已正式申報';
+   q('#mrUxFrom').style.color=cutoff.value?'#1d4ed8':'#64748b';
    const sourceOptions=originalDept.innerHTML;
    if(q('#mrUxDept').innerHTML!==sourceOptions)q('#mrUxDept').innerHTML=sourceOptions;
    if(q('#mrUxDept').value!==originalDept.value)q('#mrUxDept').value=originalDept.value;
@@ -361,6 +394,7 @@ function mount(el){
    q('#mrUxSubmit').textContent='➤ 正式申報（'+formalCount+' 筆）';
    if(state.tab!=='pending'){q('#mrUxSavePlan').disabled=true;q('#mrUxSubmit').disabled=true;}
    q('#mrUxHint').textContent=state.tab==='audit'?'異常核對唯讀，不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
+   const latestDates=latestConfirmedDates(data.prior);
    q('#mrUxRows').innerHTML=shown.map(r=>{
     const quota=r.quotaProgress;
     const type=kind(r),status=label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
@@ -370,7 +404,7 @@ function mount(el){
      '<button type="button" data-action="edit" data-kind="ready" data-id="'+id+'" data-key="'+key+'">✎ 編輯</button><button type="button" data-action="view" data-kind="ready" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>':
      '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
-      'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.suggestions?.length===1?r.suggestions[0].date:r.date||(r.residualOnly?'未安排':'—'))+(r.lastReported?'<small style="display:block;color:#526e91">最近正式報單 '+esc(r.lastReported.slice(5))+'</small>':'')+'</td><td>'+esc(r.name)+(r.role?'<small style="display:block;color:#64748b">'+esc(r.role)+(r.kind==='roster'?'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對'):'')+'</small>':'')+'</td>'+
+      'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+filingDateMarkup(r,cutoff.value,latestDates.get(norm(r.empId||r.id))||'')+'</td><td>'+esc(r.name)+(r.role?'<small style="display:block;color:#64748b">'+esc(r.role)+(r.kind==='roster'?'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對'):'')+'</small>':'')+'</td>'+
       '<td><span class="mr-ux-kind">'+esc(r.category)+'</span>'+quotaDisplayMarkup(quota,state.tab!=='done')+'</td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>'+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
       '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
@@ -519,5 +553,5 @@ function mount(el){
  },{once:true});
  render();
 }
-global.P79MonthlyRestDashboard={mount,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,dailyPendingRows,quotaProgressLabel,quotaDisplayMarkup};
+global.P79MonthlyRestDashboard={mount,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,dailyPendingRows,quotaProgressLabel,quotaDisplayMarkup,filingDateState,filingDateMarkup,latestConfirmedDates};
 })(window,document);

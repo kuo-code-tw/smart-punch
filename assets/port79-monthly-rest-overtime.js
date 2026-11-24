@@ -1005,7 +1005,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v16';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v17';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1101,7 +1101,16 @@ async function open(settings={}){
     '</td><td>'+r.tagged+'</td><td>'+r.confirmed+'</td><td>'+r.pending+
     '</td><td>'+r.noReport+'</td><td>'+r.remaining+'</td><td>'+esc(r.state)+'</td></tr>').join('')||
     '<tr><td colspan="9">沒有本月份可核對的授權人員，不能當作零申報。</td></tr>';
-   const existing=visibleExistingRows(),active=existing.filter(r=>!r.cancelled&&!r.historical);
+   const existing=visibleExistingRows();
+   if(!isReadOnlySource()){
+    const scopedIds=new Set(chosenPeople().map(e=>id(e.empId)));
+    for(const r of model.rows.filter(x=>x.saved&&!x.planned&&scopedIds.has(id(x.empId)))){
+     if(existing.some(x=>id(x.empId)===id(r.empId)&&x.date===r.date&&x.reportId===r.id))continue;
+     const emp=loadedPeople.find(x=>id(x.empId)===id(r.empId))||{};
+     existing.push({empId:r.empId,name:r.name,role:job(emp),date:r.date,category:r.category,code:r.rule?.[1],reportId:r.id,status:'已核對出勤',monthlyRest:true});
+    }
+   }
+   const active=existing.filter(r=>!r.cancelled&&!r.historical);
    const verified=active.filter(r=>r.status==='已核對出勤');
    const pending=active.filter(r=>r.status!=='已核對出勤');
    const scheduleCount=(snapshot?.schedules||[]).filter(r=>r.schedule&&(!r.month||r.month===loadedMonth)).length;
