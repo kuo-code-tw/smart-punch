@@ -1830,10 +1830,10 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     <p class="text-xs text-slate-600 dark:text-slate-300 mb-3">系統自動核對全員已配休、已申報及缺申報編號。當月未來日期的自動預排仍須確認儲存；歷史月份已核實的原日期8小時出勤可一次確認申報，不必逐人勾選。未完成正式申報及雲端讀回，不得顯示已核准。</p>
                     <p id="p79PlannedPunchNotice" role="status" aria-live="polite" hidden class="text-xs font-semibold px-2 py-1 mb-2 rounded bg-indigo-50 text-indigo-900"></p>
                     <div id="p79PlannedBulkActions" class="flex items-center flex-wrap gap-3 mb-2 text-xs font-semibold text-indigo-900">
-                        <label class="inline-flex items-center gap-2"><input id="p79PlannedBulkAll" type="checkbox" onchange="p79PlannedBulkSelectPage(this.checked)">全選本頁可核對</label>
+                        <label class="inline-flex items-center gap-2"><input id="p79PlannedBulkAll" type="checkbox" onchange="p79PlannedBulkSelectPage(this.checked)">全選全部可核對</label>
                         <span id="p79PlannedBulkSelectedCount" role="status">已選 0 筆</span>
                         <button id="p79PlannedBulkSave" type="button" disabled onclick="p79BatchConfirmPlannedOvertime()" class="rounded-lg bg-indigo-700 text-white px-3 py-1.5 font-bold disabled:opacity-40">批次核對申報</button>
-                        <small class="text-slate-500">僅完整打卡、時段唯一且有原預排 ID 可勾選；未出勤及異常紀錄不可直接申報。</small>
+                        <small class="text-slate-500">完整打卡且時段符合即可批次申報；缺卡或時段待確認保留。</small>
                     </div>
                     <div class="overflow-x-auto rounded-xl border border-indigo-100 dark:border-indigo-900 bg-white dark:bg-slate-800">
                         <table class="min-w-full text-sm text-left">
@@ -14466,9 +14466,11 @@ function p79OvertimePeriodLabel(report){
             if(!row||row.p79RestDraft||!p79CanReportOvertime())return null;
             const date=normalizeScheduleDateKey(row.rosterDate||row.dateKey);
             const report=row.overtimeReport||{};
-            // Complex leave-cover reports must use their original individual
-            // editor so all linked person/date references survive unchanged.
-            if(String(report.leaveId||row.forEmpId||'').trim())return null;
+            // Linked plans can be confirmed if their original assignment is intact.
+            if(p79OvertimeCoverDateWarning(row))return null;
+            const originalTarget=String(report.forEmpId||'').trim();
+            const rowTarget=String(row.forEmpId||'').trim();
+            if(originalTarget&&rowTarget&&originalTarget.toUpperCase()!==rowTarget.toUpperCase())return null;
             if(!date||date>todayKey||!report.id||row.reportVerified!==true||
                 report.planned!==true||p79OvertimePendingReason(row,todayKey).code!=='review'||
                 !row.clockIn||!row.clockOut||row.timeCheckRequired)return null;
@@ -14478,15 +14480,39 @@ function p79OvertimePeriodLabel(report){
             const match=p79ResolvePlannedOvertimePeriod(row);
             if(match?.state!=='completed'||match.confirmed!==true||!match.suggested)return null;
             const rules=window.P79Overtime?.reportRules?.()||[];
-            const matchedRules=rules.filter(rule=>rule?.[0]===match.suggested.category&&
-                rule[1]===match.suggested.code&&
-                String(rule[6])===String(match.suggested.overtimeStart)&&
-                String(rule[7])===String(match.suggested.overtimeEnd));
-            // Ambiguous legacy/custom codes cannot be silently confirmed in bulk.
-            if(matchedRules.length!==1)return null;
-            const selected=matchedRules[0];
-            if(window.P79Overtime?.ruleAttendanceIssue?.(start,end,date,selected,
-                p79WorkOvertimeRoster(row.empId,date)))return null;
+            const roster=p79WorkOvertimeRoster(row.empId,date);
+            const api=window.P79Overtime,matcher=window.P79OvertimeShiftMatch;
+            const matchedRules=rules.filter(rule=>{
+                if(rule?.[0]!==match.suggested.category||rule[1]!==match.suggested.code||
+                   matcher.minute(rule[6])!==matcher.minute(match.suggested.overtimeStart)||
+                   matcher.minute(rule[7])!==matcher.minute(match.suggested.overtimeEnd))return false;
+                const single=matcher.resolve({date,roster,report,rules:[rule],start,end,attendanceIssue:false});
+                return single?.state==='completed'&&single.confirmed===true&&
+                    !api.ruleAttendanceIssue(start,end,date,rule,roster);
+            });
+            // Identical effective legacy rules are not ambiguous. Distinct
+            // conversions still require an exact original identity.
+            const keyFor=r=>{
+                const v=api.report(r);
+                return JSON.stringify([v.category,v.code,v.typeName,v.declaredHours,v.convertedHours,
+                    v.normalStart,v.normalEnd,v.overtimeStart,v.overtimeEnd,v.position]);
+            };
+            const distinct=[...new Map(matchedRules.map(r=>[keyFor(r),r])).values()];
+            let selected=distinct.length===1?distinct[0]:null;
+            if(!selected&&distinct.length>1){
+                const originalMatches=distinct.filter(r=>{
+                    const v=api.report(r);
+                    return v.code===report.code&&v.typeName===report.typeName&&
+                        Number(v.declaredHours)===Number(report.declaredHours)&&
+                        String(v.convertedHours??'')===String(report.convertedHours??'')&&
+                        matcher.sameReport(report,r);
+                });
+                if(originalMatches.length===1)selected=originalMatches[0];
+            }
+            if(!selected)return null;
+            // A linked period change still requires the individual editor.
+            if((report.leaveId||originalTarget||rowTarget)&&
+                (selected[1]!==report.code||!matcher.sameReport(report,selected)))return null;
             return {row,date,report,start,end,rule:selected,key:p79PlannedBulkKey(row)};
             }catch(error){
                 console.warn('批次核對資格解析失敗，請改用單筆：',error);
@@ -14497,14 +14523,12 @@ function p79OvertimePeriodLabel(report){
             const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
             const available=p79OvertimePlannedFilteredRows
                 .filter(row=>p79PlannedBulkCandidate(row,today));
-            const visible=p79OvertimePlannedDisplayedRows.filter(row=>
-                p79PlannedBulkCandidate(row,today));
-            const marked=visible.filter(row=>p79PlannedBulkSelected.has(p79PlannedBulkKey(row))).length;
+            const marked=available.filter(row=>p79PlannedBulkSelected.has(p79PlannedBulkKey(row))).length;
             const all=document.getElementById('p79PlannedBulkAll');
             if(all){
-                all.checked=visible.length>0&&marked===visible.length;
-                all.indeterminate=marked>0&&marked<visible.length;
-                all.disabled=p79PlannedBulkBusy||!visible.length;
+                all.checked=available.length>0&&marked===available.length;
+                all.indeterminate=marked>0&&marked<available.length;
+                all.disabled=p79PlannedBulkBusy||!available.length;
             }
             const count=document.getElementById('p79PlannedBulkSelectedCount');
             if(count)count.textContent='已選 '+p79PlannedBulkSelected.size+
@@ -14529,7 +14553,7 @@ function p79OvertimePeriodLabel(report){
         function p79PlannedBulkSelectPage(checked){
             if(p79PlannedBulkBusy)return;
             const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
-            for(const row of p79OvertimePlannedDisplayedRows){
+            for(const row of p79OvertimePlannedFilteredRows){
                 const candidate=p79PlannedBulkCandidate(row,today);
                 if(!candidate)continue;
                 if(checked)p79PlannedBulkSelected.add(candidate.key);
@@ -14571,7 +14595,7 @@ function p79OvertimePeriodLabel(report){
                         expectedOriginalCode:String(original.code||''),
                         expectedOriginalCategory:String(original.category||''),
                         expectedPunchStart:item.start,expectedPunchEnd:item.end,
-                        forEmpId:String(item.row.forEmpId||''),
+                        forEmpId:String(original.forEmpId||item.row.forEmpId||''),
                         leaveHandoffId:String(original.leaveId||''),
                         note:String(original.note||''),autoSave:true
                     };
@@ -14787,7 +14811,7 @@ function p79OvertimePeriodLabel(report){
                 return '<tr>'+
                     '<td class="p-3 text-center">'+(candidate?
                         '<input type="checkbox" class="p79-planned-bulk-pick" aria-label="選取 '+escapeHtml(String(row.name||row.empId))+' '+escapeHtml(date)+' 核對申報" onchange="p79PlannedBulkToggle('+index+',this.checked)" '+(picked?'checked ':'')+(p79PlannedBulkBusy?'disabled':'')+'>':
-                        '<span title="尚未完成可安全批次核對的打卡與時段">—</span>')+'</td>'+
+                        '<span title="尚未完成可安全批次核對的打卡與時段">'+(reason.code==='review'?'時段待核':'—')+'</span>')+'</td>'+
                     '<td class="p-3 whitespace-nowrap">'+escapeHtml(date.replaceAll('-','/'))+'</td>'+
                     '<td class="p-3 font-semibold whitespace-nowrap">'+escapeHtml(row.name||'')+'</td>'+
                     '<td class="p-3">'+escapeHtml(p79OvertimeUnitForRow(row)||'—')+'</td>'+
