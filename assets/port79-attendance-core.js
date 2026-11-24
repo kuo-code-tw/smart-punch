@@ -602,6 +602,11 @@ async function p79ApplyPausedAttendanceReview(review){
  // The user reviewed both values. Queue replacement and the normal CAS write remain serialized.
  const result=await submitAttendanceWrite(payload,'考勤修改已核對並同步雲端');
  if(result?.ok&&!result.queued){
+  // If the reviewed edit moved across a day/month, its original outbox key can
+  // differ from the newly verified CAS write. Remove ONLY that exact original
+  // paused payload after cloud confirmation; never erase a newer user edit.
+  const old=readQueue().find(x=>x.key===review.key&&x.paused&&samePayload(x.payload,review.payload));
+  if(old&&!remove(review.key,review.payload))throw new Error('雲端已確認修改，但舊草稿清理未完成；請再次核對，勿重送');
   const index=records.findIndex(r=>String(r.id)===String(record.id)&&(typeof getAttendanceRecordType!=='function'||getAttendanceRecordType(r)===getAttendanceRecordType(cloud)));
   if(index>=0)records[index]={...records[index],...record};
   try{saveRecords?.();p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
