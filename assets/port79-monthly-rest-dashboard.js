@@ -271,7 +271,7 @@ function mount(el){
  <label>姓名 <input type="search" id="mrUxName" placeholder="搜尋姓名" autocomplete="off"></label>
  <label>狀態 <select id="mrUxState"><option value="">全部狀態</option><option value="ready">可申報</option><option value="review">待核對</option><option value="missing">缺資料</option><option value="plan">預排建議</option></select></label>
  <span class="mr-ux-spacer"></span>
- <button type="button" id="mrUxAuto" class="mr-ux-primary">✦ 一鍵自動編排</button>
+ <button type="button" id="mrUxAuto" class="mr-ux-primary">✦ 自動配對日期</button>
  <button type="button" id="mrUxBatch" class="mr-ux-outline">☑ 批次核對</button>
  <button type="button" id="mrUxExport" class="mr-ux-outline">⇧ 匯出</button>
  </div>
@@ -379,7 +379,7 @@ function mount(el){
    q('#mrUxAll').checked=eligible.length>0&&eligible.every(isPicked);
    q('#mrUxAll').indeterminate=eligible.some(isPicked)&&!q('#mrUxAll').checked;
    const countLabel=list=>{const people=list.filter(r=>r.kind==='roster').length;return (list.length-people)+' 筆'+(people?'／'+people+' 人':'');};
-   q('#mrUxSelected').textContent='已選：正式申報 '+formalCount+' 筆｜儲存預排 '+planCount+' 筆｜待核對 '+countLabel(selectedReview);
+   q('#mrUxSelected').textContent='已配對 '+formalCount+' 筆可申報｜預排 '+planCount+' 筆';
    q('#mrUxReviewSummary').innerHTML=selectedPending.length?
      '<b>已選取 '+countLabel(selectedPending)+' 供核對（其中 '+countLabel(selectedReview)+' 僅供檢視）</b>'+
      selectedPending.slice(0,8).map(r=>'<div style="border-top:1px solid #dbe8f9;margin-top:7px;padding-top:7px">'+
@@ -480,7 +480,7 @@ function mount(el){
  q('#mrUxAuto').onclick=()=>{
   const mode=$(el,'#mrAutoMode');if(!mode||mode.disabled)return;
   mode.checked=true;mode.dispatchEvent(new Event('change',{bubbles:true}));
-  state.tab='pending';state.hint='已依正式排班及未休額度產生可用的預排建議；須勾選並儲存才會成立，並非正式申報。';render();
+  state.tab='pending';state.hint='已配對可申報日期與時段；確認後按正式申報。';render();
  };
  q('#mrUxBatch').onclick=()=>{
   const view=currentView();

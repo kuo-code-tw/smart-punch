@@ -1005,7 +1005,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v17';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v18';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1034,8 +1034,12 @@ async function open(settings={}){
  function isReadOnlySource(){return snapshot?.provisional===true||snapshot?.readOnlyDueAttendance===true;}
  function autoHistoricalReady(){return autoPlan&&loadedMonth<today().slice(0,7);}
  function autoSelectVerifiedHistory(){
-  if(!autoHistoricalReady()||isReadOnlySource()||snapshot?.attendanceEvidence?.complete!==true)return;
-  for(const row of model?.rows||[])if(!row.saved&&!row.planned)row.checked=true;
+  if(!autoPlan||isReadOnlySource()||snapshot?.attendanceEvidence?.complete!==true||model?.workflow?.canSubmit!==true)return;
+  const current=today();
+  for(const row of model?.rows||[]){
+   // Regular-day exceptions still require an explicit individual selection.
+   if(!row.saved&&!row.planned&&!row.attempted&&row.status==='可申報'&&row.category!=='例'&&row.date<=current)row.checked=true;
+  }
  }
  function visibleExistingRows(){const ids=new Set(chosenPeople().map(e=>id(e.empId)));
   const all=!q('#mrDept').value&&!q('#mrJob').value&&!q('#mrEmp').value;
@@ -1431,11 +1435,12 @@ async function open(settings={}){
  };
  q('#mrSave').onclick=async()=>{if(isReadOnlySource()){setStatus('既有申報目前僅供查閱，不能送出正式申報。');return;}
   if(busy||!model)return;
-  const hasFormal=model.rows?.some(r=>r.checked&&!r.saved&&!r.planned);
+  const hasFormal=visibleRows().some(({r})=>r.checked&&!r.saved&&!r.planned);
   if(!hasFormal&&autoPlan&&!autoHistoricalReady())return q('#mrSavePlans').onclick();
   if(!hasFormal&&manualPeople.size)return q('#mrNewPlan').onclick();
   if(!workflowStage(loadedMonth).canSubmit){setStatus('尚未到該申報月份，不能送出正式加班。');return;}
-  const selected=model.rows.filter(r=>r.checked&&!r.saved);if(!selected.length)return;
+  const selected=visibleRows().map(({r})=>r).filter(r=>r.checked&&!r.saved&&!r.planned);if(!selected.length)return;
+  if(!backfillContext(loadedMonth).historical&&!confirm('正式申報目前篩選內 '+selected.length+' 筆已配對日期及時段？'))return;
   const context=backfillContext(loadedMonth);
   if(context.historical&&!confirm('跨月補報 '+selected.length+' 筆：實際加班及額度仍歸 '+context.sourceMonth+'，只在 '+context.handlingMonth+' 辦理補報。系統將重新驗證原月份的完整出勤、既有加班與時數；確認繼續嗎？'))return;
   if(selected.some(r=>r.planned||r.date>today())){setStatus('含尚未完成出勤的預排日期，不得作為已發生的正式加班。');return;}
