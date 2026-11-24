@@ -1,0 +1,16 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const g={window:null,document:{}};g.window=g;vm.createContext(g);
+const core=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8'),ui=fs.readFileSync('assets/port79-monthly-rest-dashboard.js','utf8');
+vm.runInContext(core,g);vm.runInContext(ui,g);
+for(const day of ['01','14','24','25','30'])assert(g.P79MonthlyRest.workflowStage('2026-11','2026-11-'+day).canSubmit);
+assert(!g.P79MonthlyRest.workflowStage('2026-12','2026-11-24').canSubmit);
+const data={ready:[{empId:'A',kind:'ready',status:'可申報',disabled:false},{empId:'B',kind:'ready',status:'可申報',disabled:false}],planned:[{empId:'A',kind:'plan',disabled:false},{empId:'A',kind:'plan',disabled:true}]};
+assert.equal(g.P79MonthlyRestDashboard.personActionRows(data,{kind:'roster',id:'a',reviewType:'deficit'}).length,2);
+assert.equal(g.P79MonthlyRestDashboard.personActionRows(data,{kind:'roster',id:'A',reviewType:'exception'}).length,0);
+assert(core.includes('if(selected.some(r=>r.planned||r.date>today()))'));
+assert(core.includes('attendance.length!==1'));
+assert(core.includes('fullDayEvidence(fresh,r.empId,r.date,attendance[0])'));
+assert(core.includes("if(!hasFormal&&autoPlan&&!autoHistoricalReady())"));
+assert(ui.includes("nativePick(child,checked)"));
+console.log('PASS daily completed-attendance submission, future blocked, person picks link real dated candidates, existing guards retained');

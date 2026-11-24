@@ -17,7 +17,7 @@ function periodLabel(value){
 }
 function suggestionStatus(x){
  if(x.referenceOnly)return x.eligible?'可預排':'待核對';
- return x.planned?'預排建議':'待申報';
+ return x.planned?'可預排':'可申報';
 }
 function suggestionPeriod(x){
  const period=periodLabel(x.period);
@@ -32,14 +32,14 @@ function compactRosterStatus(row){
 function sourceRows(el){
  const ready=$$(el,'#mrRows tr[data-row]').map(tr=>{
   const td=tr.cells,pick=$(tr,'.pick');
-  return {kind:'ready',id:tr.dataset.row,date:$(tr,'.date')?.value||'',name:$(tr,'.person')?.firstChild?.textContent?.trim()||'',
+  return {kind:'ready',id:tr.dataset.row,empId:tr.dataset.emp||'',date:$(tr,'.date')?.value||'',name:$(tr,'.person')?.firstChild?.textContent?.trim()||'',
    category:$(tr,'.category')?.value||'',period:$(tr,'.rule')?.selectedOptions?.[0]?.textContent||'',hours:td[5]?.textContent?.trim()||'—',
    status:td[6]?.textContent?.trim()||'',checked:!!pick?.checked,disabled:!!pick?.disabled,
    audit:$(tr,'[data-audit]')?.dataset.audit||''};
  }).filter(r=>r.date);
  const planned=$$(el,'#mrPlannedRows tr').filter(tr=>$(tr,'.plan-pick')).map(tr=>{
   const td=tr.cells,pick=$(tr,'.plan-pick');
-  return {kind:'plan',id:pick.dataset.planIndex,date:td[1]?.textContent?.trim()||'',name:td[3]?.textContent?.trim()||'',
+  return {kind:'plan',id:pick.dataset.planIndex,empId:tr.dataset?.emp||'',date:td[1]?.textContent?.trim()||'',name:td[3]?.textContent?.trim()||'',
     category:td[4]?.textContent?.trim()||'',period:td[5]?.textContent?.trim()||'',hours:'—',
     status:td[6]?.textContent?.trim()||'預排待核',checked:!!pick.checked,disabled:!!pick.disabled};
  });
@@ -75,6 +75,11 @@ function sourceRows(el){
 // Selection for inspection is independent of the official submit checkbox.
  // Pending/uncertain rows may be inspected even when cloud rules block filing.
 function selectionKey(row){return JSON.stringify([row.kind,row.id,row.date,row.name,row.category,row.period]);}
+function personActionRows(data,person){
+ const key=String(person?.id||'').trim().toUpperCase();
+ if(!key||person?.kind!=='roster'||person.reviewType!=='deficit')return [];
+ return [...data.ready,...data.planned].filter(row=>String(row.empId||'').trim().toUpperCase()===key&&selectionMode(row)==='native');
+}
 function selectionMode(row){
  if(!row)return 'none';
  if(row.kind==='roster')return 'review';
@@ -248,10 +253,14 @@ function mount(el){
    // Discard local inspection picks for rows no longer in the live source.
    const reviewKeys=new Set([...pending,...audit].filter(r=>selectionMode(r)==='review').map(selectionKey));
    for(const key of state.reviewSelected)if(!reviewKeys.has(key))state.reviewSelected.delete(key);
-   const isPicked=r=>selectionMode(r)==='review'?reviewSelected(state.reviewSelected,r):!!r.checked;
+   const isPicked=r=>{
+    const children=personActionRows(data,r);
+    return children.length?children.every(x=>x.checked):selectionMode(r)==='review'?reviewSelected(state.reviewSelected,r):!!r.checked;
+   };
    const selectedPending=(state.tab==='done'?[]:state.tab==='audit'?audit:pending).filter(isPicked);
-   const selectedReview=selectedPending.filter(r=>selectionMode(r)==='review');
-   const selectedNative=selectedPending.length-selectedReview.length;
+   const selectedReview=selectedPending.filter(r=>selectionMode(r)==='review'&&!personActionRows(data,r).length);
+   const formalCount=data.ready.filter(r=>r.checked&&!r.disabled).length;
+   const planCount=data.planned.filter(r=>r.checked&&!r.disabled).length;
    const needs=deficits.length;
    const ready=data.ready.filter(r=>kind(r)==='ready').length;
    const sourceLoaded=!!text(el,'#mrAuditSummary');
@@ -276,7 +285,7 @@ function mount(el){
    q('#mrUxAll').checked=eligible.length>0&&eligible.every(isPicked);
    q('#mrUxAll').indeterminate=eligible.some(isPicked)&&!q('#mrUxAll').checked;
    const countLabel=list=>{const people=list.filter(r=>r.kind==='roster').length;return (list.length-people)+' 筆'+(people?'／'+people+' 人':'');};
-   q('#mrUxSelected').textContent='已勾選 '+countLabel(selectedPending)+'（待核對 '+countLabel(selectedReview)+'／可處理 '+selectedNative+' 筆）';
+   q('#mrUxSelected').textContent='已選：正式申報 '+formalCount+' 筆｜儲存預排 '+planCount+' 筆｜待核對 '+countLabel(selectedReview);
    q('#mrUxReviewSummary').innerHTML=selectedPending.length?
      '<b>已選取 '+countLabel(selectedPending)+' 供核對（其中 '+countLabel(selectedReview)+' 僅供檢視）</b>'+
      selectedPending.slice(0,8).map(r=>'<div style="border-top:1px solid #dbe8f9;margin-top:7px;padding-top:7px">'+
@@ -287,15 +296,12 @@ function mount(el){
    const nativeSave=$(el,'#mrSave'),nativePlan=$(el,'#mrSavePlans');
    q('#mrUxSavePlan').disabled=!!nativePlan?.disabled||!data.planned.some(r=>r.checked&&!r.disabled);
    q('#mrUxSavePlan').textContent='▣ 儲存預排（'+data.planned.filter(r=>r.checked&&!r.disabled).length+' 筆）';
-   q('#mrUxSubmit').disabled=!data.ready.some(r=>r.checked&&!r.disabled)||!/申報/.test(nativeSave?.textContent||'');
-   // In automatic planning mode the existing footer saves plans, not reports.
-   // The real formal-submit action can still enter the official manual path.
-   if(q('#mrUxSubmit').disabled&&data.ready.some(r=>r.checked&&!r.disabled)&&!$(el,'#mrManualMode')?.checked)
-    q('#mrUxSubmit').disabled=false;
+   q('#mrUxSubmit').disabled=!formalCount||!!nativeSave?.disabled||!/申報/.test(nativeSave?.textContent||'');
+   q('#mrUxSubmit').textContent='➤ 正式申報（'+formalCount+' 筆）';
    if(state.tab!=='pending'){q('#mrUxSavePlan').disabled=true;q('#mrUxSubmit').disabled=true;}
    q('#mrUxHint').textContent=state.tab==='audit'?'異常核對唯讀，不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
    q('#mrUxRows').innerHTML=shown.map(r=>{
-    const type=kind(r),status=label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
+    const type=kind(r),children=personActionRows(data,r),status=children.length?children.map(x=>x.kind==='ready'?'可申報':'可預排').filter((x,i,a)=>a.indexOf(x)===i).join('／'):label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
     const id=esc(r.id),kindKey=esc(r.kind),key=esc(selectionKey(r));
     const operations=r.kind==='roster'&&r.canPreplan&&!originalMonth.disabled?
      '<button type="button" data-action="preplan" data-key="'+key+'">＋ 預排申報</button><button type="button" data-action="view" data-key="'+key+'">◎ 檢視</button>':r.kind==='ready'?
@@ -303,7 +309,7 @@ function mount(el){
      '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
       'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.suggestions?.length===1?r.suggestions[0].date:r.date||'—')+'</td><td>'+esc(r.name)+(r.kind==='roster'?'<small style="display:block;color:#64748b">'+esc(r.role)+'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對')+'</small>':'')+'</td>'+
-      '<td><span class="mr-ux-kind">'+esc(r.category)+'</span></td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+(r.suggestions.length>1?'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>':'')+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
+      '<td><span class="mr-ux-kind">'+esc(r.category)+'</span></td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>'+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
       '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
    q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+'｜詳細原因請按檢視';
@@ -312,6 +318,12 @@ function mount(el){
  }
  function updatePick(row,checked){
   if(!row)return;
+  const children=personActionRows(sourceRows(el),row);
+  if(children.length){
+   state.reviewSelected.delete(selectionKey(row));
+   for(const child of children)nativePick(child,checked);
+   return;
+  }
   if(selectionMode(row)==='review'){markForReview(state.reviewSelected,row,checked);return;}
   if(selectionMode(row)==='native')nativePick(row,checked);
  }
@@ -403,18 +415,10 @@ function mount(el){
  q('#mrUxSavePlan').onclick=()=>{if(state.tab!=='pending')return;const button=$(el,'#mrSavePlans');if(button&&!button.disabled)button.click();};
  q('#mrUxSubmit').onclick=()=>{
   if(state.tab!=='pending')return;
-  let submit=$(el,'#mrSave');
+  const submit=$(el,'#mrSave');
   if(!submit||!sourceRows(el).ready.some(r=>r.checked&&!r.disabled))return;
-  // The native automatic current-month footer means 'save plan'; never
-  // route a formal submit through that alternate action.
-  if(/預排/.test(submit.textContent||'')){
-   const mode=$(el,'#mrManualMode');
-   if(!mode||mode.disabled)return;
-   mode.checked=true;mode.dispatchEvent(new Event('change',{bubbles:true}));
-   submit=$(el,'#mrSave');
-  }
   if(!submit.disabled&&/申報/.test(submit.textContent||''))submit.click();
-  else{state.hint='目前尚未通過正式申報條件；請先核對出勤、日期與申報開放日。';render();}
+  else{state.hint='請先核對實際出勤與申報日期。';render();}
  };
  q('#mrUxExport').onclick=()=>{
   const records=currentView().shown;if(!records.length)return;
@@ -454,5 +458,5 @@ function mount(el){
  },{once:true});
  render();
 }
-global.P79MonthlyRestDashboard={mount,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected};
+global.P79MonthlyRestDashboard={mount,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows};
 })(window,document);
