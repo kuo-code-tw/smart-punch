@@ -54,7 +54,7 @@ function sourceRows(el){
   let suggestions=[];try{const parsed=JSON.parse(tr.dataset?.periodSuggestions||'[]');if(Array.isArray(parsed))suggestions=parsed.filter(x=>x&&typeof x.date==='string'&&typeof x.period==='string'&&x.period.trim());}catch{}
   if(reviewType!=='deficit')suggestions=[];
   const period=suggestions.length?suggestions.map(x=>x.date+' '+periodLabel(x.period)+'（'+x.note+'）').join('；'):reviewType==='deficit'?'尚無符合條件時段':'—';
-  roster.set(id.toUpperCase(),{kind:'roster',id,date:'',name:td[3]?.textContent?.trim()||'',role:td[2]?.textContent?.trim()||'',category:reviewType==='missing'?'尚無法計算':reviewType==='exception'?'無缺額':quota,period,suggestions,hours:'—',reviewType,due,status:reviewType==='missing'?'缺資料':reviewType==='deficit'?'未休缺額':'出勤／申報待核對',source:reason,checked:false,disabled:true});
+  roster.set(id.toUpperCase(),{kind:'roster',id,date:'',name:td[3]?.textContent?.trim()||'',role:td[2]?.textContent?.trim()||'',category:reviewType==='missing'?'尚無法計算':reviewType==='exception'?'無缺額':quota,period,suggestions,canPreplan:reviewType==='deficit'&&tr.dataset?.canPreplan==='true',hours:'—',reviewType,due,status:reviewType==='missing'?'缺資料':reviewType==='deficit'?'未休缺額':'出勤／申報待核對',source:reason,checked:false,disabled:true});
  }
  return {ready,planned,prior,roster:[...roster.values()]};
 }
@@ -79,8 +79,8 @@ function markForReview(selected,row,checked){
 function reviewSelected(selected,row){return selectionMode(row)==='review'&&selected.has(selectionKey(row));}
 function mount(el){
  if(!el||el.id!=='p79MonthlyRest'||$(el,'#mrUxRoot'))return;
- const body=$(el,'.body'),originalMonth=$(el,'#mrMonth'),originalDept=$(el,'#mrDept');
- if(!body||!originalMonth||!originalDept)return;
+ const body=$(el,'.body'),originalMonth=$(el,'#mrMonth'),originalDept=$(el,'#mrDept'),originalJob=$(el,'#mrJob');
+ if(!body||!originalMonth||!originalDept||!originalJob)return;
  const style=document.createElement('style');style.id='mrUxStyle';
  style.textContent=`
  #p79MonthlyRest{width:min(1560px,calc(100vw - 24px))!important;max-height:95dvh!important;border-radius:20px!important;overflow:hidden!important;background:#f8fbff!important;color:#172b4d!important}
@@ -161,6 +161,7 @@ function mount(el){
  <div class="mr-ux-tools">
  <label>月份 <input type="month" id="mrUxMonth"></label>
  <label>部門 <select id="mrUxDept"></select></label>
+ <label>職稱 <select id="mrUxJob"><option value="">全部職稱</option></select></label>
  <label>姓名 <input type="search" id="mrUxName" placeholder="搜尋姓名" autocomplete="off"></label>
  <label>狀態 <select id="mrUxState"><option value="">全部狀態</option><option value="ready">可申報</option><option value="review">待核對</option><option value="missing">缺資料</option><option value="plan">預排建議</option></select></label>
  <span class="mr-ux-spacer"></span>
@@ -171,7 +172,7 @@ function mount(el){
  <div class="mr-ux-grid">
  <section class="mr-ux-card"><div class="mr-ux-tabs">
  <button type="button" id="mrUxTabPending" aria-selected="true">▤ 待處理名單 <span id="mrUxPendingTab"></span></button>
- <button type="button" id="mrUxTabAudit" aria-selected="false">待核對異常 <span id="mrUxAuditTab"></span></button>
+ <button type="button" id="mrUxTabAudit" aria-selected="false">已預排／待核對 <span id="mrUxAuditTab"></span></button>
  <button type="button" id="mrUxTabDone" aria-selected="false">✓ 已完成 <span id="mrUxDoneTab"></span></button>
  </div>
  <div class="mr-ux-table-scroll"><table class="mr-ux-table"><thead><tr>
@@ -187,7 +188,7 @@ function mount(el){
  <div class="mr-ux-reason"><b>♙ 人員異動</b><small>到職、離職、職稱或權限變更時依正式資料重新確認。</small></div>
  </aside></div>
  <footer id="mrUxFooter"><span id="mrUxSelected">已勾選 0 筆</span><span class="mr-ux-spacer"></span>
- <span id="mrUxHint"></span><button type="button" id="mrUxSavePlan" class="mr-ux-outline" disabled>▣ 儲存變更</button>
+ <span id="mrUxHint"></span><button type="button" id="mrUxSavePlan" class="mr-ux-outline" disabled>▣ 儲存預排</button>
  <button type="button" id="mrUxSubmit" class="mr-ux-primary" disabled>➤ 正式申報</button></footer>`;
  body.prepend(shell);
  const q=sel=>$(shell,sel);
@@ -211,7 +212,7 @@ function mount(el){
   if(!row.disabled&&/可申報/.test(row.status))return 'ready';
   return 'review';
  }
- function label(row){if(row.kind==='roster')return row.status;const type=kind(row);return {ready:'可申報',review:'待核對',missing:'缺資料',plan:'預排建議',done:'已完成'}[type];}
+ function label(row){if(row.kind==='roster')return row.status;if(row.kind==='existing'&&/^預排/.test(row.status))return row.status;const type=kind(row);return {ready:'可申報',review:'待核對',missing:'缺資料',plan:'預排建議',done:'已完成'}[type];}
  function currentView(){const data=rows();let shown=state.tab==='done'?data.verified:state.tab==='audit'?data.audit:data.pending;
   if(state.name)shown=shown.filter(r=>norm(r.name).includes(norm(state.name)));
   if(state.status&&state.tab!=='done')shown=shown.filter(r=>kind(r)===state.status);
@@ -226,6 +227,9 @@ function mount(el){
    const sourceOptions=originalDept.innerHTML;
    if(q('#mrUxDept').innerHTML!==sourceOptions)q('#mrUxDept').innerHTML=sourceOptions;
    if(q('#mrUxDept').value!==originalDept.value)q('#mrUxDept').value=originalDept.value;
+   if(q('#mrUxJob').innerHTML!==originalJob.innerHTML)q('#mrUxJob').innerHTML=originalJob.innerHTML;
+   if(q('#mrUxJob').value!==originalJob.value)q('#mrUxJob').value=originalJob.value;
+   q('#mrUxJob').disabled=originalJob.disabled;
    const view=currentView(),{data,pending,audit,verified,shown,deficits,exceptions}=view;
    // Discard local inspection picks for rows no longer in the live source.
    const reviewKeys=new Set([...pending,...audit].filter(r=>selectionMode(r)==='review').map(selectionKey));
@@ -267,7 +271,8 @@ function mount(el){
      (selectedPending.length>8?'<small>另有 '+(selectedPending.length-8)+' 項已勾選</small>':''):
      '勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。';
    const nativeSave=$(el,'#mrSave'),nativePlan=$(el,'#mrSavePlans');
-   q('#mrUxSavePlan').disabled=!!nativePlan?.disabled||!data.planned.some(r=>r.checked);
+   q('#mrUxSavePlan').disabled=!!nativePlan?.disabled||!data.planned.some(r=>r.checked&&!r.disabled);
+   q('#mrUxSavePlan').textContent='▣ 儲存預排（'+data.planned.filter(r=>r.checked&&!r.disabled).length+' 筆）';
    q('#mrUxSubmit').disabled=!data.ready.some(r=>r.checked&&!r.disabled)||!/申報/.test(nativeSave?.textContent||'');
    // In automatic planning mode the existing footer saves plans, not reports.
    // The real formal-submit action can still enter the official manual path.
@@ -278,7 +283,8 @@ function mount(el){
    q('#mrUxRows').innerHTML=shown.map(r=>{
     const type=kind(r),status=label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
     const id=esc(r.id),kindKey=esc(r.kind),key=esc(selectionKey(r));
-    const operations=r.kind==='ready'?
+    const operations=r.kind==='roster'&&r.canPreplan&&!originalMonth.disabled?
+     '<button type="button" data-action="preplan" data-key="'+key+'">＋ 預排申報</button><button type="button" data-action="view" data-key="'+key+'">◎ 檢視</button>':r.kind==='ready'?
      '<button type="button" data-action="edit" data-kind="ready" data-id="'+id+'" data-key="'+key+'">✎ 編輯</button><button type="button" data-action="view" data-kind="ready" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>':
      '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
@@ -286,7 +292,7 @@ function mount(el){
       '<td><span class="mr-ux-kind">'+esc(r.category)+'</span></td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc(x.date.slice(5))+' '+esc(periodLabel(x.period))+'</b><small style="display:block;color:#64748b">'+esc(x.note)+'</small></div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
       '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+(r.kind==='roster'?'<small style="display:block;white-space:normal;max-width:220px;color:#64748b">'+esc(r.source)+'</small>':'')+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
-   q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+'；'+(state.tab==='audit'?'零缺額但有異常、缺資料與既有待核申報在此列示，不列為未休缺額人員。':state.tab==='done'?'已完成申報不重複申報。':'僅列剩餘例／休／國大於零的人員及日期候選；時段建議僅供核對，預排不等於正式申報；無可用時段會說明原因。零缺額異常另列。');
+   q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+'；'+(state.tab==='audit'?'零缺額但有異常、缺資料與既有待核申報在此列示，不列為未休缺額人員。':state.tab==='done'?'已完成申報不重複申報。':'僅列剩餘例／休／國大於零的人員及日期候選；可按個別預排申報設定日期與時段，或勾選自動編排建議後儲存預排；實際出勤後才可正式申報。零缺額異常另列。');
    q('#mrUxExport').disabled=!shown.length;
   }finally{state.rendering=false;}
  }
@@ -343,6 +349,7 @@ function mount(el){
  }
  q('#mrUxMonth').onchange=e=>{if(!originalMonth.disabled){state.reviewSelected.clear();originalMonth.value=e.target.value;originalMonth.dispatchEvent(new Event('change',{bubbles:true}));}};
  q('#mrUxDept').onchange=e=>{if(!originalDept.disabled){originalDept.value=e.target.value;originalDept.dispatchEvent(new Event('change',{bubbles:true}));}};
+ q('#mrUxJob').onchange=e=>{if(!originalJob.disabled){state.reviewSelected.clear();originalJob.value=e.target.value;originalJob.dispatchEvent(new Event('change',{bubbles:true}));render();}};
  q('#mrUxName').oninput=e=>{state.name=e.target.value;render();};
  q('#mrUxState').onchange=e=>{state.status=e.target.value;render();};
  q('#mrUxTabPending').onclick=()=>{state.tab='pending';render();};
@@ -377,6 +384,7 @@ function mount(el){
   const row=currentView().shown.find(x=>selectionKey(x)===button.dataset.key);
   if(button.dataset.action==='view')details(row);
   if(button.dataset.action==='edit')edit(row);
+  if(button.dataset.action==='preplan'&&row?.kind==='roster'&&row.canPreplan&&!originalMonth.disabled)el.p79OpenMonthlyRestPlan?.(row.id);
  });
  q('#mrUxSavePlan').onclick=()=>{if(state.tab!=='pending')return;const button=$(el,'#mrSavePlans');if(button&&!button.disabled)button.click();};
  q('#mrUxSubmit').onclick=()=>{
