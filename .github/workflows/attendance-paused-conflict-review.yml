@@ -36,3 +36,4 @@ jobs:
           node tests/attendance-withdraw-drafts.cjs
           node tests/attendance-paused-conflict-workflow.cjs
           node tests/attendance-paused-batch-decision.cjs
+          node tests/attendance-inspector-live-audit.cjs
