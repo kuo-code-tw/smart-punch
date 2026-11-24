@@ -9,7 +9,7 @@ const extract=(start,finish)=>{
 };
 const helper=extract(' function closeConfirmedReportDialog(el){',' const inputStyle=');
 const handler=extract('   let submissionBusy=false;', '\n   };\n  }catch(e)');
-assert(source.includes('const validation=await prepareSaveValidation(validationRequest,true)'),
+assert(source.includes('const validation=await prepareSaveValidation(validationRequest,true,(attempt,total,seconds)=>{'),
  'new+review flow reuses one current official conversion table before submission');
 assert(!handler.includes('await ensureSpecialRule(chosen)'),
  'confirmed submission must not repeat the same rule fetch after the spinner');
@@ -57,8 +57,10 @@ function setup({save='success',throwsEvent=false,handoff=false,cleanupThrows=fal
   dateInput:node('#p79OtDate'),empSelect:node('#p79OtEmp'),kind:node('#p79OtKind'),
   select:node('#p79OtCode'),forSelect:node('#p79OtForEmp'),
   approvedDates:[],people:[{empId}],
-  prepareSaveValidation:async(req,checkRules)=>{
+  prepareSaveValidation:async(req,checkRules,onRetry)=>{
    rulesChecks++;assert.equal(checkRules,true,'planned review also fetches latest rules');
+   assert.equal(typeof onRetry,'function','preflight retains safe retry progress callback');
+   onRetry(1,4,1);assert.match(node('#p79OtStatus').textContent,/自動重試核對/);
    return {cloud:{revision:41,capabilities:{nightCoverOvertimeAccountingV1:true},
      schedules:[{empId,schedule:{[date]:'中',__meta:{}}}]},
     rules:{rows:[chosen],config:{}}};

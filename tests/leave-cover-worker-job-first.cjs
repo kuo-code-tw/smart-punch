@@ -66,5 +66,5 @@ for(const script of [approvedSource,createSource]){
 new vm.Script(pickerSource);
 assert(page.includes('p79-cover-worker-job-first-v1'),'live page includes job/name layout');
 for(const asset of ['port79-smart-cover-picker.js','port79-approved-cover-auto.js','port79-leave-daily-simple.js'])
- assert(page.includes(asset+'?v='+(asset==='port79-leave-daily-simple.js'?'20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1':'20261116-sameday-4h-stroke-v1')),'static cache refreshed: '+asset);
+ assert(page.includes(asset+'?v='+(asset==='port79-leave-daily-simple.js'?'20261119-group-consecutive-leave-close-v1':'20261116-sameday-4h-stroke-v1')),'static cache refreshed: '+asset);
 console.log('PASS job-first leave cover: two independent role filters, proper defaults, conflict checks, different titles and single-person mode');

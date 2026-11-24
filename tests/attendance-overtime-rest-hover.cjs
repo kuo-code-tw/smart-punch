@@ -20,7 +20,7 @@ const visible=html=>html.split('<div class="p79-overtime-hidden-detail">')[0];
 const hidden=html=>html.includes('<div class="p79-overtime-hidden-detail">')?
  html.split('<div class="p79-overtime-hidden-detail">')[1]:'';
 state.plan=null;state.actual=0;
-assert.equal(render({},{}),'','zero hours without a report stays blank');
+assert.equal(render({},{}),'—','zero hours without a report has only a neutral placeholder');
 state.actual=125;
 let html=render({},{});
 assert.match(visible(html),/估算 2 小時/,'unreported actual positive overtime remains visible');

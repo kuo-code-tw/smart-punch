@@ -2,8 +2,8 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const html=fs.readFileSync('schedule/index.html','utf8');
 const from=html.indexOf('    function p79ApplySchedulePayload('),to=html.indexOf('    async function loadCloudData(',from);
 assert(from>=0&&to>from);
-assert(html.includes('restQuotaOvertime:false}:automaticRestMeta[dayStr]||{};'),'normal roster must never expose a null dayMeta');
-const ui={
+assert.match(html,/:automaticRestMeta\[dayStr\]\|\|\{\};/,'normal roster must never expose a null dayMeta');
+const ui={scheduleTaipeiTodayKey:()=> '2026-11-24',p79ScheduleCloudRows:[],
  employees:Array.from({length:4},(_,i)=>({id:'C'+i,name:'指揮手'+i})),
  scheduleOrderNumber:x=>Number(x)||0,cloneScheduleEmployee:x=>({...x}),
  applySchedulePersonnelOverrides:()=>{},scheduleGroupIsMeaningful:()=>true,

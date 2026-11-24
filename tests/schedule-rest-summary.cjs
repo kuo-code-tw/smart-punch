@@ -14,12 +14,12 @@ api.acceptRows([{empId:'OTHER',schedule:updated}],month);assert.equal(sum().repo
 api.acceptRows([{empId:emp.id,schedule:updated}],month);api.acceptRows([{empId:emp.id,schedule:{'2026-11-01':'早'}}],'2026-11');assert.equal(sum().reported.國,1,'another month does not erase confirmed October');
 const incomplete={...schedule};delete incomplete[dates[10]];assert.equal(api.summary(emp,incomplete,{},month,{},'').remaining,null,'incomplete roster is not a false zero');api.clear();assert.equal(sum().remaining,null,'session reset cannot reuse another account confirmations');
 // Renderer formats the current per-category audit; cloud snapshot accounting is tested above.
-const html=fs.readFileSync('schedule/index.html','utf8');let a=html.indexOf('    function p79ScheduleRestCountCells('),b=html.indexOf('    function p79RefreshScheduleRestCounts(',a);
-const realQuota=c.p79RestQuota;Object.assign(c,{p79RestQuota:()=>({counts:{例:4,休:5,國:2}}),p79DailyRestCount:()=>({counts:{例:4,休:5,國:1},dates:{例:['01','02','03','04'],休:['05','06','07','08','09'],國:['10']}}),scheduleEscapeHtml:x=>String(x||'')});
+const html=fs.readFileSync('schedule/index.html','utf8');let a=html.indexOf('    function p79ScheduleSpecialSummaryColumns('),b=html.indexOf('    function p79RefreshScheduleRestCounts(',a);
+const realQuota=c.p79RestQuota;Object.assign(c,{employees:[],monthlyScheduleData:{},monthlyScheduleMeta:{},p79TyphoonDates:()=>[],p79RestQuota:()=>({days:31,counts:{例:4,休:5,國:2}}),p79DailyRestCount:()=>({counts:{例:4,休:5,國:1},dates:{例:['01','02','03','04'],休:['05','06','07','08','09'],國:['10']}}),scheduleEscapeHtml:x=>String(x||'')});
 vm.runInContext(html.slice(a,b),c);
 const rendered=c.p79ScheduleRestCountCells(emp,month);c.p79RestQuota=realQuota;assert.match(rendered,/<span>4\/0<\/span>/);assert.match(rendered,/<span>5\/0<\/span>/);assert.match(rendered,/<span>1\/1<\/span>/);assert.match(rendered,/國超額|p79-rest-national/);
 // All staff use the same numeric-only allocated/remaining format, including the 3/1 case.
-c.p79RestQuota=()=>({counts:{例:4,休:4,國:2}});
+c.p79RestQuota=()=>({days:31,counts:{例:4,休:4,國:2}});
 c.p79ScheduleRestBalance=()=>({quota:{例:4,休:4,國:2},ledger:[],remaining:{例:0,休:1,國:2}});
 c.p79DailyRestCount=()=>({dates:{例:['01','02','03','04'],休:['05','06','07'],國:[]}});
 for(let i=0;i<83;i++){

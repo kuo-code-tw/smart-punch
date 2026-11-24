@@ -5,8 +5,8 @@ const ui=fs.readFileSync('assets/port79-workhours-reference-dashboard.js','utf8'
 const html=fs.readFileSync('assets/port79-workhours-reference-dashboard.html','utf8');
 const css=fs.readFileSync('assets/port79-workhours-reference-dashboard.css','utf8');
 new vm.Script(ui);
-assert(page.includes('port79-workhours-reference-dashboard.css?v=20261117-approved-v2'));
-assert(page.includes('port79-workhours-reference-dashboard.js?v=20261117-approved-v2'));
+assert(page.includes('port79-workhours-reference-dashboard.css?v=20261123-reference-home-tabs-v3'));
+assert(page.includes('port79-workhours-reference-dashboard.js?v=20261123-reference-home-tabs-v3'));
 assert(ui.includes('port79-workhours-reference-dashboard.html?v=20261117-approved-v1'));
 assert(html.includes('id="p79WorkhoursReference"'));
 assert(html.includes('id="prForm"')&&html.includes('id="prTableBody"'));

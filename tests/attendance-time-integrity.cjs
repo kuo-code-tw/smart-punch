@@ -19,15 +19,15 @@ assert.equal(c.chooseBetter(full,midnight).timeStr,midnight.timeStr,'genuine exp
 for(const other of [{...damaged,attNo:'other'},{...damaged,status:'OUT'},{...damaged,id:'other'}])assert.equal(c.p79AttendancePreciseVersion(full,other),null,'cannot infer from another event');
 const core=fs.readFileSync('assets/port79-attendance-core.js','utf8');
 const ds=core.indexOf('function mergeDeltaEvent(event){'),de=core.indexOf('\nasync function pollDelta(',ds);
-Object.assign(c,{records:[full],confirmCloudRecord:()=>{},pendingForId:()=>false});vm.runInContext(core.slice(ds,de),c);
-assert.equal(c.mergeDeltaEvent({kind:'upsert',record:damaged}),true);assert.equal(c.records[0].timeStr,full.timeStr);
+let acknowledgements=0;Object.assign(c,{records:[full],confirmCloudRecord:()=>{acknowledgements++},pendingForId:()=>false});vm.runInContext(core.slice(ds,de),c);
+assert.equal(c.mergeDeltaEvent({kind:'upsert',record:damaged}),false,'discarded date-only version does not trigger a redundant repaint');assert.equal(acknowledgements,1,'ignored delta is still acknowledged');assert.equal(c.records[0].timeStr,full.timeStr);
 c.mergeDeltaEvent({kind:'upsert',record:midnight});assert.equal(c.records[0].timeStr,midnight.timeStr);
 const engine=require('../attendance/v6-engine.js');
 assert.equal(engine.normalizeTime('2026/10/10'),'2026/10/10');
 let rows=engine.buildShifts([damaged,{...full,id:'out',status:'OUT',timeStr:'2026/10/11 07:51'}]);
 assert.equal(rows.length,2);assert(rows.some(r=>r.timePrecisionIssue&&r.clockIn.timeStr==='2026/10/10'));assert(!rows.some(r=>r.clockIn&&r.clockOut));
 rows=engine.buildShifts([full,{...full,id:'out',status:'OUT',timeStr:'2026/10/11 07:51'}]);assert.equal(rows.length,1);assert(rows[0].clockIn&&rows[0].clockOut);
-rows=engine.buildShifts([{...full,timeStr:'2026/10/11 00:00'},{...full,id:'out',status:'OUT',timeStr:'2026/10/11 07:51'}]);assert.equal(rows.length,1);assert.equal(rows[0].dateKey,'2026-10-11');
+rows=engine.buildShifts([{...full,timeStr:'2026/10/11 00:00'},{...full,id:'out',status:'OUT',timeStr:'2026/10/11 07:51'}]);assert.equal(rows.length,1);assert.equal(rows[0].actualDateKey,'2026-10-11','original midnight punch date remains unchanged');assert.equal(rows[0].accountingDateKey,'2026-10-10','complete midnight-to-before-08 shift belongs to previous night workday');assert.equal(rows[0].workDateAdjusted,true);
 for(const bad of ['2026/02/30 07:51','2026/10/10 25:00'])assert(engine.buildShifts([{...full,timeStr:bad}])[0].timePrecisionIssue);
 console.log('PASS precise source preserved through month/canonical/delta merges and repeated pulls; newer genuine midnight edit, cross-day pairing and damaged-row visibility; no cloud writes');
 

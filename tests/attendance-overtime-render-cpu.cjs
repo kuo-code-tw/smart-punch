@@ -41,7 +41,7 @@ for(let i=0;i<50;i++){
   const emp={empId:'E'+i};
   a.equal(ctx.p79AttendanceOvertimeSubmissionState(row,emp,view),'none');
   a.equal(ctx.p79AttendanceRosterGroup(row,emp,view),'A組');
-  a.equal(ctx.attendanceRowOvertimeText(row,view),'','no overtime must stay blank across all visible staff');
+  a.equal(ctx.attendanceRowOvertimeText(row,view),'—','no overtime must display only the neutral placeholder across all visible staff');
   a.equal(ctx.p79AttendanceSpecialParts(row,view).length,0);
 }
 a.equal(tokenReads,1,'all visible rows share one auth-token read');

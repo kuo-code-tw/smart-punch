@@ -3,7 +3,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const report=fs.readFileSync('assets/port79-overtime-report.js','utf8');
 const matchScript=fs.readFileSync('assets/port79-overtime-shift-match.js','utf8');
 const work=fs.readFileSync('work-hours/index.html','utf8');
-const g={};vm.runInNewContext(report,{window:g,Date,Intl,Set,Map});
+const g={p79OvertimeContext:{config:()=>({overtimeConversionRowsV1:[['休','休08-16',8,12.7,'','','08','16','full','休息日加班'],['休','休16-24',8,12.7,'','','16','24','full','休息日加班']]})}};vm.runInNewContext(report,{window:g,Date,Intl,Set,Map});
 vm.runInNewContext(matchScript,{window:g,Date,Intl,Set,Map});
 const date='2026-10-28';
 const start=Date.parse('2026-10-28T07:45:00+08:00'),end=Date.parse('2026-10-28T15:48:00+08:00');
@@ -16,7 +16,7 @@ assert.equal(matched.confirmed,true);
 assert.equal(matched.mismatch,true);
 assert.equal(old.code,'休16-24','source report must not mutate in memory before user confirms');
 const fnStart=report.indexOf('function verifyPlannedReviewSelection(selected)');
-const fnEnd=report.indexOf("   el.querySelector('#p79OtStage').onclick",fnStart);
+const fnEnd=report.indexOf('   let submissionBusy=false;',fnStart);
 assert(fnStart>0&&fnEnd>fnStart,'save guard must exist before click handler');
 const guard=report.slice(fnStart,fnEnd);
 const prefill={date,roster:{[date]:'早'},plannedReview:true,
@@ -40,7 +40,7 @@ assert(work.includes('if(pairs.length!==1)throw Error('),'server requires comple
 assert(work.includes('originalStart!==pair.start||originalEnd!==pair.end'),'server checks original timestamps versus latest cloud');
 assert(work.includes("matched?.suggested?.code!==draft.rule.code"),'server re-checks rule against latest real punch');
 assert(work.includes('expectedRevision:cloud.revision'),'save remains revision guarded');
-assert(report.includes('verifyPlannedReviewSelection(rows[Number(select.value)])'),'form validates before save');
+assert(report.includes('verifyPlannedReviewSelection(chosen);'),'form validates before save');
 assert(report.includes("expectedOriginalCode:editingOriginal?String(prefill.originalReportCode||'')"),'form sends optimistic baseline for same original report');
 for(const m of work.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(m[1].trim())new vm.Script(m[1]);
 new vm.Script(report);
