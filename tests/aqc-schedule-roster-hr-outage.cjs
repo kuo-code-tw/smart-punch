@@ -16,7 +16,8 @@ store.setOwner('owner');
 store.apply('2026-11',{ok:true,month:'2026-11',employees:[
  {empId:'A1',attNo:'ATT-A1',name:'現職甲',employmentStatus:'active',jobTitle:'AQC',group:'不分組'},
  {empId:'B1',name:'現職乙',employmentStatus:'active',jobTitle:'AQC',group:'B組'},
- {empId:'C1',name:'離職丙',employmentStatus:'resigned',jobTitle:'AQC',group:'C組'}
+ {empId:'C1',name:'離職丙',employmentStatus:'resigned',jobTitle:'AQC',group:'C組'},
+ {empId:'D1',name:'狀態未核對',jobTitle:'AQC',group:'D組'}
 ],schedules:[
  {empId:'A1',month:'2026-11',schedule:{__personnel:{role:'AQC',group:'A組',groupExplicit:true}}},
  {empId:'B1',month:'2026-11',schedule:{__personnel:{role:'AQC',group:'B組',groupExplicit:true}}},
@@ -50,7 +51,9 @@ for(const name of ['p79ScheduledAqcReportView','p79VerifiedAqcReportView','updat
 const view=ctx.p79VerifiedAqcReportView(records);
 assert.equal(view.verified,true,'valid schedule AQC roster must not be blocked by failed HR-only API');
 assert.equal(view.source,'schedule');
-assert.equal(view.rosterCount,2,'resigned staff must be excluded from live roster');
+assert.equal(view.rosterCount,2,'resigned and unknown employment staff must be excluded from live roster');
+ctx.isAqcEmployee=e=>e.employmentStatus==='active';ctx.systemEmployees=[{empId:'A1',employmentStatus:'resigned'}];
+assert.equal(ctx.p79VerifiedAqcReportView(records).rosterCount,1,'older schedule must not resurrect a known resigned employee');ctx.systemEmployees=[];
 assert.equal(view.rows.length,2,'only verified monthly schedule AQC records can become personnel work rows');
 assert.deepEqual(Array.from(view.persons,p=>p.group).sort(),['A組','B組']);
 assert.equal(view.persons.find(p=>p.empId==='A1').containers,15);
