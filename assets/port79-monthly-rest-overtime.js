@@ -816,7 +816,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-full-review-roster-v1';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-positive-deficit-v2';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -993,17 +993,19 @@ async function open(settings={}){
     q('#mrNeedSummary').textContent='正式班表逐人核對：未休／待核 '+review.length+' 人（F/L待核 '+fl.length+'／F/L名冊 '+flStaff.length+'／班表匹配 '+flMatched+'）'+
       (missing?'｜班表不完整 '+missing+' 人':'')+'｜下表不等於可直接申報';
     q('#mrNeedRows').innerHTML=review.map(x=>{
+     const due=x.missing?null:cats.reduce((n,k)=>n+Math.max(0,Number(x.remaining[k])||0),0);
+     const reviewType=x.missing?'missing':due>0?'deficit':'exception';
      const quota=x.missing?'尚無法計算':'例'+x.remaining.例+'／休'+x.remaining.休+'／國'+x.remaining.國;
      const status=x.missing?'班表缺漏：'+x.reason:
        (x.unreported?'排休日有出勤未申報 '+x.unreported+' 天；':'')+
        (x.pending?'既有申報待核打卡 '+x.pending+' 天；':'')+
        (x.eligible?'正式可申報 '+x.eligible+' 筆；':'')+
-       (x.planned?'月底預排 '+x.planned+' 筆':'預排需自行建立');
+       (x.planned?'月底預排 '+x.planned+' 筆':due>0?'預排需自行建立':'無剩餘缺額，不需新增未休加班');
      const plans=(model.plannedRows||[]).filter(r=>id(r.empId)===id(x.emp.empId)&&!r.saved);
      const canManual=manualPlanSelectable(x,loadedMonth);
      const pick=autoPlan?'<input type="checkbox" class="need-plan" data-emp="'+esc(x.emp.empId)+'" aria-label="勾選 '+esc(x.emp.name)+' 的自動預排" '+(plans.length&&plans.every(r=>r.checked)?'checked ':'')+(!plans.length||busy?'disabled':'')+'>':
       '<input type="checkbox" class="need-plan manual-person-pick" data-emp="'+esc(x.emp.empId)+'" aria-label="手動預排勾選 '+esc(x.emp.name)+'" '+(manualPeople.has(id(x.emp.empId))?'checked ':'')+(!canManual||busy?'disabled':'')+' title="'+(canManual?'勾選後指定日期與時段；不會自動申報':'班表不完整、沒有剩餘額度或無可預排的未來日期')+'">';
-     return '<tr><td>'+pick+'</td><td>'+esc(x.emp.empId)+'</td><td>'+esc(x.role)+'</td><td>'+esc(x.emp.name)+'</td><td>'+esc(quota)+'</td><td>'+esc(status)+'</td></tr>';
+     return '<tr data-review-type="'+reviewType+'"><td>'+pick+'</td><td>'+esc(x.emp.empId)+'</td><td>'+esc(x.role)+'</td><td>'+esc(x.emp.name)+'</td><td>'+esc(quota)+'</td><td>'+esc(status)+'</td></tr>';
     }).join('')||'<tr><td colspan="6">目前篩選內無未休額度或待核人員</td></tr>';
    const manualPicked=[...manualPeople.values()];
    q('#mrManualSummary').textContent='手動預排已勾選 '+manualPicked.length+' 人｜請逐人設定日期及時段後儲存';
