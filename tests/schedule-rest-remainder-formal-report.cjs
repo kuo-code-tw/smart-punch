@@ -26,6 +26,7 @@ for(let i=0;i<83;i++)for(const nationalOff of [0,1]){
  c.P79ScheduleRestSummary.clear();
  const unknown=c.p79ScheduleRestCountCells(emp,month,meta,[],[],selected);
  a.match(unknown,/雲端申報額度待核/,'no cloud confirmation must not claim a verified zero');
+ a.match(unknown,new RegExp('<span>'+nationalOff+'/'+(2-nationalOff)+'</span>'),'unverified cloud report IDs cannot be used as formal quota deductions');
  // A confirmed revocation releases the quota again without changing visible days.
  for(const m of Object.values(meta)){m.overtimeExcluded=true;m.overtimeRevocations=[{confirmed:true,reportId:m.overtimeReport.id}];}
  c.P79ScheduleRestSummary.acceptRows([{empId:emp.id,schedule:{...roster,__meta:meta}}],month);
