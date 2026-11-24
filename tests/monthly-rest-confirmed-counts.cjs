@@ -9,6 +9,9 @@ for(const report of [null,{category:'休',code:'休24-08'},{category:'休',id:''
 }
 const b=fixture({category:'休',id:'CLOUD-FIXTURE',code:'休24-08'}),model={balances:[{emp,...b}],rows:[{empId:emp.empId,category:'國',date:dates[16],checked:false,acknowledged:false,saved:false}]};
 assert.equal(total(b.unused),3);assert.equal(total(b.reported),1);assert.equal(total(b.remaining),2);assert.match(api.personSummary(model,emp.empId),/^例0／休0／國2$/);
+const occupied=api.personQuotaProgress(model,emp.empId);
+for(const category of ['例','休','國'])assert.equal(occupied[category].used,b.off[category]+b.reported[category]+b.reserved[category],'visible numerator comes from actual ledger');
+assert.equal(api.quotaProgressText(occupied),'例4/0／休5/0／國0/2');
 model.rows[0].checked=true;assert.match(api.personSummary(model,emp.empId),/^例0／休0／國2$/,'selection does not reduce pending days');
 model.rows[0].acknowledged=true;model.rows[0].checked=false;assert.match(api.personSummary(model,emp.empId),/^例0／休0／國2$/,'POST acknowledgement alone does not confirm saved count');
 model.rows[0].saved=true;assert.match(api.personSummary(model,emp.empId),/^例0／休0／國1$/,'cloud-confirmed readback deducts exactly once without changing unused total');
