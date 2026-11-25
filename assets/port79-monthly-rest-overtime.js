@@ -1038,7 +1038,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-reference-preplan-v23';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-multi-preplan-v24';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1244,7 +1244,9 @@ async function open(settings={}){
        (due>0?(hint.suggestions.length?'已有 '+hint.suggestions.length+' 筆時段建議；':'')+hint.reason:'無剩餘缺額，不需新增未休加班');
      const plans=(model.plannedRows||[]).filter(r=>id(r.empId)===id(x.emp.empId)&&!r.saved);
      const canManual=manualPlanSelectable(x,loadedMonth);
-     const canPreplan=canManual&&!unverifiedSource&&(Number(x.remaining.休)>0||Number(x.remaining.國)>0);
+     // Opening the plan editor is not a write. Attendance still has to be
+     // verified when the chosen date is saved, not before opening the form.
+     const canPreplan=canManual&&snapshot?.provisional!==true&&(Number(x.remaining.休)>0||Number(x.remaining.國)>0);
      const pick=autoPlan?'<input type="checkbox" class="need-plan" data-emp="'+esc(x.emp.empId)+'" aria-label="勾選 '+esc(x.emp.name)+' 的自動預排" '+(plans.length&&plans.every(r=>r.checked)?'checked ':'')+(!plans.length||busy?'disabled':'')+'>':
       '<input type="checkbox" class="need-plan manual-person-pick" data-emp="'+esc(x.emp.empId)+'" aria-label="手動預排勾選 '+esc(x.emp.name)+'" '+(manualPeople.has(id(x.emp.empId))?'checked ':'')+(!canManual||busy?'disabled':'')+' title="'+(canManual?'勾選後指定日期與時段；不會自動申報':'班表不完整、沒有剩餘額度或無可預排的未來日期')+'">';
      return '<tr data-review-type="'+reviewType+'" data-quota-progress="'+esc(JSON.stringify(quotaFor(x.emp.empId)))+'" data-period-suggestions="'+esc(JSON.stringify(hint.suggestions))+'" data-last-reported="'+esc(hint.lastReported||'')+'" data-next-report-date="'+esc(hint.nextReportDate||'')+'" data-can-preplan="'+String(canPreplan)+'"><td>'+pick+'</td><td>'+esc(x.emp.empId)+'</td><td>'+esc(x.role)+'</td><td>'+esc(x.emp.name)+'</td><td>'+esc(quota)+'</td><td>'+esc(status)+'</td></tr>';
@@ -1347,11 +1349,16 @@ async function open(settings={}){
  el.p79OpenMonthlyRestPlan=employeeId=>q('#mrNewPlan').onclick(employeeId,true);
  q('#mrManualMode').onchange=()=>{explicitPlanningMode=true;choosePlanningMode(false);};
  q('#mrAutoMode').onchange=()=>{explicitPlanningMode=true;choosePlanningMode(q('#mrAutoMode').checked);};
- q('#mrNewPlan').onclick=async(employeeId='',fromRoster=false)=>{if(isReadOnlySource()){setStatus('既有申報目前僅供查閱，不能建立預排。');return;}
-  if(busy)return;
-  const selected=id(typeof employeeId==='string'?employeeId:'')||
-    (manualPeople.size?[...manualPeople.keys()][0]:'');
-  const chosen=fromRoster?chosenPeople().find(e=>id(e.empId)===selected):manualPeople.get(selected);
+ q('#mrNewPlan').onclick=async(employeeId='',fromRoster=false)=>{
+  if(busy||!model||!snapshot)return;
+  if(snapshot.provisional===true){setStatus('歷史備援僅供查閱，不能建立預排。');return;}
+  if(!fromRoster&&isReadOnlySource()){setStatus('請從已選未休人員設定預排，儲存時重新核對正式資料。');return;}
+  const requested=Array.isArray(employeeId)?employeeId.map(id):[id(typeof employeeId==='string'?employeeId:'')].filter(Boolean);
+  const allowed=new Set(requested);
+  const eligible=fromRoster?rosterReviewRows(model,chosenPeople()).filter(x=>allowed.has(id(x.emp.empId))&&manualPlanSelectable(x,loadedMonth)&&(Number(x.remaining.休)>0||Number(x.remaining.國)>0)):[];
+  if(fromRoster&&!eligible.length){setStatus('所選人員沒有本月可設定的休／國預排額度，請核對月份及班表。');return;}
+  const selected=fromRoster?id(eligible[0].emp.empId):requested[0]||(manualPeople.size?[...manualPeople.keys()][0]:'');
+  const chosen=fromRoster?eligible[0].emp:manualPeople.get(selected);
   if(selected&&!chosen){setStatus('找不到勾選人員，請重新勾選');return;}
   const detail=chosen?rosterReviewRows(model,loadedPeople).find(x=>id(x.emp.empId)===selected):null;
   if(chosen&&!manualPlanSelectable(detail,loadedMonth)){
@@ -1361,15 +1368,16 @@ async function open(settings={}){
    {manualPlan:true,empId:chosen.empId,allowedEmpIds:[chosen.empId],requirePeriodSelection:true,pickDateExplicitly:true}:
    {manualPlan:true};
   if(fromRoster){
-   if(!chosen||!detail||!manualPlanSelectable(detail,loadedMonth)||snapshot?.attendanceEvidence?.complete!==true||
-      !(Number(detail.remaining.休)>0||Number(detail.remaining.國)>0))return setStatus('目前沒有可預排的休／國缺額或正式資料未核對');
+   if(!chosen||!detail||!manualPlanSelectable(detail,loadedMonth)||
+      !(Number(detail.remaining.休)>0||Number(detail.remaining.國)>0))return setStatus('目前沒有可預排的休／國缺額');
    const month=loadedMonth;
-   Object.assign(prefill,{monthlyRestPlanMonth:month,category:Number(detail.remaining.休)>0?'休':'國',
+   Object.assign(prefill,{allowedEmpIds:eligible.map(x=>x.emp.empId),monthlyRestPlanMonth:month,category:Number(detail.remaining.休)>0?'休':'國',
     note:'每月未休假加班預排（未核實出勤）',periodHint:'請選本月原排休／國日期及8小時時段；儲存前重新核對缺額及週期',
     validateMonthlyRestPlan:async({empId,date,rule})=>{
-     if(!el.isConnected||loadedMonth!==month||id(empId)!==selected)throw Error('原未休人員或月份已變更，請重新開啟');
+     const target=eligible.find(x=>id(x.emp.empId)===id(empId))?.emp;
+     if(!el.isConnected||loadedMonth!==month||!target||!chosenPeople().some(e=>id(e.empId)===id(empId)))throw Error('原未休人員或月份已變更，請重新開啟');
      const fresh=await a.snapshot(month,false,false,true);
-     const issue=manualRestPlanIssue(fresh,chosen,month,date,rule,today(),q('#mrCutoff').value);
+     const issue=manualRestPlanIssue(fresh,target,month,date,rule,today(),q('#mrCutoff').value);
      if(issue)throw Error(issue);
     }});
   }
@@ -1379,7 +1387,7 @@ async function open(settings={}){
    let acknowledged=false;
    const saved=event=>{
     const draft=event?.detail?.draft,result=event?.detail?.result;
-    if(chosen&&draft?.manualPlan===true&&id(draft.empId)===selected&&
+    if(chosen&&draft?.manualPlan===true&&(fromRoster?eligible.some(x=>id(x.emp.empId)===id(draft.empId)):id(draft.empId)===selected)&&
        result?.ok===true&&result?.directOvertimeSaved===true&&result?.report?.planned===true)
      acknowledged=true;
    };
