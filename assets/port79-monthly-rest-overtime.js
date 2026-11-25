@@ -256,9 +256,12 @@ function monthEndWindowDate(month,asOf=today()){
 /* A legal seven-day cycle is continuous across months and must be explicitly agreed.
    Unknown anchors are a reference-only Sunday week, never permission to auto-plan. */
 function weeklyCycleAnchor(emp){
- const source=g.p79MonthlyRestContext?.weeklyCycleStart;
+ const context=g.p79MonthlyRestContext;
+ const source=context?.weeklyCycleStart;
  const configured=typeof source==='function'?source(emp):source;
- const raw=String(configured||emp?.weeklyCycleStart||emp?.restCycleStart||emp?.workWeekStart||'').slice(0,10);
+ // Preserve explicitly agreed employee cycles; the company-wide default
+ // is supplied by the host only after the administrator confirms it.
+ const raw=String(emp?.weeklyCycleStart||emp?.restCycleStart||emp?.workWeekStart||configured||context?.defaultWeeklyCycleStart||'').slice(0,10);
  return /^\d{4}-\d{2}-\d{2}$/.test(raw)&&Number.isFinite(Date.parse(raw+'T00:00:00Z'))?raw:'';
 }
 function weeklyCycleWindow(date,anchor=''){
