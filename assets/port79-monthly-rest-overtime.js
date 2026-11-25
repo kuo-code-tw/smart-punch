@@ -718,12 +718,30 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
    if(!(b.remaining[category]>0)||originalCategory&&originalCategory!==category)continue;
    const rule=rules.find(r=>r[0]===category&&fullDayRule(r)&&minute(r[6])===minute(period[0])&&minute(r[7])===minute(period[1]));
    const issue=rule&&['休','國'].includes(original)?manualRestPlanIssue(snapshot,emp,month,date,rule,asOf):'';
-   const eligible=!!rule&&['休','國'].includes(original)&&!issue&&!source.includes('推估');
-   const note=eligible?source+'；可進入預排核對':shifts[original]?(originalCategory?source+'；加班條件待核，不可直接申報':source+'；原排正常班，假別須先核對，不可直接申報'):source+'；'+(issue||(!rule?'無相符正式加班規則':'班別尚需確認'))+'，不可直接申報';
+   // A consistent neighboring shift is a suggested future period only. The
+    // operator's batch confirmation may select it; fresh quota/weekly guards
+    // above still apply, and it must never be treated as actual attendance.
+    const eligible=!!rule&&['休','國'].includes(original)&&!issue;
+   const note=eligible?source+'；可勾選批次預排（未正式申報）':shifts[original]?(originalCategory?source+'；加班條件待核，不可直接申報':source+'；原排正常班，假別須先核對，不可直接申報'):source+'；'+(issue||(!rule?'無相符正式加班規則':'班別尚需確認'))+'，不可直接申報';
    out.push({date,category,period:period.map(v=>String(v).includes(':')?String(v):String(v).padStart(2,'0')+':00').join(' – '),note,referenceOnly:true,eligible,rank:eligible?0:originalCategory===category?1:2});
   }
  }
  return out.sort((a,b)=>Number(!!b.actualReference)-Number(!!a.actualReference)||a.rank-b.rank||a.date.localeCompare(b.date));
+}
+// Exact date/person/category/period matching: display references cannot
+// manufacture a payable candidate or silently move the selected date.
+function selectedRestCandidateKey(r){
+ const raw=String(r?.rule?.[1]||r?.period||'').trim();
+ const match=raw.match(/(\d{1,2})(?::(\d{2}))?\s*[-–—～]\s*(\d{1,2})(?::(\d{2}))?\s*$/);
+ if(!match)return '';
+ const period=match.slice(1).map((v,i)=>String(v||'0').padStart(2,'0')).join(':');
+ return [id(r.empId),r.date,r.category,period].join('|');
+}
+function matchSelectedRestCandidates(requested,candidates){
+ const keys=new Set(requested.map(selectedRestCandidateKey).filter(Boolean));
+ const matched=candidates.filter(r=>!r.saved&&keys.has(selectedRestCandidateKey(r)));
+ const found=new Set(matched.map(selectedRestCandidateKey));
+ return {matched,unmatched:requested.filter(r=>!found.has(selectedRestCandidateKey(r)))};
 }
 function personPeriodSuggestions(model,empId,asOf=today()){
  const key=id(empId),balanceRow=model?.balances?.find(b=>id(b.emp.empId)===key);
@@ -1038,7 +1056,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-multi-preplan-v24';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-exact-batch-v25';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1347,6 +1365,51 @@ async function open(settings={}){
   }
  }
  el.p79OpenMonthlyRestPlan=employeeId=>q('#mrNewPlan').onclick(employeeId,true);
+ // Batch action passes the selected dated rows, not merely employee IDs.
+ // Refresh once, match the exact original candidates, then use the existing
+ // guarded bulk save and cloud read-back. Unmatched rows are not written.
+ el.p79ProcessMonthlyRestSelection=async(requested,mode)=>{
+  if(busy||!model||!Array.isArray(requested)||!['plan','formal'].includes(mode))return;
+  const month=loadedMonth,scope=new Set(chosenPeople().map(e=>id(e.empId)));
+  const picked=requested.filter(r=>scope.has(id(r.empId))&&String(r.date||'').startsWith(month+'-')&&selectedRestCandidateKey(r));
+  const previous=(mode==='plan'?model.plannedRows:model.rows).filter(r=>r.checked&&!r.saved);
+  const byKey=new Map([...previous,...picked].map(r=>[selectedRestCandidateKey(r),r]));
+  if(!byKey.size){setStatus('沒有已指定日期及時段的勾選項目。');return;}
+  const wanted=[...byKey.values()],rejected=[];
+  busy=true;controls(true);setStatus('正在一次核對 '+wanted.length+' 筆原日期及時段…');
+  try{
+   const fresh=await a.snapshot(month,false,false,true);
+   if(!el.isConnected||loadedMonth!==month)throw Error('月份或視窗已變更');
+   if(fresh?.provisional===true||fresh?.readOnlyDueAttendance===true||fresh?.attendanceEvidence?.complete!==true)throw Error('正式班表或考勤尚未完整讀取，保留勾選，未寫入任何申報');
+   const next=plan(fresh,loadedPeople,month,rules,{manualOnly:false,cutoff:q('#mrCutoff').value});
+   const candidates=mode==='plan'?next.plannedRows:next.rows;
+   const {matched,unmatched}=matchSelectedRestCandidates(wanted,candidates);
+   // Keep native IDs for uncertain write retries; never assign a new ID
+   // to an attempted record without checking its existing cloud report.
+   for(const row of matched){
+    const old=previous.find(x=>selectedRestCandidateKey(x)===selectedRestCandidateKey(row));
+    if(old){row.id=old.id;row.attempted=old.attempted;row.acknowledged=old.acknowledged;}
+    row.checked=true;
+   }
+   for(const row of unmatched){
+    const roster=fresh.schedules?.find(x=>id(x.empId)===id(row.empId))?.schedule;
+    const meta=roster?.__meta?.[row.date]||{};
+    const reason=meta.overtimeReport?'已有加班或預排紀錄，請核對原編號':!roster?'缺少正式班表':mode==='plan'&&row.date<today()?'已過日期，請改走實際出勤正式申報':mode==='formal'&&row.date>today()?'尚未到出勤日期，只能預排':automaticRestCategory(roster,row.date,month)!==row.category?'原排假別與所選假別不符':next.reviewNotes?.[id(row.empId)]?.find(x=>x.date===row.date&&x.category===row.category)?.reason||'未符合該日期的出勤、額度或週期條件';
+    rejected.push((row.name||row.empId)+' '+row.date+'：'+reason);
+   }
+   if(!matched.length){setStatus('本次沒有符合'+(mode==='plan'?'預排':'正式申報')+'條件的日期；'+rejected.slice(0,8).join('；')+(rejected.length>8?'；另 '+(rejected.length-8)+' 筆待核':'')+'。未寫入資料。');return;}
+   // Preserve unrelated rows and only select exact matched candidates.
+   const untouched=mode==='plan'?model.rows:model.plannedRows;
+   if(mode==='plan')next.rows=untouched;else next.plannedRows=untouched;
+   snapshot=fresh;model=next;
+   if(mode==='plan'){autoPlan=true;q('#mrAutoMode').checked=true;q('#mrManualMode').checked=false;}
+   paint();
+   setStatus('已配對 '+matched.length+' 筆'+(rejected.length?'；另 '+rejected.length+' 筆不符：'+rejected.slice(0,5).join('；'):'')+'。');
+  }catch(error){setStatus('批次核對未完成：'+String(error.message||error));return;}
+  finally{busy=false;controls(false);}
+  if(rejected.length&&!confirm('有 '+rejected.length+' 筆不符條件，將保留待核，不會申報。\n'+rejected.slice(0,8).join('\n')+'\n繼續處理已配對項目？'))return;
+  if(mode==='plan')await q('#mrSavePlans').onclick();else await q('#mrSave').onclick();
+ };
  q('#mrManualMode').onchange=()=>{explicitPlanningMode=true;choosePlanningMode(false);};
  q('#mrAutoMode').onchange=()=>{explicitPlanningMode=true;choosePlanningMode(q('#mrAutoMode').checked);};
  q('#mrNewPlan').onclick=async(employeeId='',fromRoster=false)=>{
@@ -1567,6 +1630,6 @@ async function open(settings={}){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
 
 })(window);
