@@ -50,25 +50,29 @@ html[data-theme="dark"] .panel p,html[data-theme="dark"] .note,html[data-theme="
 html[data-theme="dark"] .panel .field{border-color:#385272}html[data-theme="dark"] .panel .field select,html[data-theme="dark"] .panel textarea{background:#162944;color:#e8eef9}
 @media(max-width:1020px){.grid{grid-template-columns:1fr}.layout{grid-template-columns:180px 1fr}.sidebar{width:175px;flex-basis:175px}}
 @media(max-width:740px){.sidebar{width:66px;flex-basis:66px}.brand{font-size:0}.brand:first-letter{font-size:20px}.main-nav a{font-size:0;justify-content:center}.main-nav .sym{font-size:22px}.layout{grid-template-columns:1fr}.subnav{position:static}.subnav h2{margin:4px}.subnav a{display:inline-flex;border:0;padding:7px}.page{padding:8px}.content{padding:10px}.topbar h1{font-size:18px}}
-/* PORT79 SETTINGS SIDEBAR PARITY: reuse the established homepage light-blue navigation. */
-.sidebar{width:230px;flex:0 0 230px;background:#f1f8ff;color:#203d61;border-right:1px solid #dceaf8;position:sticky;top:0;height:100vh;box-shadow:none;overflow:hidden}
-.brand{height:72px;min-height:72px;display:flex;align-items:center;gap:7px;padding:10px 17px;border:0;white-space:nowrap;font-weight:inherit}
-.port-logo{width:42px;height:47px;flex:none}
-.brand-text strong{display:block;font-size:19px;font-weight:900;line-height:1.2;color:#16385f}
+/* PORT79 SETTINGS SIDEBAR — match the established light-blue workspace navigation.
+   Only the settings shell is styled here; forms and cloud settings are unchanged. */
+.sidebar{width:230px;flex:0 0 230px;background:#f1f8ff;color:#193b63;border-right:1px solid #dceaf8;position:sticky;top:0;height:100vh;height:100dvh;box-shadow:none;overflow:hidden;font-family:"Microsoft JhengHei","Noto Sans TC",system-ui,sans-serif}
+.brand{height:64px;min-height:64px;display:flex;align-items:center;gap:14px;padding:6px 13px;border:0;white-space:nowrap;flex:none;font-weight:inherit}
+.port-logo{width:48px;height:48px;flex:0 0 48px}
+.brand-text strong{display:block;font-size:19px;font-weight:700;line-height:1.25;letter-spacing:0;color:#16385f}
 .brand-text small{display:block;font-size:11px;letter-spacing:1px;font-weight:650;color:#31587d;line-height:1.4}
-.main-nav{padding:12px 12px 0;gap:5px;flex:0 1 auto;overflow-y:auto;min-height:0}
-.main-nav a{min-height:46px;gap:13px;padding:10px 13px;color:#203d61;border-radius:10px;font-size:14px;font-weight:750;white-space:nowrap}
-.main-nav .sym{width:23px;font-size:19px;color:#284e76}
+.main-nav{margin:8px 6px 0;padding:0;gap:5px;flex:0 1 auto;overflow-y:auto;overflow-x:hidden;min-height:0}
+.main-nav a,.main-nav a:last-child{min-height:48px;gap:17px;padding:10px 14px;margin:0;border:0;color:#203d61;background:transparent;border-radius:10px;font-size:15px;font-weight:600;line-height:1.4;white-space:nowrap}
+.main-nav .nav-icon{width:20px;height:20px;flex:0 0 20px;color:#284e76}
+.main-nav .nav-arrow{margin-left:auto;color:#9cb5d0;font-size:17px;font-weight:400;line-height:1}
 .main-nav a:hover,.main-nav a:focus,.main-nav a.active{background:#d8ebff;color:#0667b3;box-shadow:0 2px 8px #bdddf247}
-.main-nav a:last-child{margin-top:0;border:0;border-radius:10px;padding:10px 13px}
-.harbor-footer{margin-top:auto;flex:none;position:relative;height:120px;overflow:hidden}
-.harbor-image{position:absolute;inset:0;background:linear-gradient(to top,transparent,#f1f8ff 88%),url("../assets/port79-harbor-banner.webp") center bottom/cover no-repeat;opacity:.55}
-html[data-theme="dark"] .sidebar{background:#14253c;color:#d8e8ff;border-color:#29466b}
-html[data-theme="dark"] .brand-text strong,html[data-theme="dark"] .brand-text small,html[data-theme="dark"] .main-nav a,html[data-theme="dark"] .main-nav .sym{color:#d8e8ff}
-html[data-theme="dark"] .main-nav a.active,html[data-theme="dark"] .main-nav a:hover{background:#234365;color:#fff}
-html[data-theme="dark"] .harbor-image{opacity:.13}
-@media(max-width:1020px){.sidebar{width:208px;flex-basis:208px}.brand{padding:10px 9px}.main-nav{padding:10px 7px}.main-nav a{gap:10px;padding:9px 9px}}
-@media(max-width:740px){.sidebar{width:65px;flex-basis:65px}.brand{padding:10px}.brand-text{display:none}.port-logo{width:42px}.main-nav{padding:10px 5px}.main-nav a{font-size:0;justify-content:center;gap:0}.main-nav .sym{font-size:22px}.harbor-footer{height:70px}}
+.main-nav a:is(:hover,:focus,.active) .nav-icon{color:#0667b3}
+.harbor-footer{margin-top:auto;flex:0 0 auto;height:clamp(108px,15.5vh,180px);overflow:hidden;position:relative}
+.harbor-image{position:absolute;inset:0;background:linear-gradient(180deg,#f1f8ff45 0%,transparent 42%),url("../assets/port79-harbor-banner.webp") center center/cover no-repeat;opacity:.72}
+html[data-theme="dark"] .sidebar{background:#10263f;color:#dceafa;border-color:#294765}
+html[data-theme="dark"] .brand-text strong,html[data-theme="dark"] .brand-text small,html[data-theme="dark"] .main-nav a{color:#dceafa}
+html[data-theme="dark"] .main-nav .nav-icon{color:#aac9e9}
+html[data-theme="dark"] .main-nav a:is(.active,:hover,:focus){background:#26496e;color:#fff}
+html[data-theme="dark"] .main-nav a:is(.active,:hover,:focus) .nav-icon{color:#83c4ff}
+html[data-theme="dark"] .harbor-image{opacity:.35;background-image:linear-gradient(180deg,#10263f88,transparent),url("../assets/port79-harbor-banner.webp")}
+@media(max-width:1020px){.sidebar{width:208px;flex-basis:208px}.brand{padding:6px 10px;gap:10px}.main-nav a,.main-nav a:last-child{gap:12px;padding:10px 12px}}
+@media(max-width:740px){.sidebar{width:65px;flex-basis:65px}.brand{padding:8px;justify-content:center}.brand-text{display:none}.port-logo{width:42px;height:42px;flex-basis:42px}.main-nav{margin:8px 5px 0}.main-nav a,.main-nav a:last-child{justify-content:center;gap:0;padding:10px;font-size:0}.main-nav .nav-label,.main-nav .nav-arrow{display:none}.main-nav .nav-icon{width:22px;height:22px;flex-basis:22px}.harbor-footer{height:70px}}
 .settings-scope{font-size:12px;color:#526784;margin:0 0 14px}.panel h3{display:flex;align-items:center;justify-content:space-between;gap:8px}.panel h3 small{font-size:11px;font-weight:650;color:inherit;opacity:.75}.checkrow{display:flex;align-items:flex-start;gap:12px;padding:16px 14px;border-top:1px solid #e7eef6;cursor:pointer}.checkrow input{width:19px;height:19px;margin:1px 0 0;flex:none;accent-color:#0967e5}.checkrow strong,.checkrow small{display:block}.checkrow strong{font-size:14px}.checkrow small{font-size:12px;color:#526784;margin-top:5px;line-height:1.5}.checkrow:hover{background:#f4f8fe}.idle-field input{width:80px;padding:8px;border:1px solid #c8d5e6;border-radius:7px;text-align:center;color:inherit;background:transparent}.idle-presets{display:flex;gap:6px;flex-wrap:wrap;padding:3px 14px 12px}.idle-presets button[aria-pressed=true]{background:#0967e5;color:white;border-color:#0967e5}.utility-line{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:10px;border-top:1px solid #e0e8f1}.utility-line span{margin-right:auto;font-size:12px;color:#526784}.bar{position:sticky;bottom:0;background:inherit;padding:10px 0;border-top:1px solid #dce5f0}.bar .primary{min-width:120px;font-size:14px}html[data-theme=dark] .checkrow{border-color:#385272}html[data-theme=dark] .checkrow:hover{background:#263d58}html[data-theme=dark] .checkrow small,html[data-theme=dark] .settings-scope,html[data-theme=dark] .utility-line span{color:#c2d1e5}
 </style>
 <script defer src="../assets/port79-hover-notes.js?v=20261125-hover-v1"></script>
@@ -76,16 +80,16 @@ html[data-theme="dark"] .harbor-image{opacity:.13}
 <body>
 <div id="loginGate"><div class="gate-card"><h2>🔒 正在確認系統設置權限</h2><p id="gateText">系統設置只能由已通過雲端驗證的超級管理員修改。</p><a class="btn primary" href="../">返回首頁登入</a></div></div>
 <div class="shell">
-<aside class="sidebar"><div class="brand"><svg class="port-logo" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="27" r="24" fill="#dcefff"/><path d="M8 31 32 21l24 10-10 14H18z" fill="#1689ef"/><path d="M24 23V12h16v11M30 12V5" fill="none" stroke="#fff" stroke-width="5"/><path d="M2 49q12-9 28 0t32-2M5 57q12-7 27 0t27-2" fill="none" stroke="#197be1" stroke-width="4"/></svg><div class="brand-text"><strong>79號碼頭</strong><small>雲端智慧系統</small></div></div><nav class="main-nav" aria-label="首頁系統選單">
-<a href="../" data-nav="home"><span class="sym">⌂</span>首頁</a>
-<a href="../attendance/" data-nav="attendance"><span class="sym">◷</span>考勤管理</a>
-<a href="../schedule/" data-nav="schedule"><span class="sym">▦</span>排班管理</a>
-<a href="../aqc-efficiency/" data-nav="efficiency"><span class="sym">⚓</span>碼頭系統管理</a>
-<a href="../hr/" data-nav="hr"><span class="sym">♙</span>人資管理</a>
-<a href="../work-hours/" data-nav="workhours"><span class="sym">▥</span>加班管理</a>
-<a href="../leave/" data-nav="leave"><span class="sym">▤</span>請假管理</a>
-<a href="../history-data/" data-nav="history"><span class="sym">☁</span>歷史資料庫</a>
-<a class="active" href="./" data-nav="settings" aria-current="page"><span class="sym">⚙</span>系統設置</a>
+<aside class="sidebar"><div class="brand"><svg class="port-logo" viewBox="0 0 64 64" fill="none" stroke="#0788ed" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true"><path d="M23 21V12h18v9M29 12V5h6v7M18 32V21h28v11M7 37l25-9 25 9-9 17H16L7 37Z"/><path d="M3 55c5 4 9 4 14 0s10-4 15 0 10 4 15 0 10-4 14 0"/></svg><div class="brand-text"><strong>79號碼頭</strong><small>雲端智慧系統</small></div></div><nav class="main-nav" aria-label="首頁系統選單">
+<a href="../" data-nav="home"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7M5 9v12h14V9M9 21v-8h6v8"/></svg><span class="nav-label">首頁</span></a>
+<a href="../attendance/" data-nav="attendance"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></svg><span class="nav-label">考勤管理</span><span class="nav-arrow" aria-hidden="true">›</span></a>
+<a href="../schedule/" data-nav="schedule"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18m-14 4h2m3 0h2m3 0h1m-11 4h2m3 0h2"/></svg><span class="nav-label">排班管理</span><span class="nav-arrow" aria-hidden="true">›</span></a>
+<a href="../aqc-efficiency/" data-nav="efficiency"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 13 9-3 9 3-3 6H6zm4-2V6h10v5M10 6V3h4v3M2 22q3-3 5 0 3-3 5 0 3-3 5 0 3-3 5 0"/></svg><span class="nav-label">碼頭系統管理</span><span class="nav-arrow" aria-hidden="true">›</span></a>
+<a href="../hr/" data-nav="hr"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m1-15a3 3 0 0 1 0 6m2 3a5 5 0 0 1 3 5"/></svg><span class="nav-label">人資管理</span><span class="nav-arrow" aria-hidden="true">›</span></a>
+<a href="../work-hours/" data-nav="workhours"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V11h3v9m4 0V5h3v15m4 0V2h3v18"/></svg><span class="nav-label">加班管理</span><span class="nav-arrow" aria-hidden="true">›</span></a>
+<a href="../leave/" data-nav="leave"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8m-8 4h5"/></svg><span class="nav-label">請假管理</span><span class="nav-arrow" aria-hidden="true">›</span></a>
+<a href="../history-data/" data-nav="history"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v5H3zm2 5v11h14V10m-10 4h6"/></svg><span class="nav-label">歷史資料庫</span><span class="nav-arrow" aria-hidden="true">›</span></a>
+<a class="active" href="./" data-nav="settings" aria-current="page"><svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2.2 2.2m9.6 9.6L19 19M19 5l-2.2 2.2M5 19l2.2-2.2"/></svg><span class="nav-label">系統設置</span><span class="nav-arrow" aria-hidden="true">›</span></a>
 </nav><div class="harbor-footer" aria-hidden="true"><div class="harbor-image"></div></div></aside>
 <div class="view"><header class="topbar"><h1>☰　系統設置</h1><div class="operator" id="operator">驗證管理員身分中…</div></header>
 <main class="page"><div class="layout"><nav class="subnav" aria-label="系統設定分類">
