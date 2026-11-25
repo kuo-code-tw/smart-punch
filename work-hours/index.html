@@ -14557,9 +14557,18 @@ function p79OvertimePeriodLabel(report){
                 if(originalMatches.length===1)selected=originalMatches[0];
             }
             if(!selected)return null;
-            // A linked period change still requires the individual editor.
+            // A changed linked extension can be rechecked in bulk only
+            // when the actual period is unambiguous and the latest roster
+            // agrees with its normal shift. The server still validates
+            // the original leave association, dates, punches and revision.
             if((report.leaveId||originalTarget||rowTarget)&&
-                (selected[1]!==report.code||!matcher.sameReport(report,selected)))return null;
+                (selected[1]!==report.code||!matcher.sameReport(report,selected))){
+                const shift=String(roster[date]||'').trim();
+                const normal={早:[480,960],中:[960,0],晚:[0,480]}[shift];
+                if(report.category!=='延'||selected[0]!=='延'||!normal||
+                    matcher.minute(selected[4])%1440!==normal[0]||matcher.minute(selected[5])%1440!==normal[1]||
+                    String(report.workDate||date)!==date)return null;
+            }
             return {row,date,report,start,end,rule:selected,key:p79PlannedBulkKey(row)};
             }catch(error){
                 console.warn('批次核對資格解析失敗，請改用單筆：',error);
@@ -14643,8 +14652,26 @@ function p79OvertimePeriodLabel(report){
                 throw Error('原預排或代班關聯已變更，請重新讀取核對');
             p79AssertDirectReportActive(operation);
             progress?.('正式寫入');
-            const result=await p79SaveWorkOvertimeDraft(draft);
-            api.verifySavedReport(draft,result);
+            let result,confirmedDraft=draft;
+            try{result=await p79SaveWorkOvertimeDraft(draft);}
+            catch(error){
+                // Only this exact server rejection occurs before any write.
+                // A separate, explicit choice is required to change a linked
+                // plan to personal overtime; never retry uncertain writes.
+                if(String(error?.message||'')!=='調班後實際加班時段不屬於原請假班別，請改為本人加班核對'||
+                    validation.cloud?.capabilities?.adjustedOvertimeReviewV1!==true||
+                    draft.rule.category!=='延'||!draft.leaveHandoffId||!draft.forEmpId||
+                    draft.coverDate!==draft.date||draft.overtimeDate!==draft.date)throw error;
+                p79AssertDirectReportActive(operation);
+                if(!window.confirm((item.row.name||item.row.empId)+' '+draft.date+' '+draft.rule.code+
+                    '：最新出勤符合本人延時加班，但不在原核准代班時段。是否沿用原申報編號改為本人加班？原請假代班安排仍保留，不視為已完成。'))
+                    throw Error('已保留原預排，未改為本人加班');
+                p79AssertDirectReportActive(operation);
+                confirmedDraft={...draft,sourceLeaveHandoffId:draft.leaveHandoffId,sourceForEmpId:draft.forEmpId,
+                    adjustedIndependentReview:true,leaveHandoffId:'',forEmpId:''};
+                result=await p79SaveWorkOvertimeDraft(confirmedDraft);
+            }
+            api.verifySavedReport(confirmedDraft,result);
             if(result?.ok!==true||result.directOvertimeSaved!==true||
                 String(result.id)!==draft.id||result.report?.planned!==false)
                 throw Error('雲端未確認原報單解除預排狀態');
@@ -17538,17 +17565,20 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const overtimeDate=String(draft.overtimeDate||draft.date);
  if(overtimeDate!==draft.date&&cloud?.capabilities?.nightCoverOvertimeAccountingV1!==true)throw Error('正式 GAS 尚未確認雙日期入帳，未送出申報');
  const employeeId=String(draft.empId).trim().toUpperCase();
- const existingReport=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
+ const existingMeta=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]||{};
+ const existingReport=existingMeta.overtimeReport;
+ const independentAdjusted=draft.adjustedIndependentReview===true;
+ if(independentAdjusted&&(cloud?.capabilities?.adjustedOvertimeReviewV1!==true||!draft.plannedReview||!draft.preventReplace||!draft.sourceLeaveHandoffId||!draft.sourceForEmpId||draft.leaveHandoffId||draft.forEmpId||draft.coverDate!==draft.date||overtimeDate!==draft.date||existingReport?.planned!==true||String(existingReport?.leaveId||'')!==draft.sourceLeaveHandoffId||String(existingMeta.forEmpId||existingReport?.forEmpId||'').trim().toUpperCase()!==String(draft.sourceForEmpId).trim().toUpperCase()))throw Error('原代班關聯已變更或正式 GAS 尚未支援調班改為本人加班，未送出');
  if(existingReport?.id&&String(existingReport.id)!==String(draft.id))throw Error('此人當日已有申報或預排，請開啟原紀錄處理，避免覆蓋。');
  if(draft.preventReplace&&(!existingReport?.id||String(existingReport.id)!==String(draft.id)))throw Error('原申報已變更或不存在，未新增另一筆；請重新讀取核對。');
  // 原申報在開窗後若已被別處更新，不可用本機舊 16-24 蓋掉雲端新 08-16。
  if(draft.plannedReview&&draft.expectedOriginalCode&&
      (String(existingReport?.code||'')!==String(draft.expectedOriginalCode)||
       String(existingReport?.category||'')!==String(draft.expectedOriginalCategory||'')||
-      String(existingReport?.leaveId||'')!==String(draft.leaveHandoffId||'')||
+      String(existingReport?.leaveId||'')!==String(independentAdjusted?draft.sourceLeaveHandoffId:draft.leaveHandoffId||'')||
       String(existingReport?.coverDate||draft.date)!==String(draft.coverDate||draft.date)||
       String(existingReport?.overtimeDate||draft.date)!==String(draft.overtimeDate||draft.date)||
-      (existingReport?.forEmpId&&String(existingReport.forEmpId).trim().toUpperCase()!==String(draft.forEmpId||'').trim().toUpperCase())))
+      (existingReport?.forEmpId&&String(existingReport.forEmpId).trim().toUpperCase()!==String(independentAdjusted?draft.sourceForEmpId:draft.forEmpId||'').trim().toUpperCase())))
      throw Error('原加班申報時段已由別處更新，已停止舊資料回寫。請重新讀取核對。');
  if(draft.manualPlan===true&&existingReport?.id&&String(existingReport.id)!==String(draft.id))throw Error('此人當日已有申報或預排，請開啟原紀錄處理，不能覆蓋。');
  const sameHours=Number(existingReport?.declaredHours)===Number(draft.rule.declaredHours)&&String(existingReport?.convertedHours??'')===String(draft.rule.convertedHours??'');
@@ -17603,7 +17633,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const originalNote=String(draft.note||'').trim(),reasonNote=reason?.exempt?reason.label:'';
  const finalNote=reasonNote&&!originalNote.includes(reasonNote)
    ?[reasonNote,originalNote].filter(Boolean).join('／'):originalNote;
- const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,workDate:draft.date,overtimeDate,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:finalNote,coverDate:draft.coverDate||draft.date,expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
+ const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,workDate:draft.date,overtimeDate,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:finalNote,coverDate:draft.coverDate||draft.date,expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||'',...(independentAdjusted?{adjustedIndependentReview:true,sourceLeaveHandoffId:draft.sourceLeaveHandoffId,sourceForEmpId:draft.sourceForEmpId}:{})};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),draft.directRow?30000:45000);
  try{
   p79AssertDirectReportActive(draft.directOperation);
@@ -17631,6 +17661,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
   }
   if(!response.ok||result.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id||(draft.preventReplace&&result.report?.id!==draft.id))throw Error(result.error||'原申報身分或加班寫入尚未確認');
   window.P79Overtime?.verifySavedReport?.(draft,result);
+  if(independentAdjusted&&(String(result.report?.leaveId||'')||String(result.report?.adjustedIndependentFrom?.leaveId||'')!==draft.sourceLeaveHandoffId||String(result.report?.adjustedIndependentFrom?.forEmpId||'').trim().toUpperCase()!==String(draft.sourceForEmpId).trim().toUpperCase()))throw Error('本人加班及原代班稽核尚未確認，請讀回原申報');
   if(draft.manualPlan===true&&result.report?.planned!==true)throw Error('雲端未確認儲存為預排，未顯示新增成功，請重新讀取核對。');
   if(draft.plannedReview===true&&result.report?.planned!==false)throw Error('雲端仍顯示預排，無法確認轉為正式加班；請重新讀取原紀錄。');
   const prior=p79WorkOvertimeMonths.get(month),merged=new Map((prior?.rows||[]).map(row=>[String(row.empId).toUpperCase(),row]));

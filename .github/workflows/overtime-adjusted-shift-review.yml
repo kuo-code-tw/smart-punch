@@ -1,0 +1,23 @@
+name: Verify adjusted overtime review
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/night-cover-dual-date-v108-core.gs'
+      - 'scripts/apply-gas-adjusted-overtime-review.cjs'
+      - 'work-hours/index.html'
+      - 'tests/overtime-adjusted-shift-review.cjs'
+      - '.github/workflows/overtime-adjusted-shift-review.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/overtime-adjusted-shift-review.cjs
+      - run: node tests/overtime-dual-date-gas-v108.cjs
