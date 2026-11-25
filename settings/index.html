@@ -101,7 +101,8 @@ html[data-theme="dark"] .harbor-image{opacity:.35;background-image:linear-gradie
 <div class="grid">
 <section class="panel" id="basic"><h3>⚙ 基本設定 <small>本機</small></h3>
 <label class="checkrow"><input type="checkbox" id="yearMode"><span><strong>使用民國年</strong><small>未勾選使用西元年</small></span></label>
-<label class="checkrow"><input type="checkbox" id="themeMode"><span><strong>使用暗色模式</strong><small>未勾選使用亮色模式</small></span></label></section>
+<label class="checkrow"><input type="checkbox" id="themeMode"><span><strong>使用暗色模式</strong><small>未勾選使用亮色模式</small></span></label>
+<div class="field col"><label for="workingClockMode">船舶司機作業時區</label><select id="workingClockMode" style="width:100%;padding:9px;border:1px solid #b9c9dd;border-radius:8px;background:inherit;color:inherit"><option value="taipei">台北時間（UTC+8，預設）</option><option value="assume-utc">假設原始紀錄為 UTC → 台北時間（核對預覽）</option></select><small>本瀏覽器的船舶司機明細顯示設定。UTC 換算僅供比對，原始日期、時間、班表與雲端資料不變。</small></div></section>
 <section class="panel" id="security"><h3>🔒 登入與安全 <small>全系統</small></h3>
 <div class="field idle-field"><label for="idleMinutes">網頁版閒置自動登出</label><div><input id="idleMinutes" type="number" min="1" max="120" step="1" inputmode="numeric" value="5" aria-describedby="idleHint"> 分鐘</div></div>
 <div class="idle-presets" aria-label="常用閒置時間"><button type="button" data-idle-minutes="5" aria-pressed="false">5 分</button><button type="button" data-idle-minutes="10" aria-pressed="false">10 分</button><button type="button" data-idle-minutes="15" aria-pressed="false">15 分</button><button type="button" data-idle-minutes="20" aria-pressed="false">20 分</button><button type="button" data-idle-minutes="30" aria-pressed="false">30 分</button><button type="button" data-idle-minutes="60" aria-pressed="false">60 分</button><button type="button" data-idle-minutes="120" aria-pressed="false">120 分</button></div>
@@ -115,6 +116,7 @@ html[data-theme="dark"] .harbor-image{opacity:.35;background-image:linear-gradie
 <div class="utility-line"><span id="cloudState" aria-live="polite">尚未測試連線</span><button type="button" id="cloudPing">測試雲端連線</button><button type="button" id="reloadCloud">重新讀取設定</button></div>
 <div class="bar"><div id="status" role="status" aria-live="polite">正在讀取雲端系統設定…</div><button type="button" id="save" class="primary">▣ 儲存設定</button></div>
 </div></div></main></div></div>
+<script src="../assets/port79-working-clock.js?v=20261125-v1"></script>
 <script>
 (function(){
 'use strict';
@@ -175,14 +177,14 @@ function authorizeLinks(){var t=encodeURIComponent(token),g=encodeURIComponent(u
  if(route==='home')return;var root=href.split('#')[0];a.href=root+'#port79sso='+t+'&gasurl='+g;});}
 function readSessionRole(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||'null');}catch(e){return null;}}
 async function init(){
- setLocalAppearance();q('yearMode').addEventListener('change',function(){saveLocal('port79_year_mode',this.checked?'roc':'gregorian');status('✅ 年份顯示方式已儲存到本瀏覽器','ok');});
+ setLocalAppearance();q('workingClockMode').value=window.P79WorkingClock.getMode();q('workingClockMode').addEventListener('change',function(){var mode=window.P79WorkingClock.setMode(this.value);if(mode===null){status('本機時區設定無法儲存','error');return;}status('✅ 船舶作業時區顯示已儲存至本瀏覽器','ok');});q('yearMode').addEventListener('change',function(){saveLocal('port79_year_mode',this.checked?'roc':'gregorian');status('✅ 年份顯示方式已儲存到本瀏覽器','ok');});
  q('themeMode').addEventListener('change',function(){var mode=this.checked?'dark':'light';saveLocal('port79_theme',mode);D.documentElement.setAttribute('data-theme',mode);status('✅ 主題已套用到本瀏覽器','ok');});
  q('idleMinutes').addEventListener('input',paintIdle);D.querySelectorAll('[data-idle-minutes]').forEach(function(b){b.addEventListener('click',function(){q('idleMinutes').value=b.dataset.idleMinutes;paintIdle();});});
  q('cloudPing').addEventListener('click',ping);q('reloadCloud').addEventListener('click',function(){if((JSON.stringify(readDraft())!==JSON.stringify(previous)||cloud&&idleNumber(q('idleMinutes').value)!==idleFromConfig(cloud))&&!confirm('重新讀取會捨棄尚未儲存的全系統設定。確定繼續？'))return;reload();});
- q('save').addEventListener('click',save);q('restore').addEventListener('click',async function(){if(!verifiedSuperadmin||busy)return;if(!confirm('恢復年份、主題、首頁公告、電腦版下載（關閉）及閒置登出（5 分鐘）的預設？將先確認雲端儲存成功。'))return;
+ q('save').addEventListener('click',save);q('restore').addEventListener('click',async function(){if(!verifiedSuperadmin||busy)return;if(!confirm('恢復年份、主題、船舶作業時區、首頁公告、電腦版下載（關閉）及閒置登出（5 分鐘）的預設？將先確認雲端儲存成功。'))return;
  var prior=readDraft(),priorIdle=q('idleMinutes').value;q('noticeEnabled').checked=false;q('noticeText').value='';q('desktopDownloadEnabled').checked=false;q('idleMinutes').value=String(DEFAULT_IDLE);paintIdle();
  var confirmed=await save();if(!confirmed){q('noticeEnabled').checked=prior.notice.enabled;q('noticeText').value=prior.notice.text;q('desktopDownloadEnabled').checked=prior.windowsDownload.enabled;q('idleMinutes').value=priorIdle;paintIdle();return;}
- q('yearMode').checked=false;q('themeMode').checked=false;saveLocal('port79_year_mode','gregorian');saveLocal('port79_theme','light');D.documentElement.setAttribute('data-theme','light');
+ q('workingClockMode').value='taipei';window.P79WorkingClock.setMode('taipei');q('yearMode').checked=false;q('themeMode').checked=false;saveLocal('port79_year_mode','gregorian');saveLocal('port79_theme','light');D.documentElement.setAttribute('data-theme','light');
  status('✅ 全系統設定已讀回確認恢復預設，並更新本機主題與年份。','ok');});
  token=getToken();if(!token){q('gateText').textContent='沒有正式登入憑證，請返回首頁以超級管理員身分登入。';return;}
  try{auth=await cloudGet('getSessionMeta');var role=String(auth.adminRole||auth.actualAdminRole||auth.role||auth.session&&auth.session.adminRole||'').toLowerCase();
