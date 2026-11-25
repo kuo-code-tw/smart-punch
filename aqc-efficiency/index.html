@@ -5230,7 +5230,7 @@ function renderDriverVesselAqcSummary(all,visible){
   }).join('');
 }
 function renderDriverVesselDetailTable(rows){
-  const clock=window.P79WorkingClock;
+  const clock=typeof window!=='undefined'?window.P79WorkingClock:null;
   const mode=clock?.getMode?.()||'taipei';
   const preview=mode==='assume-utc';
   const projected=new Map(rows.map(r=>[r,clock?.project?.(r,mode)||{date:r.workDate,start:r.startTime,end:r.endTime,converted:false}]));
