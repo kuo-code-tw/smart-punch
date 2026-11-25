@@ -322,18 +322,33 @@ function automaticRestCategory(roster,date,month){
  }
  return category;
 }
+// A documented rest category is sufficient to propose a new plan. Requiring
+// restQuotaOvertime before creating that very plan makes the workflow circular.
+// A plain working shift is still NOT a holiday, nor is an auto-allocation hint.
+function documentedFutureRestCategory(roster,date,month,category){
+ if(!['休','國'].includes(category)||automaticRestCategory(roster,date,month)!==category)return false;
+ const code=String(roster?.[date]||'').trim(),m=roster?.__meta?.[date]||{};
+ return code===category||(['早','中','晚'].includes(code)&&m.restCategory===category&&
+  (m.restQuotaOvertime===true||m.restCategoryLocked===true||m.restAllocationLocked===true||m.restAllocationSource==='manual'));
+}
+function futureRestPlanIssue(roster,date,month,emp,category){
+ const m=roster?.__meta?.[date]||{},anchor=weeklyCycleAnchor(emp);
+ if(!anchor)return '未設定約定七日週期';
+ if(!['休','國'].includes(category))return '例假不得自動預排加班';
+ if(!documentedFutureRestCategory(roster,date,month,category))return '原班表沒有可證明此日期為'+category+'假別的紀錄（正常班不能直接改列休假加班）';
+ if(emp?.flexibleWorkHours===true||emp?.workTimeSystem&& !['standard','normal','一般','一般工時','固定'].includes(String(emp.workTimeSystem).trim()))return '特殊工時制度須另行核對';
+ if(m.forEmpId||m.coverAssignmentId||m.overtimeReport||m.overtime||m.overtimeExcluded)return '已有申報、代班或排除紀錄';
+ const protectedRoster={...roster,[date]:'加班'};
+ for(const [d,meta] of Object.entries(roster.__meta||{}))if(meta?.overtimeReport||meta?.restQuotaOvertime===true)protectedRoster[d]='加班';
+ if(!futureWeekRestProtected(protectedRoster,date,anchor))return '預排後一例一休不足或跨月班表缺漏（'+weeklyCycleWindow(date,anchor)?.start+'～'+weeklyCycleWindow(date,anchor)?.end+'）';
+ return '';
+}
 function canAutoSuggestFuture(roster,date,month,emp,category){
+ if(futureRestPlanIssue(roster,date,month,emp,category))return false;
  const m=roster?.__meta?.[date]||{};
- const anchor=weeklyCycleAnchor(emp);
- // No invented workday-to-holiday conversion; do not auto-plan mandatory regular days.
- if(!anchor||category==='例'||!['休','國'].includes(category)||m.restQuotaOvertime!==true)return false;
- if(emp?.flexibleWorkHours===true||emp?.workTimeSystem&& !['standard','normal','一般','一般工時','固定'].includes(String(emp.workTimeSystem).trim()))return false;
- if(!futureWeekRestProtected(roster,date,anchor))return false;
- if(m.forEmpId||m.coverAssignmentId||m.overtimeReport||m.overtime||m.overtimeExcluded)return false;
- // A future rest day needs an explicitly recorded 8-hour working period.
  return ['早','中','晚'].includes(String(roster[date]||''))||
-  /^([01]\d|2[0-3]):[0-5]\d$/.test(String(m.overtimeStart||''))&&
-  /^([01]\d|2[0-3]):[0-5]\d$/.test(String(m.overtimeEnd||''));
+  /^([01]?\d|2[0-4])(?::[0-5]\d)?$/.test(String(m.overtimeStart||''))&&
+  /^([01]?\d|2[0-4])(?::[0-5]\d)?$/.test(String(m.overtimeEnd||''));
 }
 
 function weeklyRestReview(roster,month,cycleStart=''){
@@ -374,7 +389,7 @@ function ruleFor(date,roster,pair,category,rules){
  if(pair){const found=g.P79Overtime.inferRule(pair.start,pair.end,date,allowed,category);return found||null;}
  const m=roster.__meta?.[date]||{};
  const shift={早:['08','16'],中:['16','24'],晚:['24','08']}[roster[date]];
- const period=shift||(m.restQuotaOvertime===true&&m.overtimeStart&&m.overtimeEnd?[m.overtimeStart,m.overtimeEnd]:null);
+ const period=shift||(m.overtimeStart&&m.overtimeEnd&&(m.restQuotaOvertime===true||String(roster[date]||'')===category)?[m.overtimeStart,m.overtimeEnd]:null);
  if(!period)return null;
  const minute=x=>{const v=String(x||'').match(/^(\d{1,2})(?::(\d{2}))?$/);return v?Number(v[1])*60+Number(v[2]||0):NaN;};
  const start=minute(period[0]),end=minute(period[1]);
@@ -455,11 +470,7 @@ function plan(snapshot,people,month,rules,options={}){
    if(!verified&&!todayPending&&!upcoming){
     if(date<currentDate||historical)blocked(date,originalCategory,pairs.length>1?'出勤配對重複':pairs.length?'出勤未核實完整8小時':'無完整出勤配對');
     else if(date===currentDate&&!['open','missing'].includes(todayState))blocked(date,originalCategory,'當日出勤狀態未符合預排');
-    else if(!cycleStart)blocked(date,originalCategory,'未設定約定七日週期');
-    else if(originalCategory==='例')blocked(date,originalCategory,'例假不得自動預排加班');
-    else if(m.restQuotaOvertime!==true)blocked(date,originalCategory,'班表無已確認的未休加班安排');
-    else if(!futureWeekRestProtected(roster,date,cycleStart))blocked(date,originalCategory,'一例一休週期或跨月班表待核');
-    else blocked(date,originalCategory,'未具備可預排的正式工作時段或工時條件');
+    else blocked(date,originalCategory,futureRestPlanIssue(roster,date,month,emp,originalCategory)||'未找到原班表的8小時時段，且前後班別不一致或不足以推估');
     continue;
    }
    // Earlier weeks are eligible only with genuine completed attendance, never synthetic backfill.
@@ -471,7 +482,7 @@ function plan(snapshot,people,month,rules,options={}){
     const rule=ruleFor(date,roster,pair,category,rules)||(!pair&&manualRule?.[0]===category?manualRule:null);if(rule)byCategory.set(category,rule);}
    if(!byCategory.size)blocked(date,originalCategory,'無相符的正式8小時加班時段');
    if(byCategory.size){
-    const restProtected=!!pair||futureWeekRestProtected(roster,date,cycleStart);
+    const restProtected=!!pair||!futureRestPlanIssue(roster,date,month,emp,originalCategory);
     if(!pair&&!restProtected)continue;
     candidates.push({date,pair,byCategory,restProtected,week:weeklyCycleWindow(date,cycleStart)?.start||''});
    }
@@ -1666,6 +1677,6 @@ async function open(settings={}){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
 
 })(window);
