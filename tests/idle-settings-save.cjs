@@ -3,12 +3,12 @@ const source=fs.readFileSync('assets/port79-session-timeout.js','utf8').replace(
 function setup(handler){
  const data=new Map([['port79_user_token','test'],['port79_user_session',JSON.stringify({adminRole:'superadmin'})]]),storage={getItem:k=>data.get(k)||null,setItem:(k,v)=>data.set(k,v)};
  const els={p79IdleSave:{},p79IdleMinutes:{value:'10'},p79IdleStatus:{style:{}},p79IdleSettingsDialog:{open:true,close(){this.open=false;this.closed=(this.closed||0)+1}}};
- const calls=[],timers=[];const c={window:{},document:{currentScript:{src:'https://example.invalid/assets/port79-session-timeout.js'},readyState:'loading',addEventListener(){},getElementById:k=>els[k]||null},location:{href:'https://example.invalid/hr/',pathname:'/hr/'},sessionStorage:storage,localStorage:storage,URL,AbortController,TextEncoder,Date,console,TypeError,setTimeout:(fn,ms)=>{timers.push({fn,ms});if(ms<=5000)queueMicrotask(fn);return timers.length},clearTimeout(){},fetch:async(url,opts)=>{calls.push(opts);return {ok:true,json:async()=>handler(calls.length,opts)}}};
- vm.createContext(c);vm.runInContext(source,c);return {c,els,calls,timers,data};
+ const calls=[],urls=[],timers=[];const c={window:{},document:{currentScript:{src:'https://example.invalid/assets/port79-session-timeout.js'},readyState:'loading',addEventListener(){},getElementById:k=>els[k]||null},location:{href:'https://example.invalid/hr/',pathname:'/hr/'},sessionStorage:storage,localStorage:storage,URL,AbortController,TextEncoder,Date,console,TypeError,setTimeout:(fn,ms)=>{timers.push({fn,ms});if(ms<=5000)queueMicrotask(fn);return timers.length},clearTimeout(){},fetch:async(url,opts)=>{calls.push(opts);urls.push(url);return {ok:true,json:async()=>handler(calls.length,opts)}}};
+ vm.createContext(c);vm.runInContext(source,c);return {c,els,calls,urls,timers,data};
 }
 const field='p79_hr_idle_logout_minutes_v1',config=n=>({ok:true,config:{[field]:n,other:'preserved'}});
 (async()=>{
- let x=setup(n=>n===1?config(5):n===2?{ok:true}:config(10));await x.c.window.test.saveUI();assert.match(x.els.p79IdleStatus.textContent,/已儲存/);assert.equal(JSON.parse(x.calls[1].body).config.other,'preserved');assert.equal(x.timers.filter(t=>t.ms===15000).length,2);assert.equal(x.timers.filter(t=>t.ms===30000).length,1);assert.equal(x.els.p79IdleSettingsDialog.closed,1);
+ let x=setup(n=>n===1?config(5):n===2?{ok:true}:config(10));await x.c.window.test.saveUI();assert.match(x.els.p79IdleStatus.textContent,/已儲存/);assert.equal(JSON.parse(x.calls[1].body).config.other,'preserved');assert.equal(x.timers.filter(t=>t.ms===15000).length,2);assert.equal(x.timers.filter(t=>t.ms===30000).length,1);assert.equal(x.els.p79IdleSettingsDialog.closed,1);assert(x.urls[0].includes('action=hrGetOrgOptions'));assert(x.urls[2].includes('action=hrGetOrgOptions'));
  x=setup(n=>{if(n===2)throw new TypeError('network');return config(n===1?5:10)});await x.c.window.test.saveUI();assert.match(x.els.p79IdleStatus.textContent,/已儲存/);assert.equal(x.calls.filter(c=>c.method==='POST').length,1);
  x=setup(n=>{if(n===2)throw new TypeError('network');return config(5)});await x.c.window.test.saveUI();assert.doesNotMatch(x.els.p79IdleStatus.textContent,/✅/);assert.equal(x.data.has('port79_idle_logout_config_v1'),false);assert.equal(x.els.p79IdleSettingsDialog.closed||0,0);
  x=setup(n=>n===1?config(5):{ok:false,error:'登入已過期'});await x.c.window.test.saveUI();assert.match(x.els.p79IdleStatus.textContent,/登入已過期/);assert.equal(x.calls.length,2);
@@ -34,5 +34,7 @@ const field='p79_hr_idle_logout_minutes_v1',config=n=>({ok:true,config:{[field]:
  await x.c.window.test.saveUI();
  assert.match(x.els.p79IdleStatus.textContent,/已儲存/);
  assert.equal(x.calls.filter(c=>c.method==='POST').length,1);
- console.log('PASS 10 idle settings scenarios including auto-close after verified save, bounded readback, lock retries, auth and timeout');
+ x=setup(()=>config(10));await x.c.window.test.saveUI();assert.equal(x.calls.length,1);assert.equal(x.calls.filter(c=>c.method==='POST').length,0);assert.match(x.els.p79IdleStatus.textContent,/不需重複儲存/);
+ x=setup(()=>({ok:false,error:'測試讀取逾時'}));await x.c.window.test.saveUI();assert.match(x.els.p79IdleStatus.textContent,/讀取原設定失敗（尚未送出寫入）/);assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+ console.log('PASS idle settings: fast config route, unchanged no-op, staged failures, verified save, busy retries and auth');
 })().catch(e=>{console.error(e);process.exitCode=1});

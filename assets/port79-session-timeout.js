@@ -107,7 +107,10 @@ async function request(url,options={},timeoutMs=REQUEST_TIMEOUT_MS){
 }
 async function readCloud({maxBusyRetries=BUSY_RETRY_DELAYS_MS.length,timeoutMs=REQUEST_TIMEOUT_MS}={}){
  const token=getToken();if(!token)throw new Error('登入憑證不存在，請重新登入');
- const url=getGas(),query=url+'?action=getData&token='+encodeURIComponent(token)+'&t='+Date.now();
+ // Superadmins can read the same canonical config via the deployed HR fast lane.
+ // Keep the existing employee/non-HR admin read path and permission boundary.
+ const action=role()==='superadmin'?'hrGetOrgOptions':'getData';
+ const url=getGas(),query=url+'?action='+action+'&token='+encodeURIComponent(token)+'&t='+Date.now();
  let data;
  for(let attempt=0;attempt<=maxBusyRetries;attempt++){
   try{data=await request(query,{},timeoutMs);break;}
@@ -194,10 +197,23 @@ async function saveUI(){
  saving=true;
  const btn=document.getElementById('p79IdleSave');btn.disabled=true;setStatus('正在儲存到雲端共用設定…',false);
  try{
-  let config=await readCloud({maxBusyRetries:2,timeoutMs:15000});
   const token=getToken();
+  let config;
+  setStatus('① 正在讀取雲端原有設定…',false);
+  try{config=await readCloud({maxBusyRetries:2,timeoutMs:15000});}
+  catch(e){throw new Error('讀取原設定失敗（尚未送出寫入）：'+e.message);}
+  if(token!==getToken()||!canManage())throw new Error('登入帳號或管理權限已變更，未儲存');
   let writeError;
+  // An unchanged value is already confirmed by the authenticated canonical read.
+  if(number(config[CONFIG_FIELD])===n){
+   remember(n);lastFetch=Date.now();setStatus('✅ 雲端已是此時間，不需重複儲存',false);
+   const dialog=document.getElementById('p79IdleSettingsDialog');
+   if(dialog?.open)setTimeout(()=>{if(dialog.open&&!saving)dialog.close();},800);
+   tick();return;
+  }
+  setStatus('② 正在寫入自動登出時間…',false);
   for(let attempt=0;attempt<=BUSY_RETRY_DELAYS_MS.length;attempt++){
+   if(token!==getToken()||!canManage())throw new Error('登入帳號或管理權限已變更，未儲存');
    const merged={...config,[CONFIG_FIELD]:n};
    if(new TextEncoder().encode(JSON.stringify(merged)).length>8800)throw new Error('雲端設定容量不足，尚未儲存');
    try{
@@ -205,7 +221,7 @@ async function saveUI(){
     break;
    }catch(e){
     if(e.uncertain){writeError=e;setStatus('儲存回應中斷，正在讀回雲端確認結果…',false);break;}
-    if(!isCloudBusy(e)||attempt===BUSY_RETRY_DELAYS_MS.length)throw e;
+    if(!isCloudBusy(e)||attempt===BUSY_RETRY_DELAYS_MS.length)throw new Error('寫入設定失敗：'+e.message);
     setStatus('雲端正在處理其他資料，正在自動重試（'+(attempt+1)+'/'+BUSY_RETRY_DELAYS_MS.length+'）…',false);
     await waitForCloud(BUSY_RETRY_DELAYS_MS[attempt]);
     // Before resending, re-read shared config so unrelated settings are not overwritten.
@@ -214,9 +230,11 @@ async function saveUI(){
     if(number(config[CONFIG_FIELD])===n)break;
    }
   }
+  setStatus('③ 正在讀回正式雲端設定確認…',false);
   let confirmed;
   try{confirmed=await readCloud({maxBusyRetries:1,timeoutMs:15000});}
   catch(e){throw new Error('尚未確認儲存結果：'+e.message+'；請重新開啟設定核對，勿連續重送');}
+  if(token!==getToken()||!canManage())throw new Error('登入帳號或管理權限已變更，未套用本機設定');
   if(number(confirmed[CONFIG_FIELD])!==n)throw new Error((writeError?writeError.message+'；':'')+'雲端目前尚未確認本次時間，請稍後重新開啟設定核對');
   remember(n);lastFetch=Date.now();
   setStatus('✅ 設定已儲存，即將自動關閉視窗',false);
