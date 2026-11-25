@@ -6,7 +6,7 @@ const WEB='https://kuo-code-tw.github.io/smart-punch/port79-version.json';
 const LATEST='https://api.github.com/repos/kuo-code-tw/smart-punch/releases/latest';
 const RELEASE_CACHE='p79_public_release_check_v1';
 const RELEASE_TTL_MS=2*60*60*1000,RELEASE_ERROR_TTL_MS=30*60*1000;
-const INTERVAL=300000,EXPIRE=6000,STORED_BUILD='p79_loaded_home_build_v1';
+const INTERVAL=300000,EXPIRE=10000,STORED_BUILD='p79_loaded_home_build_v1';
 const $=id=>root.document?.getElementById(id);
 let lastChecked=0,activeCheck=null,lastResult=null,nativeUpdateRunning=false;
 function normalized(v){
@@ -107,25 +107,51 @@ function refreshBrowser(version,force=false){
   return true;
  }catch(_){return false;}
 }
+function samePublishedManifest(){
+ try{return new URL(LOCAL,root.location.href).href===WEB;}catch(_){return false;}
+}
+function readFailure(result){
+ if(result.status==='fulfilled')return normalized(result.value)?'':'版本資料格式或校驗不符';
+ return result.reason?.name==='AbortError'?'讀取逾時':String(result.reason?.message||'無法連線').slice(0,100);
+}
+// A manual browser update is a reload request, not permission to claim a
+// verified version. If the manifest is temporarily unavailable, reload the
+// current official page without inventing a build number or deleting storage.
+function refreshWithoutManifest(){
+ if(isNative()||root.navigator?.onLine===false)return false;
+ try{
+  const url=new URL(root.location.href);
+  url.searchParams.delete('_homeUpdated');
+  url.searchParams.set('_updateAt',String(Date.now()));
+  write('🔄 版本尚未核對，正在重新載入網頁；本機資料保留…');
+  root.location.replace(url.href);
+  return true;
+ }catch(_){return false;}
+}
 async function check(force=false){
  if(activeCheck)return activeCheck;
  if(!force&&Date.now()-lastChecked<60000)return lastResult;
  lastChecked=Date.now();
  const work=(async()=>{
   if(!nativeUpdateRunning)write('🔎 正在檢查更新…');
+  const native=isNative();
+  const localRead=read(LOCAL);
+  // Official browser home uses the very same manifest URL. Do not send two
+  // requests to it or wait for the unrelated Windows release API.
+  const webRead=!native&&samePublishedManifest()?localRead:read(WEB);
   const [localResult,webResult,releaseResult]=await Promise.allSettled([
-   read(LOCAL),read(WEB),readRelease()
+   localRead,webRead,native?readRelease():Promise.resolve(null)
   ]);
   const local=localResult.status==='fulfilled'?normalized(localResult.value):null;
   const web=webResult.status==='fulfilled'?normalized(webResult.value):null;
   const release=releaseResult.status==='fulfilled'?releaseVersion(releaseResult.value):'';
-  const native=isNative();
   const installedFromUrl=(()=>{
    try{return new URL(root.location.href).searchParams.get('windowsBundle')||'';}catch(_){return '';}
   })();
   const localVersion=local?.version||
    (/^V\d{6}\.\d{5}$/.test(installedFromUrl)?installedFromUrl:'');
-  const pageVersion=native?localVersion:browserLoadedBuild(localVersion);
+  const pageVersion=native?localVersion:browserLoadedBuild(localVersion||(!local&&samePublishedManifest()?web?.version:''));
+  const webError=web?'':readFailure(webResult);
   if(pageVersion&&typeof root.p79ApplyBuildVersion==='function')
    root.p79ApplyBuildVersion(pageVersion);
   const label=$('p79MainVersion');
@@ -134,14 +160,14 @@ async function check(force=false){
   const brief=compactStatus(native,pageVersion,web,release,time);
   const details=[
    (native?'本機':'目前網站')+'：'+(pageVersion||'未驗證'),
-   '線上網站：'+(web?.version||'未核對'),
+   '線上網站：'+(web?.version||'未核對'+(webError?'（'+webError+'）':'')),
    '79號碼頭電腦版最新發布：'+(release||'未核對'),
    '檢查時間：'+time
   ].join('｜');
   const field=$('p79LoginVersionStatus');
   if(field)field.title=details;
   if(!nativeUpdateRunning)write(brief);
-  const result={local,web,release,pageVersion};
+  const result={local,web,release,pageVersion,webError};
   lastResult=result;
   // Never interrupt a signed-in dashboard, password entry or an open editor.
   if(!native&&web&&pageVersion&&web.version!==pageVersion){
@@ -169,7 +195,8 @@ async function startUpdate(){
  }
  const result=await check(true);
  if(!result?.web?.version){
-  write('⚠ 暫時無法核對79號碼頭網頁版最新版本');
+  if(root.navigator?.onLine===false){write('⚠ 網路未連線，保留目前網頁及本機資料');return;}
+  if(!refreshWithoutManifest())write('⚠ 版本尚未核對'+(result?.webError?'：'+result.webError:'')+'；請重新載入網頁');
   return;
  }
  if(!refreshBrowser(result.web.version,true))write('⚠ 79號碼頭網頁版更新未啟動，請稍後再試');
