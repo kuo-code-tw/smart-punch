@@ -277,29 +277,27 @@ function weeklyReviewSummary(snapshot,people,month,plannedRows=[]){
  const rosters=new Map((snapshot?.schedules||[]).map(x=>[id(x.empId),x.schedule]));
  const picked=new Set(people.map(x=>id(x.empId))),groups=new Map();
  for(const emp of people){
-  const roster=rosters.get(id(emp.empId));
-  if(!roster)continue;
+  const currentRoster=rosters.get(id(emp.empId));
+  if(!currentRoster)continue;
+  const roster=weeklyRoster(snapshot,emp.empId,currentRoster);
   const anchor=weeklyCycleAnchor(emp),seen=new Set();
-  for(const date of Object.keys(roster).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&d.startsWith(month+'-')).sort()){
-   const w=weeklyCycleWindow(date,anchor);if(!w)continue;
-   const k=w.start+'|'+(anchor?'confirmed':'reference');
-   if(!groups.has(k))groups.set(k,{start:w.start,end:w.end,confirmed:w.confirmed,people:new Set(),regular:0,rest:0,holiday:0,planned:0,missing:0,uncertain:0});
-   const group=groups.get(k),personKey=id(emp.empId)+'|'+w.start;
-   if(!seen.has(personKey)){group.people.add(id(emp.empId));seen.add(personKey);}
-   const code=String(roster[date]||'').trim(),m=roster.__meta?.[date]||{};
-   if(code==='例')group.regular++;
-   if(code==='休')group.rest++;
-   if(code==='國')group.holiday++;
-   if(!code)group.uncertain++;
-  }
-  const keys=[...seen];
-  for(const key of keys){
-   const weekStart=key.split('|')[1],group=groups.get(weekStart+'|'+(anchor?'confirmed':'reference'));
-   const full=weeklyCycleWindow(weekStart,anchor);
-   const days=Array.from({length:7},(_,i)=>new Date(Date.parse(full.start+'T00:00:00Z')+i*86400000).toISOString().slice(0,10));
-   const complete=days.every(d=>Object.prototype.hasOwnProperty.call(roster,d));
-   const regular=days.filter(d=>roster[d]==='例').length,rest=days.filter(d=>roster[d]==='休').length;
-   if(!anchor||!complete||regular<1||rest<1)group.missing++;
+  for(const date of Object.keys(currentRoster).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&d.startsWith(month+'-')).sort()){
+   const week=weeklyCycleWindow(date,anchor);
+   if(!week||seen.has(week.start))continue;
+   seen.add(week.start);
+   const key=week.start+'|'+(anchor?'confirmed':'reference');
+   if(!groups.has(key))groups.set(key,{start:week.start,end:week.end,confirmed:week.confirmed,people:new Set(),regular:0,rest:0,holiday:0,planned:0,missing:0,uncertain:0});
+   const group=groups.get(key);
+   group.people.add(id(emp.empId));
+   for(let i=0;i<7;i++){
+    const day=new Date(Date.parse(week.start+'T00:00:00Z')+i*86400000).toISOString().slice(0,10);
+    const category=originalRestDesignation(roster,day);
+    if(protectedRegularRest(roster,day,snapshot,emp.empId))group.regular++;
+    if(category==='休')group.rest++;
+    if(category==='國')group.holiday++;
+    if(!String(roster[day]||'').trim())group.uncertain++;
+   }
+   if(!anchor||weeklyPlanIssue(roster,week.start,anchor,snapshot,emp.empId))group.missing++;
   }
  }
  for(const row of plannedRows||[]){
@@ -311,12 +309,17 @@ function weeklyReviewSummary(snapshot,people,month,plannedRows=[]){
  }
  return [...groups.values()].sort((a,b)=>a.start.localeCompare(b.start)||Number(b.confirmed)-Number(a.confirmed));
 }
-// Read the original saved designation, including raw 休 + manual 例.
+// An officially saved allocation can designate an existing off-day as 例.
+// A display-only allocation or a working shift cannot establish that designation.
 function originalRestDesignation(roster,date){
  const code=String(roster?.[date]||'').trim(),m=roster?.__meta?.[date]||{};
  const manual=String(m.manualRosterShift||'').trim();
  const marked=m.restCategoryLocked===true||m.restAllocationLocked===true||m.restAllocationSource==='manual'||m.restQuotaOvertime===true;
- if(code==='休'&&['例','休','國'].includes(manual))return manual;
+ if(code==='休'&&['例','國'].includes(manual))return manual;
+ if(m.restAllocationSource==='auto-v1'&&m.restQuotaOvertime===false&&
+    m.restSegmentSource!=='night-split-v1'&&['例','休'].includes(m.restCategory)&&
+    (code==='休'||code==='國'&&!g.p79RestQuota(date.slice(0,7)).slots.some(slot=>slot.category==='國')))return m.restCategory;
+ if(code==='休'&&manual==='休')return manual;
  if(code==='休'&&marked&&['例','休','國'].includes(m.restCategory))return m.restCategory;
  return /^(例|休|國)(?=$|[0-9])/.exec(code)?.[1]||'';
 }
@@ -358,7 +361,19 @@ function weeklyRoster(snapshot,empId,roster){
 // a SECOND rest day after overtime wrongly prohibits the first rest-day plan.
 // An actual protected regular holiday is still required; incomplete weeks
 // are never silently assumed to be complete.
-function weeklyPlanIssue(roster,date,anchor){
+function protectedRegularRest(roster,date,snapshot,empId){
+ const m=roster.__meta?.[date]||{},code=String(roster[date]||'').trim();
+ if(originalRestDesignation(roster,date)!=='例'||/\d/.test(code)||m.overtimeReport||
+    m.overtimeReports?.length||m.overtime||m.restQuotaOvertime||m.forEmpId||
+    m.coverAssignmentId||m.type==='substitute')return false;
+ if(!snapshot)return true;
+ const attendance=g.P79RestAttendance?.state(snapshot,empId,date);
+ if(attendance==='worked'||attendance==='missing'||
+    g.P79RestAttendance?.isLeaveDay(snapshot,empId,date,roster))return false;
+ return !(snapshot?.leaveCoverAssignments||[]).some(a=>date>=a.startDate&&date<=a.endDate&&
+   (a.workerIds||[]).some(worker=>id(worker)===id(empId)));
+}
+function weeklyPlanIssue(roster,date,anchor,snapshot,empId){
  const week=weeklyCycleWindow(date,anchor);
  if(!week)return '無法計算七日週期';
  const label='（'+week.start+'～'+week.end+'）';
@@ -367,35 +382,34 @@ function weeklyPlanIssue(roster,date,anchor){
   const d=new Date(Date.parse(week.start+'T00:00:00Z')+i*86400000).toISOString().slice(0,10);
   if(!roster[d])return '缺少正式班表 '+d+label;
   const m=roster.__meta?.[d]||{},report=m.overtimeReport;
-  const code=String(roster[d]).trim();
   const original=String(m.overtimeOriginalShift||'').trim();
   const marked=m.restCategoryLocked===true||m.restAllocationLocked===true||m.restAllocationSource==='manual'||m.restQuotaOvertime===true;
   const designation=originalRestDesignation(roster,d);
-  if(designation==='例'&&!report&&!m.overtime&&!m.restQuotaOvertime&&!m.forEmpId&&!m.coverAssignmentId&&!/\d/.test(code))regular++;
-  if(designation==='休'||original==='休'||report?.category==='休'||marked&&m.restCategory==='休'&&designation!=='例')rest++;
+  if(protectedRegularRest(roster,d,snapshot,empId))regular++;
+  if(designation!=='例'&&(designation==='休'||original==='休'||report?.category==='休'||marked&&m.restCategory==='休'))rest++;
  }
  if(!regular)return '七日週期無受保護的例假'+label;
  if(!rest)return '七日週期無原排休息日'+label;
  return '';
 }
-function futureRestPlanIssue(roster,date,month,emp,category){
+function futureRestPlanIssue(roster,date,month,emp,category,snapshot){
  const m=roster?.__meta?.[date]||{},anchor=weeklyCycleAnchor(emp);
  if(!anchor)return '未設定約定七日週期';
  if(!['休','國'].includes(category))return '例假不得自動預排加班';
  if(!documentedFutureRestCategory(roster,date,month,category))return '原班表沒有可證明此日期為'+category+'假別的紀錄（正常班不能直接改列休假加班）';
  if(emp?.flexibleWorkHours===true||emp?.workTimeSystem&& !['standard','normal','一般','一般工時','固定'].includes(String(emp.workTimeSystem).trim()))return '特殊工時制度須另行核對';
  if(m.forEmpId||m.coverAssignmentId||m.overtimeReport||m.overtime||m.overtimeExcluded)return '已有申報、代班或排除紀錄';
- return weeklyPlanIssue(roster,date,anchor);
+ return weeklyPlanIssue(roster,date,anchor,snapshot,emp.empId);
 }
-function canAutoSuggestFuture(roster,date,month,emp,category){
- if(futureRestPlanIssue(roster,date,month,emp,category))return false;
+function canAutoSuggestFuture(roster,date,month,emp,category,snapshot){
+ if(futureRestPlanIssue(roster,date,month,emp,category,snapshot))return false;
  const m=roster?.__meta?.[date]||{};
  return ['早','中','晚'].includes(String(roster[date]||''))||
   /^([01]?\d|2[0-4])(?::[0-5]\d)?$/.test(String(m.overtimeStart||''))&&
   /^([01]?\d|2[0-4])(?::[0-5]\d)?$/.test(String(m.overtimeEnd||''));
 }
 
-function weeklyRestReview(roster,month,cycleStart=''){
+function weeklyRestReview(roster,month,cycleStart='',snapshot,empId){
  const anchor=/^\d{4}-\d{2}-\d{2}$/.test(String(cycleStart))?cycleStart:'';
  const days=Object.keys(roster||{}).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort(),groups=new Map();
  const ms=d=>Date.parse(d+'T00:00:00+08:00');
@@ -405,8 +419,10 @@ function weeklyRestReview(roster,month,cycleStart=''){
   const base=anchor?ms(anchor):ms(date)-new Date(ms(date)+8*3600000).getUTCDay()*86400000;
   const cycle=Math.floor((ms(date)-base)/604800000),key=new Date(base+cycle*604800000+8*3600000).toISOString().slice(0,10);
   if(!groups.has(key))groups.set(key,{start:key,days:[],regular:0,rest:0});
-  const week=groups.get(key),code=String(roster[date]||'').trim();
-  week.days.push(date);if(code==='例')week.regular++;if(code==='休')week.rest++;
+  const week=groups.get(key);
+  week.days.push(date);
+  if(protectedRegularRest(roster,date,snapshot,empId))week.regular++;
+  if(originalRestDesignation(roster,date)==='休')week.rest++;
  }
  return [...groups.values()].filter(w=>w.days.length===7&&(!w.regular||!w.rest))
   .map(w=>({start:w.start,regular:w.regular,rest:w.rest,confirmedCycle:!!anchor}));
@@ -485,7 +501,7 @@ function plan(snapshot,people,month,rules,options={}){
   balances.push({emp,...b,lastReported,nextReportDate});
   b.conflicts.forEach(x=>issues.push(emp.name+' '+x.date+'：'+x.reason));
   const cycleStart=weeklyCycleAnchor(emp),weekRoster=weeklyRoster(snapshot,emp.empId,roster);
-  const restIssues=weeklyRestReview(weekRoster,month,cycleStart);
+  const restIssues=weeklyRestReview(weekRoster,month,cycleStart,snapshot,emp.empId);
   for(const week of restIssues)issues.push(emp.name+' 週期起點 '+week.start+'：'+
    (week.confirmedCycle?'約定週期':'暫以週日為起點預覽')+
    ' 例假'+week.regular+'日、休息日'+week.rest+'日；請先核對原排班，勿用加班申報補足休假');
@@ -508,13 +524,13 @@ function plan(snapshot,people,month,rules,options={}){
    // 未來日期不要求先有打卡，否則全員只能看到「今天」而漏掉月底預排。
    const todayState=g.P79RestAttendance?.state(snapshot,emp.empId,date);
    const todayPending=!historical&&date===currentDate&&!verified&&
-     ['open','missing'].includes(todayState)&&canAutoSuggestFuture(weekRoster,date,month,emp,originalCategory);
+     ['open','missing'].includes(todayState)&&canAutoSuggestFuture(weekRoster,date,month,emp,originalCategory,snapshot);
    const upcoming=!historical&&date>currentDate&&!pairs.length&&
-     (canAutoSuggestFuture(weekRoster,date,month,emp,originalCategory)||!!manualRuleByDate.get(date));
+     (canAutoSuggestFuture(weekRoster,date,month,emp,originalCategory,snapshot)||!!manualRuleByDate.get(date));
    if(!verified&&!todayPending&&!upcoming){
     if(date<currentDate||historical)blocked(date,originalCategory,pairs.length>1?'出勤配對重複':pairs.length?'出勤未核實完整8小時':'無完整出勤配對');
     else if(date===currentDate&&!['open','missing'].includes(todayState))blocked(date,originalCategory,'當日出勤狀態未符合預排');
-    else blocked(date,originalCategory,futureRestPlanIssue(weekRoster,date,month,emp,originalCategory)||'未找到原班表的8小時時段，且前後班別不一致或不足以推估');
+    else blocked(date,originalCategory,futureRestPlanIssue(weekRoster,date,month,emp,originalCategory,snapshot)||'未找到原班表的8小時時段，且前後班別不一致或不足以推估');
     continue;
    }
    // Earlier weeks are eligible only with genuine completed attendance, never synthetic backfill.
@@ -526,7 +542,7 @@ function plan(snapshot,people,month,rules,options={}){
     const rule=ruleFor(date,roster,pair,category,rules)||(!pair&&manualRule?.[0]===category?manualRule:null);if(rule)byCategory.set(category,rule);}
    if(!byCategory.size)blocked(date,originalCategory,'無相符的正式8小時加班時段');
    if(byCategory.size){
-    const restProtected=!!pair||!futureRestPlanIssue(weekRoster,date,month,emp,originalCategory);
+    const restProtected=!!pair||!futureRestPlanIssue(weekRoster,date,month,emp,originalCategory,snapshot);
     if(!pair&&!restProtected)continue;
     candidates.push({date,pair,byCategory,restProtected,week:weeklyCycleWindow(date,cycleStart)?.start||''});
    }
@@ -712,7 +728,7 @@ function manualRestPlanIssue(snapshot,emp,month,date,rule,asOf=today(),cutoff=''
  const anchor=weeklyCycleAnchor(person);
  if(!anchor)return '未設定約定七日週期，請先核對排班';
  if(person.flexibleWorkHours===true||person.workTimeSystem&&!['standard','normal','一般','一般工時','固定'].includes(String(person.workTimeSystem).trim()))return '特殊工時制度須另行核對';
- const weekIssue=weeklyPlanIssue(weeklyRoster(snapshot,emp.empId,roster),date,anchor);
+ const weekIssue=weeklyPlanIssue(weeklyRoster(snapshot,emp.empId,roster),date,anchor,snapshot,emp.empId);
  if(weekIssue)return weekIssue;
  let b;try{b=balance(person,roster,month,snapshot);}catch(e){return String(e.message||e);}
  if(!b.dates.includes(date)||b.typhoonDates.includes(date)||!(b.remaining[category]>0))return '該日不在可用額度或本月已無此假別缺額';
