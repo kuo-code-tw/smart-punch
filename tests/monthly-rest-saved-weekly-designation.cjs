@@ -44,7 +44,14 @@ const fresh={...snapshot,schedules:[{empId:'TEST',schedule:monthly}],
  attendanceEvidence:{complete:true,days:{}},pairs:[]};
 const rule=['休','休08-16',8,8,'','','08','16','full'];
 const planned=api.plan(fresh,[emp],'2026-11',[rule]);
-assert.deepEqual(Array.from(planned.plannedRows,r=>r.date),['2026-11-26','2026-11-30']);
+assert.deepEqual(Array.from(planned.plannedRows,r=>r.date),['2026-11-26','2026-11-27','2026-11-28','2026-11-30']);
+const withoutProtectedRest={...monthly,'2026-11-29':'早',__meta:{...monthly.__meta}};
+delete withoutProtectedRest.__meta['2026-11-29'];
+const warningSnapshot={...fresh,schedules:[{empId:'TEST',schedule:withoutProtectedRest}]};
+const warned=api.plan(warningSnapshot,[emp],'2026-11',[rule]);
+assert(warned.plannedRows.some(r=>r.date==='2026-11-27'&&r.needsWeeklyReview));
+assert.equal(api.manualRestPlanIssue(warningSnapshot,emp,'2026-11','2026-11-27',rule,'2026-11-25'),'',
+ 'a missing protected weekly rest day remains a warning when saving a preplan');
 assert.equal(planned.rows.length,0,'future plans must never appear as formal applications');
 const requested=planned.plannedRows.map(r=>({...r,date:'2026-11-27'})).slice(0,1);
 assert.equal(api.rematchSelectedRestCandidates(requested,planned.plannedRows).matched.length,1);

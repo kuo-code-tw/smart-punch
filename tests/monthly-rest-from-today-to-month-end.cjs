@@ -38,7 +38,11 @@ for(const row of snap.schedules)row.schedule['2026-10-28']='休';
 const attended=g.P79MonthlyRest.plan(snap,employees,'2026-10',rules);
 assert.equal(attended.rows.length,3);
 assert(attended.rows.every(r=>r.date==='2026-10-28'&&r.category==='休'&&!r.planned));
-assert.equal(attended.plannedRows.length,0,'missing and open punches cannot become confirmed work');
+assert.equal(attended.plannedRows.length,13,'remaining staff can reserve their rest quota');
+assert(attended.plannedRows.every(r=>r.date>=now&&r.category==='休'&&r.planned&&r.needsWeeklyReview),
+ 'unverified work remains a preplan with a weekly review warning');
+assert(attended.plannedRows.every(r=>!attended.rows.some(filed=>filed.empId===r.empId)),
+ 'a verified workday consumes the quota before future plans are proposed');
 assert.equal(attended.balances.length,16);
 assert.equal(g.P79MonthlyRest.plan(snap,employees,'2026-10',rules,{manualOnly:true}).plannedRows.length,0);
 now='2026-10-29';
