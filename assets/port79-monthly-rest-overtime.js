@@ -743,6 +743,30 @@ function matchSelectedRestCandidates(requested,candidates){
  const found=new Set(matched.map(selectedRestCandidateKey));
  return {matched,unmatched:requested.filter(r=>!found.has(selectedRestCandidateKey(r)))};
 }
+// Re-plan unmatched unsaved requests against the freshly calculated month's
+// eligible candidates. Exact matches win; alternatives never change employee
+// or leave category, never reuse a date, and never move an uncertain write.
+function rematchSelectedRestCandidates(requested,candidates,blocked=()=>false){
+ const pool=candidates.filter(r=>!r.saved&&selectedRestCandidateKey(r));
+ const identity=r=>id(r.empId)+'|'+r.date;
+ const used=new Set(),matched=[],unmatched=[],reassigned=[],deferred=[];
+ for(const request of requested){
+  if(blocked(request)){unmatched.push(request);continue;}
+  const exact=pool.find(r=>!used.has(identity(r))&&selectedRestCandidateKey(r)===selectedRestCandidateKey(request));
+  if(exact){used.add(identity(exact));matched.push(exact);}
+  else deferred.push(request);
+ }
+ for(const request of deferred){
+  if(request.attempted||request.acknowledged){unmatched.push(request);continue;}
+  const alternatives=pool.filter(r=>!used.has(identity(r))&&id(r.empId)===id(request.empId)&&r.category===request.category)
+   .sort((a,b)=>a.date.localeCompare(b.date));
+  const replacement=alternatives[0];
+  if(!replacement){unmatched.push(request);continue;}
+  used.add(identity(replacement));matched.push(replacement);
+  reassigned.push({from:request,to:replacement});
+ }
+ return {matched,unmatched,reassigned};
+}
 function personPeriodSuggestions(model,empId,asOf=today()){
  const key=id(empId),balanceRow=model?.balances?.find(b=>id(b.emp.empId)===key);
  if(!balanceRow)return {suggestions:[],reason:'缺少正式班表，無法建議日期'};
@@ -1056,7 +1080,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-quota-preview-v26';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-auto-rematch-v27';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1373,17 +1397,22 @@ async function open(settings={}){
   const month=loadedMonth,scope=new Set(chosenPeople().map(e=>id(e.empId)));
   const picked=requested.filter(r=>scope.has(id(r.empId))&&String(r.date||'').startsWith(month+'-')&&selectedRestCandidateKey(r));
   const previous=(mode==='plan'?model.plannedRows:model.rows).filter(r=>scope.has(id(r.empId))&&r.checked&&!r.saved);
-  const byKey=new Map([...previous,...picked].map(r=>[selectedRestCandidateKey(r),r]));
+  const byKey=new Map([...picked,...previous].map(r=>[selectedRestCandidateKey(r),r]));
   if(!byKey.size){setStatus('沒有已指定日期及時段的勾選項目。');return;}
-  const wanted=[...byKey.values()],rejected=[];
-  busy=true;controls(true);setStatus('正在一次核對 '+wanted.length+' 筆原日期及時段…');
+  const wanted=[...byKey.values()],rejected=[];let rematched=[];
+  busy=true;controls(true);setStatus('正在搜尋本月 '+wanted.length+' 筆符合假別、額度及班別的日期…');
   try{
    const fresh=await a.snapshot(month,false,false,true);
    if(!el.isConnected||loadedMonth!==month)throw Error('月份或視窗已變更');
    if(fresh?.provisional===true||fresh?.readOnlyDueAttendance===true||fresh?.attendanceEvidence?.complete!==true)throw Error('正式班表或考勤尚未完整讀取，保留勾選，未寫入任何申報');
    const next=plan(fresh,loadedPeople,month,rules,{manualOnly:false,cutoff:q('#mrCutoff').value});
    const candidates=mode==='plan'?next.plannedRows:next.rows;
-   const {matched,unmatched}=matchSelectedRestCandidates(wanted,candidates);
+   const savedAt=row=>fresh.schedules?.find(x=>id(x.empId)===id(row.empId))?.schedule?.__meta?.[row.date]?.overtimeReport;
+   const uncertain=[...model.rows,...model.plannedRows].filter(r=>(r.attempted||r.acknowledged)&&!r.saved);
+   const blocked=request=>!!savedAt(request)||uncertain.some(old=>id(old.empId)===id(request.empId)&&old.category===request.category&&
+    selectedRestCandidateKey(old)!==selectedRestCandidateKey(request));
+   const {matched,unmatched,reassigned}=rematchSelectedRestCandidates(wanted,candidates,blocked);
+   rematched=reassigned;
    // Keep native IDs for uncertain write retries; never assign a new ID
    // to an attempted record without checking its existing cloud report.
    for(const row of matched){
@@ -1394,21 +1423,25 @@ async function open(settings={}){
    for(const row of unmatched){
     const roster=fresh.schedules?.find(x=>id(x.empId)===id(row.empId))?.schedule;
     const meta=roster?.__meta?.[row.date]||{};
-    const reason=meta.overtimeReport?'已有加班或預排紀錄，請核對原編號':!roster?'缺少正式班表':mode==='plan'&&row.date<today()?'已過日期，請改走實際出勤正式申報':mode==='formal'&&row.date>today()?'尚未到出勤日期，只能預排':automaticRestCategory(roster,row.date,month)!==row.category?'原排假別與所選假別不符':next.reviewNotes?.[id(row.empId)]?.find(x=>x.date===row.date&&x.category===row.category)?.reason||'未符合該日期的出勤、額度或週期條件';
+    const relevant=(next.reviewNotes?.[id(row.empId)]||[]).filter(x=>x.category===row.category&&
+     (mode==='plan'?x.date>=today():x.date<=today()));
+    const reason=meta.overtimeReport?'原日期已有加班或預排，保留原編號，未另建':blocked(row)||row.attempted?'原寫入尚待核對，不另建日期':!roster?'缺少正式班表':'已搜尋本月符合'+row.category+'假別的其他日期，'+
+      (relevant.length?[...new Set(relevant.map(x=>x.reason))].slice(0,2).join('／'):'未找到符合出勤、額度及週期的可用時段');
     rejected.push((row.name||row.empId)+' '+row.date+'：'+reason);
    }
-   if(!matched.length){setStatus('本次沒有符合'+(mode==='plan'?'預排':'正式申報')+'條件的日期；'+rejected.slice(0,8).join('；')+(rejected.length>8?'；另 '+(rejected.length-8)+' 筆待核':'')+'。未寫入資料。');return;}
+   if(!matched.length){setStatus('已自動搜尋本月其他日期，仍無符合'+(mode==='plan'?'預排':'正式申報')+'條件的時段；'+rejected.slice(0,8).join('；')+(rejected.length>8?'；另 '+(rejected.length-8)+' 筆待核':'')+'。未寫入資料。');return;}
    // Preserve unrelated rows and only select exact matched candidates.
    const untouched=mode==='plan'?model.rows:model.plannedRows;
    if(mode==='plan')next.rows=untouched;else next.plannedRows=untouched;
    snapshot=fresh;model=next;
    if(mode==='plan'){autoPlan=true;q('#mrAutoMode').checked=true;q('#mrManualMode').checked=false;}
    paint();
-   setStatus('已配對 '+matched.length+' 筆'+(rejected.length?'；另 '+rejected.length+' 筆不符：'+rejected.slice(0,5).join('；'):'')+'。');
+   setStatus('已配對 '+matched.length+' 筆，其中自動改配 '+rematched.length+' 筆'+(rejected.length?'；另 '+rejected.length+' 筆查無合格時段：'+rejected.slice(0,5).join('；'):'')+'。');
   }catch(error){setStatus('批次核對未完成：'+String(error.message||error));return;}
   finally{busy=false;controls(false);}
-  if(rejected.length&&!confirm('有 '+rejected.length+' 筆不符條件，將保留待核，不會申報。\n'+rejected.slice(0,8).join('\n')+'\n繼續處理已配對項目？'))return;
-  if(mode==='plan')await q('#mrSavePlans').onclick();else await q('#mrSave').onclick();
+  const summary=(rematched.length?'\n自動改配 '+rematched.length+' 筆（保留原人員與假別）：\n'+rematched.slice(0,12).map(({from,to})=>(to.name||to.empId)+' '+from.date+' → '+to.date+' '+to.rule[1]).join('\n')+(rematched.length>12?'\n其餘改配日期見列表':''):'')+
+   (rejected.length?'\n另 '+rejected.length+' 筆已搜尋但無可用時段，保留待核、不寫入。':'');
+  if(mode==='plan')await q('#mrSavePlans').onclick(summary);else await q('#mrSave').onclick(summary);
  };
  q('#mrManualMode').onchange=()=>{explicitPlanningMode=true;choosePlanningMode(false);};
  q('#mrAutoMode').onchange=()=>{explicitPlanningMode=true;choosePlanningMode(q('#mrAutoMode').checked);};
@@ -1490,10 +1523,10 @@ async function open(settings={}){
   if(row&&!row.saved){row.checked=e.target.checked;paint();}
  };
  q('#mrPlanAll').onchange=()=>{if(busy||!autoPlan)return;visiblePlannedRows().forEach(r=>{r.checked=q('#mrPlanAll').checked;});paint();};
- q('#mrSavePlans').onclick=async()=>{if(isReadOnlySource()){setStatus('既有申報目前僅供查閱，不能儲存加班預排。');return;}
+ q('#mrSavePlans').onclick=async(batchSummary='')=>{if(isReadOnlySource()){setStatus('既有申報目前僅供查閱，不能儲存加班預排。');return;}
   if(busy||!model||!autoPlan)return;
   const selected=visiblePlannedRows().filter(r=>r.checked&&!r.saved);if(!selected.length)return;
-  if(!confirm('將勾選的 '+selected.length+' 筆建議儲存為預排？尚未確認出勤，不會列為正式加班；例休週期待核項目仍需核對。'))return;
+  if(!confirm('將勾選的 '+selected.length+' 筆建議儲存為預排？尚未確認出勤，不會列為正式加班；例休週期待核項目仍需核對。'+(typeof batchSummary==='string'?batchSummary:'')))return;
   busy=true;stop=false;controls(true);let failure='';
   setStatus('正在重新核對 '+selected.length+' 筆勾選預排與雲端最新資料，請稍候…');
   try{
@@ -1537,16 +1570,16 @@ async function open(settings={}){
    if(saved===selected.length&&!failure)q('#mrLoad').click();
   }
  };
- q('#mrSave').onclick=async()=>{if(isReadOnlySource()){setStatus('既有申報目前僅供查閱，不能送出正式申報。');return;}
+ q('#mrSave').onclick=async(batchSummary='')=>{if(isReadOnlySource()){setStatus('既有申報目前僅供查閱，不能送出正式申報。');return;}
   if(busy||!model)return;
   const hasFormal=visibleRows().some(({r})=>r.checked&&!r.saved&&!r.planned);
   if(!hasFormal&&autoPlan&&!autoHistoricalReady())return q('#mrSavePlans').onclick();
   if(!hasFormal&&manualPeople.size)return q('#mrNewPlan').onclick();
   if(!workflowStage(loadedMonth).canSubmit){setStatus('尚未到該申報月份，不能送出正式加班。');return;}
   const selected=visibleRows().map(({r})=>r).filter(r=>r.checked&&!r.saved&&!r.planned);if(!selected.length)return;
-  if(!backfillContext(loadedMonth).historical&&!confirm('正式申報目前篩選內 '+selected.length+' 筆已配對日期及時段？'))return;
+  if(!backfillContext(loadedMonth).historical&&!confirm('正式申報目前篩選內 '+selected.length+' 筆已配對日期及時段？'+(typeof batchSummary==='string'?batchSummary:'')))return;
   const context=backfillContext(loadedMonth);
-  if(context.historical&&!confirm('跨月補報 '+selected.length+' 筆：實際加班及額度仍歸 '+context.sourceMonth+'，只在 '+context.handlingMonth+' 辦理補報。系統將重新驗證原月份的完整出勤、既有加班與時數；確認繼續嗎？'))return;
+  if(context.historical&&!confirm('跨月補報 '+selected.length+' 筆：實際加班及額度仍歸 '+context.sourceMonth+'，只在 '+context.handlingMonth+' 辦理補報。系統將重新驗證原月份的完整出勤、既有加班與時數；確認繼續嗎？'+(typeof batchSummary==='string'?batchSummary:'')))return;
   if(selected.some(r=>r.planned||r.date>today())){setStatus('含尚未完成出勤的預排日期，不得作為已發生的正式加班。');return;}
   if(selected.some(r=>r.category==='例')&&!confirm('例假出勤須符合法定天災、事變或突發事件等例外。請確認具備法定事由及證明，不能只為補滿未休額度。仍要進入正式核對嗎？'))return;
   const seen=new Set();for(const r of selected){const key=id(r.empId)+'|'+r.date;if(!r.date.startsWith(loadedMonth+'-')||r.date>today()||seen.has(key)){setStatus('日期不符或同一人同日重複，請調整後再申報。');return;}seen.add(key);}
@@ -1630,6 +1663,6 @@ async function open(settings={}){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,canAutoSuggestFuture};
 
 })(window);
