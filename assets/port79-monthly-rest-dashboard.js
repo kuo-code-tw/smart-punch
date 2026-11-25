@@ -37,12 +37,38 @@ function quotaProgressLabel(progress,preview=false){
   return c+(preview?p.afterUsed:p.used)+'/'+(preview?p.afterRemaining:p.remaining);
  }).join('／');
 }
+// Recompute display-only quota from the selected dated rows. The controller's
+// baseline used/remaining values already include saved reports and reserved rest.
+// Do not add its selected count again: native and local reference selections
+// share this one preview, deduplicated by employee and date.
+function selectedQuotaByPerson(rows,reviewKeys){
+ const counts=new Map(),seen=new Set();
+ for(const row of rows){
+  if(!['ready','plan','reference'].includes(row.kind)||!['例','休','國'].includes(row.category)||!/^\d{4}-\d{2}-\d{2}$/.test(row.date))continue;
+  if(row.kind==='reference'?!reviewSelected(reviewKeys,row):selectionMode(row)!=='native'||!row.checked)continue;
+  const emp=norm(row.empId||row.id),key=emp+'|'+row.date;
+  if(!emp||seen.has(key))continue;
+  seen.add(key);
+  if(!counts.has(emp))counts.set(emp,{'例':0,'休':0,'國':0});
+  counts.get(emp)[row.category]++;
+ }
+ return counts;
+}
+function quotaSelectionPreview(progress,counts){
+ if(!progress)return null;
+ return Object.fromEntries(['例','休','國'].map(c=>{
+  const p=progress[c];
+  if(!p)return [c,p];
+  const selected=Math.min(Math.max(0,Number(p.remaining)||0),Math.max(0,Number(counts?.[c])||0));
+  return [c,{...p,selected,afterUsed:p.used+selected,afterRemaining:Math.max(0,p.remaining-selected),afterConfirmed:(Number(p.confirmed)||0)+selected}];
+ }));
+}
 // Keep exactly one quota line. Selected dates only change its display preview.
 function quotaDisplayMarkup(progress,allowPreview=true){
  const preview=allowPreview&&!!progress&&Object.values(progress).some(p=>p.selected>0&&p.previewAllowed!==false);
  const label=quotaProgressLabel(progress,preview)||'額度待核對';
- const title=preview?'目前勾選的預計額度；正式申報成功後才實際扣除':'已使用額度／剩餘缺額（天）';
- return '<small class="mr-ux-quota" style="display:block;color:'+(preview?'#075985':'#475569')+';margin-top:4px" title="'+esc(title)+'">'+esc(label)+'</small>';
+ const title=preview?'勾選試算（含預排與待核對日期）；不代表正式申報成功，實際額度以雲端確認為準':'已使用額度／剩餘缺額（天）';
+ return '<small class="mr-ux-quota" style="display:block;color:'+(preview?'#075985':'#475569')+';margin-top:4px" title="'+esc(title)+'">'+esc(label)+(preview?' <span style="font-size:10px">試算</span>':'')+'</small>';
 }
 // Date colours describe the actual report, never an inferred range of completed days.
 function filingDateState(row,cutoff=''){
@@ -366,6 +392,7 @@ function mount(el){
    const isPicked=r=>selectionMode(r)==='review'?reviewSelected(state.reviewSelected,r):!!r.checked;
    const selectedPending=(state.tab==='done'?[]:state.tab==='audit'?audit:pending).filter(isPicked);
    const selectedReview=selectedPending.filter(r=>selectionMode(r)==='review');
+   const selectedQuota=selectedQuotaByPerson([...pending,...audit],state.reviewSelected);
    const formalCount=data.ready.filter(r=>r.checked&&!r.disabled).length;
    const planCount=data.planned.filter(r=>r.checked&&!r.disabled).length;
    const needs=deficits.length;
@@ -420,7 +447,7 @@ function mount(el){
    q('#mrUxHint').textContent=state.submitting?submissionMessage(info,'正在送出正式申報…',true):canBatchFormal||canBatchPlan?'直接沿用已選日期及時段；只送出核對合格項目':canOpenPlan&&!hasNativePlans?'無日期項目可手動設定預排':state.tab==='audit'?'異常核對不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
    const latestDates=latestConfirmedDates(data.prior);
    q('#mrUxRows').innerHTML=shown.map(r=>{
-    const quota=r.quotaProgress;
+    const quota=state.tab==='done'?r.quotaProgress:quotaSelectionPreview(r.quotaProgress,selectedQuota.get(norm(r.empId||r.id)));
     const type=kind(r),status=label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
     const id=esc(r.id),kindKey=esc(r.kind),key=esc(selectionKey(r));
     const operations=r.kind==='roster'&&r.canPreplan&&!originalMonth.disabled?
@@ -590,5 +617,5 @@ function mount(el){
  },{once:true});
  render();
 }
-global.P79MonthlyRestDashboard={mount,submissionMessage,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,selectedPlanPeople,selectedDatedReferences,dailyPendingRows,quotaProgressLabel,quotaDisplayMarkup,filingDateState,filingDateMarkup,latestConfirmedDates};
+global.P79MonthlyRestDashboard={mount,submissionMessage,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,selectedPlanPeople,selectedDatedReferences,dailyPendingRows,selectedQuotaByPerson,quotaSelectionPreview,quotaProgressLabel,quotaDisplayMarkup,filingDateState,filingDateMarkup,latestConfirmedDates};
 })(window,document);
