@@ -45,7 +45,7 @@ function selectedQuotaByPerson(rows,reviewKeys){
  const counts=new Map(),seen=new Set();
  for(const row of rows){
   if(!['ready','plan','reference'].includes(row.kind)||!['例','休','國'].includes(row.category)||!/^\d{4}-\d{2}-\d{2}$/.test(row.date))continue;
-  if(row.kind==='reference'?!reviewSelected(reviewKeys,row):selectionMode(row)!=='native'||!row.checked)continue;
+  if(row.kind==='reference'?(row.eligible!==true||!reviewSelected(reviewKeys,row)):selectionMode(row)!=='native'||!row.checked)continue;
   const emp=norm(row.empId||row.id),key=emp+'|'+row.date;
   if(!emp||seen.has(key))continue;
   seen.add(key);
@@ -178,7 +178,7 @@ function dailyPendingRows(data){
    const item={kind:'reference',id:person.id,empId:person.id,date:hint.date,name:person.name,role:person.role,
     category:hint.category||String(hint.period||'').match(/^[休例國]/)?.[0]||'',period:suggestionPeriod(hint),
     quota:person.category,quotaProgress:person.quotaProgress||null,lastReported:person.lastReported,hours:'—',status:'待核對',source:hint.note||person.source,
-    checked:false,disabled:true,reviewType:'deficit',actualReference:hint.actualReference===true,canPreplan:person.canPreplan===true};
+    checked:false,disabled:true,reviewType:'deficit',actualReference:hint.actualReference===true,eligible:hint.eligible===true||!hint.referenceOnly,eligibilityIssue:hint.issue||'',canPreplan:person.canPreplan===true};
    covered.add(hint.date);dated.set(k,item);result.push(item);
   }
   // Preserve unresolved deficits without inventing dates or grouping dated rows.
@@ -227,7 +227,9 @@ function mount(el){
  const style=document.createElement('style');style.id='mrUxStyle';
  style.textContent=`
  #p79MonthlyRest{width:min(1560px,calc(100vw - 24px))!important;max-height:95dvh!important;border-radius:20px!important;overflow:hidden!important;background:#f8fbff!important;color:#172b4d!important}
- #p79MonthlyRest>.body{max-height:calc(95dvh - 92px)!important;padding:0!important;overflow:auto!important;display:block!important;background:#f8fbff}
+ #p79MonthlyRest[open]{display:flex!important;flex-direction:column!important;max-height:95dvh!important;min-height:0!important}
+ #p79MonthlyRest>header{flex:0 0 auto}
+ #p79MonthlyRest>.body{flex:1 1 auto!important;min-height:0!important;max-height:none!important;padding:0!important;overflow:auto!important;overscroll-behavior:contain;display:block!important;background:#f8fbff}
  #p79MonthlyRest>.body>:not(#mrUxRoot){display:none!important}
  #p79MonthlyRest>header{padding:17px 24px!important;background:linear-gradient(108deg,#fff 65%,#e9f4ff)!important;min-height:77px;display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px!important} #p79MonthlyRest>header [data-close]{grid-column:2;grid-row:1/span 2;align-self:center}
  #p79MonthlyRest>header>b{font-size:24px;color:#122b54}
@@ -282,11 +284,13 @@ function mount(el){
  #p79MonthlyRest .mr-ux-reason{padding:12px;border-radius:11px;background:#eaf3ff;margin:8px 0;line-height:1.55}
  #p79MonthlyRest .mr-ux-reason b{display:block;font-size:13px;color:#183b6c}
  #p79MonthlyRest .mr-ux-reason small{display:block;font-size:11px;color:#526e91}
- #p79MonthlyRest #mrUxFooter{position:sticky;bottom:0;z-index:5;border-radius:12px;background:#e0edfe!important;padding:10px 15px!important;display:flex!important;gap:12px;align-items:center;flex-wrap:wrap;box-shadow:0 -3px 10px #174f850c}
+ #p79MonthlyRest #mrUxFooter{position:static!important;flex:0 0 auto!important;z-index:auto;border-radius:0;background:#e0edfe!important;padding:8px 12px!important;display:flex!important;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid #c7ddf8}
  #p79MonthlyRest #mrUxFooter .mr-ux-spacer{flex:1}
  #p79MonthlyRest #mrUxFooter button{min-height:42px;min-width:118px;font-size:15px;font-weight:800}
  #p79MonthlyRest #mrUxFooter button:disabled{opacity:.45;cursor:not-allowed}
- #p79MonthlyRest #mrUxHint{color:#334155;font-size:12px;white-space:normal;overflow-wrap:anywhere;min-width:0;max-width:100%}
+ #p79MonthlyRest #mrUxHint{color:#334155;font-size:12px;white-space:normal;min-width:0;max-width:100%;flex:1 1 100%}
+ #p79MonthlyRest #mrUxProgress{max-height:100px;overflow:auto;overscroll-behavior:contain}
+ #p79MonthlyRest .mr-ux-eligibility{display:block;white-space:normal;max-width:210px;font-size:11px;line-height:1.3;color:#92400e;margin-top:3px}
  @media(max-width:1100px){#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}#p79MonthlyRest .mr-ux-reasons h3{grid-column:1/-1}#p79MonthlyRest .mr-ux-reason{margin:0}}
  @media(max-width:750px){#p79MonthlyRest #mrUxRoot{padding:10px;gap:10px}#p79MonthlyRest .mr-ux-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#p79MonthlyRest .mr-ux-stat{padding:9px;min-height:76px}#p79MonthlyRest .mr-ux-stat strong{font-size:22px}#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:block}#p79MonthlyRest .mr-ux-tools>label{flex:1 1 40%}#p79MonthlyRest .mr-ux-tools input,#p79MonthlyRest .mr-ux-tools select{min-width:0;max-width:100%}#p79MonthlyRest .mr-ux-tools .mr-ux-spacer{display:none}#p79MonthlyRest #mrUxFooter{bottom:0}}
  `;
@@ -337,7 +341,9 @@ function mount(el){
  <span id="mrUxHint" role="status" aria-live="polite"></span><button type="button" id="mrUxSavePlan" class="mr-ux-outline" disabled>▣ 儲存預排</button>
  <button type="button" id="mrUxSubmit" class="mr-ux-primary" disabled>➤ 正式申報</button></footer>`;
  body.prepend(shell);
- const q=sel=>$(shell,sel);
+ const actionFooter=$(shell,'#mrUxFooter');
+ if(actionFooter)el.appendChild(actionFooter);
+ const q=sel=>$(shell,sel)||$(actionFooter||el,sel);
  const state={tab:'pending',name:'',status:'',hint:'',snapshot:null,rendering:false,disposed:false,reviewSelected:new Set(),submitting:false};
  function rows(){
   const data=sourceRows(el);
@@ -445,11 +451,11 @@ function mount(el){
    q('#mrUxSubmit').textContent=canBatchFormal?'➤ 批次申報核對（'+(formalCount+datedFormal.length)+' 筆）':'➤ 正式申報（'+formalCount+' 筆）';
    if(state.tab!=='pending')q('#mrUxSubmit').disabled=true;
    if(state.tab==='done')q('#mrUxSavePlan').disabled=true;
-   q('#mrUxHint').textContent=state.submitting?submissionMessage(info,'正在送出正式申報…',true):canBatchFormal||canBatchPlan?'優先原日期；不符時自動搜尋同人員同假別的合格日期及時段':canOpenPlan&&!hasNativePlans?'無日期項目可手動設定預排':state.tab==='audit'?'異常核對不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
+   q('#mrUxHint').textContent=state.submitting?(originalMonth.disabled?'正在重新核對正式資料…':/未寫入資料|無符合|查無/.test(info)?'未寫入；詳細原因請看各筆狀態及上方核對結果。':'核對結果請看上方訊息。'):canBatchFormal||canBatchPlan?'優先原日期；不符時自動搜尋同人員同假別的合格日期及時段':canOpenPlan&&!hasNativePlans?'無日期項目可手動設定預排':state.tab==='audit'?'異常核對不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
    const latestDates=latestConfirmedDates(data.prior);
    q('#mrUxRows').innerHTML=shown.map(r=>{
     const quota=state.tab==='done'?r.quotaProgress:quotaSelectionPreview(r.quotaProgress,selectedQuota.get(norm(r.empId||r.id)));
-    const type=kind(r),status=label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
+    const type=kind(r),status=r.kind==='reference'&&!r.eligible?'僅參考':label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
     const id=esc(r.id),kindKey=esc(r.kind),key=esc(selectionKey(r));
     const operations=r.kind==='roster'&&r.canPreplan&&!originalMonth.disabled?
      '<button type="button" data-action="preplan" data-key="'+key+'">設定預排</button><button type="button" data-action="view" data-key="'+key+'">◎ 檢視</button>':r.kind==='ready'?
@@ -458,7 +464,7 @@ function mount(el){
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
       'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+filingDateMarkup(r,cutoff.value,latestDates.get(norm(r.empId||r.id))||'')+'</td><td>'+esc(r.name)+(r.role?'<small style="display:block;color:#64748b">'+esc(r.role)+(r.kind==='roster'?'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對'):'')+'</small>':'')+'</td>'+
       '<td><span class="mr-ux-kind">'+esc(r.category)+'</span>'+quotaDisplayMarkup(quota,state.tab!=='done')+'</td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>'+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
-      '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+'</td><td>'+operations+'</td></tr>';
+      '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+(r.kind==='reference'&&!r.eligible?'<small class="mr-ux-eligibility">'+esc(r.eligibilityIssue||r.source||'尚未符合預排資格')+'</small>':'')+''+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
    q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+(state.tab==='pending'&&audit.some(r=>r.residualOnly)?'｜尚無日期的缺額請見「已預排／待核對」':'');
    q('#mrUxExport').disabled=!shown.length;
