@@ -286,6 +286,9 @@ function mount(el){
  #p79MonthlyRest .mr-ux-table button:disabled{opacity:.35}
  #p79MonthlyRest #mrUxReviewSummary{max-height:200px;overflow:auto;grid-column:1/-1}
  #p79MonthlyRest .mr-ux-reasons h3{font-size:17px;margin:5px 2px 14px;color:#123359}
+ #p79MonthlyRest .mr-ux-reason-help{grid-column:1/-1;margin:4px 2px 0;min-width:0}
+ #p79MonthlyRest .mr-ux-reason-help>summary{display:list-item;width:fit-content;max-width:100%;box-sizing:border-box;cursor:pointer;font-size:12px;font-weight:700;color:#315986;background:#eaf3ff;border:1px solid #dce7f6;border-radius:7px;padding:5px 9px}
+ #p79MonthlyRest .mr-ux-reason-help>summary:focus-visible{outline:2px solid #315986;outline-offset:2px}
  #p79MonthlyRest .mr-ux-reason{padding:12px;border-radius:11px;background:#eaf3ff;margin:8px 0;line-height:1.55}
  #p79MonthlyRest .mr-ux-reason b{display:block;font-size:13px;color:#183b6c}
  #p79MonthlyRest .mr-ux-reason small{display:block;font-size:11px;color:#526e91}
@@ -338,9 +341,11 @@ function mount(el){
  </section>
  <aside class="mr-ux-card mr-ux-reasons"><h3>ⓘ 待核對原因</h3>
  <div id="mrUxReviewSummary" role="status" aria-live="polite" style="font-size:12px;color:#476587;line-height:1.55;margin:8px 2px">勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。</div>
+ <details class="mr-ux-reason-help"><summary aria-label="展開或收合待核對原因說明">ⓘ 原因說明</summary>
  <div class="mr-ux-reason"><b>▤ 時段衝突</b><small>建議時段與既有排班／打卡不一致時需重新核對。</small></div>
  <div class="mr-ux-reason"><b>▧ 缺少必要資料</b><small>班表、出勤或人員資料缺漏時不允許直接申報。</small></div>
  <div class="mr-ux-reason"><b>♙ 人員異動</b><small>到職、離職、職稱或權限變更時依正式資料重新確認。</small></div>
+ </details>
  </aside></div>
  <footer id="mrUxFooter"><span id="mrUxSelected">已勾選 0 筆</span>
  <span id="mrUxHint" role="status" aria-live="polite"></span><button type="button" id="mrUxSavePlan" class="mr-ux-outline" disabled>▣ 儲存預排</button>
