@@ -1,0 +1,21 @@
+name: Verify shared compact hover notes
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-hover-notes.js'
+      - 'tests/shared-hover-notes.cjs'
+      - '.github/workflows/shared-hover-notes.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check assets/port79-hover-notes.js
+      - run: node tests/shared-hover-notes.cjs
