@@ -892,6 +892,7 @@ async function fetchJson(action,params={},sys='',readOptions={}){
   }finally{clearTimeout(to)}
   readVersions.set(action,(readVersions.get(action)||0)+1);
   // Storage failures must not trigger another cloud request.
+  if(typeof readOptions.startupGuard==='function'&&!readOptions.startupGuard())throw Object.assign(new Error('登入狀態已變更，拒絕保存'),{code:'P79_SCOPE'});
   await storeApi(url,data,sys);
   if(new URL(url).pathname!==primary.pathname)recoveredGasUrl=CANONICAL_GAS_URL;
   return data;
@@ -926,6 +927,7 @@ function downloadAttendanceDatabase(targetSys='attendance',onProgress,readOption
  attendanceDownloads.set(key,pending);return pending;
 }
 function verifyAttendanceDownloadContext(expected){
+ if(typeof expected.guard==='function'&&!expected.guard())throw Object.assign(new Error('背景下載已停止'),{code:'P79_SCOPE'});
  if(expected.token!==token()||expected.viewer!==viewerKey())
   throw Object.assign(new Error('登入帳號或憑證確實已變更；未保存舊帳號的考勤資料，請重新登入'),{code:'P79_AUTH'});
  if(expected.scope!==displayScope())
@@ -935,7 +937,7 @@ function verifyAttendanceDownloadContext(expected){
 }
 async function readAttendanceDatabase(targetSys='attendance',onProgress,readOptions={}){
  const t=token(),viewer=viewerKey(),scope=displayScope(),stamp=mutationStamp();
- const expected={token:t,viewer,scope,stamp};
+ const expected={token:t,viewer,scope,stamp,guard:readOptions.startupGuard};
  if(!t)throw new Error('找不到登入 Token，請重新由首頁登入');
  const previous=await getDisplaySnapshot('attendance').catch(()=>null);
  const before=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
@@ -1060,8 +1062,8 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
   recordCount:allRecords.length,employeeCount:employees.length,
   revision:String(master?.revision||catalog?.revision||'')
  };
- await saveSystemSnapshot('attendance',snapshot);
- await saveSystemSnapshot('workhours',snapshot);
+ if(!Array.isArray(readOptions.authorizedSystems)||readOptions.authorizedSystems.includes('attendance'))await saveSystemSnapshot('attendance',snapshot);
+ if(!Array.isArray(readOptions.authorizedSystems)||readOptions.authorizedSystems.includes('workhours'))await saveSystemSnapshot('workhours',snapshot);
  if(targetSys==='attendance'||targetSys==='workhours')await applyAttendanceSnapshotToPage(snapshot,true);
  return snapshot;
 }
@@ -1204,9 +1206,9 @@ async function downloadAll(onProgress,options={}){
  const historyOnDemand=options?.historyOnDemand===true;
  const systems=(fastFirst?['leave','schedule','efficiency','hr','history','attendance','workhours']:
   ['attendance','workhours','leave','schedule','efficiency','hr','history'])
-  .filter(sys=>!historyOnDemand||sys!=='history');
+  .filter(sys=>(!historyOnDemand||sys!=='history')&&(!Array.isArray(options.systems)||options.systems.includes(sys)));
  const result=[];
- const readOptions=fastFirst?{interactive:true,...(resumeExisting?{resumeExisting:true}:{})}:{};
+ const readOptions=fastFirst?{interactive:true,...(resumeExisting?{resumeExisting:true}:{}),...(typeof options.startupGuard==='function'?{startupGuard:options.startupGuard}:{}),...(Array.isArray(options.systems)?{authorizedSystems:systems}:{})}:{};
  const batchViewer=viewerKey(),batchToken=token(),batchScope=displayScope(),batchGas=gasUrl(),batchStamp=mutationStamp();
  // Within a short same-login retry, keep the six successful snapshots and fetch
  // only modules that actually failed. A new session/scope or later refresh starts fresh.
@@ -1216,6 +1218,7 @@ async function downloadAll(onProgress,options={}){
  let attendanceSnapshot=null,attendanceError=null,connectionError=null,consecutiveTransportFailures=0;
  for(let i=0;i<systems.length;i++){
   const sys=systems[i];
+  if(typeof options.startupGuard==='function'&&!options.startupGuard())throw Object.assign(new Error('登入狀態已變更，停止背景下載'),{code:'P79_SCOPE'});
   if(prior?.some(row=>row.system===sys&&row.ok)){
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true,reused:true});
@@ -1226,10 +1229,12 @@ async function downloadAll(onProgress,options={}){
   // Manual refresh deliberately does NOT use this long reuse window.
   // In both modes a snapshot failing permission, endpoint or edit checks is
   // reloaded, never silently presented as a verified latest cloud response.
-  if(fastFirst&&await (resumeExisting?startupCachedSystem(sys,batchScope):reusableSystemDownload(sys,batchScope))){
+  const reusable=fastFirst&&await (resumeExisting?startupCachedSystem(sys,batchScope):reusableSystemDownload(sys,batchScope));
+  if(reusable){
    if(batchViewer!==viewerKey()||batchToken!==token()||
       batchScope!==displayScope()||batchGas!==gasUrl()||batchStamp!==mutationStamp())
     throw Object.assign(new Error('登入或管理權限已變更，停止沿用快取'),{code:'P79_SCOPE'});
+   if(sys==='attendance'&&reusable.data?.fullDatabase===true)attendanceSnapshot=reusable.data;
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true,reused:true});
    onProgress?.(sys,i,systems.length,'reused',null,resumeExisting?
@@ -1250,6 +1255,7 @@ async function downloadAll(onProgress,options={}){
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
    else{
     const payload=await downloadSystem(sys,null,readOptions);
+    if(typeof options.startupGuard==='function'&&!options.startupGuard())throw Object.assign(new Error('登入狀態已變更，停止保存'),{code:'P79_SCOPE'});
     if(fastFirst&&['leave','schedule','efficiency','hr','history'].includes(sys)&&payload?.ok===true){
      if(batchViewer!==viewerKey()||batchToken!==token()||batchScope!==displayScope()||
         batchGas!==gasUrl()||batchStamp!==mutationStamp())
@@ -1480,7 +1486,7 @@ if(!window.__p79BrowserBackgroundWorker&&!window.chrome?.webview?.postMessage&&t
  const src=document.querySelector?.('script[src*="port79-data-cache.js"]')?.src;
  if(src){
   const tag=document.createElement('script');
-  tag.src=new URL('port79-browser-download-status.js?v=20261123-bg-status-v1',src).href;
+  tag.src=new URL('port79-browser-download-status.js?v=20261125-auto-resume-v1',src).href;
   tag.defer=true;
   document.head.appendChild(tag);
  }

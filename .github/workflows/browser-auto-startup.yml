@@ -1,0 +1,28 @@
+name: Verify local-first browser startup
+on:
+  push:
+    branches: [main]
+    paths:
+      - assets/port79-data-cache.js
+      - assets/port79-browser-auto-start.js
+      - assets/port79-browser-download-status.js
+      - index.html
+      - tests/browser-auto-startup.cjs
+      - .github/workflows/browser-auto-startup.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/browser-auto-startup.cjs
+      - run: node --test tests/windows-cache-incremental-resume.cjs
+      - run: node tests/browser-background-download-progress.cjs
+      - run: node tests/home-restore-cache-download-gate.cjs
+      - run: node tests/cache-attendance-download.cjs

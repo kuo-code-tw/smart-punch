@@ -4,7 +4,7 @@
  if(window.__p79BrowserBackgroundWorker||window.__p79BrowserProgressUI)return;
  window.__p79BrowserProgressUI=true;
  const KEY='p79BrowserCacheProgressV1';
- let panel=null,lastDismissed=0;
+ let panel=null,lastDismissed=0,completedAt=0,completedJob=0;
  function read(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(_){return null}}
  function build(){
   if(panel||!document.body)return;
@@ -19,7 +19,7 @@
   (document.head||document.body).appendChild(style);
   panel=document.createElement('aside');panel.id='p79BrowserBgProgress';panel.hidden=true;
   panel.setAttribute('role','status');
-  panel.innerHTML='<div class="p79-head" data-p79-title>☁ 背景資料下載</div><div><span data-p79-count>0/6</span> <progress data-p79-bar max="1" value="0"></progress></div><div data-p79-summary></div><button type="button" data-p79-toggle aria-expanded="false">查看下載明細</button><div class="p79-detail" data-p79-detail hidden></div><button type="button" data-p79-dismiss hidden>關閉完成通知</button>';
+  panel.innerHTML='<div class="p79-head" data-p79-title>☁ 背景資料下載</div><div><span data-p79-count>0/6</span> <progress data-p79-bar max="1" value="0"></progress></div><div data-p79-systems></div><div data-p79-month hidden><span data-p79-month-count></span><progress data-p79-month-bar max="1" value="0"></progress></div><div data-p79-summary></div><button type="button" data-p79-toggle aria-expanded="false">查看下載明細</button><div class="p79-detail" data-p79-detail hidden></div><button type="button" data-p79-dismiss hidden>關閉完成通知</button>';
   document.body.appendChild(panel);
   const detail=panel.querySelector('[data-p79-detail]'),toggle=panel.querySelector('[data-p79-toggle]');
   toggle.addEventListener('click',()=>{detail.hidden=!detail.hidden;toggle.textContent=detail.hidden?'查看下載明細':'收合下載明細';toggle.setAttribute('aria-expanded',String(!detail.hidden))});
@@ -35,13 +35,19 @@
   const state=active?(stalled?'進度暫未更新':record.phase==='starting'?'準備中':'下載中'):
     ({complete:'已完成',partial:'部分完成',failed:'失敗',interrupted:'已中斷'})[record.phase]||'待確認';
   const completed=Math.max(0,Number(record.completed)||0),total=Math.max(0,Number(record.total)||0);
+  if(record.phase==='complete'){if(completedJob!==record.startedAt){completedJob=record.startedAt;completedAt=Date.now();}if(Date.now()-completedAt>8000){panel.hidden=true;return;}}
   const names={attendance:'考勤',workhours:'工時統計',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料'};
   panel.querySelector('[data-p79-title]').textContent='☁ 背景資料下載｜'+state;
-  panel.querySelector('[data-p79-count]').textContent=total?completed+'/'+total:'預載中';
+  panel.querySelector('[data-p79-count]').textContent=total?completed+'/'+total+'（'+Math.round(Math.min(1,completed/total)*100)+'%）':'預載中';
   panel.querySelector('[data-p79-bar]').value=total?Math.min(1,completed/total):0;
   panel.querySelector('[data-p79-summary]').textContent=(record.system?'目前：'+(names[record.system]||record.system):'')+
     (record.monthTotal?'　月份 '+record.monthCompleted+'/'+record.monthTotal:'')+
     (stalled?'｜請查看下載分頁':'');
+  const systemText={waiting:'等待',loading:'下載中',done:'已下載',reused:'沿用本機',error:'失敗',skipped:'未下載'};
+  panel.querySelector('[data-p79-systems]').textContent=Object.entries(record.states||{}).map(([sys,state])=>(names[sys]||sys)+'：'+(systemText[state]||state)).join('　');
+  const month=panel.querySelector('[data-p79-month]');month.hidden=!record.monthTotal;
+  panel.querySelector('[data-p79-month-count]').textContent='考勤月份 '+(record.monthCompleted||0)+'/'+(record.monthTotal||0);
+  panel.querySelector('[data-p79-month-bar]').value=record.monthTotal?Math.min(1,(record.monthCompleted||0)/record.monthTotal):0;
   panel.querySelector('[data-p79-detail]').textContent=String(record.detail||'');
   panel.querySelector('[data-p79-dismiss]').hidden=active;
   panel.hidden=false;
