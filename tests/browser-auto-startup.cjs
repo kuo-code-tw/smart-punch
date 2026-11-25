@@ -17,6 +17,13 @@ function setup({role='admin',permissions={hr:'view',schedule:'none',attendance:'
  const c=setup({role:'employee'});await c.run();assert.equal(c.calls.length,0);
  const d=setup({offline:true});await d.run();assert.equal(d.calls.length,0);d.win.navigator.onLine=true;d.events.get('online')();await new Promise(r=>setImmediate(r));assert.equal(d.calls.length,1);
  const e=setup();e.ss.set('port79_user_token','OTHER');await e.run();assert.equal(e.calls.length,0);
+ const all=setup({role:'superadmin'});await all.run();
+ assert.deepEqual(Array.from(all.calls[0].systems),['leave','schedule','efficiency','hr','attendance','workhours']);
+ assert.equal(all.calls[0].historyOnDemand,true);
+ const allProgress=JSON.parse(all.local.get('p79BrowserCacheProgressV1'));
+ assert.equal(allProgress.total,6);assert.equal(allProgress.completed,6);assert.equal(allProgress.phase,'complete');assert.equal(allProgress.historyOnDemand,true);assert.equal(allProgress.states.history,undefined);
+ const hist=setup({permissions:{history:'view'}});await hist.run();assert.equal(hist.calls.length,0,'history-only account does not trigger startup bulk download');
+ assert(ui.includes('歷史資料：按月讀取（未預載）'));
  assert(home.includes('P79BrowserStartup?.start?.(token)'));assert(home.includes('P79BrowserStartup?.busy?.()'));
  assert(ui.includes('data-p79-month-bar'));assert(ui.includes('data-p79-systems'));
  console.log('PASS verified web startup, permissions, no duplicate run, offline resume, progress and credential isolation');

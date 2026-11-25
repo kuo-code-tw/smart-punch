@@ -3,7 +3,9 @@
  'use strict';
  if(window.chrome?.webview?.postMessage||window.P79BrowserStartup)return;
  const KEY='p79BrowserCacheProgressV1',CHANNEL='p79-browser-cache-progress';
- const ORDER=['leave','schedule','efficiency','hr','history','attendance','workhours'];
+ // History uses direct month requests in history-data/index.html. Its optional
+ // catalog is not required by that page or the six startup modules.
+ const ORDER=['leave','schedule','efficiency','hr','attendance','workhours'];
  const names={leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料目錄',attendance:'考勤',workhours:'工時'};
  let running=false,closed=false,verifiedToken='',startedKey='',job=null,channel=null;
  try{if(typeof BroadcastChannel==='function')channel=new BroadcastChannel(CHANNEL)}catch(_){}
@@ -14,8 +16,9 @@
    const role=String(s?.adminRole||s?.role||'').toLowerCase();
    if(!s||!token||s.punchOnly===true||!['admin','superadmin'].includes(role))return null;
    const permissions=s.systemPermissions||{};
-   const systems=ORDER.filter(sys=>role==='superadmin'||['view','edit','manage'].includes(String(permissions[sys]||'').toLowerCase()));
-   return {token,viewer:window.Port79DataCache?.viewerKey?.(),scope:JSON.stringify([permissions,s.dataScope||{},s.dataScopeJobs||{}]),systems};
+   const allowed=sys=>role==='superadmin'||['view','edit','manage'].includes(String(permissions[sys]||'').toLowerCase());
+   const systems=ORDER.filter(allowed);
+   return {token,viewer:window.Port79DataCache?.viewerKey?.(),scope:JSON.stringify([permissions,s.dataScope||{},s.dataScopeJobs||{}]),systems,historyOnDemand:allowed('history')};
   }catch(_){return null}
  }
  function same(ctx){
@@ -28,7 +31,7 @@
   const row={phase,detail:String(detail||'').replace(/(?:userToken|adminToken|token)=[^&\s]+/gi,'憑證=已隱藏').slice(0,180),
    viewer:job.viewer,startedAt:job.startedAt,updatedAt:Date.now(),system:job.system,
    completed:Object.values(job.states).filter(x=>x==='done'||x==='reused').length,total:job.total,
-   monthCompleted:job.monthCompleted,monthTotal:job.monthTotal,states:{...job.states}};
+   monthCompleted:job.monthCompleted,monthTotal:job.monthTotal,states:{...job.states},historyOnDemand:job.historyOnDemand};
   job.last=row;
   try{localStorage.setItem(KEY,JSON.stringify(row))}catch(_){}
   try{channel?.postMessage(row)}catch(_){}
@@ -40,7 +43,7 @@
   const key=ctx.token+'|'+ctx.viewer+'|'+ctx.scope;
   if(startedKey===key)return;
   startedKey=key;running=true;
-  job={viewer:ctx.viewer,startedAt:Date.now(),system:'',total:ctx.systems.length,
+  job={viewer:ctx.viewer,startedAt:Date.now(),system:'',total:ctx.systems.length,historyOnDemand:ctx.historyOnDemand,
    states:Object.fromEntries(ctx.systems.map(sys=>[sys,'waiting'])),monthCompleted:0,monthTotal:0,last:null};
   publish('starting','先檢查電腦已保存資料，只有缺少或需要重新核對的項目才讀取雲端。');
   const timer=window.setInterval?.(()=>{
@@ -56,7 +59,7 @@
     if(month){job.monthCompleted=Number(month.monthCompleted)||0;job.monthTotal=Number(month.monthTotal)||0;}
     const status={loading:'下載中',done:'下載完成',reused:'沿用本機資料',error:'未完成',skipped:'尚未下載',detail:'處理月份'};
     publish('downloading',(names[sys]||sys)+'｜'+(detail||status[state]||state)+(error?'｜'+String(error.message||error):''));
-   },{quickFirst:true,resumeExisting:true,systems:ctx.systems,startupGuard:()=>same(ctx)});
+   },{quickFirst:true,resumeExisting:true,historyOnDemand:true,systems:ctx.systems,startupGuard:()=>same(ctx)});
    if(!same(ctx))return;
    await api.flushFolder?.();
    if(!same(ctx))return;
@@ -68,7 +71,7 @@
    publish(failures.length||storageWarning?'partial':'complete',failures.length?
     '未完成：'+failures.map(x=>names[x.system]+' '+x.error).join('；')+'。原快取保留。':
     storageWarning?'瀏覽器快取已保存，電腦資料夾尚未確認，請重新授權。':
-    '有權限的資料已下載或沿用本機；歷史內容依月份讀取。');
+    '有權限的基本資料已下載或沿用本機。'+(ctx.historyOnDemand?'歷史資料不列入啟動下載，請在歷史中心選月份讀取。':''));
   }catch(error){
    if(same(ctx))publish('failed','背景下載未完成，保留已完成快取：'+String(error?.message||error));
   }finally{

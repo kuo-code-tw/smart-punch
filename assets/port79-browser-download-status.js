@@ -44,7 +44,9 @@
     (record.monthTotal?'　月份 '+record.monthCompleted+'/'+record.monthTotal:'')+
     (stalled?'｜請查看下載分頁':'');
   const systemText={waiting:'等待',loading:'下載中',done:'已下載',reused:'沿用本機',error:'失敗',skipped:'未下載'};
-  panel.querySelector('[data-p79-systems]').textContent=Object.entries(record.states||{}).map(([sys,state])=>(names[sys]||sys)+'：'+(systemText[state]||state)).join('　');
+  const statuses=Object.entries(record.states||{}).map(([sys,state])=>(names[sys]||sys)+'：'+(systemText[state]||state));
+  if(record.historyOnDemand===true)statuses.push('歷史資料：按月讀取（未預載）');
+  panel.querySelector('[data-p79-systems]').textContent=statuses.join('　');
   const month=panel.querySelector('[data-p79-month]');month.hidden=!record.monthTotal;
   panel.querySelector('[data-p79-month-count]').textContent='考勤月份 '+(record.monthCompleted||0)+'/'+(record.monthTotal||0);
   panel.querySelector('[data-p79-month-bar]').value=record.monthTotal?Math.min(1,(record.monthCompleted||0)/record.monthTotal):0;
