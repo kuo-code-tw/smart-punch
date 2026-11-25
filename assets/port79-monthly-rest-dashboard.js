@@ -285,10 +285,16 @@ function mount(el){
  #p79MonthlyRest .mr-ux-table button{padding:4px 5px!important;color:#2e588e!important;background:transparent!important;font-size:12px!important;font-weight:800}
  #p79MonthlyRest .mr-ux-table button:disabled{opacity:.35}
  #p79MonthlyRest #mrUxReviewSummary{max-height:200px;overflow:auto;grid-column:1/-1}
- #p79MonthlyRest .mr-ux-reasons h3{font-size:17px;margin:5px 2px 14px;color:#123359}
- #p79MonthlyRest .mr-ux-reason-help{grid-column:1/-1;margin:4px 2px 0;min-width:0}
- #p79MonthlyRest .mr-ux-reason-help>summary{display:list-item;width:fit-content;max-width:100%;box-sizing:border-box;cursor:pointer;font-size:12px;font-weight:700;color:#315986;background:#eaf3ff;border:1px solid #dce7f6;border-radius:7px;padding:5px 9px}
+ #p79MonthlyRest .mr-ux-reason-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;grid-column:1/-1;margin:5px 2px 8px}
+ #p79MonthlyRest .mr-ux-reasons h3{font-size:17px;margin:0;color:#123359}
+ #p79MonthlyRest .mr-ux-reason-help{position:relative;flex:0 0 auto}
+ #p79MonthlyRest .mr-ux-reason-help>summary{display:grid;place-items:center;list-style:none;width:26px;height:26px;box-sizing:border-box;cursor:help;font-size:17px;font-weight:700;line-height:1;color:#315986;background:#eaf3ff;border:1px solid #dce7f6;border-radius:50%;padding:0}
+ #p79MonthlyRest .mr-ux-reason-help>summary::-webkit-details-marker{display:none}
+ #p79MonthlyRest .mr-ux-reason-help>summary::marker{content:''}
  #p79MonthlyRest .mr-ux-reason-help>summary:focus-visible{outline:2px solid #315986;outline-offset:2px}
+ #p79MonthlyRest .mr-ux-reason-popup{position:absolute;z-index:30;right:0;top:100%;width:min(286px,calc(100vw - 76px));max-height:45vh;overflow:auto;box-sizing:border-box;padding:8px;background:white;border:1px solid #dce7f6;border-radius:12px;box-shadow:0 8px 24px #174f8533}
+ #p79MonthlyRest .mr-ux-reason-popup .mr-ux-reason{margin:4px 0;padding:8px}
+ @media(hover:none){#p79MonthlyRest .mr-ux-reason-help>summary{cursor:pointer;width:30px;height:30px}}
  #p79MonthlyRest .mr-ux-reason{padding:12px;border-radius:11px;background:#eaf3ff;margin:8px 0;line-height:1.55}
  #p79MonthlyRest .mr-ux-reason b{display:block;font-size:13px;color:#183b6c}
  #p79MonthlyRest .mr-ux-reason small{display:block;font-size:11px;color:#526e91}
@@ -339,13 +345,14 @@ function mount(el){
  </tr></thead><tbody id="mrUxRows"></tbody></table></div>
  <p id="mrUxListHint" style="font-size:11px;color:#617e9f;margin:9px 3px 0">所有數字均取自當月正式來源，尚未核實的預排不等於已申報。</p>
  </section>
- <aside class="mr-ux-card mr-ux-reasons"><h3>ⓘ 待核對原因</h3>
- <div id="mrUxReviewSummary" role="status" aria-live="polite" style="font-size:12px;color:#476587;line-height:1.55;margin:8px 2px">勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。</div>
- <details class="mr-ux-reason-help"><summary aria-label="展開或收合待核對原因說明">ⓘ 原因說明</summary>
+ <aside class="mr-ux-card mr-ux-reasons"><div class="mr-ux-reason-heading"><h3>待核對原因</h3>
+ <details class="mr-ux-reason-help" id="mrUxReasonHelp"><summary aria-label="待核對原因說明，滑鼠移入查看或點擊展開">ⓘ</summary>
+ <div class="mr-ux-reason-popup">
  <div class="mr-ux-reason"><b>▤ 時段衝突</b><small>建議時段與既有排班／打卡不一致時需重新核對。</small></div>
  <div class="mr-ux-reason"><b>▧ 缺少必要資料</b><small>班表、出勤或人員資料缺漏時不允許直接申報。</small></div>
  <div class="mr-ux-reason"><b>♙ 人員異動</b><small>到職、離職、職稱或權限變更時依正式資料重新確認。</small></div>
- </details>
+ </div></details></div>
+ <div id="mrUxReviewSummary" role="status" aria-live="polite" style="font-size:12px;color:#476587;line-height:1.55;margin:8px 2px">勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。</div>
  </aside></div>
  <footer id="mrUxFooter"><span id="mrUxSelected">已勾選 0 筆</span>
  <span id="mrUxHint" role="status" aria-live="polite"></span><button type="button" id="mrUxSavePlan" class="mr-ux-outline" disabled>▣ 儲存預排</button>
@@ -354,6 +361,12 @@ function mount(el){
  const actionFooter=$(shell,'#mrUxFooter');
  if(actionFooter)el.appendChild(actionFooter);
  const q=sel=>$(shell,sel)||$(actionFooter||el,sel);
+ // Mouse hover is temporary; native details retains touch and keyboard access.
+ const reasonHelp=q('#mrUxReasonHelp');
+ reasonHelp?.addEventListener?.('pointerenter',event=>{if(event.pointerType==='mouse')reasonHelp.open=true;});
+ reasonHelp?.addEventListener?.('pointerleave',event=>{if(event.pointerType==='mouse')reasonHelp.open=false;});
+ reasonHelp?.querySelector?.('summary')?.addEventListener?.('click',event=>{if(event.pointerType==='mouse'&&reasonHelp.open)event.preventDefault();});
+ reasonHelp?.addEventListener?.('keydown',event=>{if(event.key==='Escape'&&reasonHelp.open){event.preventDefault();event.stopPropagation();reasonHelp.open=false;}});
  const state={tab:'pending',name:'',status:'',hint:'',snapshot:null,rendering:false,disposed:false,reviewSelected:new Set(),submitting:false};
  function rows(){
   const data=sourceRows(el);
