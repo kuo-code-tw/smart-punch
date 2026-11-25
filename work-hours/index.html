@@ -13407,7 +13407,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                             else{state.error='編輯中，已延後套用更新';state.at=0;}
                             return;
                         }
-                        state.officialPayload=data;state.canDelete=data.overtimeLinkedDelete===true;state.revision=data.revision;state.loadedCloudRevision=lastAttendanceCloudRevision;state.rows=data.schedules||[];state.covers=data.leaveCoverAssignments||[];state.leaveRecords=data.leaveRecords||[];state.ready=true;state.pending=false;state.error='';state.at=Date.now();state.cachePreview=false;state.source='official-roster';
+                        state.officialPayload=data;state.canDelete=data.overtimeLinkedDelete===true;state.revision=data.revision;state.loadedCloudRevision=lastAttendanceCloudRevision;state.rows=data.schedules||[];state.covers=data.leaveCoverAssignments||[];state.leaveRecords=data.leaveRecords||[];state.ready=true;state.pending=false;state.error='';state.at=Date.now();state.cachePreview=false;state.previewInvalidated=false;state.source='official-roster';
                         if(typeof window!=='undefined'&&window.P79RestAttendance){state.attendanceEvidence={complete:false,days:{}};state.restEvidencePromise=p79EnsureWorkRestEvidence(month,state);}
                         p79OvertimeCalculationCache=null;
                         clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);
@@ -17839,7 +17839,9 @@ window.P79WorkhoursCacheContext={
   const visibleMonths=new Set(window.P79WorkhoursCache.monthsFor(window.P79WorkhoursCacheContext.month()));
   const incoming=snapshot.records.filter(r=>visibleMonths.has(attendanceRecordMonthKey(r))&&(ids.has(String(r.empId||'').toUpperCase())||!r.empId&&numbers.has(normalizeAttendanceStatsAttNo(r.attNo)))).map(normalizeAttendanceRecordIdentifiers).filter(r=>!isLocallyDeletedAttendanceRecord(r));
   records=mergeAttendanceRecordCollections(incoming,Array.isArray(records)?records:[]);
-  initDropdowns();p79OvertimeCalculationCache=null;renderOvertimeStats();return {ok:true,preview:true,recordCount:incoming.length};
+  initDropdowns();p79OvertimeCalculationCache=null;renderOvertimeStats();
+ try{window.dispatchEvent(new CustomEvent('p79-workhours-data-changed',{detail:{preview:true,source:'local-full'}}));}catch(_){}
+ return {ok:true,preview:true,recordCount:incoming.length};
  },
  applyRoster:(bundle,target=null)=>{
   if(!hasValidHomepageAdminSession()||!currentPort79SsoToken()||p79WorkhoursIsEditing())return;
@@ -17847,9 +17849,10 @@ window.P79WorkhoursCacheContext={
   const state=target||p79WorkOvertimeMonths.get(month)||{token,rows:[],covers:[],leaveRecords:[]};
   if(state.token!==token||target&&p79WorkOvertimeMonths.get(month)!==target)return;
   if(Array.isArray(roster.employees))employees=mergeCloudEmployees(roster.employees.map(normalizeEmployeeIdentifiers));
-  Object.assign(state,{token,at:Date.now(),ready:true,pending:true,cachePreview:true,source:bundle.source,rows:roster.schedules,covers:roster.leaveCoverAssignments||[],leaveRecords:roster.leaveRecords||[],canDelete:false,error:'',restEvidenceLoaded:false});
+  Object.assign(state,{token,at:Date.now(),ready:true,pending:true,cachePreview:true,previewInvalidated:false,source:bundle.source,rows:roster.schedules,covers:roster.leaveCoverAssignments||[],leaveRecords:roster.leaveRecords||[],canDelete:false,error:'',restEvidenceLoaded:false});
   p79WorkOvertimeMonths.set(month,state);p79OvertimeCalculationCache=null;initDropdowns();
   clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);
+  try{window.dispatchEvent(new CustomEvent('p79-workhours-data-changed',{detail:{month,preview:true,source:'roster'}}));}catch(_){}
  },
  applyBundle:(bundle,target=null)=>{
   if(!hasValidHomepageAdminSession()||!currentPort79SsoToken())return;
@@ -17874,7 +17877,7 @@ window.P79WorkhoursCacheContext={
    leaveRecords=Array.isArray(roster.leaveRecords)?roster.leaveRecords:leaveRecords;
    schedules=[...(Array.isArray(schedules)?schedules:[]).filter(r=>String(r.month)!==month),...roster.schedules];
   }
-  Object.assign(state,{token,at:Date.now(),ready:true,pending:bundle.preview===true,cachePreview:bundle.preview===true,source:bundle.source,revision:roster.revision,loadedCloudRevision:lastAttendanceCloudRevision,rows:roster.schedules,covers:roster.leaveCoverAssignments||[],leaveRecords:roster.leaveRecords||[],canDelete:!bundle.preview&&roster.overtimeLinkedDelete===true,error:'',restEvidenceError:'',restEvidencePending:false,restEvidenceLoaded:!bundle.preview,restEvidenceRevision:lastAttendanceCloudRevision});
+  Object.assign(state,{token,at:Date.now(),ready:true,pending:bundle.preview===true,cachePreview:bundle.preview===true,previewInvalidated:false,source:bundle.source,revision:roster.revision,loadedCloudRevision:lastAttendanceCloudRevision,rows:roster.schedules,covers:roster.leaveCoverAssignments||[],leaveRecords:roster.leaveRecords||[],canDelete:!bundle.preview&&roster.overtimeLinkedDelete===true,error:'',restEvidenceError:'',restEvidencePending:false,restEvidenceLoaded:!bundle.preview,restEvidenceRevision:lastAttendanceCloudRevision});
   p79WorkOvertimeMonths.set(month,state);
   state.attendanceEvidence=p79BuildWorkRestAttendance(month,roster,incoming,!bundle.preview).attendanceEvidence;
   state.appliedCacheBundle=bundle.version;
@@ -17887,8 +17890,10 @@ window.P79WorkhoursCacheContext={
     window.dispatchEvent(new CustomEvent('p79-workhours-data-changed',{detail:{month,preview:bundle.preview===true}}));
   }catch(_){};
  },
- invalidatePreview:month=>{const state=p79WorkOvertimeMonths.get(month);if(state){state.ready=false;state.rows=[];state.covers=[];state.leaveRecords=[];state.cachePreview=false;state.canDelete=false;state.appliedCacheBundle=null;}p79OvertimeCalculationCache=null;},
- failed:(month,error)=>{const state=p79WorkOvertimeMonths.get(month)||{token:currentPort79SsoToken(),rows:[]};state.at=Date.now();state.pending=false;state.error=String(error?.message||error);state.canDelete=false;p79WorkOvertimeMonths.set(month,state);renderOvertimeStats();}
+ invalidatePreview:month=>{const state=p79WorkOvertimeMonths.get(month);if(state){state.ready=false;state.rows=[];state.covers=[];state.leaveRecords=[];state.cachePreview=false;state.previewInvalidated=true;state.canDelete=false;state.appliedCacheBundle=null;}p79OvertimeCalculationCache=null;
+ try{window.dispatchEvent(new CustomEvent('p79-workhours-data-changed',{detail:{month,invalidated:true}}));}catch(_){}},
+ failed:(month,error)=>{const state=p79WorkOvertimeMonths.get(month)||{token:currentPort79SsoToken(),rows:[]};state.at=Date.now();state.pending=false;state.error=String(error?.message||error);state.canDelete=false;p79WorkOvertimeMonths.set(month,state);renderOvertimeStats();
+ try{window.dispatchEvent(new CustomEvent('p79-workhours-data-changed',{detail:{month,preview:true,error:true}}));}catch(_){} }
 };
 window.p79ApplyAttendanceFullCache=async function(snapshot,options={}){
  const result=window.P79WorkhoursCacheContext.applyFull(snapshot);
@@ -18232,7 +18237,7 @@ window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
 <script src="../assets/port79-management-workspace.js?v=20261115-shared-user-activity-v3&sidebar=20261118-overtime-label-v1"></script>
 <!-- User-approved work-hours dashboard: private to this page; original controller stays intact. -->
 <link rel="stylesheet" href="../assets/port79-workhours-reference-dashboard.css?v=20261123-reference-home-tabs-v3">
-<script defer src="../assets/port79-workhours-reference-dashboard.js?v=20261123-reference-home-tabs-v3&reuse=20261117-local-first-v3&refresh=20261118-stable-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1&query=20261125-official-retry-v1"></script>
+<script defer src="../assets/port79-workhours-reference-dashboard.js?v=20261123-reference-home-tabs-v3&reuse=20261117-local-first-v3&refresh=20261118-stable-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1&query=20261125-official-retry-v1&overviewLocal=20261125-v1"></script>
 <script>window.Port79OrgContext.configure({system:'workhours',container:()=>document.getElementById('viewAdmin'),people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
 <script>window.p79WorkhoursRosterForVisibility=()=>typeof employees==='undefined'||!Array.isArray(employees)?[]:employees;</script>
 <!-- PORT79 approved overtime workspace: visual-only tabs; original records and handlers retained. -->
