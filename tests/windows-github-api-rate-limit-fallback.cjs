@@ -40,6 +40,12 @@ assert.match(windowsUpdater,/verified-release-updater\.exe/);
 assert.match(releaseWorkflow,/PORT79_RELEASE_DIGEST="\$\(sha256sum dist\/Port79-Windows-Lite\.zip/);
 assert.match(releaseWorkflow,/dist\/port79-windows-update\.json -R "\$REPO"/);
 assert.match(homepage,/RELEASE_TTL_MS=2\*60\*60\*1000/);
-assert.match(homepage,/read\(LOCAL\),read\(WEB\),readRelease\(\)/);
+// Native version checks still consult the official release cache; a browser
+// only checks the website and shares the same manifest request when possible.
+assert.match(homepage,/const localRead=read\(LOCAL\)/);
+assert.match(homepage,/samePublishedManifest\(\)\?localRead:read\(WEB\)/);
+assert.match(homepage,/native\?readRelease\(\):Promise\.resolve\(null\)/);
+// Exercise the actual browser behavior, not the removed three-request syntax.
+require('node:child_process').execFileSync(process.execPath,['tests/home-web-update-fallback.cjs'],{stdio:'inherit'});
 assert.match(homepage,/RELEASE_ERROR_TTL_MS/);
 console.log('PASS API-limit-safe Windows and site update metadata, hash checks, privacy allowlist and release caching');
