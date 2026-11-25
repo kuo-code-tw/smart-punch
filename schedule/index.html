@@ -33,7 +33,7 @@
 <script src="../assets/port79-monthly-rest-overtime.js?v=20261123-true-simple-official-v2&fullRoster=20261124-v21&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1&noWork=20261106&result=20261125-confirmed-popup-v1"></script>
 <script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
 <script src="../assets/port79-schedule-rest-evidence.js?v=20261109-month-to-date-no-card-v1"></script>
-<script src="../assets/port79-schedule-transfer-roles.js?v=20261112-title-visibility-v1"></script>
+<script src="../assets/port79-schedule-transfer-roles.js?v=20261125-export-overtime-option-v1"></script>
 <script id="p79-default-light-v20261001">
 (function(){
   try{
@@ -8749,6 +8749,28 @@ async function p79SaveScheduleOvertimeDraft(draft){
     function p79ScheduleExportDay(emp,dayStr,context=null) {
       return p79ScheduleDisplayDay(emp,dayStr,context).visibleCode;
     }
+    // Export-only presentation: keep attendance and stored reports untouched.
+    function p79ScheduleExportCellCode(selected,showOvertime=true){
+      const visible=String(selected?.visibleCode||'').trim();
+      if(showOvertime||!visible)return visible;
+      const timeCode=/^[代休國例延颱選]?\d{1,2}(?::\d{2})?-\d{1,2}(?::\d{2})?$/;
+      const parts=value=>String(value||'').split(/[＋+]/).map(x=>x.trim()).filter(Boolean);
+      const labels=parts(visible);
+      if(!labels.some(x=>timeCode.test(x)))return visible;
+      const base=labels.filter(x=>!timeCode.test(x));
+      if(base.length)return base.join('＋');
+      const shown=parts(selected.shownShift).filter(x=>!timeCode.test(x)).join('＋');
+      if(selected.ownApprovedLeave||selected.specialNoPunch||selected.punchPending)return shown||selected.approvedLeaveCode||selected.specialNoPunch||'打卡待核';
+      const roster=String(selected.rosterShift||'').trim();
+      // Rest-day overtime must not turn the regular rest roster into a work shift.
+      const rest=/^[休例國颱選](?=\d)/.exec(labels[0])?.[0]||'';
+      if(rest&&/^[休例國颱選]$/.test(roster))return /^[休例國颱選]$/.test(shown)?shown:roster;
+      if(shown&&shown!=='已出勤'&&shown!=='待排班')return shown;
+      if(rest)return rest;
+      if(shown)return shown;
+      if(roster&&!timeCode.test(roster)&&!parts(roster).some(x=>timeCode.test(x)))return roster;
+      return '待排班'; // no regular shift available; never invent one from overtime hours
+    }
     function p79ScheduleOvertimeExportRows_(staff,month){
       const detail=[],totals=new Map(),seen=new Set();
       const attendanceSnapshot={attendanceEvidence:typeof p79ScheduleRestClient==='function'?p79ScheduleRestClient().status(month).evidence:{complete:false}};
@@ -8804,8 +8826,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const [year, month] = yearMonth.split('-').map(Number);
       const totalDays = getDaysInMonth(year, month);
 
-      const selectedRoles=await window.P79ScheduleTransferRoles.select({employees,mode:'export',month:yearMonth,priority:getRolePriority});
-      if(!selectedRoles)return;
+      const selection=await window.P79ScheduleTransferRoles.select({employees,mode:'export',month:yearMonth,priority:getRolePriority,includeOvertimeOption:true});
+      if(!selection)return;
+      const selectedRoles=Array.isArray(selection)?selection:selection.roles;
+      const showOvertime=Array.isArray(selection)||selection.showOvertime!==false;
       if(document.getElementById('month-picker').value!==yearMonth)return alert('月份已變更，請重新選擇匯出職稱');
       const selectedEmployees=window.P79ScheduleTransferRoles.filter(employees,selectedRoles);
       if(!selectedEmployees.length)return alert('已勾選的職稱目前沒有人員');
@@ -8858,7 +8882,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         for (let d = 1; d <= totalDays; d++) {
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
           const selected=p79ScheduleDisplayDay(emp,dayStr,displayContext);
-          row[String(d)]=selected.visibleCode;
+          row[String(d)]=p79ScheduleExportCellCode(selected,showOvertime);
           const typhoonMarked=(displayContext.typhoonDays.has(dayStr)&&dayStr<=displayContext.typhoonToday)||
             selected.rosterShift==='颱'||selected.approvedLeaveCode==='颱';
           const typhoonWorked=selected.eligible&&p79ScheduleTyphoonHasWork(emp.id,dayStr,
@@ -8870,7 +8894,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           // while keeping the editable shift value identical to the UI select.
           if(eligibleEvent&&selected.shownShift!=='颱')exportTyphoonNotes.push({
             row:exportRows.length+1,col:5+d-1,date:dayStr,
-            text:'颱日：原班別仍為 '+selected.visibleCode+'；同日只算一筆'
+            text:'颱日：原班別仍為 '+row[String(d)]+'；同日只算一筆'
           });
         }
 
@@ -8907,6 +8931,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(overtime.totals.length?overtime.totals:[{'說明':'此月份尚無可核對的個人加班小計'}]),'個人加班小計');
       const notes=[
         ['月份',yearMonth],
+        ['班表時段顯示',showOvertime?'完整時段':'正常班別（加班資料保留於明細）'],
         ['班表來源',fromProvisional?'10/28 歷史備援，非月底正式定稿':'系統正式月份查詢'],
         ['加班來源','當月排班 __meta 申報；已取消的申報不重複計入'],
         ['核對時數規則','僅已核對出勤、換算時數有效且未取消且未經正式整班無卡核實的申報納入小計'],
