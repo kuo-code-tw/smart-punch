@@ -284,15 +284,15 @@ function mount(el){
  #p79MonthlyRest .mr-ux-reason{padding:12px;border-radius:11px;background:#eaf3ff;margin:8px 0;line-height:1.55}
  #p79MonthlyRest .mr-ux-reason b{display:block;font-size:13px;color:#183b6c}
  #p79MonthlyRest .mr-ux-reason small{display:block;font-size:11px;color:#526e91}
- #p79MonthlyRest #mrUxFooter{position:static!important;flex:0 0 auto!important;z-index:auto;border-radius:0;background:#e0edfe!important;padding:8px 12px!important;display:flex!important;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid #c7ddf8}
- #p79MonthlyRest #mrUxFooter .mr-ux-spacer{flex:1}
- #p79MonthlyRest #mrUxFooter button{min-height:42px;min-width:118px;font-size:15px;font-weight:800}
+ #p79MonthlyRest #mrUxFooter{position:static!important;flex:0 0 auto!important;z-index:auto;border-radius:0;background:#e0edfe!important;padding:8px 12px!important;display:flex!important;gap:8px;align-items:center;flex-wrap:nowrap;border-top:1px solid #c7ddf8}
+ #p79MonthlyRest #mrUxSelected{flex:0 0 auto;white-space:nowrap}
+ #p79MonthlyRest #mrUxFooter button{min-height:42px;min-width:118px;font-size:15px;font-weight:800;flex:0 0 auto;white-space:nowrap}
  #p79MonthlyRest #mrUxFooter button:disabled{opacity:.45;cursor:not-allowed}
- #p79MonthlyRest #mrUxHint{color:#334155;font-size:12px;white-space:normal;min-width:0;max-width:100%;flex:1 1 100%}
+ #p79MonthlyRest #mrUxHint{color:#334155;font-size:12px;white-space:nowrap;min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis}
  #p79MonthlyRest #mrUxProgress{max-height:100px;overflow:auto;overscroll-behavior:contain}
  #p79MonthlyRest .mr-ux-eligibility{display:block;white-space:normal;max-width:210px;font-size:11px;line-height:1.3;color:#92400e;margin-top:3px}
  @media(max-width:1100px){#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}#p79MonthlyRest .mr-ux-reasons h3{grid-column:1/-1}#p79MonthlyRest .mr-ux-reason{margin:0}}
- @media(max-width:750px){#p79MonthlyRest #mrUxRoot{padding:10px;gap:10px}#p79MonthlyRest .mr-ux-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#p79MonthlyRest .mr-ux-stat{padding:9px;min-height:76px}#p79MonthlyRest .mr-ux-stat strong{font-size:22px}#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:block}#p79MonthlyRest .mr-ux-tools>label{flex:1 1 40%}#p79MonthlyRest .mr-ux-tools input,#p79MonthlyRest .mr-ux-tools select{min-width:0;max-width:100%}#p79MonthlyRest .mr-ux-tools .mr-ux-spacer{display:none}#p79MonthlyRest #mrUxFooter{bottom:0}}
+ @media(max-width:750px){#p79MonthlyRest #mrUxRoot{padding:10px;gap:10px}#p79MonthlyRest .mr-ux-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#p79MonthlyRest .mr-ux-stat{padding:9px;min-height:76px}#p79MonthlyRest .mr-ux-stat strong{font-size:22px}#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:block}#p79MonthlyRest .mr-ux-tools>label{flex:1 1 40%}#p79MonthlyRest .mr-ux-tools input,#p79MonthlyRest .mr-ux-tools select{min-width:0;max-width:100%}#p79MonthlyRest .mr-ux-tools .mr-ux-spacer{display:none}#p79MonthlyRest #mrUxFooter{flex-wrap:wrap}#p79MonthlyRest #mrUxHint{white-space:normal;overflow:visible;flex:1 1 140px}}
  `;
  el.appendChild(style);
  const subtitle=document.createElement('div');subtitle.id='mrUxSubtitle';subtitle.textContent='自動編排、快速核對、正式申報一頁完成';
@@ -337,7 +337,7 @@ function mount(el){
  <div class="mr-ux-reason"><b>▧ 缺少必要資料</b><small>班表、出勤或人員資料缺漏時不允許直接申報。</small></div>
  <div class="mr-ux-reason"><b>♙ 人員異動</b><small>到職、離職、職稱或權限變更時依正式資料重新確認。</small></div>
  </aside></div>
- <footer id="mrUxFooter"><span id="mrUxSelected">已勾選 0 筆</span><span class="mr-ux-spacer"></span>
+ <footer id="mrUxFooter"><span id="mrUxSelected">已勾選 0 筆</span>
  <span id="mrUxHint" role="status" aria-live="polite"></span><button type="button" id="mrUxSavePlan" class="mr-ux-outline" disabled>▣ 儲存預排</button>
  <button type="button" id="mrUxSubmit" class="mr-ux-primary" disabled>➤ 正式申報</button></footer>`;
  body.prepend(shell);
