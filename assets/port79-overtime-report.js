@@ -2194,13 +2194,28 @@
        // posting on a redundant network read with another timeout.
        // Retry only an authoritative, no-write edit-lock refusal. Never
        // replay a timeout or unknown POST result; preserve the original ID.
-       let result;
+       let result,confirmedIndependent=false;
        for(let attempt=0;attempt<5;attempt++){
         try{
          result=await awaitOvertimeSaveConfirmation(global.p79OvertimeContext.saveReport(draft));
          break;
         }catch(error){
          const message=String(error?.message||'');
+         if(!confirmedIndependent&&draft.plannedReview===true&&draft.rule.category==='延'&&draft.leaveHandoffId&&draft.forEmpId&&
+            draft.coverDate===draft.date&&draft.overtimeDate===draft.date&&
+            validation.cloud?.capabilities?.adjustedOvertimeReviewV1===true&&
+            message==='調班後實際加班時段不屬於原請假班別，請改為本人加班核對'){
+          if(!el.isConnected||selectionKey()!==selection)throw Error('原申報內容已變更，未送出。');
+          if(!global.confirm('所選實際加班時段不屬於原請假代班時段。是否沿用原報單改為本人加班？原請假安排及稽核紀錄保留。'))throw error;
+          confirmedIndependent=true;
+          draft.adjustedIndependentReview=true;
+          draft.sourceLeaveHandoffId=draft.leaveHandoffId;
+          draft.sourceForEmpId=draft.forEmpId;
+          draft.leaveHandoffId='';draft.forEmpId='';draft.forName='';
+          sessionStorage.setItem(KEY,JSON.stringify(draft));
+          if(attempt===4)throw Error('已保留本人加班選擇，請重新讀取原申報核對。');
+          continue;
+         }
          const rosterRefused=message==='班表正在編輯，請待儲存完成後再申報';
          const serverRefused=error?.retryable===true&&error?.rejectedBeforeWrite===true;
          // Only an explicit rejection BEFORE writing is safe to resend.
@@ -2229,7 +2244,7 @@
        // asynchronous cloud reconciliation. Otherwise it can race the queue
        // mutation and re-open the first worker instead of the second.
        let progress=null;
-       if(prefill.leaveHandoffId&&prefill.editPlannedOnly!==true){
+       if(prefill.leaveHandoffId&&prefill.editPlannedOnly!==true&&draft.adjustedIndependentReview!==true){
         try{progress=advanceLeaveHandoff(draft,prefill);}
         catch(error){console.warn('加班已儲存，但代班佇列更新失敗；保留待核對清單',error);}
        }
