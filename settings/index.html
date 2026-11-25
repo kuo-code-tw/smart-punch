@@ -69,6 +69,7 @@ html[data-theme="dark"] .main-nav a.active,html[data-theme="dark"] .main-nav a:h
 html[data-theme="dark"] .harbor-image{opacity:.13}
 @media(max-width:1020px){.sidebar{width:208px;flex-basis:208px}.brand{padding:10px 9px}.main-nav{padding:10px 7px}.main-nav a{gap:10px;padding:9px 9px}}
 @media(max-width:740px){.sidebar{width:65px;flex-basis:65px}.brand{padding:10px}.brand-text{display:none}.port-logo{width:42px}.main-nav{padding:10px 5px}.main-nav a{font-size:0;justify-content:center;gap:0}.main-nav .sym{font-size:22px}.harbor-footer{height:70px}}
+.settings-scope{font-size:12px;color:#526784;margin:0 0 14px}.panel h3{display:flex;align-items:center;justify-content:space-between;gap:8px}.panel h3 small{font-size:11px;font-weight:650;color:inherit;opacity:.75}.checkrow{display:flex;align-items:flex-start;gap:12px;padding:16px 14px;border-top:1px solid #e7eef6;cursor:pointer}.checkrow input{width:19px;height:19px;margin:1px 0 0;flex:none;accent-color:#0967e5}.checkrow strong,.checkrow small{display:block}.checkrow strong{font-size:14px}.checkrow small{font-size:12px;color:#526784;margin-top:5px;line-height:1.5}.checkrow:hover{background:#f4f8fe}.idle-field input{width:80px;padding:8px;border:1px solid #c8d5e6;border-radius:7px;text-align:center;color:inherit;background:transparent}.idle-presets{display:flex;gap:6px;flex-wrap:wrap;padding:3px 14px 12px}.idle-presets button[aria-pressed=true]{background:#0967e5;color:white;border-color:#0967e5}.utility-line{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:10px;border-top:1px solid #e0e8f1}.utility-line span{margin-right:auto;font-size:12px;color:#526784}.bar{position:sticky;bottom:0;background:inherit;padding:10px 0;border-top:1px solid #dce5f0}.bar .primary{min-width:120px;font-size:14px}html[data-theme=dark] .checkrow{border-color:#385272}html[data-theme=dark] .checkrow:hover{background:#263d58}html[data-theme=dark] .checkrow small,html[data-theme=dark] .settings-scope,html[data-theme=dark] .utility-line span{color:#c2d1e5}
 </style>
 </head>
 <body>
@@ -88,28 +89,25 @@ html[data-theme="dark"] .harbor-image{opacity:.13}
 <div class="view"><header class="topbar"><h1>☰　系統設置</h1><div class="operator" id="operator">驗證管理員身分中…</div></header>
 <main class="page"><div class="layout"><nav class="subnav" aria-label="系統設定分類">
 <h2>⚙ 系統設置中心</h2>
-<a href="#basic">⚙　基本系統設定</a><a href="#org">▣　公司／單位／組別</a><a href="#roles">♙　角色與權限設定</a>
-<a href="#attendance">▦　考勤與排班規則</a><a href="#leave">▤　請假規則設定</a><a href="#shift">◷　班別與工時設定</a>
-<a href="#reports">▥　統計與報表設定</a><a href="#vessel">⚓　船舶與 Bundle</a><a href="#cloud">☁　雲端同步與處理</a>
-<a href="#desktopDownload">⬇　電腦版下載權限</a><a href="#notice">♧　通知與提醒設定</a><a href="#maintenance">▤　資料維護與備份</a><a href="#logs">▧　系統日誌</a>
+<a href="#basic">⚙　基本設定</a><a href="#security">🔒　登入與安全</a><a href="#notice">♧　通知與公告</a><a href="#desktopDownload">⬇　電腦版下載權限</a>
 </nav><div class="content">
 <div class="intro"><h2>⚙ 系統設置</h2><button id="restore" type="button">↻ 恢復預設</button></div>
-<div class="tip"><strong>這裡只提供已接上真實功能的操作。</strong> 原系統的考勤計算、核准及排班規則不得只靠畫面開關更改；尚未完成後端支援的項目，直接進入原本可用的設定功能，不提供假按鈕。全域公告儲存後會重新讀回雲端確認。</div>
+<div class="settings-scope">本機外觀立即生效；全系統設定請按下方「儲存設定」。</div>
 <div class="grid">
-<section class="panel" id="basic"><h3>⚙ 基本系統設定</h3><div class="field"><label for="yearMode">年份顯示</label><select id="yearMode"><option value="gregorian">西元年</option><option value="roc">民國年</option></select></div><div class="field"><label for="themeMode">畫面主題</label><select id="themeMode"><option value="light">亮色模式</option><option value="dark">暗色模式</option></select></div><div class="note">年份與主題會立即寫入本瀏覽器原系統使用的設定鍵，重新整理仍保留。</div></section>
-<section class="panel" id="attendance"><h3>▦ 考勤與排班規則</h3><p>正式考勤、休假日出勤、打卡待核與班表異動，目前依既有正式驗證及防誤改規則處理，不提供無法生效的假開關。</p><div class="field"><strong>既有考勤校驗</strong><span class="tag">保持原規則</span></div><div class="inline-actions"><a class="btn" data-route="schedule" href="../schedule/">查看正式排班與考勤狀態</a></div></section>
-<section class="panel" id="org"><h3>▣ 公司／單位／組別設定</h3><p>維護人資唯一主檔的總公司、事業部、單位、職稱；沿用原本具有雲端讀回核對的操作。</p><div class="inline-actions"><a class="btn" data-route="hr" href="../hr/">開啟正式組織設定</a></div></section>
-<section class="panel" id="roles"><h3>♙ 角色與權限設定</h3><p>超級管理員與一般管理員的系統權限、資料範圍、員工權限皆由原人資主檔管理，不另建兩套權限表。</p><div class="inline-actions"><a class="btn" data-route="hr" href="../hr/">開啟正式權限管理</a></div></section>
-<section class="panel" id="leave"><h3>▤ 請假規則</h3><p>請假類型、申請、審核與代班作業保留原系統實際驗證與儲存流程。</p><div class="inline-actions"><a class="btn" data-route="leave" href="../leave/">開啟正式請假管理</a></div></section>
-<section class="panel" id="shift"><h3>◷ 班別與工時</h3><p>班別配置、排班、加班與工時計算依正式資料，不擅自更改現有薪資計算倍率。</p><div class="inline-actions"><a class="btn" data-route="schedule" href="../schedule/">管理排班</a><a class="btn" data-route="workhours" href="../work-hours/">管理工時及加班</a></div></section>
-<section class="panel" id="reports"><h3>▥ 統計與報表</h3><p>出勤天數、加班時數、船舶效率等統計維持原來源與權限。</p><div class="inline-actions"><a class="btn" data-route="workhours" href="../work-hours/">開啟工時報表</a><a class="btn" data-route="efficiency" href="../aqc-efficiency/">開啟船舶效率報表</a></div></section>
-<section class="panel" id="vessel"><h3>⚓ 船舶與 Bundle 設定</h3><p>船舶主檔、航次、船舶效率與 Bundle 的正式資料處理仍由原管理模組執行。</p><div class="inline-actions"><a class="btn" data-route="efficiency" href="../aqc-efficiency/">開啟船舶管理</a></div></section>
-<section class="panel" id="cloud"><h3>☁ 雲端同步與處理</h3><p>顯示實際雲端檢查結果，不以本機快取冒充雲端正常。</p><div class="inline-actions"><button type="button" id="cloudPing">測試雲端連線</button><button type="button" id="reloadCloud">重新讀取雲端設定</button></div><div class="note" id="cloudState" aria-live="polite">尚未測試連線</div></section>
-<section class="panel" id="notice"><h3>♧ 系統通知與全域公告</h3><div class="field"><label for="noticeEnabled">首頁公告</label><label class="switch"><input type="checkbox" id="noticeEnabled"> 啟用</label></div><div class="field col"><label for="noticeText">公告內容（最多 180 字，顯示在管理員首頁）</label><textarea id="noticeText" maxlength="180" placeholder="輸入需要通知所有管理員的公告；不會發送電子郵件或簡訊"></textarea></div><div class="note">全域公告經雲端正式儲存後，各管理員重新進入首頁即可看見；本設定不偽稱有 Email 或簡訊發送功能。</div></section>
-<section class="panel" id="desktopDownload"><h3>⬇ 電腦版下載權限</h3><div class="field"><label for="desktopDownloadEnabled">首頁電腦版下載</label><label class="switch"><input type="checkbox" id="desktopDownloadEnabled"> 開放下載</label></div><div class="note">預設關閉，首頁不顯示下載入口。僅經雲端驗證的超級管理員可以變更。按下「儲存設定」並完成雲端讀回後，其他裝置也會使用新設定。本開關只控制首頁入口；GitHub 公開發布檔的直接網址不受此開關限制。</div></section>
-<section class="panel" id="maintenance"><h3>▤ 資料維護與備份</h3><p>沿用原系統「全部系統備份」流程及伺服器收據核對，不新增會誤刪正式資料的清理按鈕。</p><div class="inline-actions"><a class="btn" data-route="home" href="../?openBackup=1">開啟正式備份管理</a></div></section>
-<section class="panel wide" id="logs"><h3>▧ 系統日誌</h3><p>人員及權限異動稽核沿用人資系統的正式稽核；歷史考勤與排班檔案沿用既有歷史資料庫，不在此建立假紀錄。</p><div class="inline-actions"><a class="btn" data-route="hr" href="../hr/">查閱人資系統稽核紀錄</a><a class="btn" data-route="history" href="../history-data/">查閱歷史資料</a></div></section>
+<section class="panel" id="basic"><h3>⚙ 基本設定 <small>本機</small></h3>
+<label class="checkrow"><input type="checkbox" id="yearMode"><span><strong>使用民國年</strong><small>未勾選使用西元年</small></span></label>
+<label class="checkrow"><input type="checkbox" id="themeMode"><span><strong>使用暗色模式</strong><small>未勾選使用亮色模式</small></span></label></section>
+<section class="panel" id="security"><h3>🔒 登入與安全 <small>全系統</small></h3>
+<div class="field idle-field"><label for="idleMinutes">網頁版閒置自動登出</label><div><input id="idleMinutes" type="number" min="1" max="120" step="1" inputmode="numeric" value="5" aria-describedby="idleHint"> 分鐘</div></div>
+<div class="idle-presets" aria-label="常用閒置時間"><button type="button" data-idle-minutes="5" aria-pressed="false">5 分</button><button type="button" data-idle-minutes="10" aria-pressed="false">10 分</button><button type="button" data-idle-minutes="15" aria-pressed="false">15 分</button><button type="button" data-idle-minutes="20" aria-pressed="false">20 分</button><button type="button" data-idle-minutes="30" aria-pressed="false">30 分</button><button type="button" data-idle-minutes="60" aria-pressed="false">60 分</button><button type="button" data-idle-minutes="120" aria-pressed="false">120 分</button></div>
+<div class="note" id="idleHint">適用全部公司、單位、組別及人員的網頁版。Windows 電腦版不受閒置時間限制。</div></section>
+<section class="panel" id="notice"><h3>♧ 通知與公告 <small>全系統</small></h3>
+<label class="checkrow"><input type="checkbox" id="noticeEnabled"><span><strong>顯示首頁公告</strong><small>所有管理員重新進入首頁時顯示</small></span></label>
+<div class="field col"><label for="noticeText">公告內容</label><textarea id="noticeText" maxlength="180" placeholder="最多 180 字"></textarea></div></section>
+<section class="panel" id="desktopDownload"><h3>⬇ 電腦版下載權限 <small>全系統</small></h3>
+<label class="checkrow"><input type="checkbox" id="desktopDownloadEnabled"><span><strong>開放首頁電腦版下載</strong><small>未勾選隱藏入口；不限制公開檔案的直接網址</small></span></label></section>
 </div>
+<div class="utility-line"><span id="cloudState" aria-live="polite">尚未測試連線</span><button type="button" id="cloudPing">測試雲端連線</button><button type="button" id="reloadCloud">重新讀取設定</button></div>
 <div class="bar"><div id="status" role="status" aria-live="polite">正在讀取雲端系統設定…</div><button type="button" id="save" class="primary">▣ 儲存設定</button></div>
 </div></div></main></div></div>
 <script>
@@ -117,7 +115,12 @@ html[data-theme="dark"] .harbor-image{opacity:.13}
 'use strict';
 var DEFAULT_GAS='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 var KEY='p79SystemSettingsV1',D=document,q=function(id){return D.getElementById(id)},busy=false,auth=null,cloud=null,previous=null,token='',verifiedSuperadmin=false;
+var IDLE_FIELD='p79_hr_idle_logout_minutes_v1',IDLE_CACHE='port79_idle_logout_config_v1',DEFAULT_IDLE=5;
 var defaults={notice:{enabled:false,text:''},windowsDownload:{enabled:false}};
+function idleNumber(value){if(value===null||value===undefined||String(value).trim()==='')return null;var n=Number(value&&typeof value==='object'?value.minutes:value);return Number.isInteger(n)&&n>=1&&n<=120?n:null;}
+function idleFromConfig(config){var raw=config[IDLE_FIELD];if(raw===undefined)return DEFAULT_IDLE;var n=idleNumber(raw);if(n===null)throw Error('雲端自動登出設定格式不正確，未覆寫');return n;}
+function paintIdle(){D.querySelectorAll('[data-idle-minutes]').forEach(function(b){b.setAttribute('aria-pressed',String(Number(b.dataset.idleMinutes)===idleNumber(q('idleMinutes').value)));});}
+function rememberIdle(n){localStorage.setItem(IDLE_CACHE,JSON.stringify({minutes:n,updatedAt:Date.now()}));try{window.dispatchEvent(new StorageEvent('storage',{key:IDLE_CACHE}));}catch(_){window.Port79IdleLogout?.sync?.();}}
 function status(text,kind){q('status').textContent=text;q('status').dataset.kind=kind||'';}
 function url(){var value=String(sessionStorage.getItem('port79_gas_url')||DEFAULT_GAS).trim();return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(value)?value:DEFAULT_GAS;}
 function getToken(){var hash=new URLSearchParams(location.hash.replace(/^#/,''));var t=hash.get('port79sso');if(t)sessionStorage.setItem('port79_admin_token',t);return String(t||sessionStorage.getItem('port79_admin_token')||sessionStorage.getItem('port79_gc_superadmin_token')||sessionStorage.getItem('port79_gc_token')||'').trim();}
@@ -131,29 +134,29 @@ function apply(v){var x=normalized(v);q('noticeEnabled').checked=x.notice.enable
 function readDraft(){return normalized({notice:{enabled:q('noticeEnabled').checked,text:q('noticeText').value.trim()},windowsDownload:{enabled:q('desktopDownloadEnabled').checked}});}
 function saveLocal(key,value){localStorage.setItem(key,value);window.dispatchEvent(new Event('storage'));}
 function setLocalAppearance(){
- q('yearMode').value=localStorage.getItem('port79_year_mode')==='roc'?'roc':'gregorian';
- q('themeMode').value=localStorage.getItem('port79_theme')==='dark'?'dark':'light';
- D.documentElement.setAttribute('data-theme',q('themeMode').value);
+ q('yearMode').checked=localStorage.getItem('port79_year_mode')==='roc';
+ q('themeMode').checked=localStorage.getItem('port79_theme')==='dark';
+ D.documentElement.setAttribute('data-theme',q('themeMode').checked?'dark':'light');
 }
 async function reload(){if(busy||!verifiedSuperadmin)return;busy=true;q('reloadCloud').disabled=true;try{
  var d=await cloudGet('hrGetOrgOptions');if(!d.config||typeof d.config!=='object')throw Error('雲端設定資料不完整');
- cloud=d.config;apply(safeSettings(cloud));status('✅ 已從雲端讀取正式設定','ok');
+ var idle=idleFromConfig(d.config);cloud=d.config;apply(safeSettings(cloud));q('idleMinutes').value=String(idle);paintIdle();rememberIdle(idle);status('✅ 已從雲端讀取正式設定','ok');
 }catch(e){setError(e);}finally{busy=false;q('reloadCloud').disabled=false;}}
-async function save(){if(!verifiedSuperadmin){status('沒有通過超級管理員雲端驗證，禁止寫入','error');return false;}if(busy)return false;var draft=readDraft();if(draft.notice.enabled&&!draft.notice.text){status('請先輸入要公告的內容','error');q('noticeText').focus();return false;}
+async function save(){if(!verifiedSuperadmin){status('沒有通過超級管理員雲端驗證，禁止寫入','error');return false;}if(busy)return false;if(!cloud){status('請先重新讀取正式雲端設定','error');return false;}var idle=idleNumber(q('idleMinutes').value);if(idle===null){status('自動登出時間必須為 1～120 分鐘整數','error');q('idleMinutes').focus();return false;}var draft=readDraft();if(draft.notice.enabled&&!draft.notice.text){status('請先輸入要公告的內容','error');q('noticeText').focus();return false;}
 busy=true;q('save').disabled=true;q('restore').disabled=true;status('正在讀取最新雲端設定並保存…');
 try{
  // Revalidate current cloud identity before every write, including restoring defaults.
  var meta=await cloudGet('getSessionMeta');
  var roleNow=String(meta.adminRole||meta.actualAdminRole||meta.role||meta.session&&meta.session.adminRole||'').toLowerCase();
- if(roleNow!=='superadmin')throw Error('超級管理員身分已失效，禁止變更電腦版下載權限');
+ if(roleNow!=='superadmin')throw Error('超級管理員身分已失效，禁止變更全系統設定');
  var latest=await cloudGet('hrGetOrgOptions');if(!latest.config||typeof latest.config!=='object')throw Error('無法確認雲端原始設定，已取消儲存');
- var config=Object.assign({},latest.config);config[KEY]=draft;
+ var config=Object.assign({},latest.config);config[KEY]=Object.assign({},safeSettings(config),draft);config[IDLE_FIELD]=idle;
  if(new TextEncoder().encode(JSON.stringify(config)).length>8800)throw Error('雲端原有設定容量不足，未覆寫正式資料');
  var reply=await cloudPost({action:'saveConfig',config:config});
  var check=await cloudGet('hrGetOrgOptions');if(!check.config||typeof check.config!=='object')throw Error('寫入請求已發送，但無法讀回確認；請勿重複送出，先重新載入雲端設定');
  var actual=normalized(safeSettings(check.config));
- if(JSON.stringify(actual)!==JSON.stringify(draft))throw Error('雲端讀回與本次設定不一致；請重新載入後核對');
- cloud=check.config;previous=actual;status('✅ 全域公告及電腦版下載開關已儲存到正式雲端，並讀回確認。','ok');
+ if(JSON.stringify(actual)!==JSON.stringify(draft)||idleFromConfig(check.config)!==idle)throw Error('雲端讀回與本次設定不一致；請重新載入後核對');
+ cloud=check.config;previous=actual;rememberIdle(idle);status('✅ 全系統設定已儲存到正式雲端，並讀回確認。','ok');
  localStorage.setItem('p79_settings_notice_cache_v1',JSON.stringify({at:Date.now(),notice:actual.notice}));
  return true;
 }catch(e){setError(e);return false;}finally{busy=false;q('save').disabled=false;q('restore').disabled=false;}}
@@ -167,14 +170,15 @@ function authorizeLinks(){var t=encodeURIComponent(token),g=encodeURIComponent(u
  if(route==='home')return;var root=href.split('#')[0];a.href=root+'#port79sso='+t+'&gasurl='+g;});}
 function readSessionRole(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||'null');}catch(e){return null;}}
 async function init(){
- setLocalAppearance();q('yearMode').addEventListener('change',function(){saveLocal('port79_year_mode',this.value);status('✅ 年份顯示方式已儲存到本瀏覽器','ok');});
- q('themeMode').addEventListener('change',function(){saveLocal('port79_theme',this.value);D.documentElement.setAttribute('data-theme',this.value);status('✅ 主題已套用到本瀏覽器','ok');});
- q('cloudPing').addEventListener('click',ping);q('reloadCloud').addEventListener('click',function(){if(JSON.stringify(readDraft())!==JSON.stringify(previous)&&!confirm('重新讀取會捨棄尚未儲存的公告及下載開關設定。確定繼續？'))return;reload();});
- q('save').addEventListener('click',save);q('restore').addEventListener('click',async function(){if(!verifiedSuperadmin||busy)return;if(!confirm('恢復年份、主題、首頁公告及電腦版下載預設（關閉下載）？將先確認雲端儲存成功。'))return;
- var prior=readDraft();q('noticeEnabled').checked=false;q('noticeText').value='';q('desktopDownloadEnabled').checked=false;
- var confirmed=await save();if(!confirmed){q('noticeEnabled').checked=prior.notice.enabled;q('noticeText').value=prior.notice.text;q('desktopDownloadEnabled').checked=prior.windowsDownload.enabled;return;}
- q('yearMode').value='gregorian';q('themeMode').value='light';saveLocal('port79_year_mode','gregorian');saveLocal('port79_theme','light');D.documentElement.setAttribute('data-theme','light');
- status('✅ 已讀回確認公告及下載入口已恢復預設（關閉），並更新本機主題與年份。','ok');});
+ setLocalAppearance();q('yearMode').addEventListener('change',function(){saveLocal('port79_year_mode',this.checked?'roc':'gregorian');status('✅ 年份顯示方式已儲存到本瀏覽器','ok');});
+ q('themeMode').addEventListener('change',function(){var mode=this.checked?'dark':'light';saveLocal('port79_theme',mode);D.documentElement.setAttribute('data-theme',mode);status('✅ 主題已套用到本瀏覽器','ok');});
+ q('idleMinutes').addEventListener('input',paintIdle);D.querySelectorAll('[data-idle-minutes]').forEach(function(b){b.addEventListener('click',function(){q('idleMinutes').value=b.dataset.idleMinutes;paintIdle();});});
+ q('cloudPing').addEventListener('click',ping);q('reloadCloud').addEventListener('click',function(){if((JSON.stringify(readDraft())!==JSON.stringify(previous)||cloud&&idleNumber(q('idleMinutes').value)!==idleFromConfig(cloud))&&!confirm('重新讀取會捨棄尚未儲存的全系統設定。確定繼續？'))return;reload();});
+ q('save').addEventListener('click',save);q('restore').addEventListener('click',async function(){if(!verifiedSuperadmin||busy)return;if(!confirm('恢復年份、主題、首頁公告、電腦版下載（關閉）及閒置登出（5 分鐘）的預設？將先確認雲端儲存成功。'))return;
+ var prior=readDraft(),priorIdle=q('idleMinutes').value;q('noticeEnabled').checked=false;q('noticeText').value='';q('desktopDownloadEnabled').checked=false;q('idleMinutes').value=String(DEFAULT_IDLE);paintIdle();
+ var confirmed=await save();if(!confirmed){q('noticeEnabled').checked=prior.notice.enabled;q('noticeText').value=prior.notice.text;q('desktopDownloadEnabled').checked=prior.windowsDownload.enabled;q('idleMinutes').value=priorIdle;paintIdle();return;}
+ q('yearMode').checked=false;q('themeMode').checked=false;saveLocal('port79_year_mode','gregorian');saveLocal('port79_theme','light');D.documentElement.setAttribute('data-theme','light');
+ status('✅ 全系統設定已讀回確認恢復預設，並更新本機主題與年份。','ok');});
  token=getToken();if(!token){q('gateText').textContent='沒有正式登入憑證，請返回首頁以超級管理員身分登入。';return;}
  try{auth=await cloudGet('getSessionMeta');var role=String(auth.adminRole||auth.actualAdminRole||auth.role||auth.session&&auth.session.adminRole||'').toLowerCase();
  var active=readSessionRole();if(role!=='superadmin'||active&&String(active.adminRole||active.role||'').toLowerCase()==='employee')throw Error('此頁只允許超級管理員修改；管理員請返回原工作模組');
@@ -184,5 +188,6 @@ async function init(){
 D.addEventListener('DOMContentLoaded',init);
 })();
 </script>
+<script defer src="../assets/port79-session-timeout.js?v=20261120-desktop-idle-exempt-v1"></script>
 </body>
 </html>

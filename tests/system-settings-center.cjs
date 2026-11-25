@@ -30,6 +30,11 @@ assert.match(html,/saveConfig/);
 assert.match(html,/getSessionMeta/);
 assert.match(html,/verifiedSuperadmin/);
 assert.match(html,/#desktopDownload/);
+assert.match(html,/p79_hr_idle_logout_minutes_v1/);
+assert.match(html,/id="idleMinutes"/);
+assert.match(html,/id="yearMode"/);assert.match(html,/id="themeMode"/);
+assert.doesNotMatch(html,/<a[^>]+data-route=/,'No redirect-only setting cards');
+assert.match(html,/port79-session-timeout\.js/);
 assert.match(html,/id="desktopDownloadEnabled"/);
 assert.match(html,/windowsDownload:\{enabled:false\}/);
 assert.match(html,/JSON\.stringify\(actual\)!==JSON\.stringify\(draft\)/);
@@ -45,7 +50,7 @@ async function simulate(adminRole){
   listeners:{},addEventListener(name,fn){this.listeners[name]=fn},focus(){this.focused=true},setAttribute(){}});return fields.get(id);}
  const stored=new Map([['port79_admin_token','real-test-token'],['port79_user_session',JSON.stringify({adminRole})]]);
  const local=new Map();
- let persisted={unrelatedOrganizationKey:{keep:true}},writes=0,failNextWrite=false,activeRole=adminRole;
+ let persisted={unrelatedOrganizationKey:{keep:true},p79_hr_idle_logout_minutes_v1:30},writes=0,failNextWrite=false,activeRole=adminRole;
  const doc={readyState:'loading',documentElement:{setAttribute(){}},getElementById:field,
   querySelectorAll(){return[]},addEventListener(name,fn){events[name]=fn}};
  const ctx={
@@ -77,17 +82,21 @@ async function simulate(adminRole){
   assert.equal(writes,0,'Unauthorized role must not trigger saveConfig');
   return;
  }
+ assert.equal(field('idleMinutes').value,'30','Read existing shared idle policy instead of replacing it');
+ field('idleMinutes').value='20';
  field('noticeEnabled').checked=true;field('noticeText').value='測試公告';
  field('desktopDownloadEnabled').checked=true;
  await field('save').listeners.click();
  assert.equal(writes,1,'Save must call backend once');
  assert.equal(persisted.unrelatedOrganizationKey.keep,true,'Save must preserve unrelated canonical configuration');
+ assert.equal(persisted.p79_hr_idle_logout_minutes_v1,20);
+ assert.equal(JSON.parse(local.get('port79_idle_logout_config_v1')).minutes,20);
  assert.equal(persisted.p79SystemSettingsV1.notice.text,'測試公告');
  assert.equal(persisted.p79SystemSettingsV1.windowsDownload.enabled,true,'Only verified superadmin can persist globally enabled download');
  assert.match(field('status').textContent,/雲端.*讀回確認/);
- field('themeMode').value='dark';field('themeMode').listeners.change.call(field('themeMode'));
+ field('themeMode').checked=true;field('themeMode').listeners.change.call(field('themeMode'));
  assert.equal(local.get('port79_theme'),'dark');
- field('yearMode').value='roc';field('yearMode').listeners.change.call(field('yearMode'));
+ field('yearMode').checked=true;field('yearMode').listeners.change.call(field('yearMode'));
  assert.equal(local.get('port79_year_mode'),'roc');
  // Every command button is wired and has an observable effect.
  await field('cloudPing').listeners.click();
@@ -113,6 +122,7 @@ async function simulate(adminRole){
  assert.equal(persisted.p79SystemSettingsV1.notice.enabled,false);
  assert.equal(persisted.p79SystemSettingsV1.notice.text,'');
  assert.equal(persisted.p79SystemSettingsV1.windowsDownload.enabled,false,'Restore closes download by default');
+ assert.equal(persisted.p79_hr_idle_logout_minutes_v1,5);
  assert.equal(local.get('port79_theme'),'light');
  assert.equal(local.get('port79_year_mode'),'gregorian');
  assert.match(field('status').textContent,/讀回確認/);
