@@ -111,7 +111,7 @@ function p79PlanDirectReport_(rows,request,rule,attendance,leaveCovers,leaveReco
  /* 手動申報不受原班別限制。 */
  /* 加班時段依管理員手動選取，不與原班別比對。 */
  const report={version:1,id:request.id,category:rule[0],typeName:rule[9]||'',code:rule[1],declaredHours:Number(rule[2]),convertedHours:rule[3]===''?null:Number(rule[3]),normalStart:rule[4],normalEnd:rule[5],overtimeStart:rule[6],overtimeEnd:rule[7],position:rule[8],note:String(request.note||''),leaveId:request.leaveHandoffId||'',coverDate:request.leaveHandoffId?coverDate:'',workDate:date,overtimeDate:accounting.overtimeDate,actualMinutes,planned,status:planned?'預排待出勤':'已核對出勤',attendanceInId:attendance?.inId||'',attendanceOutId:attendance?.outId||''};
- if(accounting.adjustedShift)report.adjustedCoverReview=true;
+ if(accounting.adjustedShift||accounting.adjustedReview)report.adjustedCoverReview=true;
  if(independentAdjusted)report.adjustedIndependentFrom=independentAdjusted.source;
  const canonical=t=>p79DirectMinute_(t)===1440?'00:00':String(t).includes(':')?t:t+':00';
  const value={...old,overtimeDate:accounting.overtimeDate,type:rule[0]==='代'?'substitute':'overtime',overtime:true,overtimeType:isRest?'rest':'extended',overtimeOriginalShift:isRest?'休':original,reportOriginalShift:original,overtimeAssignedShift:assigned,overtimeStart:canonical(rule[6]),overtimeEnd:canonical(rule[7]),overtimeReport:report,note:String(request.note||''),forEmpId:rule[0]==='代'||request.leaveHandoffId?request.forEmpId||'':''};
@@ -119,7 +119,7 @@ function p79PlanDirectReport_(rows,request,rule,attendance,leaveCovers,leaveReco
  if(['休','國','例','颱','選'].includes(rule[0])){value.restCategory=rule[0];value.restQuotaOvertime=true;value.restAllocationSource='manual';}
  // 同日兩位代班只記錄申報，不把原來的排班班別改掉。
  // Changing a pending plan must not rewrite the employee's actual normal roster.
- if(request.coverPeriodMode!=='same-day'&&request.editPlannedOnly!==true)schedule[date]=assigned;
+ if(request.coverPeriodMode!=='same-day'&&request.editPlannedOnly!==true&&request.manualReviewCoverage!==true)schedule[date]=assigned;
  meta[date]=value;schedule.__meta=meta;row.schedule=schedule;
  return {rows:next,duplicate:false,report};
 }
@@ -222,10 +222,10 @@ function p79DirectAdjustedShiftV1_(rows,request,rule,attendance){
  const anchor={早:[480,960],中:[960,0],晚:[0,480]}[shift];
  // The operator may explicitly select a fully punched overtime interval
  // after a roster change. Automatic/batch matching stays strict.
- if(request.manualReviewCoverage===true&&rule[0]==='延'&&anchor&&attendance&&attendance.inId&&attendance.outId){
+ if(request.manualReviewCoverage===true&&rule[0]==='延'&&row&&attendance&&attendance.inId&&attendance.outId){
   const actual=p79DirectRuleEnvelope_(date,rule);
   if(attendance.start<=actual.overtime[0]&&attendance.end>=actual.overtime[1]&&actual.overtime[1]-actual.overtime[0]===Number(rule[2])*3600000)
-   return {shift:shift,envelope:actual};
+   return {shift:shift||String(s[date]||s[date.slice(-2)]||s[String(Number(date.slice(-2)))]||''),envelope:actual};
  }
  if(!anchor||rule[0]!=='延'||p79DirectMinute_(rule[4])%1440!==anchor[0]||p79DirectMinute_(rule[5])%1440!==anchor[1])
   throw Error('調班後所選加班時段與最新正式正常班不符，請重新選擇');
@@ -354,7 +354,7 @@ function p79DirectDatesV108_(rows,request,rule,covers,leaves,coverDate,review){
   rows.filter(function(r){return normalizeEmpId_(r.empId)===normalizeEmpId_(request.empId);}).forEach(function(row){Object.entries(row.schedule&&row.schedule.__meta||{}).forEach(function(pair){var day=pair[0],m=pair[1]||{},r=m.overtimeReport;if(day===date||!r||!r.id||m.overtimeExcluded)return;if(String(r.leaveId)===String(request.leaveHandoffId)&&String(r.coverDate||day)===coverDate&&String(m.forEmpId)===String(request.forEmpId))throw Error('原代班已有申報 '+r.id+'，須沿用原ID核對雙日期，未新增重複申報');});});
  }
  if(request.overtimeDate&&String(request.overtimeDate)!==expected)throw Error('加班歸屬日應為 '+expected+'，未寫入錯日申報');
- return {workDate:date,overtimeDate:expected,coverDate:coverDate,adjustedShift:adjusted&&adjusted.shift||''};
+ return {workDate:date,overtimeDate:expected,coverDate:coverDate,adjustedShift:adjusted&&adjusted.shift||'',adjustedReview:!!(adjusted&&request.manualReviewCoverage===true)};
 }
 
 function p79NextMonthV108_(month){return new Date(Date.UTC(Number(month.slice(0,4)),Number(month.slice(5,7)),1)).toISOString().slice(0,7);}
