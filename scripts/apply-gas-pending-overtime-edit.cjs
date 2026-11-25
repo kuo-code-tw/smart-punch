@@ -52,7 +52,7 @@ const ops=[
   ],
   [
     " if(request.coverPeriodMode!=='same-day'&&request.editPlannedOnly!==true)schedule[date]=assigned;",
-    " if(request.coverPeriodMode!=='same-day'&&request.editPlannedOnly!==true&&request.manualReviewCoverage!==true)schedule[date]=assigned;"
+    " if(request.editPlannedOnly!==true&&request.manualReviewCoverage!==true){if(request.coverPeriodMode!=='same-day')schedule[date]=assigned;}"
   ],
   [
     "return {workDate:date,overtimeDate:expected,coverDate:coverDate,adjustedShift:adjusted&&adjusted.shift||''};",
