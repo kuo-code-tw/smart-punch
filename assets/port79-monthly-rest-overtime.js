@@ -1010,6 +1010,10 @@ function simplifyMonthlyRestLayout(el,settings={}){
  #p79MonthlyRest footer #mrResult{flex-basis:100%}}`;
  el.appendChild(style);
 }
+function isExplicitScheduleEditRefusal(error){
+ const message=String(error?.message||error||'').trim();
+ return /^班表正在編輯[，,。\s]*請待儲存完成後再申報[。\s]*$/.test(message);
+}
 function showSubmissionResult(parent,selected,failure){
  const confirmed=selected.filter(row=>row.saved).length;
  const remaining=selected.length-confirmed;
@@ -1500,8 +1504,18 @@ async function open(settings={}){
    paint();controls(true);
    for(const r of selected){if(stop)break;if(r.saved)continue;activeRow=r;setStatus('正在申報 '+(count+1)+'／'+selected.length+'：'+r.name+' '+r.date+' '+r.rule[1]);
     const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),forEmpId:'',note:backfillContext(loadedMonth).note,preventReplace:false,createdAt:Date.now()};
+    const hadUnconfirmedAttempt=!!r.attempted;
     sessionStorage.setItem(KEY,JSON.stringify(draft));r.attempted=true;r.status='送出中／待雲端讀回';paint();controls(true);
-    let result;try{result=await a.saveReport(draft,batch);}catch(error){r.status='未確認成功：'+error.message;paint();controls(true);throw error;}
+    let result;try{result=await a.saveReport(draft,batch);}catch(error){
+     // An explicit edit-lock refusal is not an ambiguous write. Never re-read the
+     // whole locked roster just to verify a request the server refused. Preserve
+     // any earlier uncertain attempt, and never bypass another editor's lock.
+     if(!hadUnconfirmedAttempt&&isExplicitScheduleEditRefusal(error)){
+      r.attempted=false;r.checked=true;r.status='班表編輯中，本次未送出成功';
+      if(!model.rows.some(row=>row.attempted&&!row.saved))sessionStorage.removeItem(KEY);
+     }else r.status='未確認成功：'+String(error?.message||error);
+     paint();controls(true);throw error;
+    }
     if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('雲端尚未確認接收此筆申報');
     r.acknowledged=true;r.checked=false;r.status='雲端已接收／批次核對中';count++;paint();controls(true);
    }
