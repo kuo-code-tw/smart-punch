@@ -78,6 +78,10 @@ function rowQuotaProgress(tr){
   return p&&['例','休','國'].every(c=>p[c]&&Number.isFinite(p[c].used)&&Number.isFinite(p[c].remaining))?p:null;
  }catch{return null;}
 }
+function submissionMessage(nativeStatus,localHint){
+ const status=String(nativeStatus||'').trim();
+ return status||localHint||'正在讀取正式雲端資料…';
+}
 function sourceRows(el){
  const ready=$$(el,'#mrRows tr[data-row]').map(tr=>{
   const td=tr.cells,pick=$(tr,'.pick');
@@ -199,7 +203,7 @@ function mount(el){
  #p79MonthlyRest #mrUxSubtitle{font-size:12px;color:#527297;font-weight:600;margin-top:3px}
  #p79MonthlyRest .mr-ux-banner{border-radius:13px;background:linear-gradient(95deg,#e5f1ff,#dbeaff);color:#214a80;padding:11px 15px;font-size:13px;font-weight:650;display:flex;align-items:center;gap:10px;min-height:44px}
  #p79MonthlyRest .mr-ux-banner .mr-ux-info{display:inline-grid;place-items:center;width:25px;height:25px;flex:none;border-radius:50%;background:#4b9afb;color:white;font-weight:900}
- #p79MonthlyRest #mrUxProgress{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ #p79MonthlyRest #mrUxProgress{flex:1;min-width:0;white-space:normal;overflow-wrap:anywhere}
  #p79MonthlyRest .mr-ux-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
  #p79MonthlyRest .mr-ux-stat{display:flex;align-items:center;gap:12px;border:1px solid #c7ddf8;border-radius:15px;padding:13px 17px;background:linear-gradient(145deg,#fff,#eff6ff);min-height:94px}
  #p79MonthlyRest .mr-ux-stat:nth-child(2){background:linear-gradient(145deg,#fff,#ecfbf4);border-color:#bbdfcf}
@@ -246,7 +250,7 @@ function mount(el){
  #p79MonthlyRest #mrUxFooter .mr-ux-spacer{flex:1}
  #p79MonthlyRest #mrUxFooter button{min-height:42px;min-width:118px;font-size:15px;font-weight:800}
  #p79MonthlyRest #mrUxFooter button:disabled{opacity:.45;cursor:not-allowed}
- #p79MonthlyRest #mrUxHint{color:#597394;font-size:11px}
+ #p79MonthlyRest #mrUxHint{color:#334155;font-size:12px;white-space:normal;overflow-wrap:anywhere;min-width:0;max-width:100%}
  @media(max-width:1100px){#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}#p79MonthlyRest .mr-ux-reasons h3{grid-column:1/-1}#p79MonthlyRest .mr-ux-reason{margin:0}}
  @media(max-width:750px){#p79MonthlyRest #mrUxRoot{padding:10px;gap:10px}#p79MonthlyRest .mr-ux-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#p79MonthlyRest .mr-ux-stat{padding:9px;min-height:76px}#p79MonthlyRest .mr-ux-stat strong{font-size:22px}#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:block}#p79MonthlyRest .mr-ux-tools>label{flex:1 1 40%}#p79MonthlyRest .mr-ux-tools input,#p79MonthlyRest .mr-ux-tools select{min-width:0;max-width:100%}#p79MonthlyRest .mr-ux-tools .mr-ux-spacer{display:none}#p79MonthlyRest #mrUxFooter{bottom:-10px}}
  `;
@@ -294,11 +298,11 @@ function mount(el){
  <div class="mr-ux-reason"><b>♙ 人員異動</b><small>到職、離職、職稱或權限變更時依正式資料重新確認。</small></div>
  </aside></div>
  <footer id="mrUxFooter"><span id="mrUxSelected">已勾選 0 筆</span><span class="mr-ux-spacer"></span>
- <span id="mrUxHint"></span><button type="button" id="mrUxSavePlan" class="mr-ux-outline" disabled>▣ 儲存預排</button>
+ <span id="mrUxHint" role="status" aria-live="polite"></span><button type="button" id="mrUxSavePlan" class="mr-ux-outline" disabled>▣ 儲存預排</button>
  <button type="button" id="mrUxSubmit" class="mr-ux-primary" disabled>➤ 正式申報</button></footer>`;
  body.prepend(shell);
  const q=sel=>$(shell,sel);
- const state={tab:'pending',name:'',status:'',hint:'',snapshot:null,rendering:false,disposed:false,reviewSelected:new Set()};
+ const state={tab:'pending',name:'',status:'',hint:'',snapshot:null,rendering:false,disposed:false,reviewSelected:new Set(),submitting:false};
  function rows(){
   const data=sourceRows(el);
   const pendingReports=data.prior.filter(r=>r.status!=='已核對出勤'&&!/已取消|歷史版本/.test(r.status));
@@ -366,9 +370,9 @@ function mount(el){
    q('#mrUxPendingTab').textContent=sourceLoaded?'('+pendingTotal+' 筆／'+needs+' 人)':'';
    q('#mrUxAuditTab').textContent=sourceLoaded?'('+audit.filter(r=>r.kind!=='roster').length+' 筆／'+new Set(audit.filter(r=>r.kind==='roster').map(r=>r.id)).size+' 人)':'';
    q('#mrUxDoneTab').textContent=sourceLoaded?'('+verified.length+')':'';
-   const info=originalState.replace(/\s+/g,' ').slice(0,115);
+   const info=originalState.replace(/\s+/g,' ').trim();
    const sourceFailed=!sourceLoaded&&/讀取失敗|核對失敗|錯誤|無法取得|無法載入/.test(info);
-   q('#mrUxProgress').textContent=sourceFailed?'資料讀取失敗｜'+(info||'請按右側重新讀取'):state.hint||info||'正在讀取正式雲端資料…';
+   q('#mrUxProgress').textContent=sourceFailed?'資料讀取失敗｜'+(info||'請按右側重新讀取'):submissionMessage(info,state.hint);
    q('#mrUxProgress').setAttribute('role',sourceFailed?'alert':'status');
    q('#mrUxReload').title=sourceFailed?'重新讀取正式班表與考勤':'重新讀取雲端資料';
    q('#mrUxTabPending').setAttribute('aria-selected',String(state.tab==='pending'));
@@ -393,7 +397,7 @@ function mount(el){
    q('#mrUxSubmit').disabled=!formalCount||!!nativeSave?.disabled||!/申報/.test(nativeSave?.textContent||'');
    q('#mrUxSubmit').textContent='➤ 正式申報（'+formalCount+' 筆）';
    if(state.tab!=='pending'){q('#mrUxSavePlan').disabled=true;q('#mrUxSubmit').disabled=true;}
-   q('#mrUxHint').textContent=state.tab==='audit'?'異常核對唯讀，不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
+   q('#mrUxHint').textContent=state.submitting?submissionMessage(info,'正在送出正式申報…'):state.tab==='audit'?'異常核對唯讀，不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
    const latestDates=latestConfirmedDates(data.prior);
    q('#mrUxRows').innerHTML=shown.map(r=>{
     const quota=r.quotaProgress;
@@ -512,7 +516,10 @@ function mount(el){
   if(state.tab!=='pending')return;
   const submit=$(el,'#mrSave');
   if(!submit||!sourceRows(el).ready.some(r=>r.checked&&!r.disabled))return;
-  if(!submit.disabled&&/申報/.test(submit.textContent||'')&&!/預排/.test(submit.textContent||''))submit.click();
+  if(!submit.disabled&&/申報/.test(submit.textContent||'')&&!/預排/.test(submit.textContent||'')){
+   state.hint='';state.submitting=true;
+   submit.click();render();
+  }
   else{state.hint='請先核對實際出勤與申報日期。';render();}
  };
  q('#mrUxExport').onclick=()=>{
@@ -553,5 +560,5 @@ function mount(el){
  },{once:true});
  render();
 }
-global.P79MonthlyRestDashboard={mount,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,dailyPendingRows,quotaProgressLabel,quotaDisplayMarkup,filingDateState,filingDateMarkup,latestConfirmedDates};
+global.P79MonthlyRestDashboard={mount,submissionMessage,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,dailyPendingRows,quotaProgressLabel,quotaDisplayMarkup,filingDateState,filingDateMarkup,latestConfirmedDates};
 })(window,document);
