@@ -37,6 +37,26 @@ const ops=[
   [
     " if(!planned&&!actualMinutes)throw Error('出勤時間沒有包含所選加班時段');",
     " if(!planned&&!actualMinutes)throw Error('出勤時間沒有包含所選加班時段');\n if(request.manualReviewCoverage===true&&(!p79DirectOriginalPlannedReviewV1_(old,request)||rule[0]!=='延'||!attendance||!attendance.inId||!attendance.outId||attendance.start>envelope.overtime[0]||attendance.end<envelope.overtime[1]||actualMinutes!==Number(rule[2])*60))throw Error('手動核對須由原預排、完整實際加班打卡及正確時數確認');"
+  ],
+  [
+    " if(request.manualReviewCoverage===true&&rule[0]==='延'&&anchor&&attendance&&attendance.inId&&attendance.outId){",
+    " if(request.manualReviewCoverage===true&&rule[0]==='延'&&row&&attendance&&attendance.inId&&attendance.outId){"
+  ],
+  [
+    "   return {shift:shift,envelope:actual};",
+    "   return {shift:shift||String(s[date]||s[date.slice(-2)]||s[String(Number(date.slice(-2)))]||''),envelope:actual};"
+  ],
+  [
+    " if(accounting.adjustedShift)report.adjustedCoverReview=true;",
+    " if(accounting.adjustedShift||accounting.adjustedReview)report.adjustedCoverReview=true;"
+  ],
+  [
+    " if(request.coverPeriodMode!=='same-day'&&request.editPlannedOnly!==true)schedule[date]=assigned;",
+    " if(request.coverPeriodMode!=='same-day'&&request.editPlannedOnly!==true&&request.manualReviewCoverage!==true)schedule[date]=assigned;"
+  ],
+  [
+    "return {workDate:date,overtimeDate:expected,coverDate:coverDate,adjustedShift:adjusted&&adjusted.shift||''};",
+    "return {workDate:date,overtimeDate:expected,coverDate:coverDate,adjustedShift:adjusted&&adjusted.shift||'',adjustedReview:!!(adjusted&&request.manualReviewCoverage===true)};"
   ]
 ];
 if(process.argv.length!==4||process.argv[2]===process.argv[3])throw Error('usage: node scripts/apply-gas-pending-overtime-edit.cjs LIVE_Code.gs PATCHED_Code.gs');
