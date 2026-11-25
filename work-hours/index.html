@@ -12760,7 +12760,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 if (currentEmp && !isAdminLoggedIn) renderEmpHistoryTable();
 
                 showToast(
-                    localSaved ? '修改已暫存，尚未收到雲端確認，正在同步…' : '本機容量不足，尚未收到雲端確認，正在直接同步…',
+                    localSaved ? '修改已暫存，尚未收到雲端確認，正在同步…' : '本機容量不足，尚未收到雲端確認，正在嘗試背景同步…',
                     'warning'
                 );
 
@@ -12768,7 +12768,8 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     action: 'updateRecord',
                     record: r,
                     originalTimeStr,
-                    originalPunchType
+                    originalPunchType,
+                    p79LocalFirst: true
                 }, '考勤紀錄已成功更新並同步雲端！',
                 () => {
                     p79RefreshLinkedOvertimeAfterAttendanceCloudSave(originalTimeStr,r.timeStr);
@@ -17972,7 +17973,7 @@ window.p79OvertimeApplicationContext={
 })();
 </script>
 <script src="../assets/port79-overtime-monthly-matrix.js?v=20261026-conversion-diagnostics"></script>
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2&sync=20261125-queue-isolation-v1"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2&sync=20261125-local-first-edit-v2"></script>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261017.official1&rev=20261022-workflow&sync=20261104-leave-roster-v1&syncfix=20261114-no-loop-v1"></script><link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
 <script src="../assets/port79-full-refresh.js?v=20261018.1"></script>
 <style id="p79-monthly-attendance-wider-v20261020">

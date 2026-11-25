@@ -63,6 +63,7 @@ let syncBatchDone=0;
 let syncBatchStartedAt=0;
 let lastStatusUiSignature='';
 const rejectedPunchById=new Map();
+const p79LocalFirstEditCallbacks=new Map();
 
 function token(){
   return String(
@@ -674,6 +675,7 @@ async function send(payload,timeout=25000){
   const url=gasUrl();
   if(!url) throw new Error('未設定 GAS URL');
   const body={...payload};
+  delete body.p79LocalFirst;
   const tk=token();
   if(tk&&!body.token)body.token=tk;
 
@@ -757,7 +759,7 @@ function p79PunchUploadPriority(item){
   return 3;
 }
 function p79OrderedReadyQueue(q,force,now,attempted=null){
-  return q.filter(x=>!x.paused&&(!attempted||!attempted.has(x.key))&&(force||Number(x.nextRetryAt||0)<=now))
+  return q.filter(x=>!x.paused&&(!attempted||!attempted.has(x.key+'|'+JSON.stringify(x.payload)))&&(force||Number(x.nextRetryAt||0)<=now))
     .map((item,index)=>({item,index}))
     .sort((a,b)=>p79PunchUploadPriority(a.item)-p79PunchUploadPriority(b.item)||a.index-b.index)
     .map(x=>x.item);
@@ -782,7 +784,7 @@ async function drain(force=false){
       const now=Date.now();
       const item=p79OrderedReadyQueue(q,force,now,attempted)[0];
       if(!item)break;
-      attempted.add(item.key);
+      attempted.add(item.key+'|'+JSON.stringify(item.payload));
 
       currentOpText=desc(item.payload);
       activeSyncRecordId=payloadRecordId(item.payload);
@@ -813,6 +815,7 @@ async function drain(force=false){
 
         try{p79RenderOnlyVisibleAttendanceView?.()}catch(e){}
 
+        if(latestConfirmed&&typeof p79CompleteLocalFirstEdit==='function')p79CompleteLocalFirstEdit(item,data);
         if(typeof item.payload?._v5Success==='function'){
           try{item.payload._v5Success(data)}catch(e){}
         }
@@ -911,6 +914,7 @@ async function drainFast(force=true, concurrency=4){
       syncBatchDone++;
       lastDoneAt=Date.now();
 
+      if(latestConfirmed&&typeof p79CompleteLocalFirstEdit==='function')p79CompleteLocalFirstEdit(item,data);
       if(typeof item.payload?._v5Success==='function'){
         try{item.payload._v5Success(data)}catch(e){}
       }
@@ -994,7 +998,7 @@ async function drainFast(force=true, concurrency=4){
       activeSyncRecordId=group.length===1?payloadRecordId(group[0]?.payload):'';
       updateUi();
 
-      for(const item of group)attempted.add(item.key);
+      for(const item of group)attempted.add(item.key+'|'+JSON.stringify(item.payload));
       const results=await Promise.all(group.map(processOne));
       if(results.some(r=>r?.retryable===true))break;
 
@@ -1283,6 +1287,13 @@ window.p79V5GetStatus=()=>({
 });
 
 
+function p79CompleteLocalFirstEdit(item,data){
+  const callback=p79LocalFirstEditCallbacks.get(item.key);
+  if(!callback||!samePayload(callback.payload,item.payload))return;
+  p79LocalFirstEditCallbacks.delete(item.key);
+  try{callback.onSuccess?.(data)}catch(e){}
+  if(callback.successMsg)try{showToast(callback.successMsg,'success')}catch(e){}
+}
 async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
   const recordId = payload?.record?.id ?? payload?.id;
 
@@ -1299,6 +1310,27 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
     const reason=String(pausedItem.lastError||'此修改已暫停，請核對雲端時間後重新修改');
     if(typeof onError==='function')try{onError(reason)}catch(e){}
     updateUi();return {ok:false,queued:true,paused:true,error:reason};
+  }
+  // Manual UI corrections already applied the local record. Persist an immutable
+  // intent first, return the queued receipt immediately, and verify in the drain.
+  // Imports, explicit reconciliation and live employee punches keep their ACK path.
+  if(payload?.p79LocalFirst===true&&['updateRecord','editRecord'].includes(String(payload.action||''))){
+    const snapshot=JSON.parse(JSON.stringify(payload));
+    enqueue(snapshot);
+    const key=opKey(snapshot);
+    const queued=readQueue().some(x=>x.key===key&&samePayload(x.payload,snapshot));
+    if(!queued||(typeof queueStorage!=='undefined'&&queueStorage==='memory')){
+      const reason='本機儲存空間不足，修改暫留目前頁面；請勿關閉，系統仍會嘗試同步';
+      try{showToast(reason,'warning')}catch(e){}
+      if(!writing)setTimeout(()=>drain(false),0);
+      if(typeof onError==='function')try{onError(reason)}catch(e){}
+      return {ok:false,queued,localSaved:false,error:reason};
+    }
+    p79LocalFirstEditCallbacks.set(key,{payload:snapshot,onSuccess,successMsg});
+    currentOpText='本機已儲存，等待背景同步';
+    updateUi();
+    if(!writing)setTimeout(()=>drain(false),0);
+    return {ok:true,queued:true,localSaved:true,cloudConfirmed:false};
   }
   // 沒有其他 writer 時直接送 GAS。
   if(!writing && navigator.onLine !== false&&

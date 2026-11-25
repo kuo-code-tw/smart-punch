@@ -17458,13 +17458,14 @@ function getManualPairRecordAnchor(record) {
                 p79ScheduleAttendanceMutationRender();
                 p79ReturnToAttendanceAuditAfterMutation();
 
-                showToast('考勤修改已套用，正在同步雲端…', 'success');
+                showToast('考勤修改已暫存，背景同步中，尚未取得雲端確認', 'warning');
 
                 postToCloud({
                     action: 'updateRecord',
                     record: r,
                     originalTimeStr,
-                    originalPunchType
+                    originalPunchType,
+                    p79LocalFirst: true
                 }, '考勤紀錄已成功更新並同步雲端！',
                 () => {
                     markRecentAttendanceMutationCloudConfirmed(r.id);
@@ -24646,7 +24647,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 
 
 <script src="../assets/port79-punch-device-state.js?v=20261022-self-binding"></script>
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2&dup=20261124-final-two-v1&sync=20261125-queue-isolation-v1"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2&dup=20261124-final-two-v1&sync=20261125-local-first-edit-v2"></script>
 
 
 
