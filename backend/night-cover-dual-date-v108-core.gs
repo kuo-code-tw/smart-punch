@@ -119,7 +119,7 @@ function p79PlanDirectReport_(rows,request,rule,attendance,leaveCovers,leaveReco
  if(['休','國','例','颱','選'].includes(rule[0])){value.restCategory=rule[0];value.restQuotaOvertime=true;value.restAllocationSource='manual';}
  // 同日兩位代班只記錄申報，不把原來的排班班別改掉。
  // Changing a pending plan must not rewrite the employee's actual normal roster.
- if(request.coverPeriodMode!=='same-day'&&request.editPlannedOnly!==true&&request.manualReviewCoverage!==true)schedule[date]=assigned;
+ if(request.editPlannedOnly!==true&&request.manualReviewCoverage!==true){if(request.coverPeriodMode!=='same-day')schedule[date]=assigned;}
  meta[date]=value;schedule.__meta=meta;row.schedule=schedule;
  return {rows:next,duplicate:false,report};
 }
