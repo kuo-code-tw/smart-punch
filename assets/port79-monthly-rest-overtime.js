@@ -1372,7 +1372,7 @@ async function open(settings={}){
   if(busy||!model||!Array.isArray(requested)||!['plan','formal'].includes(mode))return;
   const month=loadedMonth,scope=new Set(chosenPeople().map(e=>id(e.empId)));
   const picked=requested.filter(r=>scope.has(id(r.empId))&&String(r.date||'').startsWith(month+'-')&&selectedRestCandidateKey(r));
-  const previous=(mode==='plan'?model.plannedRows:model.rows).filter(r=>r.checked&&!r.saved);
+  const previous=(mode==='plan'?model.plannedRows:model.rows).filter(r=>scope.has(id(r.empId))&&r.checked&&!r.saved);
   const byKey=new Map([...previous,...picked].map(r=>[selectedRestCandidateKey(r),r]));
   if(!byKey.size){setStatus('沒有已指定日期及時段的勾選項目。');return;}
   const wanted=[...byKey.values()],rejected=[];
