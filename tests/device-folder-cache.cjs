@@ -10,7 +10,7 @@ function directory(name='79號碼頭雲端資料庫'){
 }
 function setup({folder=directory(),stores=new Map(),persistent=false,dbFails=false,dbHangs=false,doc={},timer=setTimeout}={}){
  const ss=storage(),ls=storage();ss.setItem('port79_user_session',JSON.stringify({empId:'A',adminRole:'admin'}));ss.setItem('port79_user_token','TOKEN');
- const db={objectStoreNames:{contains:k=>stores.has(k)},createObjectStore:k=>stores.set(k,new Map()),close(){},transaction(name){const tx={},map=stores.get(name)||new Map();stores.set(name,map);tx.objectStore=()=>({get(key){const req={};queueMicrotask(()=>{req.result=map.get(key);req.onsuccess?.();tx.oncomplete?.()});return req},put(row){map.set(row.key,row);queueMicrotask(()=>tx.oncomplete?.())},getAll(){const req={};queueMicrotask(()=>{req.result=[...map.values()];req.onsuccess?.()});return req},clear(){map.clear();queueMicrotask(()=>tx.oncomplete?.())}});return tx}};
+ const db={objectStoreNames:{contains:k=>stores.has(k)},createObjectStore:k=>stores.set(k,new Map()),close(){},transaction(name){const tx={},map=stores.get(name)||new Map();stores.set(name,map);tx.objectStore=()=>({get(key){const req={};queueMicrotask(()=>{req.result=map.get(key);req.onsuccess?.();tx.oncomplete?.()});return req},put(row){map.set(row.key,row);queueMicrotask(()=>tx.oncomplete?.())},delete(key){map.delete(key)},getAll(){const req={};queueMicrotask(()=>{req.result=[...map.values()];req.onsuccess?.()});return req},clear(){map.clear();queueMicrotask(()=>tx.oncomplete?.())}});return tx}};
  const window={crypto:webcrypto,navigator:{storage:{persist:async()=>persistent,persisted:async()=>persistent}},fetch:async()=>{throw Error('unexpected cloud write')},showDirectoryPicker:async()=>folder};
  const ctx={window,sessionStorage:ss,localStorage:ls,URL,URLSearchParams,Request,Response,Blob,TextEncoder,Uint8Array,Date,JSON,Map,Set,Promise,console,setTimeout:timer,clearTimeout,document:doc,location:{pathname:'/smart-punch/hr/',href:'https://example.com/smart-punch/hr/'},indexedDB:{open(){const req={};if(dbHangs)return req;queueMicrotask(()=>{if(dbFails){req.error=Error('quota');req.onerror?.();return}req.result=db;if(!stores.has('settings'))req.onupgradeneeded?.();req.onsuccess?.()});return req}}};
  vm.createContext(ctx);vm.runInContext(source,ctx);return {api:window.Port79DataCache,stores,folder,ss,window};
@@ -139,6 +139,22 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
   await x.api.put({key,kind:'system',system:'attendance',savedAt:Date.now(),data:{ok:true,fullDatabase:true,months:[month],monthStats:[{month,ok:true}],records:[{timeStr:'115/10/01 08:00'},{timeStr:'2026/09/30 23:30'}]}});
   assert.equal((await x.api.getExportSnapshot('getAttendanceMonthRaw',month)).data.records.length,1);assert.equal(await x.api.getExportSnapshot('getAttendanceMonthRaw','2026-09'),null);
   await x.api.put({key,kind:'system',system:'attendance',savedAt:Date.now(),data:{ok:true,month,records:[]}});assert.equal(await x.api.getExportSnapshot('getAttendanceMonthRaw',month),null);
+ });
+ await test('attendance startup keeps a compact browser preview and rebuilds it from a newer full cache',async()=>{
+  const x=setup(),key='A@admin|system|attendance',month='2026-10',old={id:'old'},current={id:'current'};
+  const putFull=records=>x.api.put({key,kind:'system',system:'attendance',savedAt:Date.now(),data:{ok:true,fullDatabase:true,months:[month],records}});
+  let fullReads=0;
+  const select=records=>{fullReads++;return records.filter(record=>record.id!=='old')};
+  await putFull([old,current]);
+  assert.equal((await x.api.getAttendanceStartupPreview(month,select)).records[0].id,'current');
+  const restarted=setup({stores:x.stores});
+  assert.equal((await restarted.api.getAttendanceStartupPreview(month,select)).records[0].id,'current');
+  assert.equal(fullReads,1);
+  await putFull([old,{id:'new'}]);
+  assert.equal((await x.api.getAttendanceStartupPreview(month,select)).records[0].id,'new');
+  assert.equal(fullReads,2);
+  x.ss.setItem('port79_cache_mutated_at',String(Date.now()+100));
+  assert.equal(await x.api.getAttendanceStartupPreview(month,select),null);
  });
  await test('local mutations and changed credentials invalidate export snapshots',async()=>{
   const x=setup(),month='2026-10',data={ok:true,month,records:[]};

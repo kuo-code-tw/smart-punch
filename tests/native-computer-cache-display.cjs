@@ -29,7 +29,7 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
   const p=c.p79HydrateLeaveComputerCache(()=>active);active=false;d.resolve({data:{employees:[],leaveRecords:[{id:'stale'}]}});assert.equal(await p,false);assert.equal(paints,0);
  });
  await test('attendance preview selects boundary months, honors deletion tombstones and never persists old data',async()=>{
-  const html=read('attendance/index.html'),start=html.indexOf('window.p79ApplyAttendanceFullCache=async function('),end=html.indexOf('\n};',start)+3;let writes=0;
+  const html=read('attendance/index.html'),start=html.indexOf('window.p79SelectAttendancePreviewRecords=function('),end=html.indexOf('\n};',html.indexOf('window.p79ApplyAttendanceFullCache=async function(',start))+3;let writes=0;
   const c=context({console,Date,Set,window:{},records:[{id:'pending',timeStr:'2026-10-02'}],employees:[{empId:'AUTH'}],document:{getElementById:()=>null},attendanceRecordMonthKey:r=>r.timeStr.slice(0,7),isLocallyDeletedAttendanceRecord:r=>r.id==='deleted',mergeAttendanceRecordCollections:(a,b)=>[...a,...b],localStorage:{setItem(){writes++}},saveAttendanceSafetyBackup(){writes++}});vm.runInContext(html.slice(start,end),c);
   const now=new Date(),ym=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   const result=await c.window.p79ApplyAttendanceFullCache({records:[{id:'current',timeStr:ym+'-01'},{id:'ancient',timeStr:'2000-01-01'},{id:'deleted',timeStr:ym+'-02'}],employees:[{empId:'CACHED'}]},{previewOnly:true,silent:true});

@@ -778,7 +778,7 @@ html.dark #p79UnifiedShellV103,html[data-theme="dark"] #p79UnifiedShellV103{--p7
 </style>
 <style id="p79-year-menu-only-style">#port79CalendarModeBox{display:none!important}</style>
 
-<script src="/smart-punch/assets/port79-data-cache.js?v=20261123-quick-preload-shared-v1&bg=20261123-progress-v1"></script>
+<script src="/smart-punch/assets/port79-data-cache.js?v=20261123-quick-preload-shared-v1&bg=20261123-progress-v1&attendance=20261125-local-preview-v1"></script>
 <script src="../assets/port79-ui-trim.js?v=20261025-zh-import-export"></script>
 
 <style id="p79-attendance-workhours-split-css">
@@ -23528,10 +23528,13 @@ window.addEventListener('scroll',sync,{passive:true});sync();})();
     const startedAt=p79AttendancePreviewStartedAt;
     setTimeout(async()=>{
       try{
-        const row=await window.Port79DataCache?.getDisplaySnapshot?.('attendance');
+        const now=new Date();
+        const month=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+        const snapshot=await window.Port79DataCache?.getAttendanceStartupPreview?.(month,window.p79SelectAttendancePreviewRecords);
         if(Number(typeof lastCloudLoadSuccessAt!=='undefined'?lastCloudLoadSuccessAt:0)>=startedAt)return;
-        if(row?.data?.fullDatabase&&Array.isArray(row.data.records)){
-          await window.p79ApplyAttendanceFullCache?.(row.data,{showAll:false,forceCurrentMonth:true,fromIndexedDb:true,silent:true,previewOnly:true});
+        if(snapshot&&Array.isArray(snapshot.records)){
+          const applied=await window.p79ApplyAttendanceFullCache?.(snapshot,{showAll:false,forceCurrentMonth:true,fromIndexedDb:true,silent:true,previewOnly:true,startupMonth:month});
+          if(!applied?.ok)return;
           try{setCloudSyncStatus('⚡ 本機考勤快取已顯示｜背景核對雲端中','info')}catch(_){}
         }else if(typeof navigator!=='undefined'&&navigator.onLine===false){
           const snapshot=await p79LoadLocalDbSnapshot();if(snapshot)p79ApplyLocalDbSnapshot(snapshot,{allowRecords:true});
@@ -23924,14 +23927,18 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 <script id="p79-attendance-full-cache-bridge-v20261004">
 (function(){
 'use strict';
+window.p79SelectAttendancePreviewRecords=function(sourceRecords){
+ const now=new Date();
+ const months=new Set([-1,0,1].map(offset=>{
+  const date=new Date(now.getFullYear(),now.getMonth()+offset,1);
+  return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0');
+ }));
+ return sourceRecords.filter(record=>months.has(attendanceRecordMonthKey(record)));
+};
 window.p79ApplyAttendanceFullCache=async function(snapshot,options={}){
  try{
   if(!snapshot||!Array.isArray(snapshot.records))throw new Error('完整考勤快取格式不正確');
-  const nowForPreview=new Date(),previewMonths=new Set([-1,0,1].map(offset=>{
-   const d=new Date(nowForPreview.getFullYear(),nowForPreview.getMonth()+offset,1);
-   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-  }));
-  const selected=options.previewOnly?snapshot.records.filter(r=>previewMonths.has(attendanceRecordMonthKey(r))):snapshot.records;
+  const selected=options.previewOnly&&!options.startupMonth?window.p79SelectAttendancePreviewRecords(snapshot.records):snapshot.records;
   const cloudRows=selected.filter(r=>typeof isLocallyDeletedAttendanceRecord!=='function'||!isLocallyDeletedAttendanceRecord(r)).map(r=>typeof normalizeAttendanceRecordIdentifiers==='function'?normalizeAttendanceRecordIdentifiers(r):r);
   if(typeof mergeAttendanceRecordCollections==='function') records=mergeAttendanceRecordCollections(cloudRows,Array.isArray(records)?records:[]);
   else if(typeof deduplicateAttendanceRecordArray==='function') records=deduplicateAttendanceRecordArray([...(Array.isArray(records)?records:[]),...cloudRows]);

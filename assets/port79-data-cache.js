@@ -141,13 +141,21 @@ async function put(row){
 }
 async function putLocal(row){
  const db=await openDb();
- return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(row);tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error)});
+ const replacingAttendance=row.data?.fullDatabase&&row.key===systemKey('attendance');
+ const previewKey=row.key+'|startup-preview';
+ if(replacingAttendance)forgetMemory(previewKey);
+ return new Promise((resolve,reject)=>{
+  const tx=db.transaction(STORE,'readwrite'),store=tx.objectStore(STORE);
+  store.put(row);
+  if(replacingAttendance)store.delete(previewKey);
+  tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);
+ });
 }
-async function get(key){
+async function get(key,{folder=true}={}){
  const cached=recallMemory(key);if(cached)return cached;
  let row=null;
  try{const db=await openDb();row=await new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get(key);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}catch(_){}
- if(!row)row=await readFolderSnapshot(key);
+ if(!row&&folder)row=await readFolderSnapshot(key);
  if(row)rememberMemory(row);
  return row;
 }
@@ -532,20 +540,46 @@ async function getSystemSnapshot(sys){
  return viewer===viewerKey()&&credential===token()&&row&&currentViewerRow(row)&&row.data?row:null;
 }
 // Display-only data: current account/scope, no intervening edit, no permission from payload.
-async function getDisplaySnapshot(sys,options={}){
- const scope=displayScope(),viewer=viewerKey(),credential=token();
+function displaySnapshotContext(){
+ return {scope:displayScope(),viewer:viewerKey(),credential:token(),endpoint:gasUrl()};
+}
+function validDisplaySnapshot(row,context,options={}){
+ const {scope,viewer,credential,endpoint}=context;
+ if(!row||!credential||viewer!==viewerKey()||credential!==token()||scope!==displayScope()||endpoint!==gasUrl()||
+    row.data?.ok!==true||row.savedAt<mutationStamp()||row.savedAt>Date.now()+60000)return false;
+ if(row.displayScope!==undefined&&row.displayScope!==scope)return false;
+ if(row.cacheEndpoint&&row.cacheEndpoint!==endpoint)return false;
+ // Legacy snapshots predate scope metadata. Only the same superadmin has unrestricted scope.
+ if(row.displayScope===undefined&&!viewer.endsWith('@superadmin'))return false;
+ if(options.month&&row.scope?.month&&row.scope.month!==options.month)return false;
+ if(options.month&&/^\d{4}-\d{2}$/.test(String(row.data.month||''))&&row.data.month!==options.month)return false;
+ if(options.month&&row.scope?.year&&String(row.scope.year)!==options.month.slice(0,4))return false;
+ return true;
+}
+async function readDisplaySnapshot(read,options={}){
+ const context=displaySnapshotContext();
  let timer,row;
  const timeoutMs=Math.min(10000,Math.max(1500,Number(options.timeoutMs)||1500));
- try{row=await Promise.race([getSystemSnapshot(sys),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),timeoutMs)})]);}finally{clearTimeout(timer)}
- if(!row||!credential||viewer!==viewerKey()||credential!==token()||scope!==displayScope()||row.data?.ok!==true||row.savedAt<mutationStamp()||row.savedAt>Date.now()+60000)return null;
- if(row.displayScope!==undefined&&row.displayScope!==scope)return null;
- if(row.cacheEndpoint&&row.cacheEndpoint!==gasUrl())return null;
- // Legacy snapshots predate scope metadata. Only the same superadmin has unrestricted scope.
- if(row.displayScope===undefined&&!viewer.endsWith('@superadmin'))return null;
- if(options.month&&row.scope?.month&&row.scope.month!==options.month)return null;
- if(options.month&&/^\d{4}-\d{2}$/.test(String(row.data.month||''))&&row.data.month!==options.month)return null;
- if(options.month&&row.scope?.year&&String(row.scope.year)!==options.month.slice(0,4))return null;
- return row;
+ try{row=await Promise.race([read(),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),timeoutMs)})]);}finally{clearTimeout(timer)}
+ return validDisplaySnapshot(row,context,options)?row:null;
+}
+function getDisplaySnapshot(sys,options={}){
+ return readDisplaySnapshot(()=>getSystemSnapshot(sys),options);
+}
+async function getAttendanceStartupPreview(month,selectRecords){
+ const context=displaySnapshotContext();
+ if(!context.credential)return null;
+ const key=systemKey('attendance')+'|startup-preview';
+ const cached=await readDisplaySnapshot(()=>get(key,{folder:false}),{month});
+ if(cached)return validDisplaySnapshot(cached,context,{month})?cached.data:null;
+ const full=await getDisplaySnapshot('attendance',{timeoutMs:10000});
+ if(!validDisplaySnapshot(full,context)||!full.data.fullDatabase||!Array.isArray(full.data.records))return null;
+ const data={ok:true,month,months:full.data.months,records:selectRecords(full.data.records)};
+ const row={key,kind:'system',system:'attendance',savedAt:full.savedAt,displayScope:context.scope,cacheEndpoint:context.endpoint,data};
+ // The folder keeps its full backup. Subsequent launches can read this small IndexedDB row.
+ rememberMemory(row);
+ void putLocal(row).catch(()=>{});
+ return data;
 }
 // Explicit read-only roster previews: ordinary authoritative fetches still bypass cache.
 function schedulePreviewData(data,month,scoped=false){
@@ -1440,7 +1474,7 @@ if(typeof window.addEventListener==='function'){
  window.__port79NativeCloudSyncReady=true;
 }
 
-window.Port79DataCache={preloadCurrent,getDisplaySnapshot,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
+window.Port79DataCache={preloadCurrent,getDisplaySnapshot,getAttendanceStartupPreview,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 if(!window.__p79BrowserBackgroundWorker&&!window.chrome?.webview?.postMessage&&typeof document!=='undefined'&&document?.head?.appendChild&&document?.createElement){
  // Shared by every management page without changing its own navigation flow.
  const src=document.querySelector?.('script[src*="port79-data-cache.js"]')?.src;
