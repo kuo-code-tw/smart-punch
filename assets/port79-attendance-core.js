@@ -363,7 +363,23 @@ function p79EveryDuplicateAttendanceRowAlreadySaved(payload,sameId){
   fullTime.test(String(row.timeStr||'').trim())&&
   p79AttendanceEditAlreadySaved(payload,row));
 }
-async function p79ReadAttendanceEditCloud(id,signal,context=null){
+// Only a full, identical original event qualifies. Never infer identity from the visible table alone.
+function p79IdenticalOriginalDuplicates(payload,rows){
+ if(!payload?.record||!Array.isArray(rows)||rows.length<2)return false;
+ const expected=payload.record,first=rows[0];
+ const full=/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/;
+ const type=r=>typeof getAttendanceRecordType==='function'?getAttendanceRecordType(r):String(r.status||'');
+ const stable=r=>JSON.stringify(Object.keys(r).sort().map(k=>[k,r[k]]));
+ const month=v=>String(v||'').replace(/\//g,'-').match(/^\d{4}-\d{2}/)?.[0];
+ if(!full.test(String(first.timeStr||''))||!full.test(String(payload.originalTimeStr||''))||
+    !full.test(String(expected.timeStr||''))||!month(first.timeStr)||month(first.timeStr)!==month(expected.timeStr)||
+    !String(first.empId||'').trim()||!String(first.attNo||'').trim()||
+    !['empId','attNo','id'].every(k=>String(expected[k]??'').trim()&&normalizeCompareValue(first[k])===normalizeCompareValue(expected[k]))||
+    !payload.originalPunchType||String(payload.originalPunchType)!==type(first)||type(expected)!==type(first)||
+    normalizeCompareValue(payload.originalTimeStr)!==normalizeCompareValue(first.timeStr))return false;
+ return rows.every(row=>stable(row)===stable(first));
+}
+async function p79ReadAttendanceEditCloud(id,signal,context=null,allowIdenticalRepair=false){
  const url=gasUrl();if(!url)throw new Error('未設定 GAS URL');
  const expected=context?.record||context;
  const months=[...new Set([context?.originalTimeStr,expected?.timeStr].map(value=>String(value||'').replace(/\//g,'-').match(/^\d{4}-\d{2}/)?.[0]).filter(Boolean))];
@@ -382,6 +398,9 @@ async function p79ReadAttendanceEditCloud(id,signal,context=null){
   if(sameId.length===1&&unique.length===1&&/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim()))return unique[0];
   if(sameId.length>1&&typeof p79EveryDuplicateAttendanceRowAlreadySaved==='function'&&
     p79EveryDuplicateAttendanceRowAlreadySaved(context?.record?context:{record:expected},sameId))return unique[0];
+  if(allowIdenticalRepair&&typeof p79IdenticalOriginalDuplicates==='function'&&p79IdenticalOriginalDuplicates(context,sameId)){
+   return {...sameId[0],p79IdenticalDuplicateCount:sameId.length};
+  }
   if(!sameId.length)throw Object.assign(new Error('正式月份主表已無此紀錄，舊修改已停止送出'),{retryable:false,recordAbsent:true,checkedMonths:months});
   if(sameId.length>1)throw Object.assign(new Error('正式主表有多筆共用紀錄編號的考勤，無法唯一確認班次或時間。請在待同步明細查看各筆雲端時間，原修改草稿保留；不得強制重送'),{retryable:false,ambiguousRecords:true});
   throw Object.assign(new Error('正式主表找不到身分及完整時間相符的考勤，修改草稿已保留'),{retryable:false});
@@ -683,7 +702,7 @@ async function send(payload,timeout=25000){
   const timer=setTimeout(()=>ctrl.abort(),timeout);
   try{
     if(['updateRecord','editRecord'].includes(String(payload.action||''))){
-      const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(payload),ctrl.signal,payload);
+      const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(payload),ctrl.signal,payload,true);
       if(p79AttendanceEditAlreadySaved(payload,cloud))return {ok:true,alreadySaved:true};
       if(normalizeCompareValue(payload.originalTimeStr)!==normalizeCompareValue(cloud.timeStr)||
          (payload.originalPunchType&&String(payload.originalPunchType)!==(typeof getAttendanceRecordType==='function'?getAttendanceRecordType(cloud):String(cloud.status)))){
@@ -691,6 +710,12 @@ async function send(payload,timeout=25000){
       }
       // Normalize only equivalent date formatting; never rebase a changed cloud time.
       body.originalTimeStr=cloud.timeStr;
+      if(cloud.p79IdenticalDuplicateCount>=2){
+        // Dedicated route: legacy GAS rejects the unknown action without writing.
+        // Never fall back to normal updateRecord for duplicated physical rows.
+        body.action='p79RepairIdenticalAttendanceEditV1';
+        body.expectedDuplicateCount=cloud.p79IdenticalDuplicateCount;
+      }
 
     }
     const r=await fetch(url,{
@@ -704,12 +729,17 @@ async function send(payload,timeout=25000){
     let data=null;
     try{data=JSON.parse(text)}catch(e){throw new Error('GAS 回傳不是 JSON')}
     if(!data?.ok){
+      if(body.action==='p79RepairIdenticalAttendanceEditV1'&&/未知操作|unknown action|unsupported/i.test(String(data?.error||'')))
+        throw Object.assign(new Error('相同考勤重複修復尚未部署至雲端，修改草稿保留'),{retryable:false});
       const err=new Error(String(data?.error||'雲端寫入失敗'));
       err.retryable=data?.retryable!==false;
       err.serverData=data;
       err.duplicatePunch=data?.duplicatePunch===true;
       throw err;
     }
+    if(body.action==='p79RepairIdenticalAttendanceEditV1'&&
+       (data.identicalAttendanceEditConfirmed!==true||String(data.id||'')!==payloadRecordId(payload)))
+      throw Object.assign(new Error('重複考勤尚未收到正式修復確認，修改草稿保留'),{retryable:false});
     const action=String(payload?.action||'');
     const employeePunch=['queueEmployeePunch','persistEmployeePunch'].includes(action)||
       (action==='addRecord'&&String(payload?.record?.source||'').toLowerCase().includes('employee'));
@@ -1516,6 +1546,17 @@ function p79ResumeTransientAttendanceEdits(){
   }
   if(changed)saveQueue(q);
 }
+function p79ResumeIdenticalDuplicateEdits(){
+ const q=readQueue();let changed=false;
+ for(const item of q){
+  if(!item?.paused||!['updateRecord','editRecord'].includes(String(item.payload?.action||'')))continue;
+  if(!/正式主表有多筆共用紀錄編號|相同考勤重複修復尚未部署至雲端/.test(String(item.lastError||'')))continue;
+  // Startup only: re-read the authoritative month. The ordinary conflict guard
+  // still pauses different people, times, notes or other nonidentical events.
+  item.paused=false;item.state='pending';item.nextRetryAt=Date.now()+1500;changed=true;
+ }
+ if(changed)saveQueue(q);
+}
 function p79ShortenTransientEditRetryWait(){
   const q=readQueue(),now=Date.now();let changed=false;
   for(const item of q){
@@ -1539,6 +1580,7 @@ function p79ShortenOldPunchRetryWait(){
 document.addEventListener('DOMContentLoaded',()=>{
   p79PruneVerifiedDeletedRecordRetries20261010();
   p79ResumeTransientAttendanceEdits();
+  p79ResumeIdenticalDuplicateEdits();
   p79ShortenTransientEditRetryWait();
   p79ShortenOldPunchRetryWait();
   updateUi();
