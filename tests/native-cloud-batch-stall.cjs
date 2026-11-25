@@ -84,6 +84,27 @@ test('expired manager login blocks all subsequent cloud reads',async()=>{
  assert.deepEqual(f.calls,['leave']);
  assert(res.slice(1).every(x=>x.skipped));
 });
+test('Windows startup counts workhours only after the real month bundle is confirmed',async()=>{
+ for(const mode of ['confirmed','reused','preview','failed']){
+  const f=suite();const calls=[];
+  f.context.window={P79WorkhoursCache:{prepareForStartup:async args=>{
+   calls.push(args);assert.equal(args.guard(),true);
+   if(mode==='failed')throw Error('month unavailable');
+   return {preview:mode==='preview',source:mode==='reused'?'本機有效快取':'雲端'};
+  }}};
+  f.context.sessionStorage={getItem:()=>JSON.stringify({adminRole:'superadmin'})};
+  f.context.ymNow=()=> '2026-11';
+  const res=await f.run({quickFirst:true,historyOnDemand:true,prepareWorkhours:true});
+  assert.equal(calls.length,1);assert.equal(calls[0].month,'2026-11');
+  assert.equal(res.length,6);
+  const work=res.find(x=>x.system==='workhours');
+  const states=f.progress.filter(x=>x.sys==='workhours').map(x=>x.state);
+  const ok=mode==='confirmed'||mode==='reused';
+  assert.equal(work.ok,ok);
+  assert.equal(states.at(-1),mode==='confirmed'?'done':mode==='reused'?'reused':'error');
+  assert.equal(f.writes.includes('workhours'),false,'Do not replace complete overtime bundle with attendance-only snapshot');
+ }
+});
 test('Windows and homepage report real month counts and do not count failures as completed',()=>{
  assert.match(js,/const timeoutMs=readOptions\?\.interactive===true\?30000:DOWNLOAD_TIMEOUT_MS/);
  assert.match(js,/fetchJson\('historyGetMonthData',\{token:t,type,month:m\},'',readOptions\)/);
@@ -92,7 +113,7 @@ test('Windows and homepage report real month counts and do not count failures as
  assert.match(js,/if\(state==='done'\|\|state==='reused'\)done\.add\(sys\)/);
  assert.match(js,/status\('stalled',lastDetail/);
  assert.match(js,/monthCompleted:Math\.max\(0,Math\.min\(240,lastMonthCompleted\)\)/);
- assert.match(js,/\{quickFirst:true,resumeExisting:window\.__port79WorkerResumeOnly===true,historyOnDemand\}/);
+ assert.match(js,/\{quickFirst:true,resumeExisting:window\.__port79WorkerResumeOnly===true,historyOnDemand,prepareWorkhours:true\}/);
  assert.match(native,/monthCompleted=Math\.Max\(0,Math\.Min\(240,data\.monthCompleted\)\)/);
  assert.match(native,/monthTotal=Math\.Max\(0,Math\.Min\(240,data\.monthTotal\)\)/);
  assert.match(compact,/count\+'\/'\+total\+\(monthTotal\?/);
