@@ -45,7 +45,10 @@ function selectedQuotaByPerson(rows,reviewKeys){
  const counts=new Map(),seen=new Set();
  for(const row of rows){
   if(!['ready','plan','reference'].includes(row.kind)||!['例','休','國'].includes(row.category)||!/^\d{4}-\d{2}-\d{2}$/.test(row.date))continue;
-  if(row.kind==='reference'?(row.eligible!==true||!reviewSelected(reviewKeys,row)):selectionMode(row)!=='native'||!row.checked)continue;
+  // Count an eligible checked reference OR a selected/saved internal supplement.
+  // Saved drafts remain a display-only allocation after their checkbox is disabled.
+  const draft=row.kind==='reference'&&row.supplementDraftEligible===true&&row.eligible!==true;
+  if(row.kind==='reference'?(draft?!(row.draftSaved===true||reviewSelected(reviewKeys,row)):(row.eligible!==true||!reviewSelected(reviewKeys,row))):selectionMode(row)!=='native'||!row.checked)continue;
   const emp=norm(row.empId||row.id),key=emp+'|'+row.date;
   if(!emp||seen.has(key))continue;
   seen.add(key);
@@ -67,7 +70,7 @@ function quotaSelectionPreview(progress,counts){
 function quotaDisplayMarkup(progress,allowPreview=true){
  const preview=allowPreview&&!!progress&&Object.values(progress).some(p=>p.selected>0&&p.previewAllowed!==false);
  const label=quotaProgressLabel(progress,preview)||'額度待核對';
- const title=preview?'勾選試算（含預排與待核對日期）；不代表正式申報成功，實際額度以雲端確認為準':'已使用額度／剩餘缺額（天）';
+ const title=preview?'勾選／已儲存補報草案及預排額度試算；不代表正式申報成功，實際額度以雲端確認為準':'已使用額度／剩餘缺額（天）';
  return '<small class="mr-ux-quota" style="display:block;color:'+(preview?'#075985':'#475569')+';margin-top:4px" title="'+esc(title)+'">'+esc(label)+(preview?' <span style="font-size:10px">試算</span>':'')+'</small>';
 }
 // Date colours describe the actual report, never an inferred range of completed days.
