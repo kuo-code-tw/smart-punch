@@ -728,11 +728,20 @@ async function send(payload,timeout=25000){
   }
 }
 
+// Coordinate the actual preflight + write across attendance/home/work-hours tabs.
+async function p79SendAttendanceInBrowserLane(payload,timeout){
+  const locks=typeof navigator!=='undefined'?navigator.locks:null;
+  if(!locks||typeof locks.request!=='function')return send(payload,timeout);
+  return locks.request('port79-attendance-cloud-write-v1',{mode:'exclusive',ifAvailable:true},lock=>{
+    if(!lock)throw Object.assign(new Error('考勤同步通道忙碌，其他分頁正在同步'),{retryable:true});
+    return send(payload,timeout);
+  });
+}
 function p79TransientAttendanceError(error){
   if(error?.retryable===false)return false;
   const message=String(error?.message||error||'');
   if(/CONFLICT|STALE_RECORD|原時間|原始時間|身分|權限|登入|已被|已由|已刪除|找不到|不存在|缺少/i.test(message))return false;
-  return /雲端目前正在處理其他資料|Failed to fetch|NetworkError|network request failed|Load failed|雲端.*忙碌|讀取逾時|寫入逾時/i.test(message)||error?.name==='AbortError';
+  return /雲端目前正在處理其他資料|Failed to fetch|NetworkError|network request failed|Load failed|雲端.*忙碌|考勤同步通道忙碌|讀取逾時|寫入逾時/i.test(message)||error?.name==='AbortError';
 }
 function p79PauseAttendanceWrite(payload,error,attempts){
   const edit=['updateRecord','editRecord'].includes(String(payload?.action||''));
@@ -747,8 +756,8 @@ function p79PunchUploadPriority(item){
   if(['syncRecords','repairAttendanceRecords'].includes(action))return 4;
   return 3;
 }
-function p79OrderedReadyQueue(q,force,now){
-  return q.filter(x=>!x.paused&&(force||Number(x.nextRetryAt||0)<=now))
+function p79OrderedReadyQueue(q,force,now,attempted=null){
+  return q.filter(x=>!x.paused&&(!attempted||!attempted.has(x.key))&&(force||Number(x.nextRetryAt||0)<=now))
     .map((item,index)=>({item,index}))
     .sort((a,b)=>p79PunchUploadPriority(a.item)-p79PunchUploadPriority(b.item)||a.index-b.index)
     .map(x=>x.item);
@@ -765,13 +774,15 @@ async function drain(force=false){
   syncBatchTotal=Math.max(1,q.length);
   syncBatchDone=0;
   syncBatchStartedAt=Date.now();
+  const attempted=new Set();
   try{
     while(true){
       q=readQueue();
       if(!q.length)break;
       const now=Date.now();
-      const item=p79OrderedReadyQueue(q,force,now)[0];
+      const item=p79OrderedReadyQueue(q,force,now,attempted)[0];
       if(!item)break;
+      attempted.add(item.key);
 
       currentOpText=desc(item.payload);
       activeSyncRecordId=payloadRecordId(item.payload);
@@ -780,7 +791,7 @@ async function drain(force=false){
       updateUi();
 
       try{
-        const data=await send(item.payload,45000);
+        const data=await p79SendAttendanceInBrowserLane(item.payload,45000);
         // 寫入 ACK 不能跳過其他人尚未讀取的 Delta；游標只由讀取結果推進。
 
         const rid=item?.payload?.record?.id ?? item?.payload?.id;
@@ -852,7 +863,9 @@ async function drain(force=false){
         activeSyncRecordId='';
         currentOpText=cur.paused?'已暫停，等待核對':'等待重試';
         updateUi();
-        break;
+        // A record-specific conflict must not block unrelated records. A shared
+        // transport/lock failure yields instead of flooding the busy cloud.
+        if(!cur.paused&&p79TransientAttendanceError(err))break;
       }
     }
   }finally{
@@ -867,6 +880,7 @@ async function drain(force=false){
 // V6.0.12：管理員手動按「快速同步」時使用。
 // 同一 record id 絕不並行；不同 record id 最多 4 筆同時送。
 async function drainFast(force=true, concurrency=4){
+  if(typeof navigator!=='undefined'&&navigator.locks&&typeof navigator.locks.request==='function')return drain(force);
   if(writing)return false;
   if(navigator.onLine===false){updateUi();return false}
 
@@ -878,10 +892,11 @@ async function drainFast(force=true, concurrency=4){
   syncBatchTotal=Math.max(1,q.length);
   syncBatchDone=0;
   syncBatchStartedAt=Date.now();
+  const attempted=new Set();
 
   const processOne=async(item)=>{
     try{
-      const data=await send(item.payload,45000);
+      const data=await p79SendAttendanceInBrowserLane(item.payload,45000);
 
       // 保留未讀 Delta，讓其他人的同時修改仍可同步。
 
@@ -929,7 +944,7 @@ async function drainFast(force=true, concurrency=4){
       cur.paused=p79PauseAttendanceWrite(cur.payload,err,attempts);
         cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts,err);
       saveQueue(current.map(x=>x.key===cur.key?cur:x));
-      return {ok:false,item,error:err,retryable:true};
+      return {ok:false,item,error:err,retryable:!cur.paused&&p79TransientAttendanceError(err)};
     }
   };
 
@@ -939,7 +954,7 @@ async function drainFast(force=true, concurrency=4){
       if(!q.length)break;
 
       const now=Date.now();
-      const eligible=p79OrderedReadyQueue(q,force,now);
+      const eligible=p79OrderedReadyQueue(q,force,now,attempted);
       if(!eligible.length)break;
 
       const group=[];
@@ -979,6 +994,7 @@ async function drainFast(force=true, concurrency=4){
       activeSyncRecordId=group.length===1?payloadRecordId(group[0]?.payload):'';
       updateUi();
 
+      for(const item of group)attempted.add(item.key);
       const results=await Promise.all(group.map(processOne));
       if(results.some(r=>r?.retryable===true))break;
 
@@ -1297,7 +1313,7 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
     updateUi();
 
     try{
-      const data=await send(payload,45000);
+      const data=await p79SendAttendanceInBrowserLane(payload,45000);
       const latestConfirmed=remove(opKey(payload),payload);
       // 保留未讀 Delta，讓其他人的同時修改仍可同步。
 
