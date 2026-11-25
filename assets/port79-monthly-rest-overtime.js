@@ -1017,7 +1017,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v21';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261124-quota-progress-v22&submit=20261125-feedback';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1459,13 +1459,13 @@ async function open(settings={}){
   if(selected.some(r=>r.category==='例')&&!confirm('例假出勤須符合法定天災、事變或突發事件等例外。請確認具備法定事由及證明，不能只為補滿未休額度。仍要進入正式核對嗎？'))return;
   const seen=new Set();for(const r of selected){const key=id(r.empId)+'|'+r.date;if(!r.date.startsWith(loadedMonth+'-')||r.date>today()||seen.has(key)){setStatus('日期不符或同一人同日重複，請調整後再申報。');return;}seen.add(key);}
   if(selected.some(r=>!fullDayRule(r.rule))){setStatus('未休假加班只允許完整8小時的申報，不能用未滿8小時、超過8小時或申報時段不足8小時的規則。');return;}
-  busy=true;stop=false;controls(true);lastFailure='';let count=0,failure='',batch=null;
+  busy=true;stop=false;controls(true);lastFailure='';let count=0,failure='',batch=null,verifiedSnapshot=null,activeRow=null;
   try{
    setStatus('正在重新核對未休額度與已申報紀錄…');
    const fresh=await a.snapshot(loadedMonth,false,false,true),available=new Map(),usage=new Map();batch=fresh.saveContext;
    if(fresh?.provisional===true||fresh?.readOnlyDueAttendance===true||fresh?.attendanceEvidence?.complete!==true)throw Error('正式考勤尚未完整核對，本次未送出正式申報');
    for(const emp of loadedPeople.filter(emp=>selected.some(r=>id(r.empId)===id(emp.empId)))){const roster=fresh.schedules.find(x=>id(x.empId)===id(emp.empId))?.schedule;if(!roster)throw Error(emp.name+' 班表已變更，請重新讀取');available.set(id(emp.empId),balance(emp,roster,loadedMonth,fresh).remaining);}
-   for(const r of selected){const roster=fresh.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule,meta=roster?.__meta?.[r.date]||{};
+   for(const r of selected){activeRow=r;const roster=fresh.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule,meta=roster?.__meta?.[r.date]||{};
     if(meta.overtimeReport?.id===r.id&&meta.overtimeReport.planned!==true&&meta.overtimeReport.category===r.category&&meta.overtimeReport.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.checked=false;r.status='已核對儲存成功';continue;}
     if(r.date<forwardReportStart(loadedMonth,q('#mrCutoff').value))throw Error(r.name+' 早於你設定的本次申報起日，請重新讀取');
     // Genuine completed attendance remains on its ORIGINAL day even if reported later.
@@ -1481,20 +1481,21 @@ async function open(settings={}){
     const key=id(r.empId)+'|'+r.category,n=(usage.get(key)||0)+1;usage.set(key,n);if(n>(available.get(id(r.empId))?.[r.category]||0))throw Error(r.name+'「'+r.category+'」勾選超過目前未休額度，請減少勾選或重新讀取');
    }
    paint();controls(true);
-   for(const r of selected){if(stop)break;if(r.saved)continue;setStatus('正在申報 '+(count+1)+'／'+selected.length+'：'+r.name+' '+r.date+' '+r.rule[1]);
+   for(const r of selected){if(stop)break;if(r.saved)continue;activeRow=r;setStatus('正在申報 '+(count+1)+'／'+selected.length+'：'+r.name+' '+r.date+' '+r.rule[1]);
     const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),forEmpId:'',note:backfillContext(loadedMonth).note,preventReplace:false,createdAt:Date.now()};
     sessionStorage.setItem(KEY,JSON.stringify(draft));r.attempted=true;r.status='送出中／待雲端讀回';paint();controls(true);
     let result;try{result=await a.saveReport(draft,batch);}catch(error){r.status='未確認成功：'+error.message;paint();controls(true);throw error;}
     if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id)throw Error('雲端尚未確認接收此筆申報');
     r.acknowledged=true;r.checked=false;r.status='雲端已接收／批次核對中';count++;paint();controls(true);
    }
-  }catch(e){failure=e.message;}
+  }catch(e){failure=(activeRow?activeRow.name+' '+activeRow.date+'：':'')+String(e?.message||e);if(activeRow&&!activeRow.attempted&&!activeRow.saved)activeRow.status='申報核對失敗：'+failure;}
   finally{
    const pending=model.rows.filter(r=>r.attempted&&!r.saved);
    if(pending.length){
     setStatus('正在一次核對 '+pending.length+' 筆雲端申報…');
     try{
      const verified=await a.snapshot(loadedMonth,true,false,true);
+     verifiedSnapshot=verified;
      for(const r of pending){const report=verified.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date]?.overtimeReport;
       if(report?.id===r.id&&report.planned!==true&&report.category===r.category&&report.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.acknowledged=true;r.checked=false;r.status='雲端讀回已確認';}
       else{r.checked=true;r.status='讀回未確認；保留原編號重試核對';}
@@ -1508,7 +1509,7 @@ async function open(settings={}){
    // 成功申報後立即用最新雲端重新建立建議，已完成項目直接消失，不需關閉重開。
    if(confirmed&&!failure&&!stop){
     try{
-     const latest=await a.snapshot(loadedMonth,false,false,true);
+     const latest=verifiedSnapshot||await a.snapshot(loadedMonth,true,false,true);
      if(!el.open||q('#mrMonth').value!==loadedMonth)return;
      snapshot=latest;model=plan(latest,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan,cutoff:q('#mrCutoff').value});
      g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedRows||[],loadedPeople);
