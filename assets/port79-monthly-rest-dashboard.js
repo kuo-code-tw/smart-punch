@@ -120,7 +120,7 @@ function sourceRows(el){
   const td=tr.cells,pick=$(tr,'.plan-pick');
   return {kind:'plan',id:pick.dataset.planIndex,empId:tr.dataset?.emp||'',date:td[1]?.textContent?.trim()||'',name:td[3]?.textContent?.trim()||'',
     category:td[4]?.textContent?.trim()||'',period:td[5]?.textContent?.trim()||'',hours:tr.dataset?.hours||'—',
-    quotaProgress:rowQuotaProgress(tr),status:td[6]?.textContent?.trim()||'預排待核',checked:!!pick.checked,disabled:!!pick.disabled};
+    quotaProgress:rowQuotaProgress(tr),status:td[6]?.textContent?.trim()||'預排待核',saved:tr.dataset?.saved==='true',checked:!!pick.checked,disabled:!!pick.disabled};
  });
  const prior=$$(el,'#mrExistingRows tr').filter(tr=>tr.cells.length===8).map(tr=>{
   const td=tr.cells;
@@ -155,6 +155,9 @@ function sourceRows(el){
 }
 // One employee/work-date per visible row. Native candidates retain their
 // exact controller IDs; a reference never becomes a payable report.
+function quotaFullyAllocated(progress){
+ return !!progress&&['例','休','國'].every(c=>progress[c]&&Number.isFinite(Number(progress[c].remaining))&&progress[c].remaining!=null&&Number(progress[c].remaining)===0);
+}
 function dailyPendingRows(data){
  const people=new Map(data.roster.map(r=>[String(r.id).trim().toUpperCase(),r]));
  const key=(emp,date)=>String(emp||'').trim().toUpperCase()+'|'+date;
@@ -163,13 +166,15 @@ function dailyPendingRows(data){
  const confirmedDates=new Set((data.prior||[]).filter(r=>r.status==='已核對出勤'&&r.empId&&r.date).map(r=>key(r.empId,r.date)));
  for(const row of [...data.ready,...data.planned]){
   const person=people.get(String(row.empId||'').trim().toUpperCase());
+  // Completed quotas leave the actionable list, not the official record archive.
+  if(quotaFullyAllocated(row.quotaProgress||person?.quotaProgress)||row.kind==='plan'&&row.saved===true)continue;
   const item={...row,role:person?.role||row.role||'',quota:person?.category||'',quotaProgress:row.quotaProgress||person?.quotaProgress||null,lastReported:person?.lastReported||''};
   // The real dated row takes precedence over the person's preview of it.
   const k=key(row.empId||row.audit||row.name,row.date);
   if(dated.has(k))continue;
   dated.set(k,item);result.push(item);
  }
- for(const person of data.roster.filter(r=>r.reviewType==='deficit')){
+ for(const person of data.roster.filter(r=>r.reviewType==='deficit'&&!quotaFullyAllocated(r.quotaProgress))){
   const covered=new Set(result.filter(r=>String(r.empId||'').trim().toUpperCase()===String(person.id).trim().toUpperCase()).map(r=>r.date));
   for(const hint of person.suggestions||[]){
    if(!hint.date||covered.has(hint.date))continue;
@@ -349,11 +354,12 @@ function mount(el){
   const data=sourceRows(el);
   const pendingReports=data.prior.filter(r=>r.status!=='已核對出勤'&&!/已取消|歷史版本/.test(r.status));
   const verified=data.prior.filter(r=>r.status==='已核對出勤'&&!/已取消|歷史版本/.test(r.status));
-  const deficits=data.roster.filter(r=>r.reviewType==='deficit');
+  const deficits=data.roster.filter(r=>r.reviewType==='deficit'&&!quotaFullyAllocated(r.quotaProgress));
   const exceptions=data.roster.filter(r=>r.reviewType!=='deficit');
   const daily=dailyPendingRows(data);
   const pending=daily.filter(r=>!r.residualOnly);
-  const audit=[...pendingReports,...exceptions,...daily.filter(r=>r.residualOnly)];
+  const savedPlanRows=data.planned.filter(r=>r.saved&&!pendingReports.some(p=>norm(p.empId)===norm(r.empId)&&p.date===r.date)).map(r=>({...r,kind:'existing',status:'預排已儲存（待出勤）'}));
+  const audit=[...pendingReports,...savedPlanRows,...exceptions.filter(r=>!quotaFullyAllocated(r.quotaProgress)),...daily.filter(r=>r.residualOnly)];
   return {data,pending,audit,verified,deficits,exceptions};
  }
  function kind(row){
@@ -403,7 +409,7 @@ function mount(el){
    const formalCount=data.ready.filter(r=>r.checked&&!r.disabled).length;
    const planCount=data.planned.filter(r=>r.checked&&!r.disabled).length;
    const needs=deficits.length;
-   const ready=data.ready.filter(r=>kind(r)==='ready').length;
+   const ready=pending.filter(r=>kind(r)==='ready').length;
    const sourceLoaded=!!text(el,'#mrAuditSummary');
    const pendingTotal=pending.filter(r=>r.kind!=='roster').length;
    q('#mrUxPending').textContent=sourceLoaded?pendingTotal+' 筆':'—';
@@ -625,5 +631,5 @@ function mount(el){
  },{once:true});
  render();
 }
-global.P79MonthlyRestDashboard={mount,submissionMessage,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,selectedPlanPeople,selectedDatedReferences,dailyPendingRows,selectedQuotaByPerson,quotaSelectionPreview,quotaProgressLabel,quotaDisplayMarkup,filingDateState,filingDateMarkup,latestConfirmedDates};
+global.P79MonthlyRestDashboard={mount,submissionMessage,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,selectedPlanPeople,selectedDatedReferences,dailyPendingRows,quotaFullyAllocated,selectedQuotaByPerson,quotaSelectionPreview,quotaProgressLabel,quotaDisplayMarkup,filingDateState,filingDateMarkup,latestConfirmedDates};
 })(window,document);

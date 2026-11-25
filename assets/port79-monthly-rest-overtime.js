@@ -1188,7 +1188,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v41';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v42';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1359,7 +1359,7 @@ async function open(settings={}){
       ' 筆（尚未建立）｜未能安排 '+unfilled+' 天'+(weeklyReview?'｜例休週期待核 '+weeklyReview+' 筆':'')+'；尚未發生或尚未核實，不計入正式申報';
     q('#mrPlannedRows').innerHTML=upcoming.map(r=>{
       const emp=loadedPeople.find(e=>id(e.empId)===id(r.empId))||{};
-      return '<tr data-emp="'+esc(r.empId)+'"'+quotaAttr(r.empId)+' data-hours="'+esc(r.rule?.[2]||'')+' 小時"><td><input type="checkbox" class="plan-pick" data-plan-index="'+model.plannedRows.indexOf(r)+'" '+(r.checked?'checked':'')+' '+(r.saved?'disabled':'')+' aria-label="預排 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date)+'</td><td>'+esc(job(emp))+'</td><td>'+esc(r.name)+'</td><td class="'+esc(r.category)+'">'+
+      return '<tr data-emp="'+esc(r.empId)+'" data-saved="'+String(r.saved===true)+'"'+quotaAttr(r.empId)+' data-hours="'+esc(r.rule?.[2]||'')+' 小時"><td><input type="checkbox" class="plan-pick" data-plan-index="'+model.plannedRows.indexOf(r)+'" '+(r.checked?'checked':'')+' '+(r.saved?'disabled':'')+' aria-label="預排 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date)+'</td><td>'+esc(job(emp))+'</td><td>'+esc(r.name)+'</td><td class="'+esc(r.category)+'">'+
         esc(r.category)+'</td><td>'+esc(r.rule?.[1])+'</td><td>'+esc(r.status)+'</td></tr>';
     }).join('')||'<tr><td colspan="7">目前沒有可產生的月底預排建議；請查看各單位缺額和班表限制</td></tr>';
     const review=rosterReviewRows(model,chosenPeople());
