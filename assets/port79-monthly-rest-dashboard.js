@@ -166,6 +166,9 @@ function dailyPendingRows(data){
 // Selection for inspection is independent of the official submit checkbox.
  // Pending/uncertain rows may be inspected even when cloud rules block filing.
 function selectionKey(row){return JSON.stringify([row.kind,row.id,row.date,row.name,row.category,row.period]);}
+function selectedPlanPeople(rows,selected){
+ return [...new Map(rows.filter(r=>r.canPreplan&&['roster','reference'].includes(r.kind)&&reviewSelected(selected,r)).map(r=>[norm(r.empId||r.id),r.empId||r.id])).values()];
+}
 function personActionRows(data,person){
  const key=String(person?.id||'').trim().toUpperCase();
  if(!key||person?.kind!=='roster'||person.reviewType!=='deficit')return [];
@@ -394,18 +397,19 @@ function mount(el){
      (selectedPending.length>8?'<small>另有 '+(selectedPending.length-8)+' 項已勾選</small>':''):
      '勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。';
    const nativeSave=$(el,'#mrSave'),nativePlan=$(el,'#mrSavePlans');
-   // A dated reference must not silently become a real report. When a single
-   // eligible person is selected, reuse the existing guarded plan editor.
-   const manualPlanPeople=new Map(selectedReview.filter(r=>r.canPreplan&&['roster','reference'].includes(r.kind)).map(r=>[norm(r.empId||r.id),r]));
-   const canOpenPlan=state.tab==='pending'&&!originalMonth.disabled&&manualPlanPeople.size===1;
-   const hasNativePlans=planCount>0&&!nativePlan?.disabled;
+   // A reference remains a reference. Open the existing guarded editor with
+   // every selected eligible employee, including a multi-person selection.
+   const manualPlanPeople=selectedPlanPeople(state.tab==='audit'?audit:pending,state.reviewSelected);
+   const canOpenPlan=state.tab!=='done'&&!originalMonth.disabled&&manualPlanPeople.length>0;
+   const hasNativePlans=state.tab==='pending'&&planCount>0&&!nativePlan?.disabled;
    q('#mrUxSavePlan').disabled=!hasNativePlans&&!canOpenPlan;
-   q('#mrUxSavePlan').textContent=hasNativePlans?'▣ 儲存預排（'+planCount+' 筆）':canOpenPlan?'▣ 設定預排（1 人）':'▣ 儲存預排（0 筆）';
-   q('#mrUxSavePlan').title=!hasNativePlans&&manualPlanPeople.size>1?'尚未建立可儲存的日期與時段，請逐人使用設定預排；不會將參考日直接存成加班。':'預排未正式申報，日期及時段須確認。';
+   q('#mrUxSavePlan').textContent=hasNativePlans?'▣ 儲存預排（'+planCount+' 筆）':canOpenPlan?'▣ 設定預排（'+manualPlanPeople.length+' 人）':'▣ 儲存預排（0 筆）';
+   q('#mrUxSavePlan').title='預排未正式申報；可先選人員、日期及時段，儲存時再核對正式資料。';
    q('#mrUxSubmit').disabled=!formalCount||!!nativeSave?.disabled||!/申報/.test(nativeSave?.textContent||'');
    q('#mrUxSubmit').textContent='➤ 正式申報（'+formalCount+' 筆）';
-   if(state.tab!=='pending'){q('#mrUxSavePlan').disabled=true;q('#mrUxSubmit').disabled=true;}
-   q('#mrUxHint').textContent=state.submitting?submissionMessage(info,'正在送出正式申報…',true):state.tab==='audit'?'異常核對唯讀，不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
+   if(state.tab!=='pending')q('#mrUxSubmit').disabled=true;
+   if(state.tab==='done')q('#mrUxSavePlan').disabled=true;
+   q('#mrUxHint').textContent=state.submitting?submissionMessage(info,'正在送出正式申報…',true):canOpenPlan&&!hasNativePlans?'已選人員可先設定預排；儲存前核對日期、額度及正式資料':state.tab==='audit'?'異常核對不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
    const latestDates=latestConfirmedDates(data.prior);
    q('#mrUxRows').innerHTML=shown.map(r=>{
     const quota=r.quotaProgress;
@@ -520,11 +524,11 @@ function mount(el){
   if(button.dataset.action==='preplan'&&['roster','reference'].includes(row?.kind)&&row.canPreplan&&!originalMonth.disabled)el.p79OpenMonthlyRestPlan?.(row.empId||row.id);
  });
  q('#mrUxSavePlan').onclick=()=>{
-  if(state.tab!=='pending'||originalMonth.disabled)return;
+  if(state.tab==='done'||originalMonth.disabled)return;
   const button=$(el,'#mrSavePlans'),view=currentView();
-  if(button&&!button.disabled&&view.data.planned.some(r=>r.checked&&!r.disabled)){button.click();return;}
-  const people=new Map(view.pending.filter(r=>r.canPreplan&&['roster','reference'].includes(r.kind)&&reviewSelected(state.reviewSelected,r)).map(r=>[norm(r.empId||r.id),r]));
-  if(people.size===1){const row=people.values().next().value;el.p79OpenMonthlyRestPlan?.(row.empId||row.id);}
+  if(state.tab==='pending'&&button&&!button.disabled&&view.data.planned.some(r=>r.checked&&!r.disabled)){button.click();return;}
+  const people=selectedPlanPeople(state.tab==='audit'?view.audit:view.pending,state.reviewSelected);
+  if(people.length)el.p79OpenMonthlyRestPlan?.(people);
  };
  q('#mrUxSubmit').onclick=()=>{
   if(state.tab!=='pending')return;
@@ -574,5 +578,5 @@ function mount(el){
  },{once:true});
  render();
 }
-global.P79MonthlyRestDashboard={mount,submissionMessage,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,dailyPendingRows,quotaProgressLabel,quotaDisplayMarkup,filingDateState,filingDateMarkup,latestConfirmedDates};
+global.P79MonthlyRestDashboard={mount,submissionMessage,sourceRows,periodLabel,selectionKey,selectionMode,markForReview,reviewSelected,personActionRows,selectedPlanPeople,dailyPendingRows,quotaProgressLabel,quotaDisplayMarkup,filingDateState,filingDateMarkup,latestConfirmedDates};
 })(window,document);
