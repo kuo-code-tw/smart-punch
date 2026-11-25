@@ -517,7 +517,10 @@ function plan(snapshot,people,month,rules,options={}){
    if(date<nextReportDate)continue; // Earlier unresolved attendance stays in the audit ledger.
    if((b.typhoonDates||[]).includes(date)||!['早','中','晚','國','休','例'].includes(roster[date])||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
    const originalCategory=automaticRestCategory(roster,date,month);
-   if(!originalCategory)continue;
+   if(!originalCategory){
+    if(date>=currentDate&&['早','中','晚'].includes(roster[date]))for(const category of ['休','國'])blocked(date,category,'原排'+roster[date]+'班，沒有已確認的'+category+'假別');
+    continue;
+   }
    const pairs=pairsByKey.get(id(emp.empId)+'|'+date)||[];
    const verified=date<=currentDate&&pairs.length===1&&fullDayEvidence(snapshot,emp.empId,date,pairs[0]);
    // 預排從今天一路看到月底；今天尚在班內可列草案，已結束且沒有打卡不可假裝出勤。
@@ -792,13 +795,13 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
    if(!(b.remaining[category]>0)||originalCategory&&originalCategory!==category)continue;
    const rule=rules.find(r=>r[0]===category&&fullDayRule(r)&&minute(r[6])===minute(period[0])&&minute(r[7])===minute(period[1]));
    const documented=documentedFutureRestCategory(roster,date,month,category);
-   const issue=rule&&documented?manualRestPlanIssue(snapshot,emp,month,date,rule,asOf):'';
+   const issue=!documented?'原排'+original+'，沒有已確認的'+category+'假別':!rule?'沒有對應的正式8小時規則':manualRestPlanIssue(snapshot,emp,month,date,rule,asOf);
    // A consistent neighboring shift is a suggested future period only. The
     // operator's batch confirmation may select it; fresh quota/weekly guards
     // above still apply, and it must never be treated as actual attendance.
     const eligible=!!rule&&documented&&!issue;
-   const note=eligible?source+'；可勾選批次預排（未正式申報）':shifts[original]?(originalCategory?source+'；加班條件待核，不可直接申報':source+'；原排正常班，假別須先核對，不可直接申報'):source+'；'+(issue||(!rule?'無相符正式加班規則':'班別尚需確認'))+'，不可直接申報';
-   out.push({date,category,period:period.map(v=>String(v).includes(':')?String(v):String(v).padStart(2,'0')+':00').join(' – '),note,referenceOnly:true,eligible,rank:eligible?0:originalCategory===category?1:2});
+   const note=eligible?source+'；可勾選批次預排（未正式申報）':source+'；'+(issue||'班別尚需確認')+'，不可直接申報';
+   out.push({date,category,period:period.map(v=>String(v).includes(':')?String(v):String(v).padStart(2,'0')+':00').join(' – '),note,referenceOnly:true,eligible,issue,rank:eligible?0:originalCategory===category?1:2});
   }
  }
  return out.sort((a,b)=>Number(!!b.actualReference)-Number(!!a.actualReference)||a.rank-b.rank||a.date.localeCompare(b.date));
@@ -1155,7 +1158,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-weekly-layout-v31';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-eligibility-layout-v33';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1500,8 +1503,11 @@ async function open(settings={}){
     const meta=roster?.__meta?.[row.date]||{};
     const relevant=(next.reviewNotes?.[id(row.empId)]||[]).filter(x=>x.category===row.category&&
      (mode==='plan'?x.date>=today():x.date<=today()));
-    const reason=meta.overtimeReport?'原日期已有加班或預排，保留原編號，未另建':blocked(row)||row.attempted?'原寫入尚待核對，不另建日期':!roster?'缺少正式班表':'已搜尋本月符合'+row.category+'假別的其他日期，'+
-      (relevant.length?[...new Set(relevant.map(x=>x.reason))].slice(0,2).join('／'):'未找到符合出勤、額度及週期的可用時段');
+    const balanceRow=next.balances.find(b=>id(b.emp.empId)===id(row.empId));
+    const sameCategoryFormal=next.rows.filter(r=>id(r.empId)===id(row.empId)&&r.category===row.category&&!r.saved);
+    const exactRef=(next.rosterReferences?.[id(row.empId)]||[]).find(r=>r.date===row.date&&r.category===row.category);
+    const reasons=[exactRef?.issue,...relevant.map(x=>x.date.slice(5)+' '+x.reason)].filter(Boolean);
+    const reason=meta.overtimeReport?'原日期已有加班或預排，保留原編號，未另建':blocked(row)||row.attempted?'原寫入尚待核對，不另建日期':!roster?'缺少正式班表':!balanceRow?'班表不完整，無法計算額度':!balanceRow.remaining[row.category]?'最新雲端'+row.category+'剩餘額度為0':mode==='plan'&&sameCategoryFormal.length>=balanceRow.remaining[row.category]?'缺額已有 '+sameCategoryFormal.length+' 筆實際出勤候選，請先正式申報':'原班表 '+(roster[row.date]||'未排')+'；'+([...new Set(reasons)].slice(0,3).join('／')||'本月無符合原假別及8小時規則的候選');
     rejected.push((row.name||row.empId)+' '+row.date+'：'+reason);
    }
    if(!matched.length){setStatus('已自動搜尋本月其他日期，仍無符合'+(mode==='plan'?'預排':'正式申報')+'條件的時段；'+rejected.slice(0,8).join('；')+(rejected.length>8?'；另 '+(rejected.length-8)+' 筆待核':'')+'。未寫入資料。');return;}
