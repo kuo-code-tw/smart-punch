@@ -361,6 +361,46 @@
   saveValidationContexts.set(request,{...context,...credentials,...scope});
   return {rules,cloud:context.cloud};
  }
+ // Background queue is intentionally limited to existing, independent planned
+ // reviews. All cloud checks and the original report ID remain mandatory.
+ async function runQueuedReview(draft,stage,guard){
+  const current=()=>{if(!guard()||!global.p79OvertimeContext?.canReport?.())throw Error('登入或申報權限已變更，停止背景申報');};
+  current();
+  if(!draft?.id||draft.preventReplace!==true||draft.plannedReview!==true||draft.manualPlan===true||draft.leaveHandoffId||draft.forEmpId||draft.overtimeDate!==draft.date||draft.coverDate!==draft.date||!['休','例','國','延'].includes(draft.rule?.category))throw Error('此申報不符合背景上傳條件');
+  const validation=await prepareSaveValidation(draft,true,()=>{current();stage('checking','雲端忙碌，重試核對');},{onStage:label=>{current();stage('checking',label);}});
+  current();
+  const latest=validation.rules,active=activeReportRows(latest.rows,latest.config);
+  if(!typeOptions(latest.config,active).some(option=>option.name===draft.rule.typeName)||!active.some(row=>JSON.stringify(report(row))===JSON.stringify(draft.rule)))throw Error('所選加班類型、時段或換算已變更，請重新開啟原申報');
+  const actual=validation.cloud.schedules.find(row=>String(row.empId).trim().toUpperCase()===String(draft.empId).trim().toUpperCase())?.schedule?.__meta?.[draft.date]?.overtimeReport;
+  if(!actual||String(actual.id)!==String(draft.id))throw Error('原申報已變更或不存在，未送出');
+  // Do not overwrite a report already formally completed in another tab.
+  if(actual.planned!==true){
+   verifySavedReport(draft,{report:actual});
+   if(actual.planned!==false||String(actual.overtimeDate||draft.date)!==draft.overtimeDate||String(actual.forEmpId||'')!==String(draft.forEmpId||'')||String(actual.note||'').trim()!==String(draft.note||'').trim())throw Error('原申報已非預排，請核對正式紀錄');
+   return {ok:true,directOvertimeSaved:true,id:draft.id,report:actual,cloudReadbackConfirmed:true};
+  }
+  const operation={stopped:false,guard,controller:new AbortController()};
+  draft.directOperation=operation;
+  draft.onProgress=label=>{current();stage(label==='正式寫入'?'writing':'checking',label);};
+  current();
+  const result=await global.p79OvertimeContext.saveReport(draft);
+  current();stage('confirming','核對正式儲存結果');
+  verifySavedReport(draft,result);
+  if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==draft.id||result.report?.planned!==false||String(result.report.overtimeDate||draft.date)!==draft.overtimeDate)throw Error('正式申報結果尚未確認');
+  return result;
+ }
+ // An interrupted POST is never automatically replayed. Only a read can
+ // establish that the exact original report was already converted.
+ async function checkQueuedReview(draft,guard){
+  if(!guard())throw Error('登入已變更');
+  const {cloud}=await prepareSaveValidation(draft,false);
+  if(!guard())throw Error('登入已變更');
+  const actual=cloud.schedules.find(row=>String(row.empId).trim().toUpperCase()===String(draft.empId).trim().toUpperCase())?.schedule?.__meta?.[draft.date]?.overtimeReport;
+  if(!actual||actual.planned!==false)throw Error('尚未確認正式申報；請開啟原紀錄核對，不會自動重送');
+  verifySavedReport(draft,{report:actual});
+  if(String(actual.overtimeDate||draft.date)!==draft.overtimeDate||String(actual.forEmpId||'')!==String(draft.forEmpId||'')||String(actual.note||'').trim()!==String(draft.note||'').trim())throw Error('雲端原紀錄內容不同，請人工核對');
+  return {ok:true,directOvertimeSaved:true,id:draft.id,report:actual,cloudReadbackConfirmed:true};
+ }
  function takeSaveContext(draft){
   const saved=saveValidationContexts.get(draft);saveValidationContexts.delete(draft);
   if(!saved)return null;
@@ -2032,6 +2072,26 @@
       coverDate:independentFiling?date:(prefill.coverDate||date),
       leaveHandoffId:independentFiling?'':(prefill.leaveHandoffId||''),
       ...(prefill.sameDayCover&&!independentFiling?{coverPeriodMode:'same-day'}:{})};
+     // Existing independent planned-review edits can be durably staged
+     // BEFORE network validation. Leave-linked, cross-date and manual monthly
+     // plans keep their original synchronous validation/handoff workflow.
+     if(global.P79OvertimeUploadQueue?.available?.()&&prefill.savedReport&&prefill.reportId&&prefill.plannedReview===true&&
+        !prefill.leaveHandoffId&&!prefill.forEmpId&&(chosen[0]!=='延'||!forSelect.value)&&!prefill.monthlyRestPlanMonth&&prefill.manualPlan!==true&&
+        String(prefill.empId)===String(empId)&&String(prefill.date)===date&&
+        validationRequest.overtimeDate===date&&validationRequest.coverDate===date&&['休','例','國','延'].includes(chosen[0])){
+      const start=Number(prefill.attendance?.start),end=Number(prefill.attendance?.end);
+      if(!(end>start))throw Error('原申報需完成上下班打卡才能確認修改時段');
+      const issue=ruleAttendanceIssue(start,end,date,chosen);if(issue)throw Error(issue);
+      const draft={...validationRequest,id:String(prefill.reportId),preventReplace:true,plannedReview:true,manualPlan:false,
+       expectedOriginalCode:String(prefill.originalReportCode||''),expectedOriginalCategory:String(prefill.originalReportCategory||''),
+       expectedPunchStart:start,expectedPunchEnd:end,rule:report(chosen),forEmpId:'',forName:'',
+       note:el.querySelector('#p79OtNote').value,createdAt:Date.now(),gasUrl:auth().url,autoSave:true};
+      await global.P79OvertimeUploadQueue.enqueue(draft);
+      // Successful enqueue means LOCAL persistence only, never formal filing.
+      completed=true;try{sessionStorage.removeItem(KEY);}catch(_){}
+      closeConfirmedReportDialog(el);
+      return;
+     }
      // Always read the current official rule table during preflight, including
      // original planned-review edits. Reuse this already verified snapshot
      // instead of performing a second GET after the Save spinner appears.
@@ -2175,7 +2235,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={chosenMatchesLeaveSplit,independentShiftOvertimeIssue,RECOVERY_STORAGE,overtimeRecoverySnapshot,rememberOvertimeOptions,recoverableOvertimeOptions,ruleGuide,prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={runQueuedReview,checkQueuedReview,chosenMatchesLeaveSplit,independentShiftOvertimeIssue,RECOVERY_STORAGE,overtimeRecoverySnapshot,rememberOvertimeOptions,recoverableOvertimeOptions,ruleGuide,prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 

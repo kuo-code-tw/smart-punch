@@ -6,7 +6,8 @@
 <!-- Official HR hidden job-title policy: selectors only; data and calculations unchanged. -->
 <script defer src="../assets/port79-hidden-job-titles.js?v=20261117-hr-hidden-v1&refresh=20261118-stable-v1"></script>
 <script defer src="../assets/port79-workhours-hidden-job-ui.js?v=20261117-hr-filter-v1&refresh=20261118-stable-v1"></script>
-<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v7-write-priority"></script>
+<script defer src="../assets/port79-overtime-upload-queue.js?v=20261125-local-outbox-v1"></script>
+<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v7-write-priority&outbox=20261125-v1"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261124-planned-review-v3"></script>
 <script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
@@ -13667,6 +13668,7 @@ async function p79ExportOvertimeComparison(printMode){
         }
         function p79AssertDirectReportActive(operation){
             if(operation?.stopped)throw Error('本次核對已逾時，已停止後續送出');
+            if(typeof operation?.guard==='function'&&!operation.guard())throw Error('登入或申報權限已變更，停止背景申報');
         }
         // Directly confirm an existing verified plan in its main-ledger row.
         // Use the same eligibility and authoritative cloud save as bulk review.
@@ -17644,7 +17646,12 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
   return result;
  }catch(error){if(error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||''))throw Error('加班寫入結果尚未確認；已保留內容，請再次按儲存核對，同一筆申報不會重複新增。');throw error;}finally{clearTimeout(timer)}
 }
-window.p79OvertimeContext={config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),employees:()=>p79WorkhoursEligibleEmployees(),approvedLeaves:()=>sanitizeLeaveRecords(leaveRecords),canReport:p79CanReportOvertime,saveReport:p79SaveWorkOvertimeDraft,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
+window.p79OvertimeContext={uploadIdentity:()=>{
+ if(!hasValidHomepageAdminSession()||!currentEmp||!p79CanReportOvertime())return null;
+ const owner=String(sessionStorage.getItem('aqc_admin_id')||currentEmp.empId||'').trim().toUpperCase();
+ if(!owner||String(currentEmp.empId||'').trim().toUpperCase()!==owner)return null;
+ return {owner,scope:JSON.stringify([getAuthoritativeAdminSessionRole(),currentEmp.systemPermissions||{},currentEmp.dataScope||{},currentEmp.dataScopeJobs||{},currentEmp.finePermissions||{}])};
+},config:()=>sysConfig,gasUrl:()=>getActiveGasUrl(),token:()=>currentPort79SsoToken(),employees:()=>p79WorkhoursEligibleEmployees(),approvedLeaves:()=>sanitizeLeaveRecords(leaveRecords),canReport:p79CanReportOvertime,saveReport:p79SaveWorkOvertimeDraft,refreshAccess:()=>hasValidHomepageAdminSession()?preloadAttendanceEmployeeMaster(false,true):Promise.resolve(false),canEditRules:p79CanManageOvertime,persistConfig:()=>saveConfig()};
 document.addEventListener('DOMContentLoaded',()=>{
   const params=new URLSearchParams(location.search);
   if(params.get('attendanceOvertimeReport')!=='1')return;

@@ -1,0 +1,25 @@
+name: Verify local overtime upload queue
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-overtime-upload-queue.js'
+      - 'assets/port79-overtime-report.js'
+      - 'work-hours/index.html'
+      - 'tests/overtime-local-outbox.cjs'
+      - '.github/workflows/overtime-local-outbox.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check assets/port79-overtime-upload-queue.js
+      - run: node tests/overtime-local-outbox.cjs
+      - run: node tests/overtime-planned-matched-period-save.cjs
+      - run: node tests/overtime-save-preflight-concurrency.cjs
