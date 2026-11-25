@@ -8,8 +8,11 @@ assert(page.includes('const bundle=await window.P79WorkhoursCache.load(month);')
  'restoring an existing full local snapshot cannot force a fresh multi-month cloud download');
 assert(page.includes('port79-workhours-cache.js?v=20261116-attendance-preview-v1&reuse=20261117-local-first-v2'),
  'browser must see the updated locally optimized cache module');
-assert(page.includes('port79-workhours-reference-dashboard.js?v=20261117-approved-v2&reuse=20261117-local-first-v3'),
- 'browser must see the updated dashboard script');
+const dashboardScript=page.match(/src="([^"]*port79-workhours-reference-dashboard\.js\?[^"]+)"/)?.[1];
+assert(dashboardScript,'dashboard must load a versioned script');
+const dashboardParams=new URL(dashboardScript,'https://fixture.invalid/').searchParams;
+assert.equal(dashboardParams.get('reuse'),'20261117-local-first-v3','local reuse must remain versioned');
+assert.equal(dashboardParams.get('query'),'20261125-official-retry-v1','browser must load the official read retry update');
 assert(dashboard.includes("{cache:'default'}"),'versioned static HTML should use normal browser caching');
 assert(page.includes("'p79-workhours-data-changed'"),'official bundle must signal the cached month as soon as it is applied');
 assert(dashboard.includes("window.addEventListener('p79-workhours-data-changed',refreshOnChange)"),

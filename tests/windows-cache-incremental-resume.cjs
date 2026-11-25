@@ -113,7 +113,18 @@ test('startup resume is explicit while the user-triggered sync still refreshes c
  assert.match(src,/resumeExisting:window.__port79WorkerResumeOnly===true/);
  assert.match(native,/if\(sender==cloudWorker\?\.CoreWebView2&&!cloudWorkerJobActive/);
  assert.match(src,/row\.savedAt<mutationStamp\(\)/);
- assert.match(src,/row\.cacheEndpoint&&row\.cacheEndpoint!==gasUrl\(\)/);
+ // The reader now captures endpoint with the account context before disk IO.
+ const a=src.indexOf('function validDisplaySnapshot('),b=src.indexOf('\nasync function readDisplaySnapshot',a);
+ assert(a>=0&&b>a);
+ let endpoint='https://fixture.invalid/A';
+ const c={Date,displayScope:()=> 'all',viewerKey:()=> 'U@admin',token:()=> 'AUTH',gasUrl:()=>endpoint,mutationStamp:()=>0};
+ vm.createContext(c);vm.runInContext(src.slice(a,b),c);
+ const context={scope:'all',viewer:'U@admin',credential:'AUTH',endpoint};
+ const row={data:{ok:true},savedAt:Date.now(),displayScope:'all',cacheEndpoint:endpoint};
+ assert.equal(c.validDisplaySnapshot(row,context),true);
+ assert.equal(c.validDisplaySnapshot({...row,cacheEndpoint:'https://fixture.invalid/B'},context),false,'another cloud project cannot supply local data');
+ endpoint='https://fixture.invalid/B';
+ assert.equal(c.validDisplaySnapshot(row,context),false,'endpoint changed during disk read must discard old data');
  assert(src.includes('historyOnDemand=options?.historyOnDemand===true'));
  assert(src.includes('historyOnDemand?6:7'));
  assert(src.includes('resumeExisting:window.__port79WorkerResumeOnly===true,historyOnDemand'));
