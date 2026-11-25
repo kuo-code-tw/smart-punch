@@ -1,0 +1,25 @@
+name: Verify local-first workhours overview
+on:
+  pull_request:
+    paths:
+      - 'assets/port79-workhours-reference-dashboard.js'
+      - 'work-hours/index.html'
+      - 'tests/workhours-overview-local-first.cjs'
+      - '.github/workflows/workhours-overview-local-first.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'assets/port79-workhours-reference-dashboard.js'
+      - 'tests/workhours-overview-local-first.cjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/workhours-overview-local-first.cjs
