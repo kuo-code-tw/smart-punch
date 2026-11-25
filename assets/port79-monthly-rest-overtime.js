@@ -1201,7 +1201,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1443,7 +1443,7 @@ async function open(settings={}){
   paint();
  };
  q('#mrAll').onchange=()=>{if(!model?.workflow?.canSubmit)return;model.quotaPreviewSuppressed=false;visibleRows().forEach(({r})=>{if(!r.saved&&!r.planned)r.checked=q('#mrAll').checked;});paint();};
- q('#mrLoad').onclick=async()=>{
+ q('#mrLoad').onclick=async(options={})=>{
   if(busy)return;invalidate();busy=true;controls(true);setStatus('正在同時讀取班表、出勤及雲端加班選項…');
   try{const requestedMonth=q('#mrMonth').value;
    if(loadedMonth&&loadedMonth!==requestedMonth)manualPeople.clear();
@@ -1459,7 +1459,9 @@ async function open(settings={}){
     }
     g.p79RestQuota(loadedMonth);
     if(!a.employees().length)throw Error('沒有可檢視的人員');
-   const [data,ruleResponse]=await Promise.all([a.snapshot(loadedMonth,false,false,true,true),g.P79Overtime.loadRules()]);
+   const preferLocal=options?.preferLocal===true&&g.P79WorkhoursCache?.enabled?.()===true&&!!g.P79WorkhoursCache?.verifiedRawMonths?.(loadedMonth,g.p79OvertimeContext?.token?.());
+   const readMonth=preferLocal?a.snapshot(loadedMonth,false,false,false,true).catch(()=>a.snapshot(loadedMonth,false,false,true,true)):a.snapshot(loadedMonth,false,false,true,true);
+   const [data,ruleResponse]=await Promise.all([readMonth,g.P79Overtime.loadRules()]);
     snapshot=data;rules=ruleResponse.rows;
     people=monthlyPlanPeople(a.employees(),snapshot,loadedMonth);
     loadedPeople=people.slice();
@@ -1521,9 +1523,10 @@ async function open(settings={}){
   const byKey=new Map([...picked,...previous].map(r=>[selectedRestCandidateKey(r),r]));
   if(!byKey.size){setStatus('沒有已指定日期及時段的勾選項目。');return;}
   const wanted=[...byKey.values()],rejected=[];let rematched=[];
-  busy=true;controls(true);setStatus('正在搜尋本月 '+wanted.length+' 筆符合假別、額度及班別的日期…');
+  busy=true;controls(true);setStatus((mode==='plan'?'正在依電腦已讀取的班表配對 ':'正在搜尋本月 ')+wanted.length+' 筆符合假別、額度及班別的日期…');
   try{
-   const fresh=await a.snapshot(month,false,false,true);
+   // Future preplans use the already-loaded desktop snapshot; the save handler verifies cloud once.
+   const fresh=mode==='plan'?snapshot:await a.snapshot(month,false,false,true);
    if(!el.isConnected||loadedMonth!==month)throw Error('月份或視窗已變更');
    if(fresh?.provisional===true||fresh?.readOnlyDueAttendance===true||fresh?.attendanceEvidence?.complete!==true)throw Error('正式班表或考勤尚未完整讀取，保留勾選，未寫入任何申報');
    const next=plan(fresh,loadedPeople,month,rules,{manualOnly:false,cutoff:q('#mrCutoff').value});
@@ -1651,11 +1654,12 @@ async function open(settings={}){
   if(busy||!model||!autoPlan)return;
   const selected=visiblePlannedRows().filter(r=>r.checked&&!r.saved);if(!selected.length)return;
   if(!confirm('將勾選的 '+selected.length+' 筆建議儲存為預排？尚未確認出勤，不會列為正式加班；例休週期待核項目仍需核對。'+(typeof batchSummary==='string'?batchSummary:'')))return;
-  busy=true;stop=false;controls(true);let failure='';
-  setStatus('正在重新核對 '+selected.length+' 筆勾選預排與雲端最新資料，請稍候…');
+  busy=true;stop=false;controls(true);let failure='',latest=null,verified=null;
+  setStatus('正在一次核對 '+selected.length+' 筆預排的雲端版本與額度…');
   try{
-   const latest=await a.snapshot(loadedMonth,false,false,true);
+   latest=await a.snapshot(loadedMonth,false,false,true);
    if(latest?.provisional===true||latest?.readOnlyDueAttendance===true||latest?.attendanceEvidence?.complete!==true)throw Error('正式考勤未完整核對，不能儲存預排');
+   const batch=latest.saveContext;
    const suggested=plan(latest,loadedPeople,loadedMonth,rules,{manualOnly:false,cutoff:q('#mrCutoff').value}).plannedRows;
    const key=r=>id(r.empId)+'|'+r.date+'|'+r.category+'|'+g.P79Overtime.report(r.rule).code;
    const valid=new Set(suggested.map(key));
@@ -1669,9 +1673,10 @@ async function open(settings={}){
     if(r.acknowledged)continue;
     if(stop)break;
     if(r.date<today())throw Error('預排日期已過，請重新讀取');
-    const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),manualPlan:true,preventReplace:false,note:'每月未休假加班預排（正式配休）',createdAt:Date.now()};
-    r.attempted=true;r.status='儲存預排中／待雲端讀回';setStatus('正在儲存勾選預排：'+r.name+' '+r.date);paint();controls(true);
-    const result=await a.saveReport(draft);
+    const progress='預排 '+(selected.indexOf(r)+1)+'／'+selected.length+'：'+r.name+' '+r.date;
+    const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),manualPlan:true,preventReplace:false,note:'每月未休假加班預排（正式配休）',createdAt:Date.now(),directRow:true,onProgress:stage=>setStatus(progress+'｜'+stage)};
+    r.attempted=true;r.status='儲存預排中／待雲端讀回';setStatus(progress+'｜上傳雲端');paint();controls(true);
+    const result=await a.saveReport(draft,batch);
     if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==r.id||result.report?.planned!==true)throw Error('雲端未確認儲存為預排');
     r.acknowledged=true;
    }
@@ -1680,18 +1685,27 @@ async function open(settings={}){
    const pending=model.plannedRows.filter(r=>r.attempted&&!r.saved);
    try{
     if(pending.length){
-     const fresh=await a.snapshot(loadedMonth,true,false,true);
+     setStatus('正在讀回確認 '+pending.length+' 筆雲端預排（不再重新下載考勤）…');
+     const fresh=await a.snapshot(loadedMonth,true,false,true);verified=fresh;
      for(const r of pending){
       const report=fresh.schedules?.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date]?.overtimeReport;
       if(report?.id===r.id&&report.planned===true&&report.category===r.category&&report.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.checked=false;r.status='預排已儲存（未正式申報）';}
       else r.status='雲端讀回未確認，保留選取與原編號供重試';
      }
     }
-   }catch(error){failure+=(failure?'；':'')+'讀回未確認：'+String(error.message||error);}
+   }catch(error){failure+=(failure?'；':'')+'讀回未確認：'+String(error.message||error);pending.forEach(r=>{if(!r.saved){r.checked=true;r.status='雲端讀回未確認，保留原編號供核對';}});}
    const saved=selected.filter(r=>r.saved).length;
-   busy=false;paint();controls(false);a.refresh?.();
+   // Reuse confirmed roster and already-read attendance; no redundant full reload.
+   if(saved===selected.length&&!failure&&latest&&verified&&!stop){
+    try{
+     snapshot={...latest,schedules:verified.schedules,leaveDates:verified.leaveDates,leaveCoverAssignments:verified.leaveCoverAssignments,approvedLeaves:verified.approvedLeaves,saveContext:null};
+     model=plan(snapshot,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan,cutoff:q('#mrCutoff').value});
+     g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedRows||[],loadedPeople);
+    }catch(error){failure='預排已確認，但畫面額度更新未完成：'+String(error.message||error);}
+   }
    setStatus('本次已確認雲端儲存 '+saved+' 筆預排，已占用正式額度（未正式申報加班）。'+(failure?'未完成：'+failure:'')+(selected.some(r=>!r.saved)?'其餘保留選取，請核對後重試。':''));
-   if(saved===selected.length&&!failure)q('#mrLoad').click();
+   busy=false;try{paint();}finally{controls(false);}
+   g.setTimeout?.(()=>{try{a.refresh?.();}catch(error){console.warn('預排已核對，統計更新失敗',error);}},0);
   }
  };
  q('#mrSave').onclick=async(batchSummary='')=>{if(isReadOnlySource()){setStatus('既有申報目前僅供查閱，不能送出正式申報。');return;}
@@ -1784,8 +1798,8 @@ async function open(settings={}){
    }
   }
  };
- // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
- q('#mrLoad').click();
+ // 開啟時只讀核對，優先重用同帳號已核對的本機月份資料；沒有使用者確認不呼叫 saveReport。
+ q('#mrLoad').onclick({preferLocal:true});
 }
 g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
 

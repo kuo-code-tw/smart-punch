@@ -1,0 +1,15 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const controller=fs.readFileSync('assets/port79-monthly-rest-overtime.js','utf8');
+const dashboard=fs.readFileSync('assets/port79-monthly-rest-dashboard.js','utf8');
+new vm.Script(controller);new vm.Script(dashboard);
+const planSave=controller.slice(controller.indexOf("q('#mrSavePlans').onclick=async"),controller.indexOf("q('#mrSave').onclick=async"));
+assert(planSave.includes('const batch=latest.saveContext'));
+assert(planSave.includes('await a.saveReport(draft,batch)'));
+assert(planSave.includes('const fresh=await a.snapshot(loadedMonth,true,false,true)'));
+assert(!planSave.includes("q('#mrLoad').click()"));
+assert(planSave.includes('report?.id===r.id&&report.planned===true'));
+assert(planSave.includes('model=plan(snapshot,loadedPeople,loadedMonth,rules'));
+assert(controller.includes("const fresh=mode==='plan'?snapshot:await a.snapshot(month,false,false,true)"));
+assert(dashboard.includes('finally{state.submitting=false;render();}'));
+console.log('PASS local-first preplan');
