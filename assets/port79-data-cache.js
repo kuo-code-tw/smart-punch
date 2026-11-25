@@ -939,15 +939,16 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  const t=token(),viewer=viewerKey(),scope=displayScope(),stamp=mutationStamp();
  const expected={token:t,viewer,scope,stamp,guard:readOptions.startupGuard};
  if(!t)throw new Error('找不到登入 Token，請重新由首頁登入');
- const previous=await getDisplaySnapshot('attendance').catch(()=>null);
+ // A full 22-month snapshot can take several seconds to restore from disk.
+ const previous=await getDisplaySnapshot('attendance',{timeoutMs:10000}).catch(()=>null);
  const before=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
- onProgress?.('attendance',0,1,'catalog','讀取月份清單');
+ onProgress?.('attendance',0,0,'catalog','核對雲端月份清單（尚未下載月份）');
  const catalog=await fetchJson('getAttendanceMonths',{token:t},'',readOptions);
  if(!Array.isArray(catalog?.months))throw new Error('考勤月份清單格式不正確，請重新下載');
  const months=[...new Set((Array.isArray(catalog?.months)?catalog.months:[]).filter(m=>/^\d{4}-\d{2}$/.test(String(m))))].sort();
  if(!months.length)months.push(ymNow());
 
- onProgress?.('attendance',0,months.length+1,'master','讀取員工主檔');
+ onProgress?.('attendance',0,0,'master','核對員工主檔及已下載版本（尚未下載月份）');
  const master=await fetchJson('getAttendanceEmployeeMaster',{token:t},'',readOptions);
  if(!Array.isArray(master?.employees))throw new Error('員工主檔格式不正確，已保留原有快取');
  const employees=master.employees;
@@ -958,14 +959,14 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  const monthCheckpointSignature=cloudRevision?JSON.stringify([
   cloudRevision,String(catalog.revision||''),String(master.revision||''),months,employees
  ]):'';
- const checkpointMaxAgeMs=24*60*60*1000;
+ // Exact server revision, scoped master and mutation checks are the checkpoint validity criteria.
+ // Do not expire a completed chunk solely because another day has passed.
  async function checkpointMonth(month){
   if(!monthCheckpointSignature)return null;
   const row=await get(systemKey('attendance')+'|checkpoint|'+month).catch(()=>null);
   if(!row||!currentViewerRow(row)||row.kind!=='system'||row.system!=='attendance'||
      row.displayScope!==scope||row.cacheEndpoint!==gasUrl()||
      row.savedAt<stamp||row.savedAt>Date.now()+60000||
-     Date.now()-row.savedAt>checkpointMaxAgeMs||
      row.data?.signature!==monthCheckpointSignature||
      !Array.isArray(row.data?.rows)||row.data?.month!==month)return null;
   return row.data.rows;
@@ -995,7 +996,11 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
    const confirmed=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
   verifyAttendanceDownloadContext(expected);
    if(String(confirmed?.revision||'')===String(before.revision)){
-   onProgress?.('attendance',months.length,months.length,'reused','雲端版本未變，重用電腦完整快取');
+   // The revision was checked twice; renew the persisted verification timestamp,
+   // otherwise every later startup re-enters the expired-cache download path.
+   if(!Array.isArray(readOptions.authorizedSystems)||readOptions.authorizedSystems.includes('attendance'))await saveSystemSnapshot('attendance',old);
+   if(!Array.isArray(readOptions.authorizedSystems)||readOptions.authorizedSystems.includes('workhours'))await saveSystemSnapshot('workhours',old);
+   onProgress?.('attendance',months.length,months.length,'reused','雲端版本未變，重用電腦完整快取（未下載月份）');
    if(targetSys==='attendance'||targetSys==='workhours')await applyAttendanceSnapshotToPage(old,true);
    return {...old,reusedCache:true};
    }
@@ -1169,11 +1174,11 @@ const SYSTEM_REUSE_MAX_AGE_MS=30*60*1000;
 const SYSTEM_AUTO_RESUME_MAX_AGE_MS=24*60*60*1000;
 async function startupCachedSystem(sys,scopeAtStart){
  if(!['attendance','workhours','leave','schedule','efficiency','hr','history'].includes(sys))return null;
- const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
+ const snapshot=await getDisplaySnapshot(sys,{timeoutMs:['attendance','workhours'].includes(sys)?10000:3500}).catch(()=>null);
  if(!snapshot||snapshot.data?.ok!==true||snapshot.kind!=='system'||snapshot.system!==sys||
     snapshot.displayScope!==scopeAtStart||!Number.isFinite(Number(snapshot.savedAt)))return null;
  if(Date.now()-Number(snapshot.savedAt)>SYSTEM_AUTO_RESUME_MAX_AGE_MS)return null;
- if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
+ if(sys==='efficiency'&&(snapshot.scope?.month||snapshot.month||snapshot.data?.month)!==ymNow())return null;
  if(sys==='schedule'&&snapshot.scope?.month&&snapshot.scope.month!==ymNow())return null;
  if(sys==='attendance'||sys==='workhours'){
   const data=snapshot.data;
@@ -1190,7 +1195,7 @@ async function reusableSystemDownload(sys,scopeAtStart){
  if(Date.now()-Number(snapshot.savedAt)>SYSTEM_REUSE_MAX_AGE_MS)return null;
  if(snapshot.system!==sys||snapshot.kind!=='system')return null;
  // The current month is part of scoped, mutable efficiency results.
- if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
+ if(sys==='efficiency'&&(snapshot.scope?.month||snapshot.month||snapshot.data?.month)!==ymNow())return null;
  return snapshot;
 }
 let lastAllDownload=null;
@@ -1250,7 +1255,7 @@ async function downloadAll(onProgress,options={}){
   }
   onProgress?.(sys,i,systems.length,'loading');
   try{
-   if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`,{monthCompleted:mi,monthTotal:mt}),readOptions);
+   if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state}${mt>0?' '+mi+'/'+mt:''}`,{monthCompleted:mi,monthTotal:mt}),readOptions);
    else if(sys==='workhours'&&attendanceError)throw attendanceError;
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
    else{

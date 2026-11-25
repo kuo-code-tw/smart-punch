@@ -22,6 +22,7 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
   const x=setup(a=>a==='getSyncMeta'?{ok:true,revision:'R1'}:null);await x.api.downloadSystem('attendance');const count=x.calls.length;
   const d=await x.api.downloadSystem('attendance');assert.equal(d.reusedCache,true);assert.equal(x.calls.length-count,4);
   assert.equal(x.calls.filter(u=>u.searchParams.get('action')==='getAttendanceMonthData').length,2);
+  assert.equal(x.snapshots.length,4,'verified unchanged cache renews both local snapshots');
  });
  await test('changed revisions and changed employee scope trigger a full read',async()=>{
   let revision='R1';const x=setup(a=>a==='getSyncMeta'?{ok:true,revision}:null);await x.api.downloadSystem('attendance');revision='R2';

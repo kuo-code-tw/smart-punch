@@ -89,6 +89,10 @@ test('permission change, expired cache, or wrong month force cloud revalidation'
  const month=fixture({savedMonth:'2026-10'});await month.run();
  assert(month.calls.includes('efficiency'));
 });
+test('current efficiency month from native request scope is reused without another cloud download',async()=>{
+ const f=fixture();const row=f.disk.get('efficiency');delete row.month;row.scope={month:'2026-11'};
+ const result=await f.run();assert.equal(result.filter(x=>x.reused).length,7);assert.deepEqual(f.calls,[]);
+});
 test('partial attendance download is never considered an already-complete local snapshot',async()=>{
  const f=fixture();
  f.disk.get('attendance').data.monthStats[0].ok=false;
