@@ -130,7 +130,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
   const verified=cats.includes(r?.category)&&confirmedReport(m,r);
   const confirmedNoWork=confirmedReport(m,r)&&g.P79RestAttendance?.verifiedNoWork?.(snapshot,emp.empId,d)===true;
   const hasUnverifiedReport=cats.includes(r?.category)&&!verified&&r&&!storedReport(r);
-  const scheduledRest=cats.includes(allocation?.restCategory)&&!allocation.restQuotaOvertime;
+  const scheduledRest=cats.includes(allocation?.restCategory)&&!allocation.restQuotaOvertime&&(!['早','中','晚'].includes(String(roster[d]||'').trim())||partialNightSet.has(d));
   const leave=g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||false;
   if(leave){
    ledger.push({date:d,kind:'leave',category:'',actual});
@@ -311,10 +311,19 @@ function weeklyReviewSummary(snapshot,people,month,plannedRows=[]){
  }
  return [...groups.values()].sort((a,b)=>a.start.localeCompare(b.start)||Number(b.confirmed)-Number(a.confirmed));
 }
+// Read the original saved designation, including raw 休 + manual 例.
+function originalRestDesignation(roster,date){
+ const code=String(roster?.[date]||'').trim(),m=roster?.__meta?.[date]||{};
+ const manual=String(m.manualRosterShift||'').trim();
+ const marked=m.restCategoryLocked===true||m.restAllocationLocked===true||m.restAllocationSource==='manual'||m.restQuotaOvertime===true;
+ if(code==='休'&&['例','休','國'].includes(manual))return manual;
+ if(code==='休'&&marked&&['例','休','國'].includes(m.restCategory))return m.restCategory;
+ return /^(例|休|國)(?=$|[0-9])/.exec(code)?.[1]||'';
+}
 function automaticRestCategory(roster,date,month){
  const original=String(roster?.[date]||'').trim(),meta=roster?.__meta?.[date]||{};
  const marked=cats.includes(meta.restCategory)?meta.restCategory:'';
- const category=cats.includes(original)?original:marked;
+ const category=originalRestDesignation(roster,date)||marked;
  if(!category)return '';
  if(category==='國'){
   const sources=new Set(g.p79RestQuota(month).slots.filter(x=>x.category==='國').map(x=>x.sourceDate));
@@ -328,7 +337,7 @@ function automaticRestCategory(roster,date,month){
 function documentedFutureRestCategory(roster,date,month,category){
  if(!['休','國'].includes(category)||automaticRestCategory(roster,date,month)!==category)return false;
  const code=String(roster?.[date]||'').trim(),m=roster?.__meta?.[date]||{};
- return code===category||(['早','中','晚'].includes(code)&&m.restCategory===category&&
+ return originalRestDesignation(roster,date)===category||(['早','中','晚'].includes(code)&&m.restCategory===category&&
   (m.restQuotaOvertime===true||m.restCategoryLocked===true||m.restAllocationLocked===true||m.restAllocationSource==='manual'));
 }
 // Adjacent months are used only for weekly validation and shift inference;
@@ -361,8 +370,9 @@ function weeklyPlanIssue(roster,date,anchor){
   const code=String(roster[d]).trim();
   const original=String(m.overtimeOriginalShift||'').trim();
   const marked=m.restCategoryLocked===true||m.restAllocationLocked===true||m.restAllocationSource==='manual'||m.restQuotaOvertime===true;
-  if(code==='例'&&!report&&!m.overtime&&!m.restQuotaOvertime&&!m.forEmpId&&!m.coverAssignmentId)regular++;
-  if(code==='休'||original==='休'||report?.category==='休'||marked&&m.restCategory==='休')rest++;
+  const designation=originalRestDesignation(roster,d);
+  if(designation==='例'&&!report&&!m.overtime&&!m.restQuotaOvertime&&!m.forEmpId&&!m.coverAssignmentId&&!/\d/.test(code))regular++;
+  if(designation==='休'||original==='休'||report?.category==='休'||marked&&m.restCategory==='休'&&designation!=='例')rest++;
  }
  if(!regular)return '七日週期無受保護的例假'+label;
  if(!rest)return '七日週期無原排休息日'+label;
@@ -694,7 +704,7 @@ function manualRestPlanIssue(snapshot,emp,month,date,rule,asOf=today(),cutoff=''
  if(!roster)return '缺少正式班表';
  const category=rule[0],meta=roster.__meta?.[date]||{};
  if(date<forwardReportStart(month,cutoff,asOf))return '早於你設定的本次申報起日';
- if(!['休','國'].includes(roster[date])||automaticRestCategory(roster,date,month)!==category)return '所選日期原班表假別不符，請先核對正式排班';
+ if(!documentedFutureRestCategory(roster,date,month,category))return '所選日期原班表假別不符，請先核對正式排班';
  if(meta.overtimeReport||meta.overtime||meta.forEmpId||meta.coverAssignmentId||meta.overtimeExcluded)return '已有加班、代班或排除紀錄，不得重複預排';
  if((snapshot.leaveDates||[]).includes(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))return '該日已有請假，不得重複預排';
  if((snapshot.pairs||[]).some(p=>id(p.empId)===id(emp.empId)&&p.date===date))return '該日已有打卡，請由實際出勤核對流程處理';
@@ -765,11 +775,12 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
   for(const category of ['休','國']){
    if(!(b.remaining[category]>0)||originalCategory&&originalCategory!==category)continue;
    const rule=rules.find(r=>r[0]===category&&fullDayRule(r)&&minute(r[6])===minute(period[0])&&minute(r[7])===minute(period[1]));
-   const issue=rule&&['休','國'].includes(original)?manualRestPlanIssue(snapshot,emp,month,date,rule,asOf):'';
+   const documented=documentedFutureRestCategory(roster,date,month,category);
+   const issue=rule&&documented?manualRestPlanIssue(snapshot,emp,month,date,rule,asOf):'';
    // A consistent neighboring shift is a suggested future period only. The
     // operator's batch confirmation may select it; fresh quota/weekly guards
     // above still apply, and it must never be treated as actual attendance.
-    const eligible=!!rule&&['休','國'].includes(original)&&!issue;
+    const eligible=!!rule&&documented&&!issue;
    const note=eligible?source+'；可勾選批次預排（未正式申報）':shifts[original]?(originalCategory?source+'；加班條件待核，不可直接申報':source+'；原排正常班，假別須先核對，不可直接申報'):source+'；'+(issue||(!rule?'無相符正式加班規則':'班別尚需確認'))+'，不可直接申報';
    out.push({date,category,period:period.map(v=>String(v).includes(':')?String(v):String(v).padStart(2,'0')+':00').join(' – '),note,referenceOnly:true,eligible,rank:eligible?0:originalCategory===category?1:2});
   }
@@ -1128,7 +1139,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-auto-rematch-v27';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-weekly-layout-v31';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1711,6 +1722,6 @@ async function open(settings={}){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
 
 })(window);
