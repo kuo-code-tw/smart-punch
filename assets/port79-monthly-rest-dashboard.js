@@ -16,7 +16,7 @@ function periodLabel(value){
  return match?match[1]+' '+match[2]+':00 – '+match[3]+':00':raw||'時段待核';
 }
 function suggestionStatus(x){
- if(x.referenceOnly)return x.eligible?'可預排':'待核對';
+ if(x.referenceOnly)return x.draftSaved?'本機草案已儲存':x.eligible?'可預排':x.supplementDraftEligible?'補報草案（未入帳）':'待核對';
  return x.planned?'可預排':'可申報';
 }
 function suggestionPeriod(x){
@@ -178,7 +178,7 @@ function dailyPendingRows(data){
    const item={kind:'reference',id:person.id,empId:person.id,date:hint.date,name:person.name,role:person.role,
     category:hint.category||String(hint.period||'').match(/^[休例國]/)?.[0]||'',period:suggestionPeriod(hint),
     quota:person.category,quotaProgress:person.quotaProgress||null,lastReported:person.lastReported,hours:'—',status:'待核對',source:hint.note||person.source,
-    checked:false,disabled:true,reviewType:'deficit',actualReference:hint.actualReference===true,eligible:hint.eligible===true||!hint.referenceOnly,eligibilityIssue:hint.issue||'',canPreplan:person.canPreplan===true};
+    checked:false,disabled:true,reviewType:'deficit',actualReference:hint.actualReference===true,eligible:hint.eligible===true||!hint.referenceOnly,eligibilityIssue:hint.issue||'',supplementDraftEligible:hint.supplementDraftEligible===true,draftSaved:hint.draftSaved===true,canPreplan:person.canPreplan===true};
    covered.add(hint.date);dated.set(k,item);result.push(item);
   }
   // Preserve unresolved deficits without inventing dates or grouping dated rows.
@@ -193,8 +193,8 @@ function dailyPendingRows(data){
  // Pending/uncertain rows may be inspected even when cloud rules block filing.
 function selectionKey(row){return JSON.stringify([row.kind,row.id,row.date,row.name,row.category,row.period]);}
 function selectedDatedReferences(rows,selected,mode,asOf=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date())){
- return rows.filter(r=>r.kind==='reference'&&r.eligible===true&&reviewSelected(selected,r)&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&
-  (mode==='formal'?r.date<=asOf:r.date>=asOf&&!r.actualReference));
+ return rows.filter(r=>r.kind==='reference'&&reviewSelected(selected,r)&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&
+  (mode==='formal'?r.eligible===true&&r.date<=asOf:r.eligible===true&&r.date>=asOf&&!r.actualReference||r.supplementDraftEligible===true&&!r.draftSaved));
 }
 function selectedPlanPeople(rows,selected){
  return [...new Map(rows.filter(r=>r.canPreplan&&['roster','reference'].includes(r.kind)&&reviewSelected(selected,r)).map(r=>[norm(r.empId||r.id),r.empId||r.id])).values()];
@@ -206,6 +206,7 @@ function personActionRows(data,person){
 }
 function selectionMode(row){
  if(!row)return 'none';
+ if(row.kind==='reference'&&row.draftSaved)return 'none';
  if(row.kind==='roster'||row.kind==='reference')return 'review';
  if(row.kind==='existing')return row.status==='已核對出勤'?'none':'review';
  if(row.kind==='plan')return row.disabled?'review':'native';
@@ -426,7 +427,9 @@ function mount(el){
    q('#mrUxAll').checked=eligible.length>0&&eligible.every(isPicked);
    q('#mrUxAll').indeterminate=eligible.some(isPicked)&&!q('#mrUxAll').checked;
    const countLabel=list=>{const people=list.filter(r=>r.kind==='roster').length;return (list.length-people)+' 筆'+(people?'／'+people+' 人':'');};
-   q('#mrUxSelected').textContent='已配對 '+formalCount+' 筆可申報｜預排 '+planCount+' 筆';
+   const draftCount=selectedPending.filter(r=>r.supplementDraftEligible&&!r.eligible&&!r.draftSaved).length;
+   const storedDraftCount=pending.filter(r=>r.draftSaved).length;
+   q('#mrUxSelected').textContent='可申報 '+formalCount+' 筆｜正式預排 '+planCount+' 筆'+(draftCount?'｜補報草案 '+draftCount+' 筆':'')+(storedDraftCount?'｜本機已存 '+storedDraftCount+' 筆（未入帳）':'');
    q('#mrUxReviewSummary').innerHTML=selectedPending.length?
      '<b>已選取 '+countLabel(selectedPending)+' 供核對（其中 '+countLabel(selectedReview)+' 僅供檢視）</b>'+
      selectedPending.slice(0,8).map(r=>'<div style="border-top:1px solid #dbe8f9;margin-top:7px;padding-top:7px">'+
@@ -445,8 +448,8 @@ function mount(el){
    const canBatchPlan=!originalMonth.disabled&&datedPlans.length>0;
    const canBatchFormal=!originalMonth.disabled&&datedFormal.length>0;
    q('#mrUxSavePlan').disabled=!hasNativePlans&&!canBatchPlan&&!canOpenPlan;
-   q('#mrUxSavePlan').textContent=canBatchPlan?'▣ 批次預排核對（'+(planCount+datedPlans.length)+' 筆）':hasNativePlans?'▣ 儲存預排（'+planCount+' 筆）':canOpenPlan?'▣ 設定預排（'+manualPlanPeople.length+' 人）':'▣ 儲存預排（0 筆）';
-   q('#mrUxSavePlan').title='有日期時段者直接批次核對，不必重新輸入；未核實出勤不列入正式申報。';
+   q('#mrUxSavePlan').textContent=canBatchPlan?(draftCount?'▣ 批次補報／預排（':'▣ 批次預排核對（')+(planCount+datedPlans.length)+' 筆）':hasNativePlans?'▣ 儲存預排（'+planCount+' 筆）':canOpenPlan?'▣ 設定預排（'+manualPlanPeople.length+' 人）':'▣ 儲存預排（0 筆）';
+   q('#mrUxSavePlan').title='有日期時段者直接批次配對；尚無法定假別資格者只存本機補報草案，不入帳。';
    q('#mrUxSubmit').disabled=!canBatchFormal&&(!formalCount||!!nativeSave?.disabled||!/申報/.test(nativeSave?.textContent||''));
    q('#mrUxSubmit').textContent=canBatchFormal?'➤ 批次申報核對（'+(formalCount+datedFormal.length)+' 筆）':'➤ 正式申報（'+formalCount+' 筆）';
    if(state.tab!=='pending')q('#mrUxSubmit').disabled=true;
@@ -455,7 +458,7 @@ function mount(el){
    const latestDates=latestConfirmedDates(data.prior);
    q('#mrUxRows').innerHTML=shown.map(r=>{
     const quota=state.tab==='done'?r.quotaProgress:quotaSelectionPreview(r.quotaProgress,selectedQuota.get(norm(r.empId||r.id)));
-    const type=kind(r),status=r.kind==='reference'&&!r.eligible?'僅參考':label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
+    const type=kind(r),status=r.kind==='reference'&&!r.eligible?(r.draftSaved?'本機已存（未入帳）':r.supplementDraftEligible?'補報草案': '僅參考'):label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
     const id=esc(r.id),kindKey=esc(r.kind),key=esc(selectionKey(r));
     const operations=r.kind==='roster'&&r.canPreplan&&!originalMonth.disabled?
      '<button type="button" data-action="preplan" data-key="'+key+'">設定預排</button><button type="button" data-action="view" data-key="'+key+'">◎ 檢視</button>':r.kind==='ready'?
@@ -464,7 +467,7 @@ function mount(el){
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
       'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+filingDateMarkup(r,cutoff.value,latestDates.get(norm(r.empId||r.id))||'')+'</td><td>'+esc(r.name)+(r.role?'<small style="display:block;color:#64748b">'+esc(r.role)+(r.kind==='roster'?'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對'):'')+'</small>':'')+'</td>'+
       '<td><span class="mr-ux-kind">'+esc(r.category)+'</span>'+quotaDisplayMarkup(quota,state.tab!=='done')+'</td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>'+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
-      '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+(r.kind==='reference'&&!r.eligible?'<small class="mr-ux-eligibility">'+esc(r.eligibilityIssue||r.source||'尚未符合預排資格')+'</small>':'')+''+'</td><td>'+operations+'</td></tr>';
+      '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+(r.kind==='reference'&&!r.eligible?'<small class="mr-ux-eligibility">'+esc(r.supplementDraftEligible?'補報候選；未確認正式加班資格':r.eligibilityIssue||r.source||'尚未符合預排資格')+'</small>':'')+''+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
    q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+(state.tab==='pending'&&audit.some(r=>r.residualOnly)?'｜尚無日期的缺額請見「已預排／待核對」':'');
    q('#mrUxExport').disabled=!shown.length;
