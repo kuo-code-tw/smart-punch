@@ -78,9 +78,9 @@ function rowQuotaProgress(tr){
   return p&&['例','休','國'].every(c=>p[c]&&Number.isFinite(p[c].used)&&Number.isFinite(p[c].remaining))?p:null;
  }catch{return null;}
 }
-function submissionMessage(nativeStatus,localHint){
+function submissionMessage(nativeStatus,localHint,submitting=false){
  const status=String(nativeStatus||'').trim();
- return status||localHint||'正在讀取正式雲端資料…';
+ return (submitting?status||localHint:localHint||status)||'正在讀取正式雲端資料…';
 }
 function sourceRows(el){
  const ready=$$(el,'#mrRows tr[data-row]').map(tr=>{
@@ -133,6 +133,8 @@ function dailyPendingRows(data){
  const people=new Map(data.roster.map(r=>[String(r.id).trim().toUpperCase(),r]));
  const key=(emp,date)=>String(emp||'').trim().toUpperCase()+'|'+date;
  const dated=new Map(),result=[];
+ // A confirmed cloud report must not reappear as a read-only roster suggestion.
+ const confirmedDates=new Set((data.prior||[]).filter(r=>r.status==='已核對出勤'&&r.empId&&r.date).map(r=>key(r.empId,r.date)));
  for(const row of [...data.ready,...data.planned]){
   const person=people.get(String(row.empId||'').trim().toUpperCase());
   const item={...row,role:person?.role||row.role||'',quota:person?.category||'',quotaProgress:row.quotaProgress||person?.quotaProgress||null,lastReported:person?.lastReported||''};
@@ -146,7 +148,7 @@ function dailyPendingRows(data){
   for(const hint of person.suggestions||[]){
    if(!hint.date||covered.has(hint.date))continue;
    const k=key(person.id,hint.date);
-   if(dated.has(k))continue;
+   if(dated.has(k)||confirmedDates.has(k))continue;
    const item={kind:'reference',id:person.id,empId:person.id,date:hint.date,name:person.name,role:person.role,
     category:hint.category||String(hint.period||'').match(/^[休例國]/)?.[0]||'',period:suggestionPeriod(hint),
     quota:person.category,quotaProgress:person.quotaProgress||null,lastReported:person.lastReported,hours:'—',status:'待核對',source:hint.note||person.source,
@@ -372,7 +374,7 @@ function mount(el){
    q('#mrUxDoneTab').textContent=sourceLoaded?'('+verified.length+')':'';
    const info=originalState.replace(/\s+/g,' ').trim();
    const sourceFailed=!sourceLoaded&&/讀取失敗|核對失敗|錯誤|無法取得|無法載入/.test(info);
-   q('#mrUxProgress').textContent=sourceFailed?'資料讀取失敗｜'+(info||'請按右側重新讀取'):submissionMessage(info,state.hint);
+   q('#mrUxProgress').textContent=sourceFailed?'資料讀取失敗｜'+(info||'請按右側重新讀取'):submissionMessage(info,state.hint,state.submitting);
    q('#mrUxProgress').setAttribute('role',sourceFailed?'alert':'status');
    q('#mrUxReload').title=sourceFailed?'重新讀取正式班表與考勤':'重新讀取雲端資料';
    q('#mrUxTabPending').setAttribute('aria-selected',String(state.tab==='pending'));
@@ -397,7 +399,7 @@ function mount(el){
    q('#mrUxSubmit').disabled=!formalCount||!!nativeSave?.disabled||!/申報/.test(nativeSave?.textContent||'');
    q('#mrUxSubmit').textContent='➤ 正式申報（'+formalCount+' 筆）';
    if(state.tab!=='pending'){q('#mrUxSavePlan').disabled=true;q('#mrUxSubmit').disabled=true;}
-   q('#mrUxHint').textContent=state.submitting?submissionMessage(info,'正在送出正式申報…'):state.tab==='audit'?'異常核對唯讀，不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
+   q('#mrUxHint').textContent=state.submitting?submissionMessage(info,'正在送出正式申報…',true):state.tab==='audit'?'異常核對唯讀，不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
    const latestDates=latestConfirmedDates(data.prior);
    q('#mrUxRows').innerHTML=shown.map(r=>{
     const quota=r.quotaProgress;
@@ -463,15 +465,15 @@ function mount(el){
    if(catChanged)apply('.category',nextCat);
    else if(nextRule!==rule.value)apply('.rule',nextRule);
    if(nextDate!==row.date)apply('.date',nextDate);
-   state.hint='候選資料已更新；正式申報前仍須再次雲端核對。';
+   state.submitting=false;state.hint='候選資料已更新；正式申報前仍須再次雲端核對。';
    close();render();
   };
   editor.showModal();
  }
- q('#mrUxMonth').onchange=e=>{if(!originalMonth.disabled){state.reviewSelected.clear();originalMonth.value=e.target.value;originalMonth.dispatchEvent(new Event('change',{bubbles:true}));}};
+ q('#mrUxMonth').onchange=e=>{if(!originalMonth.disabled){state.submitting=false;state.hint='';state.reviewSelected.clear();originalMonth.value=e.target.value;originalMonth.dispatchEvent(new Event('change',{bubbles:true}));}};
  q('#mrUxCutoff').onchange=e=>{
   const input=$(el,'#mrCutoff');if(!input||input.disabled)return;
-  state.reviewSelected.clear();state.hint='';input.value=e.target.value;input.dispatchEvent(new Event('change',{bubbles:true}));render();
+  state.submitting=false;state.reviewSelected.clear();state.hint='';input.value=e.target.value;input.dispatchEvent(new Event('change',{bubbles:true}));render();
  };
  q('#mrUxDept').onchange=e=>{if(!originalDept.disabled){originalDept.value=e.target.value;originalDept.dispatchEvent(new Event('change',{bubbles:true}));}};
  q('#mrUxJob').onchange=e=>{if(!originalJob.disabled){state.reviewSelected.clear();originalJob.value=e.target.value;originalJob.dispatchEvent(new Event('change',{bubbles:true}));render();}};
@@ -480,21 +482,21 @@ function mount(el){
  q('#mrUxTabPending').onclick=()=>{state.tab='pending';render();};
  q('#mrUxTabAudit').onclick=()=>{state.tab='audit';state.status='';q('#mrUxState').value='';render();};
  q('#mrUxTabDone').onclick=()=>{state.tab='done';render();};
- q('#mrUxReload').onclick=()=>{state.hint='';state.reviewSelected.clear();$(el,'#mrLoad')?.click();render();};
+ q('#mrUxReload').onclick=()=>{state.submitting=false;state.hint='';state.reviewSelected.clear();$(el,'#mrLoad')?.click();render();};
  q('#mrUxAuto').onclick=()=>{
   const mode=$(el,'#mrAutoMode');if(!mode||mode.disabled)return;
   mode.checked=true;mode.dispatchEvent(new Event('change',{bubbles:true}));
-  state.tab='pending';state.hint='已配對可申報日期與時段；確認後按正式申報。';render();
+  state.tab='pending';state.submitting=false;state.hint='已配對可申報日期與時段；確認後按正式申報。';render();
  };
  q('#mrUxBatch').onclick=()=>{
   const view=currentView();
   const selected=(state.tab==='audit'?view.audit:state.tab==='pending'?view.pending:[]).filter(r=>selectionMode(r)==='review'?
    reviewSelected(state.reviewSelected,r):!!r.checked);
   if(!selected.length){
-   state.hint='請先勾選待核對資料；可以勾選灰色狀態的項目查看原因，但不會直接申報。';
+   state.submitting=false;state.hint='請先勾選待核對資料；可以勾選灰色狀態的項目查看原因，但不會直接申報。';
   }else{
    const blocked=selected.filter(r=>selectionMode(r)==='review').length;
-   state.hint='已選取 '+selected.length+' 項核對資料，其中 '+blocked+' 項待查核；右側顯示所選項目，尚未修改正式申報狀態。';
+   state.submitting=false;state.hint='已選取 '+selected.length+' 項核對資料，其中 '+blocked+' 項待查核；右側顯示所選項目，尚未修改正式申報狀態。';
   }
   render();
  };
@@ -520,7 +522,7 @@ function mount(el){
    state.hint='';state.submitting=true;
    submit.click();render();
   }
-  else{state.hint='請先核對實際出勤與申報日期。';render();}
+  else{state.submitting=false;state.hint='請先核對實際出勤與申報日期。';render();}
  };
  q('#mrUxExport').onclick=()=>{
   const records=currentView().shown;if(!records.length)return;
