@@ -117,6 +117,7 @@ function p79PlanDirectReport_(rows,request,rule,attendance,leaveCovers,leaveReco
  const value={...old,overtimeDate:accounting.overtimeDate,type:rule[0]==='代'?'substitute':'overtime',overtime:true,overtimeType:isRest?'rest':'extended',overtimeOriginalShift:isRest?'休':original,reportOriginalShift:original,overtimeAssignedShift:assigned,overtimeStart:canonical(rule[6]),overtimeEnd:canonical(rule[7]),overtimeReport:report,note:String(request.note||''),forEmpId:rule[0]==='代'||request.leaveHandoffId?request.forEmpId||'':''};
  delete value.overtimeExcluded;delete value.overtimeDeletedAt;
  if(['休','國','例','颱','選'].includes(rule[0])){value.restCategory=rule[0];value.restQuotaOvertime=true;value.restAllocationSource='manual';}
+ if(planned&&rule[0]==='休'&&String(request.note||'')==='每月未休假加班預排（正式配休）'&&['早','中','晚'].includes(String(original)))value.plannedRestOriginalCategory='休';
  // 同日兩位代班只記錄申報，不把原來的排班班別改掉。
  // Changing a pending plan must not rewrite the employee's actual normal roster.
  if(request.editPlannedOnly!==true&&request.manualReviewCoverage!==true){if(request.coverPeriodMode!=='same-day')schedule[date]=assigned;}

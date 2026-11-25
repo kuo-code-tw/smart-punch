@@ -402,14 +402,22 @@ function weeklyPlanIssue(roster,date,anchor,snapshot,empId){
  if(!rest)return '七日週期無原排休息日'+label;
  return '';
 }
+// A future ordinary shift can be explicitly designated as a rest-day plan
+// on cloud save, without requiring the designation to exist beforehand.
+function canDesignateFutureRest(roster,date,month,category){
+ if(documentedFutureRestCategory(roster,date,month,category))return true;
+ return category==='休'&&['早','中','晚'].includes(String(roster?.[date]||'').trim())&&!automaticRestCategory(roster,date,month)&&!originalRestDesignation(roster,date);
+}
 function futureRestPlanIssue(roster,date,month,emp,category,snapshot){
  const m=roster?.__meta?.[date]||{},anchor=weeklyCycleAnchor(emp);
  if(!anchor)return '未設定約定七日週期';
  if(!['休','國'].includes(category))return '例假不得自動預排加班';
- if(!documentedFutureRestCategory(roster,date,month,category))return '原班表沒有可證明此日期為'+category+'假別的紀錄（正常班不能直接改列休假加班）';
+ if(!canDesignateFutureRest(roster,date,month,category))return '既有假別不符或無可配對班別，不能覆蓋原假別';
  if(emp?.flexibleWorkHours===true||emp?.workTimeSystem&& !['standard','normal','一般','一般工時','固定'].includes(String(emp.workTimeSystem).trim()))return '特殊工時制度須另行核對';
  if(m.forEmpId||m.coverAssignmentId||m.overtimeReport||m.overtime||m.overtimeExcluded)return '已有申報、代班或排除紀錄';
- return weeklyPlanIssue(roster,date,anchor,snapshot,emp.empId);
+ const proposed=category==='休'&&!documentedFutureRestCategory(roster,date,month,category)?
+  {...roster,__meta:{...roster.__meta,[date]:{...m,restCategory:'休',restCategoryLocked:true}}}:roster;
+ return weeklyPlanIssue(proposed,date,anchor,snapshot,emp.empId);
 }
 function canAutoSuggestFuture(roster,date,month,emp,category,snapshot){
  if(futureRestPlanIssue(roster,date,month,emp,category,snapshot))return false;
@@ -546,14 +554,15 @@ function plan(snapshot,people,month,rules,options={}){
    const m=roster.__meta?.[date]||{};
    if(date<nextReportDate)continue; // Earlier unresolved attendance stays in the audit ledger.
    if((b.typhoonDates||[]).includes(date)||!(['早','中','晚','國','休','例'].includes(roster[date])||/^[休國例]\s*\d/.test(String(roster[date]||'')))||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
-   const originalCategory=automaticRestCategory(roster,date,month);
+   const originalCategory=automaticRestCategory(roster,date,month)||
+    (!historical&&date>currentDate&&canDesignateFutureRest(roster,date,month,'休')?'休':'');
    if(!originalCategory){
     if(date>=currentDate&&['早','中','晚'].includes(roster[date]))for(const category of ['休','國'])blocked(date,category,'原排'+roster[date]+'班，沒有已確認的'+category+'假別');
     continue;
    }
    const pairs=pairsByKey.get(id(emp.empId)+'|'+date)||[];
    const verified=date<=currentDate&&pairs.length===1&&fullDayEvidence(snapshot,emp.empId,date,pairs[0]);
-   // 預排從今天一路看到月底；今天尚在班內可列草案，已結束且沒有打卡不可假裝出勤。
+   // 預排從今天一路看到月底；今天尚在班內可列預排建議，已結束且沒有打卡不可假裝出勤。
    // 未來日期不要求先有打卡，否則全員只能看到「今天」而漏掉月底預排。
    const todayState=g.P79RestAttendance?.state(snapshot,emp.empId,date);
    const todayPending=!historical&&date===currentDate&&!verified&&
@@ -753,7 +762,7 @@ function manualRestPlanIssue(snapshot,emp,month,date,rule,asOf=today(),cutoff=''
  if(!roster)return '缺少正式班表';
  const category=rule[0],meta=roster.__meta?.[date]||{};
  if(date<forwardReportStart(month,cutoff,asOf))return '早於你設定的本次申報起日';
- if(!documentedFutureRestCategory(roster,date,month,category))return '所選日期原班表假別不符，請先核對正式排班';
+ if(!canDesignateFutureRest(roster,date,month,category)||date===asOf&&!documentedFutureRestCategory(roster,date,month,category))return '既有假別不符或不是可配休的未來班別';
  if(meta.overtimeReport||meta.overtime||meta.forEmpId||meta.coverAssignmentId||meta.overtimeExcluded)return '已有加班、代班或排除紀錄，不得重複預排';
  if((snapshot.leaveDates||[]).includes(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))return '該日已有請假，不得重複預排';
  if((snapshot.pairs||[]).some(p=>id(p.empId)===id(emp.empId)&&p.date===date))return '該日已有打卡，請由實際出勤核對流程處理';
@@ -761,7 +770,7 @@ function manualRestPlanIssue(snapshot,emp,month,date,rule,asOf=today(),cutoff=''
  const anchor=weeklyCycleAnchor(person);
  if(!anchor)return '未設定約定七日週期，請先核對排班';
  if(person.flexibleWorkHours===true||person.workTimeSystem&&!['standard','normal','一般','一般工時','固定'].includes(String(person.workTimeSystem).trim()))return '特殊工時制度須另行核對';
- const weekIssue=weeklyPlanIssue(weeklyRoster(snapshot,emp.empId,roster),date,anchor,snapshot,emp.empId);
+ const weekIssue=futureRestPlanIssue(weeklyRoster(snapshot,emp.empId,roster),date,month,person,category,snapshot);
  if(weekIssue)return weekIssue;
  let b;try{b=balance(person,roster,month,snapshot);}catch(e){return String(e.message||e);}
  if(!b.dates.includes(date)||b.typhoonDates.includes(date)||!(b.remaining[category]>0))return '該日不在可用額度或本月已無此假別缺額';
@@ -814,8 +823,8 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
   for(const category of ['休','國']){
    if(!(b.remaining[category]>0)||originalCategory&&originalCategory!==category)continue;
    const rule=rules.find(r=>r[0]===category&&fullDayRule(r)&&restPeriodMatches([r[6],r[7]],period));
-   const documented=documentedFutureRestCategory(roster,date,month,category);
-   const issue=!documented?'原排'+original+'，沒有已確認的'+category+'假別':!rule?'沒有對應的正式8小時規則':manualRestPlanIssue(snapshot,emp,month,date,rule,asOf);
+   const documented=canDesignateFutureRest(roster,date,month,category);
+   const issue=!documented?'既有假別不符或無可配對班別':!rule?'沒有對應的正式8小時規則':manualRestPlanIssue(snapshot,emp,month,date,rule,asOf);
    // A consistent neighboring shift is a suggested future period only. The
     // operator's batch confirmation may select it; fresh quota/weekly guards
     // above still apply, and it must never be treated as actual attendance.
@@ -1188,13 +1197,13 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v42';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v43';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
  }
  const el=document.createElement('dialog');el.id='p79MonthlyRest';
- el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>加班歸屬月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}" max="${today().slice(0,7)}"></label><label>已申報截止日（自行設定）<input id="mrCutoff" type="date" title="留空核對整月"></label><button type="button" id="mrPrior">補報上月</button><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休額度</button></div><div class="filters" id="mrPlanningModes" style="padding:12px;background:#eef2ff;border-radius:10px;margin:10px 0"><b>建立未休假預排</b><label><input id="mrManualMode" type="checkbox">手動預排</label><label><input id="mrAutoMode" type="checkbox">自動預排（今天至月底）</label><button id="mrNewPlan" type="button" class="primary">＋ 新增預排</button></div><div id="mrBackfill" hidden role="status" style="font-weight:800;color:#7c3aed;margin:6px 0"></div><div id="mrPhase" hidden role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" hidden role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details hidden style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><div id="mrCompactStats" role="status" aria-live="polite" class="mr-compact-stats">讀取資料後顯示核對摘要</div><section id="mrAutomaticSupplement" style="margin:10px 0;padding:10px;border:1px solid #cbd5e1;border-radius:10px"><b>全員未休假自動補算結果（不須逐人對表）</b><div id="mrAutoSupplementSummary" role="status" style="margin:7px 0;color:#334155;font-size:12px">正在核對全員來源…</div><div class="scroll" style="max-height:300px"><table><thead><tr><th>職稱</th><th>姓名</th><th>已自動配休</th><th>未休加班註記</th><th>已核對申報</th><th>申報出勤待核</th><th>註記缺申報</th><th>未休缺額</th><th>狀態</th></tr></thead><tbody id="mrAutoSupplementRows"></tbody></table></div><small style="display:block;margin-top:5px;color:#64748b">自動配休與加班註記不等於正式申報。只有正式申報編號及出勤核實完成才會列為已核對申報；資料來源未完成時不判定申報成功。</small></section><details id="mrWeeklyDetails" style="margin:8px 0 12px;border:1px solid #dbe4ee;border-radius:10px;padding:10px" open><summary style="cursor:pointer;font-weight:800">逐週例／休／國核對（依原班表）</summary><div class="scroll" style="max-height:230px"><table><thead><tr><th>週期</th><th>人數</th><th>例假</th><th>休息日</th><th>國定假日</th><th>預排建議</th><th>待確認</th></tr></thead><tbody id="mrWeeklyRows"></tbody></table></div><small style="display:block;color:#64748b;margin-top:6px">未設定員工約定七日週期或跨月班表不足時，只做參考核對，不會自行把普通工作日改為休假加班。</small></details><section id="mrNeedSection"><b hidden id="mrNeedSummary">各公司、單位、組別及職稱排班核對中…</b><div hidden id="mrScopeSummary" role="status"></div><details id="mrScopeDetails" style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">展開單位／職稱統計</summary><div class="scroll"><table><thead><tr><th>單位</th><th>組別</th><th>職稱</th><th>名冊</th><th>完成</th><th>未休／待核</th><th>班表缺漏</th><th>正式可申報</th><th>預排方式</th></tr></thead><tbody id="mrScopeRows"></tbody></table></div></details><div class="scroll"><table><thead><tr><th>預排勾選</th><th>員工編號</th><th>職稱</th><th>姓名</th><th>未休／待核額度</th><th>班表與考勤核對</th></tr></thead><tbody id="mrNeedRows"></tbody></table></div><div id="mrManualSelected" style="margin:10px 0;padding:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px" hidden><b id="mrManualSummary">手動預排尚未勾選人員</b><p style="font-size:12px">勾選後，逐人按「設定日期與時段」；確認後才儲存預排，不會自動申報。</p><div id="mrManualRows"></div></div></section><section id="mrPlannedSection"><b hidden id="mrPlannedSummary">自動預排建議核對中…</b><div class="scroll"><table><thead><tr><th><input id="mrPlanAll" type="checkbox" aria-label="全選自動預排建議"></th><th>日期</th><th>職稱</th><th>姓名</th><th>假別</th><th>原排班別／草案時段</th><th>狀態</th></tr></thead><tbody id="mrPlannedRows"></tbody></table></div><button id="mrSavePlans" type="button" class="primary" disabled>儲存勾選預排（0 筆）</button></section><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><section id="mrExistingSection" aria-label="本月已申報休假加班" style="margin:12px 0;border:1px solid #cbd5e1;border-radius:10px;padding:10px"><b>已申報的例／休／國加班（唯讀，不重複申報）</b><div id="mrExistingStatus" role="status" style="margin:6px 0;font-size:12px;color:#334155">讀取班表後顯示既有申報。</div><div class="scroll" style="max-height:310px"><table><thead><tr><th>日期</th><th>職稱</th><th>姓名</th><th>假別</th><th>申報時段</th><th>申報狀態</th><th>來源／說明</th><th>申報編號</th></tr></thead><tbody id="mrExistingRows"></tbody></table></div></section><b>已完成出勤・尚未申報（自行勾選後送出）</b><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
+ el.innerHTML=`<header><b>每月未休假加班</b><button data-close>關閉</button></header><div class="body"><div class="filters"><label>加班歸屬月份<input id="mrMonth" type="month" value="${esc(a.month()||today().slice(0,7))}" max="${today().slice(0,7)}"></label><label>已申報截止日（自行設定）<input id="mrCutoff" type="date" title="留空核對整月"></label><button type="button" id="mrPrior">補報上月</button><label>部門<select id="mrDept"></select></label><label>職稱<select id="mrJob"></select></label><label>人員<select id="mrEmp"></select></label><button class="primary" id="mrLoad">讀取未休額度</button></div><div class="filters" id="mrPlanningModes" style="padding:12px;background:#eef2ff;border-radius:10px;margin:10px 0"><b>建立未休假預排</b><label><input id="mrManualMode" type="checkbox">手動預排</label><label><input id="mrAutoMode" type="checkbox">自動預排（今天至月底）</label><button id="mrNewPlan" type="button" class="primary">＋ 新增預排</button></div><div id="mrBackfill" hidden role="status" style="font-weight:800;color:#7c3aed;margin:6px 0"></div><div id="mrPhase" hidden role="status" style="font-weight:800;color:#0369a1;margin:8px 0"></div><div id="mrAuditSummary" hidden role="status" style="font-size:12px;font-weight:700;color:#334155"></div><details hidden style="margin-top:6px"><summary style="cursor:pointer;font-size:12px">逐人缺額及待核對原因</summary><pre id="mrAuditDetails" style="white-space:pre-wrap;font:12px/1.6 sans-serif"></pre></details><div id="mrCompactStats" role="status" aria-live="polite" class="mr-compact-stats">讀取資料後顯示核對摘要</div><section id="mrAutomaticSupplement" style="margin:10px 0;padding:10px;border:1px solid #cbd5e1;border-radius:10px"><b>全員未休假自動補算結果（不須逐人對表）</b><div id="mrAutoSupplementSummary" role="status" style="margin:7px 0;color:#334155;font-size:12px">正在核對全員來源…</div><div class="scroll" style="max-height:300px"><table><thead><tr><th>職稱</th><th>姓名</th><th>已自動配休</th><th>未休加班註記</th><th>已核對申報</th><th>申報出勤待核</th><th>註記缺申報</th><th>未休缺額</th><th>狀態</th></tr></thead><tbody id="mrAutoSupplementRows"></tbody></table></div><small style="display:block;margin-top:5px;color:#64748b">自動配休與加班註記不等於正式申報。只有正式申報編號及出勤核實完成才會列為已核對申報；資料來源未完成時不判定申報成功。</small></section><details id="mrWeeklyDetails" style="margin:8px 0 12px;border:1px solid #dbe4ee;border-radius:10px;padding:10px" open><summary style="cursor:pointer;font-weight:800">逐週例／休／國核對（依原班表）</summary><div class="scroll" style="max-height:230px"><table><thead><tr><th>週期</th><th>人數</th><th>例假</th><th>休息日</th><th>國定假日</th><th>預排建議</th><th>待確認</th></tr></thead><tbody id="mrWeeklyRows"></tbody></table></div><small style="display:block;color:#64748b;margin-top:6px">未設定員工約定七日週期或跨月班表不足時，只做參考核對，不會自行把普通工作日改為休假加班。</small></details><section id="mrNeedSection"><b hidden id="mrNeedSummary">各公司、單位、組別及職稱排班核對中…</b><div hidden id="mrScopeSummary" role="status"></div><details id="mrScopeDetails" style="margin-top:8px"><summary style="cursor:pointer;font-weight:700">展開單位／職稱統計</summary><div class="scroll"><table><thead><tr><th>單位</th><th>組別</th><th>職稱</th><th>名冊</th><th>完成</th><th>未休／待核</th><th>班表缺漏</th><th>正式可申報</th><th>預排方式</th></tr></thead><tbody id="mrScopeRows"></tbody></table></div></details><div class="scroll"><table><thead><tr><th>預排勾選</th><th>員工編號</th><th>職稱</th><th>姓名</th><th>未休／待核額度</th><th>班表與考勤核對</th></tr></thead><tbody id="mrNeedRows"></tbody></table></div><div id="mrManualSelected" style="margin:10px 0;padding:10px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px" hidden><b id="mrManualSummary">手動預排尚未勾選人員</b><p style="font-size:12px">勾選後，逐人按「設定日期與時段」；確認後才儲存預排，不會自動申報。</p><div id="mrManualRows"></div></div></section><section id="mrPlannedSection"><b hidden id="mrPlannedSummary">自動預排建議核對中…</b><div class="scroll"><table><thead><tr><th><input id="mrPlanAll" type="checkbox" aria-label="全選自動預排建議"></th><th>日期</th><th>職稱</th><th>姓名</th><th>假別</th><th>原排班別／預排時段</th><th>狀態</th></tr></thead><tbody id="mrPlannedRows"></tbody></table></div><button id="mrSavePlans" type="button" class="primary" disabled>儲存勾選預排（0 筆）</button></section><div id="mrStatus" role="status">選好月份與人員後，讀取班表及出勤紀錄。</div><section id="mrExistingSection" aria-label="本月已申報休假加班" style="margin:12px 0;border:1px solid #cbd5e1;border-radius:10px;padding:10px"><b>已申報的例／休／國加班（唯讀，不重複申報）</b><div id="mrExistingStatus" role="status" style="margin:6px 0;font-size:12px;color:#334155">讀取班表後顯示既有申報。</div><div class="scroll" style="max-height:310px"><table><thead><tr><th>日期</th><th>職稱</th><th>姓名</th><th>假別</th><th>申報時段</th><th>申報狀態</th><th>來源／說明</th><th>申報編號</th></tr></thead><tbody id="mrExistingRows"></tbody></table></div></section><b>已完成出勤・尚未申報（自行勾選後送出）</b><div class="scroll"><table><thead><tr><th><input id="mrAll" type="checkbox" aria-label="全選"></th><th>日期</th><th>姓名</th><th>假別</th><th>出勤時段</th><th>申報時數</th><th>狀態</th></tr></thead><tbody id="mrRows"></tbody></table></div></div><footer><button data-close>取消</button><span id="mrResult" role="status" aria-live="polite">尚未送出申報</span><button id="mrSave" class="primary" disabled>申報勾選項目</button></footer>`;
  el.querySelector('#mrNeedSection').before(el.querySelector('#mrPlannedSection'));
  simplifyMonthlyRestLayout(el,settings);
  // Mount the requested visual dashboard, preserving the original official controller.
@@ -1579,7 +1588,7 @@ async function open(settings={}){
       !(Number(detail.remaining.休)>0||Number(detail.remaining.國)>0))return setStatus('目前沒有可預排的休／國缺額');
    const month=loadedMonth;
    Object.assign(prefill,{allowedEmpIds:eligible.map(x=>x.emp.empId),monthlyRestPlanMonth:month,category:Number(detail.remaining.休)>0?'休':'國',
-    note:'每月未休假加班預排（未核實出勤）',periodHint:'請選本月原排休／國日期及8小時時段；儲存前重新核對缺額及週期',
+    note:'每月未休假加班預排（正式配休）',periodHint:'依本月未來班別選擇可配休時段；儲存後占用正式額度',
     validateMonthlyRestPlan:async({empId,date,rule})=>{
      const target=eligible.find(x=>id(x.emp.empId)===id(empId))?.emp;
      if(!el.isConnected||loadedMonth!==month||!target||!chosenPeople().some(e=>id(e.empId)===id(empId)))throw Error('原未休人員或月份已變更，請重新開啟');
@@ -1656,7 +1665,7 @@ async function open(settings={}){
     if(r.acknowledged)continue;
     if(stop)break;
     if(r.date<today())throw Error('預排日期已過，請重新讀取');
-    const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),manualPlan:true,preventReplace:false,note:'每月未休假加班預排（使用者勾選）',createdAt:Date.now()};
+    const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),manualPlan:true,preventReplace:false,note:'每月未休假加班預排（正式配休）',createdAt:Date.now()};
     r.attempted=true;r.status='儲存預排中／待雲端讀回';setStatus('正在儲存勾選預排：'+r.name+' '+r.date);paint();controls(true);
     const result=await a.saveReport(draft);
     if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==r.id||result.report?.planned!==true)throw Error('雲端未確認儲存為預排');

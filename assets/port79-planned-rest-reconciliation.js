@@ -4,6 +4,10 @@
 const text=v=>String(v??'').trim(),id=v=>text(v).toUpperCase(),rest=v=>['例','休','國','颱'].includes(text(v))?text(v):'';
 function originalCategory(schedule,date,meta){
  const explicit=rest(meta.plannedRestOriginalCategory);if(explicit)return explicit;
+ const plan=meta.overtimeReport;
+ if(plan?.planned===true&&plan.id&&plan.category==='休'&&meta.restCategory==='休'&&
+  meta.restQuotaOvertime===true&&meta.restAllocationSource==='manual'&&
+  text(plan.note)==='每月未休假加班預排（正式配休）')return '休';
  const savedOriginal=meta.reportOriginalShift??meta.overtimeOriginalShift;
  const original=rest(savedOriginal);
  // A report's category alone cannot prove an originally scheduled holiday.
