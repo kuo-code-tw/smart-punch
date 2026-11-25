@@ -182,10 +182,9 @@ function dailyPendingRows(data){
    covered.add(hint.date);dated.set(k,item);result.push(item);
   }
   // Preserve unresolved deficits without inventing dates or grouping dated rows.
-  const eligibleDates=result.filter(r=>norm(r.empId)===norm(person.id)&&(r.kind!=='reference'||r.eligible===true)).length;
-  const remaining=Math.max(0,Number(person.due||0)-eligibleDates);
+  const remaining=Math.max(0,Number(person.due||0)-covered.size);
   if(!covered.size||remaining>0)result.push({...person,suggestions:[],period:'尚缺 '+(remaining||person.due)+' 天，未找到其他可用日期',due:remaining||person.due,
-   category:person.category,canPreplan:eligibleDates===0&&person.canPreplan,residualOnly:true});
+   category:person.category,canPreplan:!covered.size&&person.canPreplan,residualOnly:true});
  }
  return result.sort((a,b)=>String(a.date||'9999').localeCompare(String(b.date||'9999'))||
   String(a.name||'').localeCompare(String(b.name||''),'zh-Hant')||String(a.id).localeCompare(String(b.id)));
