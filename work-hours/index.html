@@ -18224,6 +18224,37 @@ body.p79-work-hours-page #adminContentOvertime #overtimeTableBody .p79-overtime-
    margin-top:0!important;
  }
 }
+
+/* Desktop overtime records: one compact row, including four-action pending plans.
+   Keep the mobile card layout and all status / action handlers unchanged. */
+@media(min-width:851px){
+ body.p79-work-hours-page #adminContentOvertime #p79OvertimeStatsTable #overtimeTableBody>tr{
+   height:40px!important;min-height:40px!important;
+ }
+ body.p79-work-hours-page #adminContentOvertime #p79OvertimeStatsTable #overtimeTableBody>tr>td{
+   padding:4px 6px!important;line-height:18px!important;vertical-align:middle!important;
+ }
+ body.p79-work-hours-page #adminContentOvertime #p79OvertimeStatsTable #overtimeTableBody .p79-overtime-inline{
+   grid-template-columns:minmax(0,1fr) auto!important;
+   min-height:0!important;gap:6px!important;align-items:center!important;
+ }
+ body.p79-work-hours-page #adminContentOvertime #p79OvertimeStatsTable #overtimeTableBody .p79-overtime-row-actions{
+   display:flex!important;flex-wrap:nowrap!important;align-items:center!important;
+   justify-content:flex-end!important;gap:4px!important;
+   width:auto!important;min-width:0!important;flex:0 0 auto!important;margin:0!important;
+ }
+ body.p79-work-hours-page #adminContentOvertime #p79OvertimeStatsTable #overtimeTableBody .p79-overtime-row-actions>button{
+   flex:0 0 auto!important;width:auto!important;min-width:48px!important;
+   min-height:26px!important;height:26px!important;line-height:18px!important;
+   padding:3px 6px!important;box-sizing:border-box!important;white-space:nowrap!important;
+ }
+ body.p79-work-hours-page #adminContentOvertime #p79OvertimeStatsTable #overtimeTableBody .p79-overtime-row-actions>span{
+   flex:0 0 auto!important;white-space:nowrap!important;line-height:18px!important;
+ }
+ body.p79-work-hours-page #adminContentOvertime #p79OvertimeStatsTable #overtimeTableBody .p79-overtime-row-actions>.p79-overtime-action-placeholder{
+   display:none!important;min-height:0!important;
+ }
+}
 </style>
 
 <script id="p79-overtime-rest-review-refresh">
