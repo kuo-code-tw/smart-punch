@@ -1,0 +1,25 @@
+name: Verify pending overtime edit
+on:
+  pull_request:
+    paths:
+      - 'work-hours/index.html'
+      - 'assets/port79-overtime-report.js'
+      - 'backend/night-cover-dual-date-v108-core.gs'
+      - 'scripts/apply-gas-pending-overtime-edit.cjs'
+      - 'tests/overtime-pending-edit.cjs'
+      - '.github/workflows/overtime-pending-edit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node tests/overtime-pending-edit.cjs
+      - run: node tests/overtime-adjusted-shift-review.cjs
+      - run: node tests/overtime-dual-date-gas-v108.cjs
+      - run: node tests/overtime-local-outbox.cjs
