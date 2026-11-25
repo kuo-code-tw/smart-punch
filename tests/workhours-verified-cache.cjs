@@ -6,12 +6,12 @@ const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {
 function setup(disk=new Map()){
  let token='TOKEN',viewer='A1@admin',version='v1',scope='scope1',rev='R1',stamp='',deny=false,failAction='',hold=null,corrupt=false,churn=false,diskFailure=false;
  const calls=[],applied=[];
- const win={sessionStorage:{getItem:()=>stamp},Port79DataCache:{viewerKey:()=>viewer,get:async k=>clone(disk.get(k)),put:async row=>{if(diskFailure)throw Error('disk unavailable');disk.set(row.key,clone(row));},getSystemSnapshot:async()=>null},P79WorkhoursCacheContext:{token:()=>token,url:()=> 'https://script.google.com/macros/s/FIXTURE/exec',canRead:()=>!deny,month:()=>month,applyBundle:b=>applied.push(clone(b)),failed:(m,e)=>applied.push({error:e.message}),applyFull(){}}};
+ const win={sessionStorage:{getItem:()=>stamp},Port79DataCache:{viewerKey:()=>viewer,get:async k=>clone(disk.get(k)),put:async row=>{if(diskFailure)throw Error('disk unavailable');disk.set(row.key,clone(row));return true;},getSystemSnapshot:async()=>null},P79WorkhoursCacheContext:{token:()=>token,url:()=> 'https://script.google.com/macros/s/FIXTURE/exec',canRead:()=>!deny,month:()=>month,applyBundle:b=>applied.push(clone(b)),failed:(m,e)=>applied.push({error:e.message}),applyFull(){}}};
  win.fetch=async(url,opts)=>{const u=new URL(url),action=u.searchParams.get('action'),m=u.searchParams.get('month');calls.push({action,month:m,token:u.searchParams.get('token'),opts});if(hold?.action===action)await hold.promise;if(failAction===action)return {ok:true,json:async()=>({ok:false,error:'fixture rejection'})};const revisions={schedule:'S1',leave:'L1',employees:'E1',attendance:rev,attendanceDelta:'D1',scope};let data;
  if(action==='getOvertimeReportCacheMeta'){data={ok:true,month:m,viewer:viewer.split('@')[0],cacheSchemaVersion:1,version,revisions};if(churn)version+='x';}
  else if(action==='getScheduleDataSecure')data={ok:true,month:m,employees:[{empId:viewer.split('@')[0]}],schedules:[{empId:viewer.split('@')[0],month:m,schedule:{__meta:{}}}],revision:'S1:L1:E1:'+m,overtimeLinkedDelete:true};
  else if(action==='getOvertimeConfig')data={ok:true,config:{overtimeConversionRowsV1:[['休','fixture',8,12.7]]}};
- else data={ok:true,month:m,records:[{id:'fixture-'+m}],revision:corrupt?'wrong':rev,deltaSeq:'D1'};
+ else data={ok:true,month:m,records:[{id:'fixture-'+m,empId:viewer.split('@')[0]}],revision:corrupt?'wrong':rev,deltaSeq:'D1'};
  return {ok:true,json:async()=>clone(data)};};
  const c={window:win,URL,Date,Intl,Map,Set,Object,Array,JSON,String,Number,Promise,AbortController,setTimeout,clearTimeout};vm.createContext(c);vm.runInContext(source,c);
  return {api:win.P79WorkhoursCache,win,calls,disk,applied,setToken:x=>token=x,setViewer:x=>viewer=x,change:()=>{version+='x';rev+='x'},scope:x=>{scope=x;version+='s'},stamp:x=>stamp=x,deny:x=>deny=x,fail:x=>failAction=x,hold:action=>{const d=deferred();hold={action,...d};return d;},corrupt:x=>corrupt=x,churn:x=>churn=x,diskFailure:x=>diskFailure=x};
@@ -52,6 +52,15 @@ await test('dashboard reuses independently verified raw months and keeps account
  assert.equal(t.api.verifiedRawMonths(month,'WRONG'),null,'another token cannot access this cache');
  t.stamp(String(Date.now()+5000));
  assert.equal(t.api.verifiedRawMonths(month,'TOKEN'),null,'a newer edit invalidates the formerly verified snapshot');
+});
+await test('startup background prewarms actual month; page reuses it after one metadata call',async()=>{
+ const t=setup();const session={empId:'A1',adminRole:'superadmin'};t.win.sessionStorage.getItem=k=>k==='port79_user_session'?JSON.stringify(session):'';delete t.win.P79WorkhoursCacheContext;
+ const result=await t.api.prepareForStartup({month,token:'TOKEN',url:'https://script.google.com/macros/s/FIXTURE/exec',guard:()=>true});
+ assert.equal(result.preview,false);assert.equal(t.disk.size,1);assert.equal(result.localScope,JSON.stringify([{}, {}, {}]));assert(Object.values(result.raw).every(x=>x.records.length===1));
+ const n=setup(t.disk);n.win.sessionStorage.getItem=k=>k==='port79_user_session'?JSON.stringify(session):'';
+ const b=await n.api.load(month);assert.equal(b.source,'本機有效快取');assert.equal(n.calls.length,1);assert.equal(n.calls[0].action,'getOvertimeReportCacheMeta');
+ const changed=setup(t.disk);changed.win.sessionStorage.getItem=k=>k==='port79_user_session'?JSON.stringify({...session,dataScope:{attendance:['new']}}):'';
+ let previews=0;await changed.api.load(month,{onPreview:()=>previews++});assert.equal(previews,0,'old scoped bundle must not paint after permission changes');
 });
 await test('main-table then accounting/status reuse the same verified month without redownload',async()=>{const t=setup();await t.api.load(month);const n=t.calls.length;const a=await t.api.load(month),b=await t.api.load(month);assert.equal(t.calls.length,n);assert.equal(a.version,b.version);assert.equal(a.preview,false);});
 await test('changed cloud version reloads full data and replaces obsolete records',async()=>{const t=setup();const a=await t.api.load(month);t.change();const b=await t.api.load(month,{force:true});assert.notEqual(a.version,b.version);assert.equal(t.calls.filter(c=>c.action==='getScheduleDataSecure').length,2);assert.equal(b.raw[month].revision,'R1x');});

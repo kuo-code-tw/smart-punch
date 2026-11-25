@@ -1224,6 +1224,22 @@ async function downloadAll(onProgress,options={}){
  for(let i=0;i<systems.length;i++){
   const sys=systems[i];
   if(typeof options.startupGuard==='function'&&!options.startupGuard())throw Object.assign(new Error('登入狀態已變更，停止背景下載'),{code:'P79_SCOPE'});
+  // The generic workhours snapshot is only attendance. Prepare the actual
+  // versioned overtime month separately, using the same loader as the page.
+  if(!connectionError&&sys==='workhours'&&options.prepareWorkhours===true&&typeof window!=='undefined'&&window.P79WorkhoursCache?.prepareForStartup){
+   let session=null;try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')}catch(_){}
+   const role=String(session?.adminRole||session?.role||'').toLowerCase();
+   const allowed=role==='superadmin'||role==='admin'&&['workhours','attendance','schedule'].every(k=>['view','manage'].includes(String(session?.systemPermissions?.[k]||'')));
+   if(allowed&&!session?.punchOnly){
+    const guard=()=>batchViewer===viewerKey()&&batchToken===token()&&batchScope===displayScope()&&batchGas===gasUrl()&&batchStamp===mutationStamp()&&(typeof options.startupGuard!=='function'||options.startupGuard());
+    onProgress?.(sys,i,systems.length,'loading',null,'準備本月加班申報、班表與考勤');
+    try{const bundle=await window.P79WorkhoursCache.prepareForStartup({month:ymNow(),token:batchToken,url:batchGas,guard});
+     if(!guard()||!bundle||bundle.preview!==false)throw Error('加班月份資料尚未確認');
+     const reused=bundle.source==='本機有效快取';result.push({system:sys,ok:true,reused});onProgress?.(sys,i,systems.length,reused?'reused':'done',null,reused?'本月完整加班快取版本未變':'本月完整加班資料已保存本機');
+    }catch(e){result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e);}
+    continue;
+   }
+  }
   if(prior?.some(row=>row.system===sys&&row.ok)){
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true,reused:true});
@@ -1465,7 +1481,7 @@ async function nativeCloudSyncFromDesktop(){
     state==='error'||state==='skipped'?label+' 未完成：'+String(error?.message||error||'雲端讀取未完成'):
     '正在下載 '+label;
    status('downloading',message,done.size,month);
-  },{quickFirst:true,resumeExisting:window.__port79WorkerResumeOnly===true,historyOnDemand});
+  },{quickFirst:true,resumeExisting:window.__port79WorkerResumeOnly===true,historyOnDemand,prepareWorkhours:true});
   const success=result.filter(x=>x.ok).length,failures=result.filter(x=>!x.ok);
   fullyCompleted=success===total&&!failures.length;
   status(failures.length?(success?'partial':'failed'):'complete',

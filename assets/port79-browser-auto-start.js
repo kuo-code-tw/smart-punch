@@ -59,7 +59,7 @@
     if(month){job.monthCompleted=Number(month.monthCompleted)||0;job.monthTotal=Number(month.monthTotal)||0;}
     const status={loading:'下載中',done:'下載完成',reused:'沿用本機資料',error:'未完成',skipped:'尚未下載',detail:'處理月份'};
     publish('downloading',(names[sys]||sys)+'｜'+(detail||status[state]||state)+(error?'｜'+String(error.message||error):''));
-   },{quickFirst:true,resumeExisting:true,historyOnDemand:true,systems:ctx.systems,startupGuard:()=>same(ctx)});
+   },{quickFirst:true,resumeExisting:true,historyOnDemand:true,prepareWorkhours:true,systems:ctx.systems,startupGuard:()=>same(ctx)});
    if(!same(ctx))return;
    await api.flushFolder?.();
    if(!same(ctx))return;

@@ -19,10 +19,12 @@ function publish(k,type,value){const entry=observers.get(k);if(!entry)return;if(
 let generation=0,startupFlight=null;
 const copy=x=>JSON.parse(JSON.stringify(x));
 function remember(k,b){memory.delete(k);memory.set(k,b);while(memory.size>3){const oldest=memory.keys().next().value;memory.delete(oldest);verifiedMemo.delete(oldest);}}
-const context=()=>g.P79WorkhoursCacheContext;
+let backgroundContext=null;
+const context=()=>g.P79WorkhoursCacheContext||backgroundContext;
+function localScope(){try{const s=JSON.parse(g.sessionStorage?.getItem('port79_user_session')||'null');return s&&typeof s==='object'?JSON.stringify([s.systemPermissions||{},s.dataScope||{},s.dataScopeJobs||{}]):'';}catch(_){return '';}}
 function mutationStamp(){try{return String(g.sessionStorage?.getItem('port79_cache_mutated_at')||'');}catch(_){return '';}}
-function identity(){const c=context(),token=c?.token?.(),viewer=g.Port79DataCache?.viewerKey?.(),url=c?.url?.();if(!token||!viewer||!url||!c.canRead()||c.cacheAccess?.()===false)throw Error('登入或加班查看權限已失效');const endpoint=new URL(url);if(endpoint.origin!=='https://script.google.com'||!/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(endpoint.pathname))throw Error('GAS 網址不正確');return {token,viewer,url,generation,stamp:mutationStamp()};}
-function assert(s){const n=identity();if(n.token!==s.token||n.viewer!==s.viewer||n.url!==s.url||n.generation!==s.generation||n.stamp!==s.stamp)throw Error('登入或資料版本已變更，請重新讀取');}
+function identity(){const c=context(),token=c?.token?.(),viewer=g.Port79DataCache?.viewerKey?.(),url=c?.url?.();if(!token||!viewer||!url||!c.canRead()||c.cacheAccess?.()===false)throw Error('登入或加班查看權限已失效');const endpoint=new URL(url);if(endpoint.origin!=='https://script.google.com'||!/^\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(endpoint.pathname))throw Error('GAS 網址不正確');return {token,viewer,url,generation,stamp:mutationStamp(),scope:localScope()};}
+function assert(s){const n=identity();if(n.token!==s.token||n.viewer!==s.viewer||n.url!==s.url||n.generation!==s.generation||n.stamp!==s.stamp||n.scope!==s.scope)throw Error('登入或資料版本已變更，請重新讀取');}
 function key(s,month){return s.viewer+'|system|workhours|verified-v1|'+encodeURIComponent(s.url)+'|'+month;}
 function monthsFor(month){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('月份格式不正確');const d=new Date(month+'-01T00:00:00Z'),current=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date()),offset=n=>new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+n,1)).toISOString().slice(0,7);return [offset(-1),month,...(offset(1)<=current?[offset(1)]:[])];}
 async function request(s,action,month){
@@ -38,11 +40,11 @@ async function meta(s,month,force=false){
 }
 function valid(b,month,s){
  const months=monthsFor(month);
- return b?.schema===1&&b.month===month&&b.viewer===s.viewer&&b.url===s.url&&typeof b.version==='string'&&b.version&&b.config?.ok===true&&b.config.config&&typeof b.config.config==='object'&&b.roster?.ok===true&&b.roster.month===month&&b.meta?.version===b.version&&Array.isArray(b.roster.employees)&&Array.isArray(b.roster.schedules)&&b.roster.schedules.every(r=>r&&String(r.month)===month&&r.schedule&&typeof r.schedule==='object'&&!Array.isArray(r.schedule))&&months.every(m=>b.raw?.[m]?.ok===true&&b.raw[m].month===m&&Array.isArray(b.raw[m].records));
+ return (!s.scope||b?.localScope===s.scope)&&b?.schema===1&&b.month===month&&b.viewer===s.viewer&&b.url===s.url&&typeof b.version==='string'&&b.version&&b.config?.ok===true&&b.config.config&&typeof b.config.config==='object'&&b.roster?.ok===true&&b.roster.month===month&&b.meta?.version===b.version&&Array.isArray(b.roster.employees)&&Array.isArray(b.roster.schedules)&&b.roster.schedules.every(r=>r&&String(r.month)===month&&r.schedule&&typeof r.schedule==='object'&&!Array.isArray(r.schedule))&&months.every(m=>b.raw?.[m]?.ok===true&&b.raw[m].month===m&&Array.isArray(b.raw[m].records));
 }
 async function saved(s,month){
  const k=key(s,month),stamp=Number(s.stamp)||0;if(valid(memory.get(k),month,s)&&Number(memory.get(k).savedAt||0)>=stamp)return memory.get(k);
- let timer;try{const row=await Promise.race([g.Port79DataCache?.get?.(k),new Promise(r=>{timer=setTimeout(()=>r(null),10000);})]);assert(s);if(valid(row?.data,month,s)&&row.savedAt>0&&row.savedAt>=stamp&&row.savedAt<=Date.now()+60000){row.data.savedAt=row.savedAt;remember(k,row.data);return row.data;}}catch(_){}finally{clearTimeout(timer);}return null;
+ let timer;try{const row=await Promise.race([g.Port79DataCache?.get?.(k),new Promise(r=>{timer=setTimeout(()=>r(null),10000);})]);assert(s);if(row?.data&&s.scope&&row.displayScope===s.scope&&!row.data.localScope)row.data.localScope=s.scope;if(valid(row?.data,month,s)&&(!s.scope||!row.displayScope||row.displayScope===s.scope)&&row.savedAt>0&&row.savedAt>=stamp&&row.savedAt<=Date.now()+60000){row.data.savedAt=row.savedAt;remember(k,row.data);return row.data;}}catch(_){}finally{clearTimeout(timer);}return null;
 }
 function compatible(b,m){
  const r=m.revisions,revision=[r.schedule,r.leave,r.employees,b.month].join(':');
@@ -97,15 +99,17 @@ function load(month,options={}){
    if(!months.every(m=>raw[m]?.ok===true&&raw[m].month===m&&Array.isArray(raw[m].records)))throw Error('跨月考勤尚未讀齊');
    publish(k,'onAttendance',{month,roster,raw,preview:true,source:'雲端考勤已讀取，背景核對版本中'});
    const config=await request(s,'getOvertimeConfig',month);assert(s);
-   const b={schema:1,month,viewer:s.viewer,url:s.url,version:before.version,roster,raw,config,meta:before};
+   const b={schema:1,month,viewer:s.viewer,url:s.url,localScope:s.scope,version:before.version,roster,raw,config,meta:before};
    if(!valid(b,month,s))throw Error('完整班表或跨月考勤尚未讀齊，未覆蓋原快取');
    const after=await meta(s,month,true);assert(s);
    if(before.version!==after.version||!compatible(b,after)){before=after;continue;}
    b.meta=after;b.savedAt=Date.now();b.source='雲端已核對，已保存本機';b.preview=false;remember(key(s,month),b);verifiedMemo.set(key(s,month),{version:b.version,token:s.token,stamp:s.stamp});
-   const row={key:key(s,month),kind:'system',system:'workhours',month,savedAt:b.savedAt,size:JSON.stringify(b).length,data:copy(b)};
+   const row={key:key(s,month),kind:'system',system:'workhours',month,savedAt:b.savedAt,size:JSON.stringify(b).length,data:copy(b),...(s.scope?{displayScope:s.scope,cacheEndpoint:s.url}:{})};
    // Cache/disk failures cannot hold the rendered result hostage. Account/scope
    // remain in the row key; a late write cannot validate a later version.
-   void Promise.resolve(g.Port79DataCache?.put?.(row)).catch(()=>{});
+   const persistence=Promise.resolve(g.Port79DataCache?.put?.(row));
+   if(options.persist===true){try{if(await persistence!==true)throw Error('加班月份本機保存尚未確認');assert(s);}catch(e){memory.delete(key(s,month));verifiedMemo.delete(key(s,month));throw e;}}
+   else void persistence.catch(()=>{});
    return b;
   }
   throw Error('雲端資料持續更新，未確認快取版本；請重新讀取');
@@ -134,6 +138,20 @@ function startup(){
   try{const b=await load(month,{onPreview:b=>context().applyBundle(b),onRoster:b=>context().applyRoster?.(b),onAttendance:b=>context().applyBundle(b),onInvalidate:()=>context().invalidatePreview?.(month)});assert(s);finished=true;context().applyBundle(b);return true;}catch(e){finished=true;context().failed?.(month,e);return false;}
  })().finally(()=>{if(startupFlight===flight)startupFlight=null;});return flight.promise;
 }
-g.P79WorkhoursCache={load,startup,invalidate,verifiedRawMonths,monthsFor,enabled:()=>!!context()?.canRead?.()&&context()?.cacheAccess?.()!==false};
+// Background callers are limited to the same permissions as the visible workhours cache.
+// The authenticated roster is the boundary for raw punch records, even on a shared PC.
+function prepareForStartup(input){
+ if(!input||!input.token||typeof input.guard!=='function'||!input.guard())return Promise.reject(Error('登入狀態尚未確認'));
+ if(g.P79WorkhoursCacheContext)return load(input.month,{persist:true});
+ if(backgroundContext)return Promise.reject(Error('加班月份已在背景準備中'));
+ const normalize=v=>{const raw=String(v??'').trim();if(!raw)return '';const n=Number(raw);return Number.isFinite(n)?String(Math.trunc(n)):raw.toUpperCase();};
+ const session=()=>{try{return JSON.parse(g.sessionStorage?.getItem('port79_user_session')||'null')}catch(_){return null}};
+ const allowed=()=>{const s=session(),r=String(s?.adminRole||s?.role||'').toLowerCase();return input.guard()&&!!s&&!s.punchOnly&&(r==='superadmin'||r==='admin'&&['workhours','attendance','schedule'].every(k=>['view','manage'].includes(String(s.systemPermissions?.[k]||''))));};
+ if(!allowed())return Promise.reject(Error('沒有完整加班月份快取權限'));
+ backgroundContext={token:()=>input.token,url:()=>input.url,canRead:allowed,cacheAccess:allowed,
+  scopeRecords:(rows,people)=>{const ids=new Set(people.map(e=>String(e.empId||'').trim().toUpperCase()).filter(Boolean)),numbers=new Map();for(const e of people){const n=normalize(e.attNo);if(n)numbers.set(n,(numbers.get(n)||0)+1);}return rows.filter(r=>{const id=String(r.empId||'').trim().toUpperCase();return id?ids.has(id):numbers.get(normalize(r.attNo))===1;});}};
+ return Promise.resolve().then(()=>load(input.month,{persist:true})).finally(()=>{backgroundContext=null;});
+}
+g.P79WorkhoursCache={load,startup,invalidate,verifiedRawMonths,monthsFor,prepareForStartup,enabled:()=>!!context()?.canRead?.()&&context()?.cacheAccess?.()!==false};
 })(window);
 
