@@ -1044,8 +1044,9 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
       <div class="vessel-section-title"><div><span class="vessel-eyebrow">OPERATIONS</span><h2>全船 AQC 作業明細</h2></div><span id="driverVesselCount" class="vessel-count"></span></div>
       <div id="driverVesselLoadState" class="vessel-load-state" role="status"></div>
       <div id="driverVesselSourceState" class="vessel-source-state" role="status"></div>
+      <div id="driverVesselClockState" class="vessel-source-state" role="status"></div>
       <div id="driverVesselAqcSummary" class="vessel-aqc-grid" aria-label="全船 AQC 統計"></div>
-      <div class="vessel-table-scroll"><table id="driverVesselDetailTable" class="tbl w-full text-center"><thead><tr><th>AQC</th><th>日期</th><th>姓名</th><th>組別</th><th>作業時間</th><th>時數</th><th>卸櫃</th><th>裝櫃</th><th>H/C</th><th>總櫃數</th><th>效率</th><th>操作</th></tr></thead><tbody id="driverVesselRecordBody"></tbody></table></div>
+      <div class="vessel-table-scroll"><table id="driverVesselDetailTable" class="tbl w-full text-center"><thead><tr><th>AQC</th><th>日期</th><th>姓名</th><th>組別</th><th>作業時間（台北）</th><th>時數</th><th>卸櫃</th><th>裝櫃</th><th>H/C</th><th>總櫃數</th><th>效率</th><th>操作</th></tr></thead><tbody id="driverVesselRecordBody"></tbody></table></div>
       <div class="vessel-table-foot"><span>效率＝（櫃數＋H/C）÷ 時數；組別依作業當月排班。</span><span id="driverVesselGroupState" role="status"></span><button type="button" class="btn bg-slate-100" onclick="retryOperationScheduleGroups()">更新組別</button></div>
     </div>
     <div id="integratedRecordDetails" class="space-y-3 hidden">
@@ -5229,12 +5230,19 @@ function renderDriverVesselAqcSummary(all,visible){
   }).join('');
 }
 function renderDriverVesselDetailTable(rows){
-  const sorted=[...rows].sort((a,b)=>normalizeAqcNo(a.number||a.gcNo).localeCompare(normalizeAqcNo(b.number||b.gcNo),undefined,{numeric:true})||compareWorkingReportChronology(a,b));
+  const clock=window.P79WorkingClock;
+  const mode=clock?.getMode?.()||'taipei';
+  const preview=mode==='assume-utc';
+  const projected=new Map(rows.map(r=>[r,clock?.project?.(r,mode)||{date:r.workDate,start:r.startTime,end:r.endTime,converted:false}]));
+  const clockStatus=document.getElementById('driverVesselClockState');
+  if(clockStatus)clockStatus.textContent=preview?'⚠ 核對預覽：假設 WORKING REPORT 儲存時間為 UTC，換算台北時間 (+8 小時)。未修改原始資料；日期篩選、組別及統計仍依原作業日期。':'台北時間（UTC+8）：保留原始作業日期及時鐘；舊紀錄如有偏移，可至系統設定切換核對預覽。';
+  const sorted=[...rows].sort((a,b)=>normalizeAqcNo(a.number||a.gcNo).localeCompare(normalizeAqcNo(b.number||b.gcNo),undefined,{numeric:true})||(preview?compareWorkingReportChronology({...a,workDate:projected.get(a).date,startTime:projected.get(a).start,endTime:projected.get(a).end},{...b,workDate:projected.get(b).date,startTime:projected.get(b).start,endTime:projected.get(b).end}):compareWorkingReportChronology(a,b)));
   let previous=null,index=-1;
   return sorted.map(r=>{
     const aqc=normalizeAqcNo(r.number||r.gcNo),m=workloadRecordMetrics(r);let header='';
     if(aqc!==previous){previous=aqc;index++;const count=sorted.filter(x=>normalizeAqcNo(x.number||x.gcNo)===aqc).length;header=`<tr class="vessel-aqc-divider tone-${index%3}"><td colspan="12">AQC ${esc(aqc||'未填')} <span>目前 ${count} 筆作業</span></td></tr>`;}
-    return header+`<tr class="vessel-operation-row"><td><span class="vessel-aqc-pill tone-${index%3}">${esc(aqc||'—')}</span></td><td>${esc(r.workDate||'')}</td><td class="vessel-person-name">${esc(displayPersonName(r.name))}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(r.startTime||'—')} → ${esc(r.endTime||'—')}</td><td>${m.hours.toFixed(2)}</td><td class="vessel-disc">${m.disc}</td><td class="vessel-load">${m.load}</td><td>${m.hc}</td><td class="vessel-total">${m.containers}</td><td class="vessel-eff">${m.eff.toFixed(2)}</td><td><button class="vessel-edit" onclick="openRecordDialog(decodeURIComponent('${encodeURIComponent(String(r.id||'')).replace(/'/g,'%27')}'))">編輯</button></td></tr>`;
+    const shown=projected.get(r),endLabel=shown.converted&&shown.endDate!==shown.date?shown.endDate+' '+shown.end:shown.end;
+    return header+`<tr class="vessel-operation-row"><td><span class="vessel-aqc-pill tone-${index%3}">${esc(aqc||'—')}</span></td><td>${esc(shown.date||'')}</td><td class="vessel-person-name">${esc(displayPersonName(r.name))}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(shown.start||'—')} → ${esc(endLabel||'—')}${shown.converted?' <small title="假設原始紀錄為 UTC，未修改原始資料">預覽</small>':''}</td><td>${m.hours.toFixed(2)}</td><td class="vessel-disc">${m.disc}</td><td class="vessel-load">${m.load}</td><td>${m.hc}</td><td class="vessel-total">${m.containers}</td><td class="vessel-eff">${m.eff.toFixed(2)}</td><td><button class="vessel-edit" onclick="openRecordDialog(decodeURIComponent('${encodeURIComponent(String(r.id||'')).replace(/'/g,'%27')}'))">編輯</button></td></tr>`;
   }).join('')||'<tr><td colspan="12" class="vessel-empty">目前篩選沒有明細，請選擇船舶或按「顯示全船全部 AQC」。</td></tr>';
 }
 function vesselScopeRows(rows,job,masters){
@@ -5433,7 +5441,7 @@ async function importWorkingSheetDriverAudit(file){
   dualAuditWorkingReference=null;try{localStorage.removeItem(DUAL_AUDIT_WORKING_CACHE_KEY);}catch(_){}renderWorkingSheetDriverAudit();
   const state=document.getElementById('workingSheetDriverFileState');if(state)state.textContent='正在解析 WORKING SHEET 與 WORKING REPORT…';
   try{
-    await window.p79EnsureXlsx();const buf=await file.arrayBuffer(),book=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
+    await window.p79EnsureXlsx();const buf=await file.arrayBuffer(),book=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:false});
     if(version!==workingSheetDriverImportVersion)return;
     if(!book.Sheets['WORKING SHEET']||!book.Sheets['WORKING REPORT'])throw Error('檔案需同時包含 WORKING SHEET 與 WORKING REPORT 分頁');
     const summary=parseWorkingSheetSummary(book);if(!summary)throw Error('無法讀取 WORKING SHEET');
@@ -5809,7 +5817,7 @@ async function importDualWorkingExcel(file) {
   if(state){state.className='rounded-xl border bg-sky-50 px-3 py-2 text-xs font-bold text-sky-700';state.textContent='② 正在解析 WORKING SHEET / WORKING REPORT...'}
   try{
     const buf=await file.arrayBuffer();
-    const book=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
+    const book=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:false});
     const summary=parseWorkingSheetSummary(book);
     if(!summary)throw new Error('找不到 WORKING SHEET 船舶資料');
     Object.assign(summary,parseWorkingReportProductivity(book,summary));
@@ -11299,7 +11307,7 @@ function workingValueTimePart(v){
       if(mins>=1440)mins=0;
       return {h:Math.floor(mins/60)%24,m:mins%60,s:0};
     }
-    if(v>=1000){
+    if(v>=1000 && v%1!==0){
       const d=excelDateTime(v);
       if(d)return {h:d.getHours(),m:d.getMinutes(),s:d.getSeconds()};
     }
@@ -11318,6 +11326,9 @@ function combineWorkingDateTimeValues(values){
 
   // 先找同一格就同時有日期＋時間的情況。
   for(const v of list){
+    if(typeof v==='number' && v>=1000 && v%1!==0){
+      const d=excelDateTime(v);if(d&&d.getFullYear()>=2000)return d;
+    }
     if(v instanceof Date && v.getUTCFullYear()>=2000){
       // SheetJS Date is UTC-encoded Excel wall time; preserve its worksheet date
       // and clock, including 16:00-23:59 values that would otherwise cross days.
@@ -13109,7 +13120,11 @@ async function importExcel(file) {
   setExcelImportStage('讀取 試算表 檔案',8);
   const buf=await file.arrayBuffer();
   setExcelImportStage('解析 試算表 工作表',15);
-  const book=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
+  // For ship reports, preserve Excel serials: SheetJS Date conversion depends
+  // on runtime/version. Numeric date+time fractions are Taipei wall time.
+  let book=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:false});
+  if(!(book.SheetNames.includes('WORKING SHEET')&&book.SheetNames.includes('WORKING REPORT')))
+    book=XLSX.read(new Uint8Array(buf),{type:'array',cellDates:true});
   if(book.SheetNames.includes('WORKING SHEET')&&book.SheetNames.includes('WORKING REPORT')){
     setExcelImportStage('解析 WORKING SHEET 船舶主檔',25);
     const summary=parseWorkingSheetSummary(book);
@@ -17276,6 +17291,7 @@ window.addEventListener('load',function(){
 <script src="./personnel-reference-dashboard.js?v=20261117-schedule-roster-v3&dates=20261118-full-month-v2"></script>
 <script src="../assets/port79-gate-dialog.js?v=20261110-parent-dialog-v6"></script>
 <link rel="stylesheet" href="./driver-workstation-dashboard.css?v=20261117-trend-v3">
+<script src="../assets/port79-working-clock.js?v=20261125-v1"></script>
 <script src="./driver-workstation-dashboard.js?v=20261117-trend-v3"></script>
 <script>window.Port79OrgContext.configure({system:'efficiency',people:()=>systemEmployees,render:()=>renderAll()});</script>
 </body></html>
