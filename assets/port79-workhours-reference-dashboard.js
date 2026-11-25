@@ -147,7 +147,7 @@
   const restApplicants=new Set(reports.filter(r=>r.category==='休').map(r=>r.empId).filter(Boolean)).size;
   return{applications:reports.length,reviewRate:reports.length?round(completed/reports.length*100):null,restApplicants};
  }
- function compute(){
+ function compute(force=false){
   if(typeof hasValidHomepageAdminSession!=='function'||!hasValidHomepageAdminSession()||
      typeof p79WorkhoursEligibleEmployees!=='function')
     return{ok:false,reason:'尚未完成工時系統登入及權限核對'};
@@ -174,12 +174,16 @@
   const person=id('prPerson').value;
   const scoped=matches.filter(e=>person==='ALL'||empId(e)===person);
   const allow=new Set(scoped.map(empId)),byId=new Map(scoped.map(e=>[empId(e),e]));
-  const verified=typeof p79WorkOvertimeMonthVerified==='function'&&p79WorkOvertimeMonthVerified(month);
-  if(!verified){
-   // Official original month loader only reads; never calls save.
-   if(typeof p79LoadWorkOvertimeMonths==='function'&&typeof records!=='undefined'&&Array.isArray(records))
-      p79LoadWorkOvertimeMonths(records,month);
-   return{ok:false,reason:'正式雲端加班及班表月份尚未核對完成，不能顯示推估數字'};
+  const verified=()=>typeof p79WorkOvertimeMonthVerified==='function'&&p79WorkOvertimeMonthVerified(month);
+  const getOfficialMonth=()=>typeof p79WorkOvertimeMonths==='undefined'?null:p79WorkOvertimeMonths.get(month);
+  if((force||(!verified()&&!getOfficialMonth()?.error))&&typeof p79LoadWorkOvertimeMonths==='function'&&
+      typeof records!=='undefined'&&Array.isArray(records))
+   p79LoadWorkOvertimeMonths(records,month,force);
+  if(!verified()){
+   const official=getOfficialMonth();
+   const reason=official?.error?'正式雲端加班及班表讀取失敗：'+official.error+'。請按查詢重試。':
+    '正在核對正式雲端加班及班表月份';
+   return{ok:false,reason};
   }
   // Derived from the same native, authorized overtime calculation cache.
   // The original builder reuses its fingerprinted calculation cache; invoke it
@@ -338,7 +342,8 @@
   const official=typeof p79WorkOvertimeMonths!=='undefined'?p79WorkOvertimeMonths.get(month):null;
   return JSON.stringify([typeof currentPort79SsoToken==='function'?currentPort79SsoToken():'',
    id('prStart')?.value||'',id('prEnd')?.value||'',official?.revision||'',
-   official?.appliedCacheBundle||'',official?.pending||false,
+   official?.appliedCacheBundle||'',official?.pending||false,official?.ready||false,
+   official?.cachePreview||false,official?.error||'',
    typeof lastAttendanceCloudRevision==='undefined'?'':lastAttendanceCloudRevision,
    window.sessionStorage?.getItem?.('port79_cache_mutated_at')||'',
    window.Port79JobTitleVisibility?.status?.()||'',window.Port79JobTitleVisibility?.revision?.()||0,
@@ -351,7 +356,7 @@
   if(signature===lastAutoSignature)return;
   lastAutoSignature=signature;refresh();
  }
- function refresh(){if(!id('p79WorkhoursReference'))return;try{paint(compute())}
+ function refresh(force=false){if(!id('p79WorkhoursReference'))return;try{paint(compute(force))}
   catch(e){say('prDataStatus','無法核對正式資料：'+String(e?.message||e));id('prDataStatus').dataset.error='true'}}
  // The default overview is a genuine page in the same navigation, not a
  // separate destination that must be reached via an extra back button.
@@ -383,7 +388,7 @@
   id('prStart').value=dateTaipei().slice(0,7)+'-01';
   const now=dateTaipei();const [y,m]=now.slice(0,7).split('-').map(Number);
   id('prEnd').value=y+'-'+String(m).padStart(2,'0')+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0');
-  id('prForm').addEventListener('submit',event=>{event.preventDefault();state.page=1;refresh()});
+  id('prForm').addEventListener('submit',event=>{event.preventDefault();state.page=1;refresh(true)});
   document.querySelectorAll('#p79WorkhoursReference [data-pr-tab]').forEach(b=>b.addEventListener('click',()=>{state.tab=b.dataset.prTab;state.page=1;drawTable(state.all)}));
   document.querySelectorAll('#p79WorkhoursReference [data-pr-open]').forEach(b=>b.addEventListener('click',()=>legacy(b.dataset.prOpen)));
   for(const filter of ['prUnit','prJob','prPerson'])id(filter).addEventListener('change',()=>{
