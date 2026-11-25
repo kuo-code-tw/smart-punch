@@ -7,7 +7,7 @@
 <script defer src="../assets/port79-hidden-job-titles.js?v=20261117-hr-hidden-v1&refresh=20261118-stable-v1"></script>
 <script defer src="../assets/port79-workhours-hidden-job-ui.js?v=20261117-hr-filter-v1&refresh=20261118-stable-v1"></script>
 <script defer src="../assets/port79-overtime-upload-queue.js?v=20261125-local-outbox-v1"></script>
-<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v7-write-priority&outbox=20261125-v1"></script>
+<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v7-write-priority&outbox=20261125-v1&bulkReview=20261125-v2"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261124-planned-review-v3"></script>
 <script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
@@ -14634,10 +14634,9 @@ function p79OvertimePeriodLabel(report){
             };
             // Direct and batch review must follow the same fresh official
             // conversion-table check as the individual report editor.
-            // Only direct row confirmation gets the short bounded retry policy.
-            // Bulk and legacy dialogs retain their established validation flow.
-            if(progress){draft.directRow=true;draft.onProgress=progress;draft.directOperation=operation;}
-            const policy=progress?{maxAttempts:3,maxDelay:2500,rulesTimeout:10000,contextTimeout:12000,onStage:progress}:{};
+            // Batch confirmation gets bounded retries without the short direct-row deadline.
+            if(progress){draft.onProgress=progress;if(operation){draft.directRow=true;draft.directOperation=operation;}else draft.batchReview=true;}
+            const policy=operation?{maxAttempts:3,maxDelay:2500,rulesTimeout:10000,contextTimeout:12000,onStage:progress}:draft.batchReview?{maxAttempts:4,maxDelay:5500,rulesTimeout:25000,contextTimeout:45000,onStage:progress}:{};
             const validation=await api.prepareSaveValidation(draft,true,progress?()=>progress('雲端忙碌，重試'):undefined,policy);
             p79AssertDirectReportActive(operation);
             const active=api.activeReportRows(validation.rules.rows,validation.rules.config);
@@ -14658,6 +14657,8 @@ function p79OvertimePeriodLabel(report){
                 // Only this exact server rejection occurs before any write.
                 // A separate, explicit choice is required to change a linked
                 // plan to personal overtime; never retry uncertain writes.
+                if(draft.batchReview&&String(error?.message||'')==='代班工作日期或本人正常班已變更，請重新核對'&&validation.cloud?.capabilities?.adjustedOvertimeReviewV1!==true)
+                    throw Error('正式後端尚未支援調班核對，原預排已保留，不需修改班表。');
                 if(String(error?.message||'')!=='調班後實際加班時段不屬於原請假班別，請改為本人加班核對'||
                     validation.cloud?.capabilities?.adjustedOvertimeReviewV1!==true||
                     draft.rule.category!=='延'||!draft.leaveHandoffId||!draft.forEmpId||
@@ -14703,7 +14704,7 @@ function p79OvertimePeriodLabel(report){
                     p79PlannedPunchNotice('批次核對進行中 '+(i+1)+' / '+selected.length+
                         '：'+(item.row.name||item.row.empId)+' '+item.date);
                     try{
-                        await p79ConfirmPlannedOvertimeCandidate(item);
+                        await p79ConfirmPlannedOvertimeCandidate(item,stage=>p79PlannedPunchNotice('批次核對 '+(i+1)+' / '+selected.length+'：'+(item.row.name||item.row.empId)+' '+item.date+'｜'+stage));
                         p79PlannedBulkSelected.delete(item.key);
                         completed++;
                     }catch(error){
@@ -17551,7 +17552,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
     }
     return data;
    }catch(error){
-    const transport=error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||'');
+    const transport=error?.name==='AbortError'||error?.name==='TimeoutError'||error instanceof TypeError||/Failed to fetch|NetworkError|signal is aborted|operation was aborted/i.test(error?.message||'');
     if(!transport&&!error?.retryable)throw error;
     if(attempt===maxAttempts)throw Error(error?.retryable?'雲端仍在處理其他資料，本次修改尚未送出；請重新開啟原申報核對。':label+'連線失敗或逾時，已保留內容，請重試核對。');
     await new Promise(resolve=>setTimeout(resolve,600*attempt));
@@ -17645,6 +17646,19 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
   let response,result;
   try{
    response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});result=await response.json();
+  }catch(error){
+   // A lost POST response is not permission to send the write again.
+   // For batch review, recover only an exact already-committed report.
+   const uncertain=error?.name==='AbortError'||error?.name==='TimeoutError'||error instanceof TypeError||error instanceof SyntaxError||/Failed to fetch|NetworkError|signal is aborted|operation was aborted/i.test(error?.message||'');
+   if(!draft.batchReview||!uncertain)throw error;
+   if(currentPort79SsoToken()!==token||!p79CanReportOvertime()||getActiveGasUrl()!==url)throw Error('登入或資料來源已變更，未確認寫入結果');
+   draft.onProgress?.('連線中斷，讀回原申報');
+   const fresh=await read('getOvertimeReportContext','正式申報讀回');
+   if(currentPort79SsoToken()!==token||!p79CanReportOvertime()||getActiveGasUrl()!==url)throw Error('登入或資料來源已變更，未確認寫入結果');
+   const saved=fresh.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
+   if(!saved||String(saved.id)!==draft.id||saved.planned!==false||String(saved.workDate||draft.date)!==draft.date||String(saved.coverDate||draft.date)!==String(draft.coverDate||draft.date)||String(saved.overtimeDate||draft.date)!==overtimeDate||String(saved.leaveId||'')!==String(draft.leaveHandoffId||'')||String(saved.forEmpId||'').trim().toUpperCase()!==String(draft.forEmpId||'').trim().toUpperCase()||String(saved.note||'').trim()!==finalNote)throw Error('加班寫入結果尚未確認；原申報保留，未重複送出。');
+   window.P79Overtime?.verifySavedReport?.(draft,{report:saved});
+   response={ok:true};result={ok:true,directOvertimeSaved:true,id:draft.id,report:saved,revision:fresh.revision,cloudReadbackConfirmed:true};
   }finally{operation?.controller.signal.removeEventListener('abort',abortDirect);}
   p79AssertDirectReportActive(operation);
   if(result?.ok===true&&overtimeDate!==draft.date&&(result.report?.workDate!==draft.date||result.report?.overtimeDate!==overtimeDate))throw Error('正式雙日期讀回不符，保留原ID待核對');
@@ -17675,7 +17689,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
   p79OvertimeCalculationCache=null;
   if(!batch&&!draft.directRow)setTimeout(()=>{try{renderOvertimeStats();}catch(error){console.warn('加班已儲存，統計畫面更新失敗',error);}},0);
   return result;
- }catch(error){if(error?.name==='AbortError'||error instanceof TypeError||/Failed to fetch|NetworkError/i.test(error?.message||''))throw Error('加班寫入結果尚未確認；已保留內容，請再次按儲存核對，同一筆申報不會重複新增。');throw error;}finally{clearTimeout(timer)}
+ }catch(error){if(error?.name==='AbortError'||error?.name==='TimeoutError'||error instanceof TypeError||/Failed to fetch|NetworkError|signal is aborted|operation was aborted/i.test(error?.message||''))throw Error('加班寫入結果尚未確認；已保留原申報，未重複送出。');throw error;}finally{clearTimeout(timer)}
 }
 window.p79OvertimeContext={uploadIdentity:()=>{
  if(!hasValidHomepageAdminSession()||!currentEmp||!p79CanReportOvertime())return null;
