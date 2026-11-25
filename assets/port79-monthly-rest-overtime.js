@@ -145,11 +145,21 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
    const original=String(roster[d]||'').trim();
    // Match the actual calendar: only an originally saved bare 例/休/國
    // retains that category; a night/overtime code without work shows 休.
-   const restKind=cats.includes(original)?original:'休';
+   const designated=g.P79PlannedRestReconciliation?.originalCategory?.(roster,d,m);
+   const restKind=r.planned===true&&cats.includes(designated)?designated:cats.includes(original)?original:'休';
    off[restKind]++;
    ledger.push({date:d,kind:'off',category:restKind,actual:'rest',reportId:r.id,
      statusNote:'已核實整班無卡；加班不計，原申報待正式取消'});
    conflicts.push({date:d,reportId:r.id,reason:'已核實整班無卡，當日按休息計算；原正式加班申報待取消'});
+   continue;
+  }
+  // Cloud-confirmed preplans reserve one official quota day without treating
+  // future or incomplete attendance as earned overtime.
+  if(verified&&r.planned===true){
+   reserved[r.category]++;
+   ledger.push({date:d,kind:'reportedPendingAttendance',category:r.category,actual,reportId:r.id,
+     statusNote:actual==='worked'?'預排已有出勤，待正式申報':'正式預排已占額度，待考勤核對'});
+   if(actual==='missing')conflicts.push({date:d,reportId:r.id,reason:'正式預排已有額度，單邊缺卡待核'});
    continue;
   }
   // Only a non-revoked cloud report ID proves a formal overtime report.
