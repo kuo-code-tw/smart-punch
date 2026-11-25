@@ -166,3 +166,29 @@
   }
   @media(max-width:480px){html body.p79-work-hours-page #adminContentOvertime .p79-overtime-metrics{grid-template-columns:1fr!important}}
 }
+
+/* 2026-11-25: colorful toolbar requested by operator.
+   Presentation only; same tab IDs, actions, order and access checks. */
+@media screen {
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="home"]:not(.is-active){background:linear-gradient(155deg,#eff7ff,#c5e2ff);color:#15518a;border-color:#9ac9f5}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="home"]:not(.is-active):hover{background:#d5eaff;border-color:#9ac9f5;box-shadow:0 3px 9px rgba(30,64,110,.12)}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="overview"]:not(.is-active){background:linear-gradient(155deg,#e9f3ff,#c8ddff);color:#17469c;border-color:#a2c4f8}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="overview"]:not(.is-active):hover{background:#d8e7ff;border-color:#a2c4f8;box-shadow:0 3px 9px rgba(30,64,110,.12)}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="monthly"]:not(.is-active){background:linear-gradient(155deg,#e4faf7,#b2eee6);color:#115e59;border-color:#8cdad1}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="monthly"]:not(.is-active):hover{background:#c5f2ed;border-color:#8cdad1;box-shadow:0 3px 9px rgba(30,64,110,.12)}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="history"]:not(.is-active){background:linear-gradient(155deg,#fff5e9,#ffd9b3);color:#8b3610;border-color:#f3bd87}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="history"]:not(.is-active):hover{background:#ffe3c8;border-color:#f3bd87;box-shadow:0 3px 9px rgba(30,64,110,.12)}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="detail"]:not(.is-active){background:linear-gradient(155deg,#effbe9,#c9efb9);color:#245d22;border-color:#a8db9b}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="detail"]:not(.is-active):hover{background:#d9f4d0;border-color:#a8db9b;box-shadow:0 3px 9px rgba(30,64,110,.12)}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="rules"]:not(.is-active){background:linear-gradient(155deg,#eef2ff,#d5defa);color:#37468a;border-color:#b5c7f4}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="rules"]:not(.is-active):hover{background:#e2e8ff;border-color:#b5c7f4;box-shadow:0 3px 9px rgba(30,64,110,.12)}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="planned"]:not(.is-active){background:linear-gradient(155deg,#f6efff,#e8d4fb);color:#6b21a8;border-color:#d5b2f5}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="planned"]:not(.is-active):hover{background:#eedfff;border-color:#d5b2f5;box-shadow:0 3px 9px rgba(30,64,110,.12)}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="reset"]:not(.is-active){background:linear-gradient(155deg,#eafaff,#c4edf9);color:#155e75;border-color:#9ddbea}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="reset"]:not(.is-active):hover{background:#d5f3fc;border-color:#9ddbea;box-shadow:0 3px 9px rgba(30,64,110,.12)}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab.is-active{background:linear-gradient(115deg,#1379ee,#0756d9);color:#fff;border-color:#0756d9;box-shadow:0 5px 12px rgba(23,101,232,.25)}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="report"]{background:linear-gradient(125deg,#8b48e9,#7027cf);color:#fff;border-color:#7027cf;box-shadow:0 3px 8px rgba(112,39,207,.2)}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab[data-p79-overtime-tab="report"]:hover{background:linear-gradient(125deg,#7c36df,#6221b8)}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab:focus-visible{outline:3px solid #2563eb;outline-offset:2px}
+  #viewAdmin #p79-overtime-approved-tabs .p79-ot-ux-tab:disabled{opacity:.55;cursor:not-allowed}
+}
