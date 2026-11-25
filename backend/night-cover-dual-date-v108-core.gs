@@ -47,6 +47,21 @@ function p79DirectReportSameRequest_(meta,request,rule){
  return r.id===request.id&&String(r.workDate||request.date)===String(request.workDate||request.date)&&(!request.overtimeDate||String(r.overtimeDate||request.date)===String(request.overtimeDate))&&r.category===rule[0]&&r.code===rule[1]&&String(r.typeName||'')===String(rule[9]||'')&&Number(r.declaredHours)===Number(rule[2])&&String(r.convertedHours==null?'':r.convertedHours)===String(rule[3])&&[4,5,6,7,8].every(function(i){return String(r[['normalStart','normalEnd','overtimeStart','overtimeEnd','position'][i-4]]||'')===String(rule[i]||'');})&&String(meta.forEmpId||'')===String(request.forEmpId||'')&&String(r.leaveId||'')===String(request.leaveHandoffId||'')&&(!request.leaveHandoffId||String(r.coverDate||request.date)===String(request.coverDate||r.coverDate||request.date))&&String(meta.note||r.note||'')===String(request.note||'')&&r.planned===(request.planned===true)&&(request.planned===true||(String(r.attendanceInId||'')===String(request.attendanceInId||'')&&String(r.attendanceOutId||'')===String(request.attendanceOutId||'')));
 }
 
+// Edit an existing unapproved plan in place; never turn a real report back into a plan.
+function p79AssertPlannedEditV1_(old,request){
+ if(request.editPlannedOnly!==true)return;
+ const r=old&&old.overtimeReport,date=String(request.date||'');
+ if(request.planned!==true||!r||r.planned!==true||old.overtimeExcluded===true||
+    String(r.id)!==String(request.id)||String(r.id)!==String(request.replaceReportId)||
+    ['approvalStatus','approvedBy','approvedAt','reviewedBy','reviewedAt'].some(k=>r[k]!=null&&r[k]!==''))
+  throw Error('原預排已變更、正式申報或審核，不能再修改預排');
+ if(String(r.workDate||date)!==date||
+    String(r.coverDate||date)!==String(request.coverDate||date)||
+    String(r.overtimeDate||date)!==String(request.overtimeDate||date)||
+    String(r.leaveId||'')!==String(request.leaveHandoffId||'')||
+    normalizeEmpId_(old.forEmpId||r.forEmpId||'')!==normalizeEmpId_(request.forEmpId||''))
+  throw Error('原預排日期或代班關聯已變更，請重新讀取原預排');
+}
 function p79PlanDirectReport_(rows,request,rule,attendance,leaveCovers,leaveRecords,coverRows){
  rule=p79DirectResolvedRule_(rule);
  const next=JSON.parse(JSON.stringify(rows||[]));
@@ -56,6 +71,8 @@ function p79PlanDirectReport_(rows,request,rule,attendance,leaveCovers,leaveReco
  if(!request.id||String(request.id).length>80)throw Error('缺少有效申報識別碼');
  p79AssertOvertimeReportNotRevoked_(next,request.id);
  const schedule=row.schedule||{},meta=schedule.__meta||{},old=meta[date]||{};
+ p79AssertPlannedEditV1_(old,request);
+ if(request.editPlannedOnly===true&&((request.leaveHandoffId&&!['延','代'].includes(rule[0]))||(!request.leaveHandoffId&&rule[0]==='代')))throw Error('請保留原代班關聯，另行核對申報類型');
  const coverDate=p79DirectCoverDateV107_(request,old);
  if(next.some(r=>Object.entries(r.schedule?.__meta||{}).some(([d,m])=>m?.overtimeReport?.id===request.id&&(d!==date||String(r.empId).toUpperCase()!==String(request.empId).toUpperCase()))))throw Error('此申報識別碼已用於其他人員或日期');
  // Editing an existing linked declaration preserves its verified leave coverage.
@@ -88,6 +105,7 @@ function p79PlanDirectReport_(rows,request,rule,attendance,leaveCovers,leaveReco
  }
  const envelope=p79DirectRuleEnvelope_(date,rule),actualMinutes=planned?null:Math.max(0,Math.floor((Math.min(attendance.end,envelope.overtime[1])-Math.max(attendance.start,envelope.overtime[0]))/60000));
  if(!planned&&!actualMinutes)throw Error('出勤時間沒有包含所選加班時段');
+ if(request.manualReviewCoverage===true&&(!p79DirectOriginalPlannedReviewV1_(old,request)||rule[0]!=='延'||!attendance||!attendance.inId||!attendance.outId||attendance.start>envelope.overtime[0]||attendance.end<envelope.overtime[1]||actualMinutes!==Number(rule[2])*60))throw Error('手動核對須由原預排、完整實際加班打卡及正確時數確認');
  const isRest=['休','國','例','颱','選'].includes(rule[0])||rule[0]==='代'&&!['早','中','晚'].includes(original);
  if(isRest){const hour=(p79DirectMinute_(rule[6])%1440)/60;assigned=hour<8?'晚':hour<16?'早':'中';}
  /* 手動申報不受原班別限制。 */
@@ -100,7 +118,8 @@ function p79PlanDirectReport_(rows,request,rule,attendance,leaveCovers,leaveReco
  delete value.overtimeExcluded;delete value.overtimeDeletedAt;
  if(['休','國','例','颱','選'].includes(rule[0])){value.restCategory=rule[0];value.restQuotaOvertime=true;value.restAllocationSource='manual';}
  // 同日兩位代班只記錄申報，不把原來的排班班別改掉。
- if(request.coverPeriodMode!=='same-day')schedule[date]=assigned;
+ // Changing a pending plan must not rewrite the employee's actual normal roster.
+ if(request.coverPeriodMode!=='same-day'&&request.editPlannedOnly!==true)schedule[date]=assigned;
  meta[date]=value;schedule.__meta=meta;row.schedule=schedule;
  return {rows:next,duplicate:false,report};
 }
@@ -128,7 +147,8 @@ function p79SaveDirectOvertimeReport_(ss,data){
  if(!retry&&lease&&(normalizeEmpId_(lease.ownerEmpId)!==normalizeEmpId_(session.empId)||String(lease.clientId)!==String(data.scheduleClientId||'')))throw Error('班表正在編輯，請待儲存完成後再申報');
  if(!(Number(rule[2])>0&&Number(rule[2])<=24)||rule[3]!==''&&!(Number.isFinite(Number(rule[3]))&&Number(rule[3])>=0&&Number(rule[3])<=100))throw Error('雲端換算選項時數無效');
  const today=Utilities.formatDate(new Date(),'Asia/Taipei','yyyy-MM-dd');
- const planned=data.planned===true&&(date>=today||retry&&meta.overtimeReport.planned===true);
+ if(data.editPlannedOnly===true)p79AssertPlannedEditV1_(meta,{...data,date:date});
+ const planned=data.planned===true&&(date>=today||data.editPlannedOnly===true||retry&&meta.overtimeReport.planned===true);
  if(data.planned===true&&!planned)throw Error('過去日期須核對實際完整出勤，不可改為預排');
  let attendance=null;
  if(!retry&&!planned){
@@ -159,6 +179,7 @@ function p79SaveDirectOvertimeReport_(ss,data){
   const saved=verify&&verify.schedule&&verify.schedule.__meta&&verify.schedule.__meta[date]&&verify.schedule.__meta[date].overtimeReport;
   if(!saved||saved.workDate!==date||saved.overtimeDate!==plan.report.overtimeDate)throw Error('雙日期加班讀回不符，請保留原申報ID核對');
   if(!p79DirectConversionReceipt_(saved,data.id,rule))throw Error('加班寫入的時數、換算或時段未通過讀回確認，請保留申報識別碼再試');
+  if(data.editPlannedOnly===true&&(saved.planned!==true||String(saved.leaveId||'')!==String(data.leaveHandoffId||'')||String(saved.coverDate||date)!==String(data.coverDate||date)||String(saved.note||'')!==String(data.note||'')))throw Error('預排修改尚未通過讀回核對，請保留原預排ID');
   if(plan.report.adjustedCoverReview===true&&saved.adjustedCoverReview!==true)throw Error('調班核對標記未通過正式讀回確認');
   if(plan.report.adjustedIndependentFrom&&['leaveId','forEmpId','coverDate','overtimeDate'].some(k=>String(saved.adjustedIndependentFrom?.[k]||'')!==String(plan.report.adjustedIndependentFrom[k]||'')))throw Error('本人加班原代班稽核未通過正式讀回確認');
   plan.report=saved;
@@ -184,7 +205,7 @@ function p79GetOvertimeReportContext_(p){
  const coverDate=p79DateOnly_(p.coverDate||date),coverMonth=coverDate.slice(0,7);
  if(/^\d{4}-\d{2}-\d{2}$/.test(coverDate)&&coverMonth!==month)(readScheduleMonthOnly_(ss,coverMonth)||[]).filter(function(r){return allowed.has(normalizeEmpId_(r.empId));}).forEach(function(r){var existing=schedules.find(function(x){return normalizeEmpId_(x.empId)===normalizeEmpId_(r.empId);});if(existing){existing.schedule=Object.assign({},r.schedule||{},existing.schedule||{},{__meta:Object.assign({},r.schedule&&r.schedule.__meta||{},existing.schedule&&existing.schedule.__meta||{})});}else schedules.push(r);});
  const config=getSystemConfig_(),options={overtimeConversionRowsV1:config.overtimeConversionRowsV1,overtimeReportTypesV1:config.overtimeReportTypesV1};
- return {ok:true,action:'getOvertimeReportContext',empId:empId,date:date,month:month,records:records,config:options,schedules:schedules,capabilities:{nightCoverOvertimeAccountingV1:true,sameDayCoverFourHourV1:true,adjustedOvertimeReviewV1:true},report:(schedules.find(function(r){return normalizeEmpId_(r.empId)===empId;})||{}).schedule?.__meta?.[date]?.overtimeReport||null,leaveCoverAssignments:covers,revision:[getScheduleSyncRevision_(),getLeaveSyncRevision_(),getEmployeeAuthRevision_(),month].join(':'),apiVersion:API_VERSION};
+ return {ok:true,action:'getOvertimeReportContext',empId:empId,date:date,month:month,records:records,config:options,schedules:schedules,capabilities:{nightCoverOvertimeAccountingV1:true,sameDayCoverFourHourV1:true,adjustedOvertimeReviewV1:true,plannedOvertimeEditV1:true,manualOvertimeCoverageV1:true},report:(schedules.find(function(r){return normalizeEmpId_(r.empId)===empId;})||{}).schedule?.__meta?.[date]?.overtimeReport||null,leaveCoverAssignments:covers,revision:[getScheduleSyncRevision_(),getLeaveSyncRevision_(),getEmployeeAuthRevision_(),month].join(':'),apiVersion:API_VERSION};
 }
 
 function p79DirectCoverDateV107_(request,old){return String(request.coverDate||old&&old.overtimeReport&&old.overtimeReport.coverDate||request.date||'');}
@@ -199,6 +220,13 @@ function p79DirectAdjustedShiftV1_(rows,request,rule,attendance){
  const s=row&&row.schedule||{},shift=[s[date],s[date.slice(-2)],s[String(Number(date.slice(-2)))]].
   map(v=>String(v||'').trim()).find(v=>['早','中','晚'].includes(v));
  const anchor={早:[480,960],中:[960,0],晚:[0,480]}[shift];
+ // The operator may explicitly select a fully punched overtime interval
+ // after a roster change. Automatic/batch matching stays strict.
+ if(request.manualReviewCoverage===true&&rule[0]==='延'&&anchor&&attendance&&attendance.inId&&attendance.outId){
+  const actual=p79DirectRuleEnvelope_(date,rule);
+  if(attendance.start<=actual.overtime[0]&&attendance.end>=actual.overtime[1]&&actual.overtime[1]-actual.overtime[0]===Number(rule[2])*3600000)
+   return {shift:shift,envelope:actual};
+ }
  if(!anchor||rule[0]!=='延'||p79DirectMinute_(rule[4])%1440!==anchor[0]||p79DirectMinute_(rule[5])%1440!==anchor[1])
   throw Error('調班後所選加班時段與最新正式正常班不符，請重新選擇');
  if(!attendance||!(attendance.end>attendance.start)||!attendance.inId||!attendance.outId)throw Error('調班後須核對完整實際打卡');
@@ -267,6 +295,12 @@ function p79DirectCoverCheckV107_(rows,request,rule,cover,leaves,coverDate,revie
  if(!valid(coverDate))throw Error('原請假日期無效');
  var leave=(leaves||[]).find(function(l){return String(l.id)===String(request.leaveHandoffId)&&String(l.empId).toUpperCase()===String(request.forEmpId).toUpperCase()&&l.status==='已核准'&&coverDate>=String(l.startDate||l.startTime).slice(0,10).replace(/\//g,'-')&&coverDate<=String(l.endDate||l.endTime||l.startDate||l.startTime).slice(0,10).replace(/\//g,'-');});
  if(!cover||!leave)throw Error('對應請假或代班安排已變更，未生成加班');
+ // A revised pending plan is not proof of coverage. Keep the source link/date
+ // and defer the actual coverage decision to formal filing.
+ if(request.editPlannedOnly===true){
+  p79AssertPlannedEditV1_(review&&review.old,request);
+  return {overtimeDate:String(review.old.overtimeReport.overtimeDate||date)};
+ }
  // New two-person leave cover is two explicit same-day four-hour periods.
  // Keep the old adjacent-day rule for previously created historical reports.
  if(request.coverPeriodMode==='same-day'){
