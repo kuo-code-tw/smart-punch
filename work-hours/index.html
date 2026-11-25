@@ -17,7 +17,7 @@
 <script src="../assets/port79-planned-rest-reconciliation.js?v=20261106-workhours-no-punch-v1"></script>
 <script src="../assets/port79-workhours-no-punch-autocancel.js?v=20261106-workhours-no-punch-v1"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261123-true-simple-official-v2&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1&dashboard=20261123-review-checkbox-v3&fullRoster=20261124-v21&result=20261125-confirmed-popup-v1&quotaPreview=20261125-v26&autoRematch=20261125-v27&weeklyDefault=20261125-mon-sun-v28&restPlanGuard=20261125-v29"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261123-true-simple-official-v2&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1&dashboard=20261123-review-checkbox-v3&fullRoster=20261124-v21&result=20261125-confirmed-popup-v1&quotaPreview=20261125-v26&autoRematch=20261125-v27&weeklyDefault=20261125-mon-sun-v28&restPlanGuard=20261125-v29&crossMonthWeekly=20261125-v30"></script>
 <script src="../assets/port79-overtime-status.js?v=20261027-dept-job-name-onefield-v3"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -17977,6 +17977,20 @@ window.p79MonthlyRestContext={
    if(archiveReadOnly!==true)throw Error('原始考勤資料未讀齊或月份不符，不能判定無卡休假');
    batches=[];needAttendance=false;readOnlyDueAttendance=true;
   }
+  // Weekly rest validation needs real adjacent month rosters, not inferred days.
+  // Keep them separate from the monthly ledger and write payload. Read only
+  // for current-month planning; a failed adjacent read blocks boundary weeks only.
+  const currentMonth=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date()).slice(0,7);
+  let adjacentSchedules=[];
+  if(needAttendance&&!reportView&&!roster.provisional&&month===currentMonth){
+   const [year,mon]=month.split('-').map(Number);
+   const adjacent=[new Date(Date.UTC(year,mon-2,1)).toISOString().slice(0,7),new Date(Date.UTC(year,mon,1)).toISOString().slice(0,7)];
+   const results=await Promise.allSettled(adjacent.map(async m=>({month:m,data:await read('getScheduleDataSecure',m)})));
+   for(const result of results){if(result.status!=='fulfilled')continue;const {month:m,data}=result.value;if(data.provisional===true||!Array.isArray(data.schedules))continue;
+    for(const row of data.schedules){if(row.month&&row.month!==m)continue;const schedule=Object.fromEntries(Object.entries(row.schedule||{}).filter(([d])=>d.startsWith(m+'-')));schedule.__meta=Object.fromEntries(Object.entries(row.schedule?.__meta||{}).filter(([d])=>d.startsWith(m+'-')));adjacentSchedules.push({empId:row.empId,schedule});}
+   }
+   if(currentPort79SsoToken()!==token)throw Error('登入身分已變更，請重新讀取');
+  }
   const attendanceRows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
   const {employees,allowed,sessions,attendanceEvidence,pairs}=p79BuildWorkRestAttendance(month,roster,attendanceRows,needAttendance);
   const cached=p79WorkOvertimeMonths.get(month);if(cached?.token===token){if(needAttendance)cached.attendanceEvidence=attendanceEvidence;}
@@ -17984,7 +17998,7 @@ window.p79MonthlyRestContext={
   p79OvertimeCalculationCache=null;
 
   const leaveDates=p79WorkRestLeaveDates(month,roster,employees);
-  return {schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,attendanceEvidence,leaveDates,provisional:roster.provisional===true,archiveStatus:roster.archiveStatus||'',readOnlyDueAttendance,saveContext:needAttendance?{token,month,ready:roster.provisional!==true&&roster.revision!=null,cloud:{...roster,records:attendanceRows}}:null,leaveCoverAssignments:roster.leaveCoverAssignments||[],approvedLeaves:(roster.leaveRecords||[]).filter(l=>['已核准','已核準'].includes(l.status)).map(l=>{const emp=employees.find(e=>leaveBelongsToEmployee(l,e));return emp?{id:l.id,empId:emp.empId,leaveType:l.leaveType,start:toDateInputValue(l.startTime||l.startDate),end:toDateInputValue(l.endTime||l.endDate||l.startTime||l.startDate),days:getLeaveDays(l)}:null;}).filter(Boolean)};
+  return {schedules:(roster.schedules||[]).filter(r=>allowed.has(String(r.empId).toUpperCase())),adjacentSchedules:adjacentSchedules.filter(r=>allowed.has(String(r.empId).toUpperCase())),pairs,attendanceEvidence,leaveDates,provisional:roster.provisional===true,archiveStatus:roster.archiveStatus||'',readOnlyDueAttendance,saveContext:needAttendance?{token,month,ready:roster.provisional!==true&&roster.revision!=null,cloud:{...roster,records:attendanceRows}}:null,leaveCoverAssignments:roster.leaveCoverAssignments||[],approvedLeaves:(roster.leaveRecords||[]).filter(l=>['已核准','已核準'].includes(l.status)).map(l=>{const emp=employees.find(e=>leaveBelongsToEmployee(l,e));return emp?{id:l.id,empId:emp.empId,leaveType:l.leaveType,start:toDateInputValue(l.startTime||l.startDate),end:toDateInputValue(l.endTime||l.endDate||l.startTime||l.startDate),days:getLeaveDays(l)}:null;}).filter(Boolean)};
  }
 };
 </script>
