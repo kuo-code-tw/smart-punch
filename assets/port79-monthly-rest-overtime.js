@@ -506,7 +506,7 @@ function plan(snapshot,people,month,rules,options={}){
       const anchor=weeklyCycleAnchor(state.emp);
       const occupied=new Set((state.b.ledger||[]).filter(x=>x.category===category&&['off','reserved','reported','reportedPendingAttendance'].includes(x.kind)).map(x=>weeklyCycleWindow(x.date,anchor)?.start).filter(Boolean));
       const available=state.candidates.filter(c=>!state.used.has(c.date)&&(!c.pair)===planned&&c.byCategory.has(category)&&
-       (!spread||!occupied.has(c.week)&&!state.weeklyPlanned.has(c.week+'|'+category))&&
+       (!spread||(!occupied.has(c.week)||planned&&category==='休')&&!state.weeklyPlanned.has(c.week+'|'+category))&&
        (!planned||category!=='休'||!state.weeklyPlanned.has(c.week+'|休')));
       for(const candidate of available){
        if(!byDate.has(candidate.date))byDate.set(candidate.date,[]);
