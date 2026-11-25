@@ -152,7 +152,7 @@ function dailyPendingRows(data){
    const item={kind:'reference',id:person.id,empId:person.id,date:hint.date,name:person.name,role:person.role,
     category:hint.category||String(hint.period||'').match(/^[休例國]/)?.[0]||'',period:suggestionPeriod(hint),
     quota:person.category,quotaProgress:person.quotaProgress||null,lastReported:person.lastReported,hours:'—',status:'待核對',source:hint.note||person.source,
-    checked:false,disabled:true,reviewType:'deficit',canPreplan:false};
+    checked:false,disabled:true,reviewType:'deficit',canPreplan:person.canPreplan===true};
    covered.add(hint.date);dated.set(k,item);result.push(item);
   }
   // Preserve unresolved deficits without inventing dates or grouping dated rows.
@@ -394,8 +394,14 @@ function mount(el){
      (selectedPending.length>8?'<small>另有 '+(selectedPending.length-8)+' 項已勾選</small>':''):
      '勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。';
    const nativeSave=$(el,'#mrSave'),nativePlan=$(el,'#mrSavePlans');
-   q('#mrUxSavePlan').disabled=!!nativePlan?.disabled||!data.planned.some(r=>r.checked&&!r.disabled);
-   q('#mrUxSavePlan').textContent='▣ 儲存預排（'+data.planned.filter(r=>r.checked&&!r.disabled).length+' 筆）';
+   // A dated reference must not silently become a real report. When a single
+   // eligible person is selected, reuse the existing guarded plan editor.
+   const manualPlanPeople=new Map(selectedReview.filter(r=>r.canPreplan&&['roster','reference'].includes(r.kind)).map(r=>[norm(r.empId||r.id),r]));
+   const canOpenPlan=state.tab==='pending'&&!originalMonth.disabled&&manualPlanPeople.size===1;
+   const hasNativePlans=planCount>0&&!nativePlan?.disabled;
+   q('#mrUxSavePlan').disabled=!hasNativePlans&&!canOpenPlan;
+   q('#mrUxSavePlan').textContent=hasNativePlans?'▣ 儲存預排（'+planCount+' 筆）':canOpenPlan?'▣ 設定預排（1 人）':'▣ 儲存預排（0 筆）';
+   q('#mrUxSavePlan').title=!hasNativePlans&&manualPlanPeople.size>1?'尚未建立可儲存的日期與時段，請逐人使用設定預排；不會將參考日直接存成加班。':'預排未正式申報，日期及時段須確認。';
    q('#mrUxSubmit').disabled=!formalCount||!!nativeSave?.disabled||!/申報/.test(nativeSave?.textContent||'');
    q('#mrUxSubmit').textContent='➤ 正式申報（'+formalCount+' 筆）';
    if(state.tab!=='pending'){q('#mrUxSavePlan').disabled=true;q('#mrUxSubmit').disabled=true;}
@@ -405,8 +411,8 @@ function mount(el){
     const quota=r.quotaProgress;
     const type=kind(r),status=label(r),selectable=state.tab!=='done'&&selectionMode(r)!=='none';
     const id=esc(r.id),kindKey=esc(r.kind),key=esc(selectionKey(r));
-    const operations=r.kind==='roster'&&r.canPreplan&&!originalMonth.disabled?
-     '<button type="button" data-action="preplan" data-key="'+key+'">＋ 預排申報</button><button type="button" data-action="view" data-key="'+key+'">◎ 檢視</button>':r.kind==='ready'?
+    const operations=(r.kind==='roster'||r.kind==='reference')&&r.canPreplan&&!originalMonth.disabled?
+     '<button type="button" data-action="preplan" data-key="'+key+'">設定預排</button><button type="button" data-action="view" data-key="'+key+'">◎ 檢視</button>':r.kind==='ready'?
      '<button type="button" data-action="edit" data-kind="ready" data-id="'+id+'" data-key="'+key+'">✎ 編輯</button><button type="button" data-action="view" data-kind="ready" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>':
      '<button type="button" data-action="view" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'">◎ 檢視</button>';
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
@@ -511,9 +517,15 @@ function mount(el){
   const row=currentView().shown.find(x=>selectionKey(x)===button.dataset.key);
   if(button.dataset.action==='view')details(row);
   if(button.dataset.action==='edit')edit(row);
-  if(button.dataset.action==='preplan'&&row?.kind==='roster'&&row.canPreplan&&!originalMonth.disabled)el.p79OpenMonthlyRestPlan?.(row.id);
+  if(button.dataset.action==='preplan'&&['roster','reference'].includes(row?.kind)&&row.canPreplan&&!originalMonth.disabled)el.p79OpenMonthlyRestPlan?.(row.empId||row.id);
  });
- q('#mrUxSavePlan').onclick=()=>{if(state.tab!=='pending')return;const button=$(el,'#mrSavePlans');if(button&&!button.disabled)button.click();};
+ q('#mrUxSavePlan').onclick=()=>{
+  if(state.tab!=='pending'||originalMonth.disabled)return;
+  const button=$(el,'#mrSavePlans'),view=currentView();
+  if(button&&!button.disabled&&view.data.planned.some(r=>r.checked&&!r.disabled)){button.click();return;}
+  const people=new Map(view.pending.filter(r=>r.canPreplan&&['roster','reference'].includes(r.kind)&&reviewSelected(state.reviewSelected,r)).map(r=>[norm(r.empId||r.id),r]));
+  if(people.size===1){const row=people.values().next().value;el.p79OpenMonthlyRestPlan?.(row.empId||row.id);}
+ };
  q('#mrUxSubmit').onclick=()=>{
   if(state.tab!=='pending')return;
   const submit=$(el,'#mrSave');
