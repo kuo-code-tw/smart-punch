@@ -11,6 +11,63 @@
  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const dateTaipei=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  const state={tab:'all',page:1,all:[],current:null};
+ // Read-only, same-account local snapshots. Never inject preview rows into
+ // the authoritative ledger or grant write/export permission from a cache.
+ const localDisplay={key:'',month:'',roster:null,raw:null,loading:false,done:false,revision:0};
+ function localIdentity(month){
+  try{
+   const token=typeof currentPort79SsoToken==='function'?currentPort79SsoToken():'';
+   const viewer=window.Port79DataCache?.viewerKey?.()||'';
+   if(!token||!viewer||!hasValidHomepageAdminSession()||!window.P79WorkhoursCache?.enabled?.())return '';
+   const session=JSON.parse(window.sessionStorage?.getItem?.('port79_user_session')||'null');
+   return JSON.stringify([token,viewer,typeof getActiveGasUrl==='function'?getActiveGasUrl():'',
+    session?.systemPermissions||{},session?.dataScope||{},session?.dataScopeJobs||{},session?.finePermissions||{},
+    window.sessionStorage?.getItem?.('port79_cache_mutated_at')||'',month]);
+  }catch(_){return '';}
+ }
+ function readLocalDisplay(month){
+  const key=localIdentity(month);
+  if(localDisplay.key!==key||localDisplay.month!==month){
+   Object.assign(localDisplay,{key,month,roster:null,raw:null,loading:false,done:false,revision:localDisplay.revision+1});
+  }
+  if(!key||localDisplay.loading||localDisplay.done)return localDisplay;
+  localDisplay.loading=true;
+  const current=()=>localDisplay.key===key&&localDisplay.month===month&&localIdentity(month)===key&&
+    !(typeof p79WorkOvertimeMonths!=='undefined'&&p79WorkOvertimeMonths.get(month)?.previewInvalidated);
+  const onLocal=()=>{localDisplay.revision++;if(id('viewAdmin')?.classList.contains('p79-ref-active')&&!document.hidden)refresh();};
+  const cache=window.Port79DataCache;
+  const roster=Promise.resolve().then(()=>cache?.getSchedulePreview?.(month,{strict:true})).then(x=>{
+   if(current()&&Array.isArray(x?.data?.schedules)){localDisplay.roster=x.data.schedules;onLocal();}
+  }).catch(()=>{});
+  const raw=Promise.resolve().then(()=>cache?.getDisplaySnapshot?.('workhours',{timeoutMs:10000})).then(x=>{
+   const d=x?.data;
+   if(current()&&d?.fullDatabase===true&&Array.isArray(d.records)&&Array.isArray(d.monthStats)&&
+       d.monthStats.some(m=>m.month===month&&m.ok===true)){
+    localDisplay.raw=d.records;onLocal();
+   }
+  }).catch(()=>{});
+  void Promise.all([roster,raw]).finally(()=>{
+   if(localDisplay.key===key){localDisplay.loading=false;localDisplay.done=true;localDisplay.revision++;}
+  });
+  return localDisplay;
+ }
+ function cachedReportRows(rosterRows,month,allow){
+  const out=[];
+  if(!Array.isArray(rosterRows)||typeof p79WorkOvertimeOfficialReport!=='function')return out;
+  for(const entry of rosterRows){
+   const who=empId(entry);if(!allow.has(who))continue;
+   for(const [day,meta] of Object.entries(entry.schedule?.__meta||{})){
+    const report=meta?.overtimeReport;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!p79WorkOvertimeOfficialReport(report,meta))continue;
+    const credit=String(report.overtimeDate||meta.overtimeDate||day).slice(0,10);
+    if(credit.slice(0,7)!==month)continue;
+    // reportVerified here means stored report ID, not current cloud freshness.
+    out.push({empId:who,rosterDate:day,dateKey:day,monthKey:month,overtimeDate:credit,
+     overtimeReport:report,reportVerified:true,planned:report.planned===true,timeCheckRequired:!!report.attendanceReview});
+   }
+  }
+  return out;
+ }
  // The authoritative attendance source is getAttendanceMonthRaw, reused through
  // the application's original validated month loader. Never sum local preview
  // records and claim a full payroll month was fetched.
@@ -176,20 +233,27 @@
   const allow=new Set(scoped.map(empId)),byId=new Map(scoped.map(e=>[empId(e),e]));
   const verified=()=>typeof p79WorkOvertimeMonthVerified==='function'&&p79WorkOvertimeMonthVerified(month);
   const getOfficialMonth=()=>typeof p79WorkOvertimeMonths==='undefined'?null:p79WorkOvertimeMonths.get(month);
-  if((force||(!verified()&&!getOfficialMonth()?.error))&&typeof p79LoadWorkOvertimeMonths==='function'&&
+  const token=typeof currentPort79SsoToken==='function'?currentPort79SsoToken():'';
+  if(!token)return{ok:false,reason:'尚未確認登入'};
+  // Query is local-first. Do not start another full month read for filtering,
+  // and throttle explicit retry after a lock/timeout instead of piling up GAS calls.
+  const before=getOfficialMonth();
+  const retry=force&&before?.error&&!before.pending&&Date.now()-Number(before.at||0)>=10000;
+  if((retry||(!verified()&&!before?.error&&!before?.pending))&&typeof p79LoadWorkOvertimeMonths==='function'&&
       typeof records!=='undefined'&&Array.isArray(records))
-   p79LoadWorkOvertimeMonths(records,month,force);
-  if(!verified()){
-   const official=getOfficialMonth();
-   const reason=official?.error?'正式雲端加班及班表讀取失敗：'+official.error+'。請按查詢重試。':
-    '正在核對正式雲端加班及班表月份';
-   return{ok:false,reason};
-  }
-  // Derived from the same native, authorized overtime calculation cache.
-  // The original builder reuses its fingerprinted calculation cache; invoke it
-  // on each query so month changes never inherit stale roster or attendance.
-  const verifiedRows=typeof buildOvertimeStatisticsRows==='function'?buildOvertimeStatisticsRows():[];
-  const source=[...(Array.isArray(verifiedRows)?verifiedRows:[]),...(p79OvertimeCalculationCache?.plannedRows||[])];
+   p79LoadWorkOvertimeMonths(records,month,!!retry);
+  const official=getOfficialMonth(),isVerified=verified();
+  const sameAccount=official?.token===token;
+  const invalidated=sameAccount&&official.previewInvalidated===true;
+  const local=!invalidated?readLocalDisplay(month):null;
+  const rosterAvailable=sameAccount&&official?.ready&&official.source!=='2026-10-provisional'&&Array.isArray(official.rows);
+  const rosterRows=rosterAvailable?official.rows:Array.isArray(local?.roster)?local.roster:null;
+  const reportsAvailable=isVerified||Array.isArray(rosterRows);
+  // Keep using the native verified ledger for a confirmed month. While waiting
+  // or after a transient read failure, build a separate DISPLAY-ONLY snapshot.
+  const verifiedRows=isVerified&&typeof buildOvertimeStatisticsRows==='function'?buildOvertimeStatisticsRows():[];
+  const source=isVerified?[...(Array.isArray(verifiedRows)?verifiedRows:[]),...(p79OvertimeCalculationCache?.plannedRows||[])]:
+    cachedReportRows(rosterRows,month,allow);
   const reports=[],seen=new Set();
   for(const row of source){
    const report=row?.overtimeReport,who=empId(row),idKey=String(report?.id||'').trim();
@@ -212,7 +276,17 @@
   const active=reports.filter(r=>r.rawHours!=null);
   const invalid=reports.filter(r=>r.unverified).length;
   const overtime=active.reduce((sum,r)=>sum+r.rawHours,0);
-  const sourceRecords=verifiedAttendance(month);
+  const freshRaw=isVerified?verifiedAttendance(month):null;
+  // Use the already loaded local raw data first, but do not turn a missing
+  // month into a false zero. A locally available subset is labeled a preview.
+  const localLoaded=!invalidated&&window.P79WorkhoursCache?.enabled?.()&&typeof records!=='undefined'&&Array.isArray(records)
+   ?records.filter(r=>String(r.timeStr||r.dateKey||'').replaceAll('/','-').slice(0,7)===month):[];
+  const sourceRecords=Array.isArray(freshRaw)?freshRaw:Array.isArray(local?.raw)?local.raw:localLoaded.length?records:null;
+  if(!reportsAvailable&&!Array.isArray(sourceRecords)){
+   return{ok:false,reason:invalidated?'權限或資料範圍已變更，舊快取已停止顯示':
+    official?.error?'本機尚無此月份可用快取；雲端讀取失敗：'+official.error+'。請按查詢重試。':
+    '正在讀取本機資料，雲端在背景同步；此月份尚無可顯示快取'};
+  }
   const sessions=sourceRecords?attendanceSessions(sourceRecords,scoped,f.start,f.end):[];
   const rawHours=round(sessions.reduce((sum,s)=>sum+s.minutes,0)/60);
   const dates=[],today=dateTaipei();
@@ -225,39 +299,49 @@
    dates.push({date:d,hours:round(sessions.filter(r=>r.date===d).reduce((a,r)=>a+r.minutes,0)/60),
     overtime:round(active.filter(r=>r.creditDate===d).reduce((a,r)=>a+r.rawHours,0))});
   }
-  return{ok:true,month,scope:scoped,selectedPerson:person,attendanceAvailable:Array.isArray(sourceRecords),attendanceError:rawCloud.error,
+  return{ok:true,month,scope:scoped,selectedPerson:person,reportsAvailable,preview:!isVerified||!Array.isArray(freshRaw),
+   reportPreview:!isVerified,attendancePreview:!Array.isArray(freshRaw),syncError:sameAccount?official?.error||'':'',
+   attendanceAvailable:Array.isArray(sourceRecords),attendanceError:rawCloud.error,
    sessions,rawHours,overtime,invalid,reports:reports.sort((a,b)=>b.creditDate.localeCompare(a.creditDate)||b.id.localeCompare(a.id)),
    trend:dates,attenders:new Set(sessions.map(s=>s.empId)).size,
    pending:reports.filter(r=>r.status==='review').length};
  }
- function trendSvg(points){
+ function trendSvg(points,includeAttendance=true,includeOvertime=true){
   if(!points.length)return'<div class="pr-message">這個期間沒有可核對的日期</div>';
-  const w=670,h=202,L=48,R=14,T=15,B=29,max=Math.max(1,...points.flatMap(p=>[p.hours,p.overtime]));
+  const w=670,h=202,L=48,R=14,T=15,B=29,max=Math.max(1,...points.flatMap(p=>[includeAttendance?p.hours:0,includeOvertime?p.overtime:0]));
   const ceil=Math.ceil(max/5)*5,ww=w-L-R,hh=h-T-B;
   const x=i=>L+((points.length===1?.5:i/(points.length-1))*ww);
   const y=val=>T+hh*(1-val/ceil);
   const line=k=>points.map((p,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(p[k]).toFixed(1)).join(' ');
   let body='';
   for(let i=0;i<=4;i++){const value=ceil*i/4;body+='<line x1="'+L+'" x2="'+(w-R)+'" y1="'+y(value)+'" y2="'+y(value)+'" stroke="#e1eaf5"/><text x="'+(L-7)+'" y="'+(y(value)+4)+'" text-anchor="end" font-size="11" fill="#496b90">'+format(value)+'</text>'}
-  body+='<path fill="none" stroke="#087efa" stroke-width="3" d="'+line('hours')+'"/><path fill="none" stroke="#11a442" stroke-width="3" d="'+line('overtime')+'"/>';
-  points.forEach((p,i)=>{if(i%Math.max(1,Math.ceil(points.length/7))===0||i===points.length-1)body+='<text x="'+x(i)+'" y="'+(h-6)+'" font-size="11" text-anchor="middle">'+esc(p.date.slice(5))+'</text>';body+='<circle r="3" fill="white" stroke="#11a442" stroke-width="2" cx="'+x(i)+'" cy="'+y(p.overtime)+'"><title>'+esc(p.date)+'：正式加班 '+p.overtime+' 小時</title></circle>'});
-  return'<svg class="pr-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="依正式資料統計的工時趨勢">'+body+'</svg>';
+  if(includeAttendance)body+='<path fill="none" stroke="#087efa" stroke-width="3" d="'+line('hours')+'"/>';
+  if(includeOvertime)body+='<path fill="none" stroke="#11a442" stroke-width="3" d="'+line('overtime')+'"/>';
+  points.forEach((p,i)=>{if(i%Math.max(1,Math.ceil(points.length/7))===0||i===points.length-1)body+='<text x="'+x(i)+'" y="'+(h-6)+'" font-size="11" text-anchor="middle">'+esc(p.date.slice(5))+'</text>';if(includeOvertime)body+='<circle r="3" fill="white" stroke="#11a442" stroke-width="2" cx="'+x(i)+'" cy="'+y(p.overtime)+'"><title>'+esc(p.date)+'：加班申報 '+p.overtime+' 小時</title></circle>'});
+  return'<svg class="pr-svg" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="目前可用資料的工時趨勢">'+body+'</svg>';
  }
  function paint(data){
   state.current=data;
-  const ok=data.ok,attendance=ok&&data.attendanceAvailable;
-  say('prDataStatus',ok?(data.attendanceAvailable?'資料來源：正式原始打卡月份已核對，正式加班申報已核對；打卡區間時數不等於薪資結算工時。':data.attendanceError?'正式加班已核對；原始打卡讀取失敗：'+data.attendanceError:'正式加班已核對；原始打卡月份仍在讀取，不顯示推估工時。'):'資料狀態：'+data.reason);
-  id('prDataStatus').dataset.error=ok&&data.attendanceAvailable?'false':'true';
-  const metrics=ok?applicationMetrics(data.reports):null;
-  say('prKpiApplications',ok?format(metrics.applications):em);
-  say('prKpiReviewRate',ok&&metrics.reviewRate!==null?format(metrics.reviewRate):em);
-  say('prKpiRestApplicants',ok?format(metrics.restApplicants):em);
-  say('prKpiPending',ok?data.pending:em);
-  say('prKpiApplicationsNote',ok?'依所選日期及人員，僅計正式申請':'正式申請尚未核對');
-  say('prKpiReviewRateNote',ok?(metrics.applications?'核准及駁回件數 ÷ 正式申請':'本期間尚無正式申請'):'審核狀態尚未核對');
-  say('prKpiRestApplicantsNote',ok?'正式休息日加班申請，依人員去重':'休息日申請尚未核對');
-  say('prKpiPendingNote',ok?'正式申報狀態（非預估）':'申報狀態待核對');
-  id('prTrend').innerHTML=attendance?trendSvg(data.trend):'<div class="pr-message">正式資料尚未讀齊</div>';
+  const ok=data.ok,attendance=ok&&data.attendanceAvailable,hasReports=ok&&data.reportsAvailable!==false;
+  const preview=ok&&data.preview;
+  const message=preview?'已顯示'+(data.reportPreview?'本機／最近加班資料':'已核對加班資料')+
+    (attendance?'、'+(data.attendancePreview?'本機打卡資料（可能未完整）':'已核對打卡資料'):'；打卡尚無快取')+
+    (!hasReports?'；本機尚無此月份加班快取':'')+
+    (data.syncError?'；雲端同步未完成：'+data.syncError+'，保留目前資料，可按查詢重試。':'；雲端背景核對中，非最新結算資料。'):
+    '資料來源：正式原始打卡月份及加班申報已核對；打卡區間時數不等於薪資結算工時。';
+  say('prDataStatus',ok?message:'資料狀態：'+data.reason);
+  id('prDataStatus').dataset.error=!ok||!!data.syncError?'true':'false';
+  const metrics=hasReports?applicationMetrics(data.reports):null;
+  const label=data.reportPreview?'快取資料，待雲端核對':'依正式申報';
+  say('prKpiApplications',hasReports?format(metrics.applications):em);
+  say('prKpiReviewRate',hasReports&&metrics.reviewRate!==null?format(metrics.reviewRate):em);
+  say('prKpiRestApplicants',hasReports?format(metrics.restApplicants):em);
+  say('prKpiPending',hasReports?data.pending:em);
+  say('prKpiApplicationsNote',hasReports?label:'本機尚無加班資料');
+  say('prKpiReviewRateNote',hasReports?(data.reportPreview?label:metrics.applications?'核准及駁回件數 ÷ 正式申請':'本期間尚無正式申請'):'審核狀態尚未核對');
+  say('prKpiRestApplicantsNote',hasReports?(data.reportPreview?label:'正式休息日加班申請，依人員去重'):'休息日申請尚未核對');
+  say('prKpiPendingNote',hasReports?label:'申報狀態待核對');
+  id('prTrend').innerHTML=attendance||hasReports?trendSvg(data.trend,attendance,hasReports):'<div class="pr-message">本機尚無可顯示資料</div>';
   // A report can be credited to a different month than the physical punch.
   // Do not subtract such hours from this month's clock intervals or label
   // the remainder as normal hours unless every report has local punch evidence.
@@ -271,7 +355,7 @@
     sessionSums.set(k,(sessionSums.get(k)||0)+r.minutes/60);
   }
   const matched=ok&&[...reportSums].every(([k,h])=>sessionSums.has(k)&&h<=sessionSums.get(k));
-  const ratio=attendance&&!data.invalid&&matched&&data.rawHours>0&&data.overtime<=data.rawHours?
+  const ratio=attendance&&hasReports&&!preview&&!data.invalid&&matched&&data.rawHours>0&&data.overtime<=data.rawHours?
     Math.min(100,Math.max(0,data.overtime/data.rawHours*100)):null;
   id('prDonut').style.background=ratio===null?'conic-gradient(#dbe7f6 0 100%)':
     'conic-gradient(#087efa 0 '+(100-ratio)+'%,#18ae66 '+(100-ratio)+'% 100%)';
@@ -281,14 +365,14 @@
   say('prOvertimePercent',ratio===null?em:format(round(ratio))+'%');
   const names=[{label:'平日加班',categories:['延'],hours:0},{label:'休息日加班',categories:['休'],hours:0},
    {label:'例假日加班',categories:['例','國'],hours:0},{label:'其他加班',categories:[],hours:0}];
-  if(ok)for(const report of data.reports){
+  if(hasReports)for(const report of data.reports){
    if(report.rawHours===null)continue;
    const cat=names.find(c=>c.categories.includes(report.category))||names[3];cat.hours+=report.rawHours;
   }
   const display=names.filter(c=>c!==names[3]||c.hours>0);
   const max=Math.max(1,...display.map(c=>c.hours));
-  id('prBreakdown').innerHTML=display.map(c=>'<div class="pr-breakdown-row"><span>'+esc(c.label)+'</span><div class="pr-bar"><span style="width:'+(ok?round(c.hours/max*100):0)+'%"></span></div><span>'+((ok&&!data.invalid)?format(c.hours)+' 小時':em)+'</span><span>'+((ok&&!data.invalid&&data.overtime>0)?format(round(c.hours/data.overtime*100))+'%':em)+'</span></div>').join('')+
-   '<div class="pr-breakdown-total"><span>合計</span><strong>'+(ok&&!data.invalid?format(data.overtime)+' 小時':em)+'</strong></div>';
+  id('prBreakdown').innerHTML=display.map(c=>'<div class="pr-breakdown-row"><span>'+esc(c.label)+'</span><div class="pr-bar"><span style="width:'+(hasReports?round(c.hours/max*100):0)+'%"></span></div><span>'+((hasReports&&!data.invalid)?format(c.hours)+' 小時':em)+'</span><span>'+((hasReports&&!data.invalid&&data.overtime>0)?format(round(c.hours/data.overtime*100))+'%':em)+'</span></div>').join('')+
+   '<div class="pr-breakdown-total"><span>合計</span><strong>'+(hasReports&&!data.invalid?format(data.overtime)+' 小時':em)+'</strong></div>';
   const person=ok&&data.selectedPerson!=='ALL'?data.scope.find(e=>empId(e)===data.selectedPerson):null;
   say('prPersonalTitle',person?.name||'請選擇姓名');
   const personalSessions=person?data.sessions.filter(s=>s.empId===empId(person)):[];
@@ -297,20 +381,20 @@
   say('prPersonalActual',personalSessions.length?format(round(personalSessions.reduce((s,r)=>s+r.minutes,0)/60))+' 小時':em);
   say('prPersonalOT',personalOt.length?format(round(personalOt.reduce((s,r)=>s+r.rawHours,0)))+' 小時':em);
   say('prPersonalMissing',em); // never invent absences from raw punch intervals.
-  drawTable(ok?data.reports:[]);
+  drawTable(hasReports?data.reports:[]);
  }
  function drawTable(rows){
   state.all=rows;
   for(const [key,label]of [['all','全部'],['review','待審核'],['approved','已核准'],['rejected','已駁回']]){
    const button=id('prTab'+key);
-   button.textContent=label+' ('+rows.filter(r=>key==='all'||r.status===key).length+')';
+   button.textContent=label+' ('+(state.current?.ok&&state.current.reportsAvailable!==false?rows.filter(r=>key==='all'||r.status===key).length:em)+')';
    button.classList.toggle('is-current',state.tab===key);
   }
   const selected=rows.filter(r=>state.tab==='all'||r.status===state.tab);
   const pages=Math.max(1,Math.ceil(selected.length/5));state.page=Math.min(pages,Math.max(1,state.page));
   const shown=selected.slice((state.page-1)*5,state.page*5);
   const body=id('prTableBody');body.replaceChildren();
-  if(!shown.length){const r=body.insertRow(),c=r.insertCell();c.colSpan=11;c.textContent=state.current?.ok?'沒有符合條件的正式申報':'雲端資料尚未確認';}
+  if(!shown.length){const r=body.insertRow(),c=r.insertCell();c.colSpan=11;c.textContent=state.current?.ok&&state.current.reportsAvailable!==false?(state.current.reportPreview?'本機快取沒有符合條件的申報，雲端尚未核對':'沒有符合條件的正式申報'):'本機尚無此月份加班資料';}
   for(const r of shown){
    const tr=body.insertRow();
    const cells=['□',r.submitDate||em,r.name,r.unit||em,r.job,r.workDate,
@@ -347,7 +431,8 @@
    typeof lastAttendanceCloudRevision==='undefined'?'':lastAttendanceCloudRevision,
    window.sessionStorage?.getItem?.('port79_cache_mutated_at')||'',
    window.Port79JobTitleVisibility?.status?.()||'',window.Port79JobTitleVisibility?.revision?.()||0,
-    rawCloud.fingerprint,rawCloud.error]);
+    official?.at||0,official?.previewInvalidated||false,localDisplay.revision,
+   typeof records!=='undefined'&&Array.isArray(records)?records.length:0,rawCloud.fingerprint,rawCloud.error]);
  }
  let lastAutoSignature='';
  function refreshOnChange(){
