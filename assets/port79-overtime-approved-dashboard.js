@@ -73,7 +73,7 @@ function activate(view){
   if(!showOvertimePanel())return;
   closeMonthly();
   setActive('overview');
-  const heading=root?.querySelector('.p79-ot-ux-heading');
+  const heading=root?.querySelector('.p79-ot-ux-tabs');
   if(heading&&typeof heading.scrollIntoView==='function'&&d.getElementById('adminContentOvertime')?.classList.contains('hidden')===false){
    heading.scrollIntoView({block:'nearest'});
   }
@@ -124,11 +124,9 @@ function init(){
  if(!host||!workspace||d.getElementById(KEY))return;
  const header=d.createElement('div');
  header.id=KEY;header.className='p79-ot-ux';
- const title=d.createElement('section');title.className='p79-ot-ux-heading';
- title.innerHTML='<span class="p79-ot-ux-symbol" aria-hidden="true">◷</span><div><h2>加班管理</h2><p>加班申報、未休假加班及加班統計</p></div>';
  const tabs=d.createElement('nav');tabs.className='p79-ot-ux-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','加班管理分頁與功能');
  for(const [view,label] of entries)tabs.append(makeButton(view,label));
- header.append(title,tabs);
+ header.append(tabs);
  // The landing-page navigation must NOT be a child of the hidden overtime
  // content. The work-hours homepage can initially show the stats pane.
  // Keep the original overtime cards/forms exactly where they already are.
