@@ -403,10 +403,7 @@ function futureRestPlanIssue(roster,date,month,emp,category,snapshot){
 }
 function canAutoSuggestFuture(roster,date,month,emp,category,snapshot){
  if(futureRestPlanIssue(roster,date,month,emp,category,snapshot))return false;
- const m=roster?.__meta?.[date]||{};
- return ['早','中','晚'].includes(String(roster[date]||''))||
-  /^([01]?\d|2[0-4])(?::[0-5]\d)?$/.test(String(m.overtimeStart||''))&&
-  /^([01]?\d|2[0-4])(?::[0-5]\d)?$/.test(String(m.overtimeEnd||''));
+ return !!rosterRestPeriod(roster,date,true);
 }
 
 function weeklyRestReview(roster,month,cycleStart='',snapshot,empId){
@@ -444,16 +441,40 @@ function futureWeekRestProtected(roster,date,cycleStart=''){
  }
  return regular>=1&&rest>=1;
 }
+// One official shift resolver shared by reference, planning and rule matching.
+function restPeriodMinute(value){
+ const m=String(value??'').trim().match(/^(\d{1,2})(?::(\d{2}))?$/);
+ if(!m)return NaN;
+ const h=Number(m[1]),n=Number(m[2]||0);
+ return h<=24&&n<60&&(h!==24||n===0)?(h*60+n)%1440:NaN;
+}
+function restPeriodMatches(a,b){
+ return !!a&&!!b&&a.length===2&&b.length===2&&a.every((x,i)=>Number.isFinite(restPeriodMinute(x))&&restPeriodMinute(x)===restPeriodMinute(b[i]));
+}
+function rosterRestPeriod(roster,date,allowNeighbors=false){
+ const code=String(roster?.[date]||'').trim(),m=roster?.__meta?.[date]||{};
+ const ranges={早:['08','16'],中:['16','24'],晚:['24','08']};
+ const valid=p=>p&&Number.isFinite(restPeriodMinute(p[0]))&&Number.isFinite(restPeriodMinute(p[1]))&&(restPeriodMinute(p[1])-restPeriodMinute(p[0])+1440)%1440===480;
+ if(ranges[code])return {period:ranges[code],source:'原班表'+code+'班'};
+ const timed=code.match(/^[休國例]\s*(\d{1,2}(?::\d{2})?)\s*[-–—～]\s*(\d{1,2}(?::\d{2})?)$/);
+ if(timed&&valid(timed.slice(1)))return {period:timed.slice(1),source:'原班表已保存加班時段'};
+ if(valid([m.overtimeStart,m.overtimeEnd]))return {period:[m.overtimeStart,m.overtimeEnd],source:'原班表註記時段'};
+ const saved=[m.overtimeAssignedShift,m.reportOriginalShift,m.overtimeOriginalShift,m.leaveOriginalShift].map(x=>String(x||'').trim()).filter(x=>ranges[x]);
+ const unique=[...new Set(saved)];
+ if(unique.length===1)return {period:ranges[unique[0]],source:'已保存原班別'+unique[0]+'班'};
+ if(unique.length>1)return null; // conflicting same-day records are not inferred
+ if(allowNeighbors&&['休','國'].includes(code)){
+  const days=Object.keys(roster||{}).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)&&ranges[roster[d]]).sort();
+  const prior=days.filter(d=>d<date).at(-1),next=days.find(d=>d>date);
+  if(prior&&next&&roster[prior]===roster[next])return {period:ranges[roster[prior]],source:'前後班表同為'+roster[prior]+'班（推估）'};
+ }
+ return null;
+}
 function ruleFor(date,roster,pair,category,rules){
  const allowed=rules.filter(r=>r[0]===category&&fullDayRule(r));
  if(pair){const found=g.P79Overtime.inferRule(pair.start,pair.end,date,allowed,category);return found||null;}
- const m=roster.__meta?.[date]||{};
- const shift={早:['08','16'],中:['16','24'],晚:['24','08']}[roster[date]];
- const period=shift||(m.overtimeStart&&m.overtimeEnd&&(m.restQuotaOvertime===true||String(roster[date]||'')===category)?[m.overtimeStart,m.overtimeEnd]:null);
- if(!period)return null;
- const minute=x=>{const v=String(x||'').match(/^(\d{1,2})(?::(\d{2}))?$/);return v?Number(v[1])*60+Number(v[2]||0):NaN;};
- const start=minute(period[0]),end=minute(period[1]);
- return allowed.find(r=>minute(r[6])===start&&minute(r[7])===end)||null;
+ const resolved=rosterRestPeriod(roster,date,true);
+ return resolved?allowed.find(r=>restPeriodMatches(resolved.period,[r[6],r[7]]))||null:null;
 }
 const filingPriority=typeof g.p79RestCategoryPriority==='function'?g.p79RestCategoryPriority():['例','休','國'];
 function sortRows(rows){
@@ -515,7 +536,7 @@ function plan(snapshot,people,month,rules,options={}){
   for(const date of b.dates){
    const m=roster.__meta?.[date]||{};
    if(date<nextReportDate)continue; // Earlier unresolved attendance stays in the audit ledger.
-   if((b.typhoonDates||[]).includes(date)||!['早','中','晚','國','休','例'].includes(roster[date])||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
+   if((b.typhoonDates||[]).includes(date)||!(['早','中','晚','國','休','例'].includes(roster[date])||/^[休國例]\s*\d/.test(String(roster[date]||'')))||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
    const originalCategory=automaticRestCategory(roster,date,month);
    if(!originalCategory){
     if(date>=currentDate&&['早','中','晚'].includes(roster[date]))for(const category of ['休','國'])blocked(date,category,'原排'+roster[date]+'班，沒有已確認的'+category+'假別');
@@ -542,7 +563,7 @@ function plan(snapshot,people,month,rules,options={}){
    // 有正式班表的例／休／國只能保留原假別；未來預排不擅自把休假日轉成上班。
    const categoryOptions=[originalCategory];
    for(const category of categoryOptions){const manualRule=manualRuleByDate.get(date);
-    const rule=ruleFor(date,roster,pair,category,rules)||(!pair&&manualRule?.[0]===category?manualRule:null);if(rule)byCategory.set(category,rule);}
+    const rule=ruleFor(date,pair?roster:weekRoster,pair,category,rules)||(!pair&&manualRule?.[0]===category?manualRule:null);if(rule)byCategory.set(category,rule);}
    if(!byCategory.size)blocked(date,originalCategory,'無相符的正式8小時加班時段');
    if(byCategory.size){
     const restProtected=!!pair||!futureRestPlanIssue(weekRoster,date,month,emp,originalCategory,snapshot);
@@ -779,21 +800,11 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
    }
    continue;
   }
-  let period=shifts[original],source=period?'原班表'+original+'班':'';
-  if(!period&&['休','國'].includes(original)){
-   if(Number.isFinite(minute(m.overtimeStart))&&Number.isFinite(minute(m.overtimeEnd))&&(minute(m.overtimeEnd)-minute(m.overtimeStart)+1440)%1440===480){
-    period=[m.overtimeStart,m.overtimeEnd];source='原班表註記時段';
-   }else{
-    const prior=shiftDays.filter(d=>d<date&&shifts[weekRoster[d]]).at(-1),next=shiftDays.find(d=>d>date&&shifts[weekRoster[d]]);
-    // A neighboring shift is an estimate, not actual attendance. Do not guess
-    // when the two sides of the rest day disagree.
-    if(prior&&next&&weekRoster[prior]===weekRoster[next]){period=shifts[weekRoster[prior]];source='前後班表同為'+weekRoster[prior]+'班（推估）';}
-   }
-  }
+  const resolved=rosterRestPeriod(weekRoster,date,true),period=resolved?.period,source=resolved?.source||'';
   if(!period)continue;
   for(const category of ['休','國']){
    if(!(b.remaining[category]>0)||originalCategory&&originalCategory!==category)continue;
-   const rule=rules.find(r=>r[0]===category&&fullDayRule(r)&&minute(r[6])===minute(period[0])&&minute(r[7])===minute(period[1]));
+   const rule=rules.find(r=>r[0]===category&&fullDayRule(r)&&restPeriodMatches([r[6],r[7]],period));
    const documented=documentedFutureRestCategory(roster,date,month,category);
    const issue=!documented?'原排'+original+'，沒有已確認的'+category+'假別':!rule?'沒有對應的正式8小時規則':manualRestPlanIssue(snapshot,emp,month,date,rule,asOf);
    // A consistent neighboring shift is a suggested future period only. The
@@ -812,8 +823,10 @@ function selectedRestCandidateKey(r){
  const raw=String(r?.rule?.[1]||r?.period||'').trim();
  const match=raw.match(/(\d{1,2})(?::(\d{2}))?\s*[-–—～]\s*(\d{1,2})(?::(\d{2}))?\s*$/);
  if(!match)return '';
- const period=match.slice(1).map((v,i)=>String(v||'0').padStart(2,'0')).join(':');
- return [id(r.empId),r.date,r.category,period].join('|');
+ const period=[restPeriodMinute(match[1]+':'+(match[2]||'00')),restPeriodMinute(match[3]+':'+(match[4]||'00'))];
+ if(!period.every(Number.isFinite))return '';
+ const canonical=period.join(':');
+ return [id(r.empId),r.date,r.category,canonical].join('|');
 }
 function matchSelectedRestCandidates(requested,candidates){
  const keys=new Set(requested.map(selectedRestCandidateKey).filter(Boolean));
@@ -1744,6 +1757,6 @@ async function open(settings={}){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
 
 })(window);
