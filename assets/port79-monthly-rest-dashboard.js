@@ -233,7 +233,7 @@ function mount(el){
  #p79MonthlyRest>header>b{font-size:24px;color:#122b54}
  #p79MonthlyRest>header [data-close]{background:#e4edf8!important;color:#315072!important;font-weight:700}
  #p79MonthlyRest>footer:not(#mrUxFooter){display:none!important}
- #p79MonthlyRest #mrUxRoot{display:flex;flex-direction:column;gap:16px;padding:16px 21px 18px;min-width:0;font-family:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif}
+ #p79MonthlyRest #mrUxRoot{display:flex;flex-direction:column;gap:10px;padding:10px 16px 10px;min-width:0;font-family:"Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif}
  #p79MonthlyRest #mrUxRoot *{box-sizing:border-box}
  #p79MonthlyRest #mrUxSubtitle{font-size:12px;color:#527297;font-weight:600;margin-top:3px}
  #p79MonthlyRest .mr-ux-banner{border-radius:13px;background:linear-gradient(95deg,#e5f1ff,#dbeaff);color:#214a80;padding:11px 15px;font-size:13px;font-weight:650;display:flex;align-items:center;gap:10px;min-height:44px}
@@ -258,15 +258,15 @@ function mount(el){
  #p79MonthlyRest .mr-ux-primary{background:linear-gradient(#2581ff,#055de5)!important;color:#fff!important;box-shadow:0 4px 8px #125de324;font-weight:800}
  #p79MonthlyRest .mr-ux-outline{background:#f8fbff!important;border:1px solid #bed1e9!important;color:#245077!important;font-weight:750}
  #p79MonthlyRest .mr-ux-tools button{min-height:40px;white-space:nowrap;padding:7px 11px}
- #p79MonthlyRest .mr-ux-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(245px,1fr);gap:13px;min-height:250px}
+ #p79MonthlyRest .mr-ux-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(245px,1fr);gap:13px;min-height:0;align-items:start}
  #p79MonthlyRest .mr-ux-card{min-width:0;background:white;border:1px solid #dce7f6;border-radius:16px;padding:14px;box-shadow:0 3px 11px #174f850d}
  #p79MonthlyRest .mr-ux-tabs{display:flex;border-bottom:1px solid #d9e6f6;gap:18px;padding:0 4px 10px}
  #p79MonthlyRest .mr-ux-tabs button{background:none!important;border:0!important;padding:6px 10px!important;font-size:15px!important;font-weight:800!important;color:#637894!important}
  #p79MonthlyRest .mr-ux-tabs button[aria-selected="true"]{color:#0864dc!important;border-bottom:3px solid #0d7cf7!important;border-radius:0!important}
- #p79MonthlyRest .mr-ux-table-scroll{overflow:auto;max-height:43dvh}
+ #p79MonthlyRest .mr-ux-table-scroll{overflow-x:auto;overflow-y:visible;max-height:none;min-height:0}
  #p79MonthlyRest .mr-ux-table{width:100%;border-collapse:collapse;white-space:nowrap;min-width:740px;font-size:13px}
- #p79MonthlyRest .mr-ux-table th{background:#e9f3ff;padding:13px 10px;color:#344d71;font-size:13px}
- #p79MonthlyRest .mr-ux-table td{padding:11px 9px;border-bottom:1px solid #e2eaf5;vertical-align:middle}
+ #p79MonthlyRest .mr-ux-table th{background:#e9f3ff;padding:8px 7px;color:#344d71;font-size:13px}
+ #p79MonthlyRest .mr-ux-table td{padding:6px 7px;border-bottom:1px solid #e2eaf5;vertical-align:middle}
  #p79MonthlyRest .mr-ux-table td:first-child,#p79MonthlyRest .mr-ux-table th:first-child{width:36px}
  #p79MonthlyRest .mr-ux-table input[type=checkbox]{width:18px!important;height:18px!important;min-height:18px!important}
  #p79MonthlyRest .mr-ux-pill{display:inline-flex;align-items:center;border-radius:99px;padding:5px 10px;font-size:12px;font-weight:800}
@@ -277,17 +277,18 @@ function mount(el){
  #p79MonthlyRest .mr-ux-kind{border-radius:8px;background:#e2f0ff;color:#1357a8;padding:5px 9px;font-weight:800}
  #p79MonthlyRest .mr-ux-table button{padding:4px 5px!important;color:#2e588e!important;background:transparent!important;font-size:12px!important;font-weight:800}
  #p79MonthlyRest .mr-ux-table button:disabled{opacity:.35}
+ #p79MonthlyRest #mrUxReviewSummary{max-height:200px;overflow:auto;grid-column:1/-1}
  #p79MonthlyRest .mr-ux-reasons h3{font-size:17px;margin:5px 2px 14px;color:#123359}
  #p79MonthlyRest .mr-ux-reason{padding:12px;border-radius:11px;background:#eaf3ff;margin:8px 0;line-height:1.55}
  #p79MonthlyRest .mr-ux-reason b{display:block;font-size:13px;color:#183b6c}
  #p79MonthlyRest .mr-ux-reason small{display:block;font-size:11px;color:#526e91}
- #p79MonthlyRest #mrUxFooter{position:sticky;bottom:-18px;z-index:5;border-radius:12px;background:#e0edfe!important;padding:10px 15px!important;display:flex!important;gap:12px;align-items:center;flex-wrap:wrap;box-shadow:0 -3px 10px #174f850c}
+ #p79MonthlyRest #mrUxFooter{position:sticky;bottom:0;z-index:5;border-radius:12px;background:#e0edfe!important;padding:10px 15px!important;display:flex!important;gap:12px;align-items:center;flex-wrap:wrap;box-shadow:0 -3px 10px #174f850c}
  #p79MonthlyRest #mrUxFooter .mr-ux-spacer{flex:1}
  #p79MonthlyRest #mrUxFooter button{min-height:42px;min-width:118px;font-size:15px;font-weight:800}
  #p79MonthlyRest #mrUxFooter button:disabled{opacity:.45;cursor:not-allowed}
  #p79MonthlyRest #mrUxHint{color:#334155;font-size:12px;white-space:normal;overflow-wrap:anywhere;min-width:0;max-width:100%}
  @media(max-width:1100px){#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}#p79MonthlyRest .mr-ux-reasons h3{grid-column:1/-1}#p79MonthlyRest .mr-ux-reason{margin:0}}
- @media(max-width:750px){#p79MonthlyRest #mrUxRoot{padding:10px;gap:10px}#p79MonthlyRest .mr-ux-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#p79MonthlyRest .mr-ux-stat{padding:9px;min-height:76px}#p79MonthlyRest .mr-ux-stat strong{font-size:22px}#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:block}#p79MonthlyRest .mr-ux-tools>label{flex:1 1 40%}#p79MonthlyRest .mr-ux-tools input,#p79MonthlyRest .mr-ux-tools select{min-width:0;max-width:100%}#p79MonthlyRest .mr-ux-tools .mr-ux-spacer{display:none}#p79MonthlyRest #mrUxFooter{bottom:-10px}}
+ @media(max-width:750px){#p79MonthlyRest #mrUxRoot{padding:10px;gap:10px}#p79MonthlyRest .mr-ux-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#p79MonthlyRest .mr-ux-stat{padding:9px;min-height:76px}#p79MonthlyRest .mr-ux-stat strong{font-size:22px}#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:block}#p79MonthlyRest .mr-ux-tools>label{flex:1 1 40%}#p79MonthlyRest .mr-ux-tools input,#p79MonthlyRest .mr-ux-tools select{min-width:0;max-width:100%}#p79MonthlyRest .mr-ux-tools .mr-ux-spacer{display:none}#p79MonthlyRest #mrUxFooter{bottom:0}}
  `;
  el.appendChild(style);
  const subtitle=document.createElement('div');subtitle.id='mrUxSubtitle';subtitle.textContent='自動編排、快速核對、正式申報一頁完成';
