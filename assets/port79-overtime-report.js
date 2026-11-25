@@ -284,8 +284,8 @@
  // Read-only cloud queries can safely retry a transient busy response.
  // Never apply this helper to a POST: unknown write results must not replay.
  function retryableCloudRead(error){
-  return error?.retryable===true||
-   /雲端目前正在處理其他資料|正在處理其他資料|雲端忙碌|稍後自動重試|班表正在編輯|HTTP 429|HTTP 5\d\d|Failed to fetch|NetworkError|Load failed|AbortError|逾時|timeout|timed out|網路連線失敗/i.test(String(error?.message||error||''));
+  return error?.retryable===true||error?.name==='AbortError'||error?.name==='TimeoutError'||
+   /雲端目前正在處理其他資料|正在處理其他資料|雲端忙碌|稍後自動重試|班表正在編輯|HTTP 429|HTTP 5\d\d|Failed to fetch|NetworkError|Load failed|AbortError|signal is aborted|operation was aborted|逾時|timeout|timed out|網路連線失敗/i.test(String(error?.message||error||''));
  }
  function cloudError(data,fallback){
   const error=Error(String(data?.error||fallback));
