@@ -1010,6 +1010,23 @@ function simplifyMonthlyRestLayout(el,settings={}){
  #p79MonthlyRest footer #mrResult{flex-basis:100%}}`;
  el.appendChild(style);
 }
+function showSubmissionResult(parent,selected,failure){
+ const confirmed=selected.filter(row=>row.saved).length;
+ const remaining=selected.length-confirmed;
+ const result=document.createElement('dialog');
+ result.id='p79MonthlyRestSubmissionResult';
+ result.setAttribute('aria-labelledby','mrSubmissionResultTitle');
+ result.setAttribute('aria-describedby','mrSubmissionResultSummary');
+ result.style.cssText='width:min(440px,calc(100% - 32px));box-sizing:border-box;padding:24px;border:1px solid #cbd5e1;border-radius:14px;color:#123451;background:#fff;box-shadow:0 18px 55px #23395055';
+ result.innerHTML='<h2 id="mrSubmissionResultTitle" style="margin:0 0 8px;font-size:20px"></h2><p id="mrSubmissionResultSummary" style="margin:0 0 16px"></p><p data-reason hidden></p><form method="dialog" style="display:flex;justify-content:flex-end"><button autofocus style="padding:8px 18px;border:0;border-radius:8px;background:#0864c8;color:#fff;cursor:pointer">確定</button></form>';
+ result.querySelector('h2').textContent=remaining===0?'申報完成':confirmed?'部分申報完成':'申報尚未確認完成';
+ result.querySelector('#mrSubmissionResultSummary').textContent='本次雲端已確認 '+confirmed+' 筆。'+(remaining?'另有 '+remaining+' 筆尚未確認完成。':'');
+ const reason=result.querySelector('[data-reason]');
+ if(remaining&&failure){reason.textContent=failure;reason.hidden=false;}
+ result.addEventListener('close',()=>result.remove(),{once:true});
+ parent.appendChild(result);
+ result.showModal();
+}
 async function open(settings={}){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
@@ -1503,9 +1520,11 @@ async function open(settings={}){
      if(!failure&&pending.every(r=>r.saved))sessionStorage.removeItem(KEY);
     }catch(e){failure+=(failure?'；':'')+'批次讀回未確認：'+e.message;pending.forEach(r=>{r.checked=true;r.status='讀回未確認；保留原編號重試核對';});}
    }
-   const confirmed=model.rows.filter(r=>r.saved).length,unverified=model.rows.filter(r=>r.attempted&&!r.saved).length;
+   const confirmed=selected.filter(r=>r.saved).length,unverified=selected.filter(r=>r.attempted&&!r.saved).length;
    setStatus('本次已核對成功 '+confirmed+' 筆。'+(unverified?'另有 '+unverified+' 筆待核對。':'')+(stop?'已停止，其餘未送出。':'')+(failure?'後續停止：'+failure:'成功項目已移出待報清單。'));
-   lastFailure=failure;model.quotaPreviewSuppressed=!!failure||!!stop||unverified>0;busy=false;paint();controls(false);a.refresh?.();
+   lastFailure=failure;model.quotaPreviewSuppressed=!!failure||!!stop||unverified>0;busy=false;paint();controls(false);
+   if(el.open)showSubmissionResult(el,selected,failure);
+   a.refresh?.();
    // 成功申報後立即用最新雲端重新建立建議，已完成項目直接消失，不需關閉重開。
    if(confirmed&&!failure&&!stop){
     try{

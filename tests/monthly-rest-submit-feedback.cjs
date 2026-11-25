@@ -22,4 +22,28 @@ assert(controller.includes('verifiedSnapshot=verified;'));
 assert(controller.includes('const latest=verifiedSnapshot||await a.snapshot(loadedMonth,true,false,true);'));
 assert(controller.includes('report?.id===r.id&&report.planned!==true&&report.category===r.category'));
 assert(controller.includes('if(!fullDayEvidence(fresh,r.empId,r.date,attendance[0]))'));
+const start=controller.indexOf('function showSubmissionResult(');
+const end=controller.indexOf('async function open(',start);
+const elements=new Map();
+let opened=0,removed=0;
+const dialog={
+ style:{},setAttribute(){},
+ querySelector(selector){if(!elements.has(selector))elements.set(selector,{});return elements.get(selector);},
+ addEventListener(event,listener){assert.equal(event,'close');this.close=listener;},
+ showModal(){opened++;},remove(){removed++;}
+};
+context.document.createElement=tag=>{assert.equal(tag,'dialog');return dialog;};
+vm.runInContext(controller.slice(start,end),context);
+const parent={appendChild(child){assert.equal(child,dialog);}};
+context.showSubmissionResult(parent,[{saved:true},{saved:true}],'');
+assert.equal(elements.get('h2').textContent,'申報完成');
+assert.match(elements.get('#mrSubmissionResultSummary').textContent,/確認 2 筆/);
+dialog.close();assert.equal(removed,1);
+context.showSubmissionResult(parent,[{saved:true},{acknowledged:true}],'雲端讀回逾時');
+assert.equal(elements.get('h2').textContent,'部分申報完成');
+assert.match(elements.get('#mrSubmissionResultSummary').textContent,/確認 1 筆.*另有 1 筆/);
+assert.equal(elements.get('[data-reason]').textContent,'雲端讀回逾時');
+context.showSubmissionResult(parent,[{acknowledged:true}],'');
+assert.equal(elements.get('h2').textContent,'申報尚未確認完成');
+assert.equal(opened,3);
 console.log('PASS monthly rest submit feedback, confirmed-date suppression, cloud readback source, and existing official guards');
