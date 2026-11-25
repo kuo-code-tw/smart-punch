@@ -116,7 +116,6 @@ html[data-theme="dark"] .harbor-image{opacity:.35;background-image:linear-gradie
 <div class="utility-line"><span id="cloudState" aria-live="polite">尚未測試連線</span><button type="button" id="cloudPing">測試雲端連線</button><button type="button" id="reloadCloud">重新讀取設定</button></div>
 <div class="bar"><div id="status" role="status" aria-live="polite">正在讀取雲端系統設定…</div><button type="button" id="save" class="primary">▣ 儲存設定</button></div>
 </div></div></main></div></div>
-<script src="../assets/port79-working-clock.js?v=20261125-v1"></script>
 <script>
 (function(){
 'use strict';
@@ -177,14 +176,14 @@ function authorizeLinks(){var t=encodeURIComponent(token),g=encodeURIComponent(u
  if(route==='home')return;var root=href.split('#')[0];a.href=root+'#port79sso='+t+'&gasurl='+g;});}
 function readSessionRole(){try{return JSON.parse(sessionStorage.getItem('port79_user_session')||'null');}catch(e){return null;}}
 async function init(){
- setLocalAppearance();q('workingClockMode').value=window.P79WorkingClock.getMode();q('workingClockMode').addEventListener('change',function(){var mode=window.P79WorkingClock.setMode(this.value);if(mode===null){status('本機時區設定無法儲存','error');return;}status('✅ 船舶作業時區顯示已儲存至本瀏覽器','ok');});q('yearMode').addEventListener('change',function(){saveLocal('port79_year_mode',this.checked?'roc':'gregorian');status('✅ 年份顯示方式已儲存到本瀏覽器','ok');});
+ setLocalAppearance();q('workingClockMode').value=localStorage.getItem('p79_working_report_clock_preview_v1')==='assume-utc'?'assume-utc':'taipei';q('workingClockMode').addEventListener('change',function(){saveLocal('p79_working_report_clock_preview_v1',this.value==='assume-utc'?'assume-utc':'taipei');status('✅ 船舶作業時區顯示已儲存至本瀏覽器','ok');});q('yearMode').addEventListener('change',function(){saveLocal('port79_year_mode',this.checked?'roc':'gregorian');status('✅ 年份顯示方式已儲存到本瀏覽器','ok');});
  q('themeMode').addEventListener('change',function(){var mode=this.checked?'dark':'light';saveLocal('port79_theme',mode);D.documentElement.setAttribute('data-theme',mode);status('✅ 主題已套用到本瀏覽器','ok');});
  q('idleMinutes').addEventListener('input',paintIdle);D.querySelectorAll('[data-idle-minutes]').forEach(function(b){b.addEventListener('click',function(){q('idleMinutes').value=b.dataset.idleMinutes;paintIdle();});});
  q('cloudPing').addEventListener('click',ping);q('reloadCloud').addEventListener('click',function(){if((JSON.stringify(readDraft())!==JSON.stringify(previous)||cloud&&idleNumber(q('idleMinutes').value)!==idleFromConfig(cloud))&&!confirm('重新讀取會捨棄尚未儲存的全系統設定。確定繼續？'))return;reload();});
  q('save').addEventListener('click',save);q('restore').addEventListener('click',async function(){if(!verifiedSuperadmin||busy)return;if(!confirm('恢復年份、主題、船舶作業時區、首頁公告、電腦版下載（關閉）及閒置登出（5 分鐘）的預設？將先確認雲端儲存成功。'))return;
  var prior=readDraft(),priorIdle=q('idleMinutes').value;q('noticeEnabled').checked=false;q('noticeText').value='';q('desktopDownloadEnabled').checked=false;q('idleMinutes').value=String(DEFAULT_IDLE);paintIdle();
  var confirmed=await save();if(!confirmed){q('noticeEnabled').checked=prior.notice.enabled;q('noticeText').value=prior.notice.text;q('desktopDownloadEnabled').checked=prior.windowsDownload.enabled;q('idleMinutes').value=priorIdle;paintIdle();return;}
- q('workingClockMode').value='taipei';window.P79WorkingClock.setMode('taipei');q('yearMode').checked=false;q('themeMode').checked=false;saveLocal('port79_year_mode','gregorian');saveLocal('port79_theme','light');D.documentElement.setAttribute('data-theme','light');
+ q('workingClockMode').value='taipei';saveLocal('p79_working_report_clock_preview_v1','taipei');q('yearMode').checked=false;q('themeMode').checked=false;saveLocal('port79_year_mode','gregorian');saveLocal('port79_theme','light');D.documentElement.setAttribute('data-theme','light');
  status('✅ 全系統設定已讀回確認恢復預設，並更新本機主題與年份。','ok');});
  token=getToken();if(!token){q('gateText').textContent='沒有正式登入憑證，請返回首頁以超級管理員身分登入。';return;}
  try{auth=await cloudGet('getSessionMeta');var role=String(auth.adminRole||auth.actualAdminRole||auth.role||auth.session&&auth.session.adminRole||'').toLowerCase();
