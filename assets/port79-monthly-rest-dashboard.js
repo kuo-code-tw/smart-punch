@@ -444,7 +444,7 @@ function mount(el){
    q('#mrUxSubmit').textContent=canBatchFormal?'➤ 批次申報核對（'+(formalCount+datedFormal.length)+' 筆）':'➤ 正式申報（'+formalCount+' 筆）';
    if(state.tab!=='pending')q('#mrUxSubmit').disabled=true;
    if(state.tab==='done')q('#mrUxSavePlan').disabled=true;
-   q('#mrUxHint').textContent=state.submitting?submissionMessage(info,'正在送出正式申報…',true):canBatchFormal||canBatchPlan?'直接沿用已選日期及時段；只送出核對合格項目':canOpenPlan&&!hasNativePlans?'無日期項目可手動設定預排':state.tab==='audit'?'異常核對不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
+   q('#mrUxHint').textContent=state.submitting?submissionMessage(info,'正在送出正式申報…',true):canBatchFormal||canBatchPlan?'優先原日期；不符時自動搜尋同人員同假別的合格日期及時段':canOpenPlan&&!hasNativePlans?'無日期項目可手動設定預排':state.tab==='audit'?'異常核對不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
    const latestDates=latestConfirmedDates(data.prior);
    q('#mrUxRows').innerHTML=shown.map(r=>{
     const quota=state.tab==='done'?r.quotaProgress:quotaSelectionPreview(r.quotaProgress,selectedQuota.get(norm(r.empId||r.id)));
@@ -561,16 +561,17 @@ function mount(el){
  q('#mrUxSavePlan').onclick=()=>{
   if(state.tab==='done'||originalMonth.disabled)return;
   const button=$(el,'#mrSavePlans'),view=currentView();
-  const dated=state.tab==='pending'?selectedDatedReferences(view.pending,state.reviewSelected,'plan'):[];
-  if(dated.length){state.hint='';state.submitting=true;el.p79ProcessMonthlyRestSelection?.(dated,'plan');render();return;}
+  const dated=state.tab==='pending'?[...selectedDatedReferences(view.pending,state.reviewSelected,'plan'),...view.data.planned.filter(r=>r.checked&&!r.disabled)]:[];
+  if(dated.length&&typeof el.p79ProcessMonthlyRestSelection==='function'){state.hint='';state.submitting=true;el.p79ProcessMonthlyRestSelection(dated,'plan');render();return;}
   if(state.tab==='pending'&&button&&!button.disabled&&view.data.planned.some(r=>r.checked&&!r.disabled)){button.click();return;}
   const people=selectedPlanPeople((state.tab==='audit'?view.audit:view.pending).filter(r=>r.kind==='roster'&&!r.date),state.reviewSelected);
   if(people.length)el.p79OpenMonthlyRestPlan?.(people);
  };
  q('#mrUxSubmit').onclick=()=>{
   if(state.tab!=='pending'||originalMonth.disabled)return;
-  const dated=selectedDatedReferences(currentView().pending,state.reviewSelected,'formal');
-  if(dated.length){state.hint='';state.submitting=true;el.p79ProcessMonthlyRestSelection?.(dated,'formal');render();return;}
+  const view=currentView();
+  const dated=[...selectedDatedReferences(view.pending,state.reviewSelected,'formal'),...view.data.ready.filter(r=>r.checked&&!r.disabled)];
+  if(dated.length&&typeof el.p79ProcessMonthlyRestSelection==='function'){state.hint='';state.submitting=true;el.p79ProcessMonthlyRestSelection(dated,'formal');render();return;}
   const submit=$(el,'#mrSave');
   if(!submit||!sourceRows(el).ready.some(r=>r.checked&&!r.disabled))return;
   if(!submit.disabled&&/申報/.test(submit.textContent||'')&&!/預排/.test(submit.textContent||'')){
