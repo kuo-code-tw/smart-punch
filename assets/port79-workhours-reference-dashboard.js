@@ -13,7 +13,7 @@
  const state={tab:'all',page:1,all:[],current:null};
  // Read-only, same-account local snapshots. Never inject preview rows into
  // the authoritative ledger or grant write/export permission from a cache.
- const localDisplay={key:'',month:'',roster:null,raw:null,loading:false,done:false,revision:0};
+ const localDisplay={key:'',month:'',roster:null,raw:null,loading:false,done:false,revision:0,generation:0};
  function localIdentity(month){
   try{
    const token=typeof currentPort79SsoToken==='function'?currentPort79SsoToken():'';
@@ -28,11 +28,12 @@
  function readLocalDisplay(month){
   const key=localIdentity(month);
   if(localDisplay.key!==key||localDisplay.month!==month){
-   Object.assign(localDisplay,{key,month,roster:null,raw:null,loading:false,done:false,revision:localDisplay.revision+1});
+   Object.assign(localDisplay,{key,month,roster:null,raw:null,loading:false,done:false,revision:localDisplay.revision+1,generation:localDisplay.generation+1});
   }
   if(!key||localDisplay.loading||localDisplay.done)return localDisplay;
   localDisplay.loading=true;
-  const current=()=>localDisplay.key===key&&localDisplay.month===month&&localIdentity(month)===key&&
+  const generation=localDisplay.generation;
+  const current=()=>localDisplay.generation===generation&&localDisplay.key===key&&localDisplay.month===month&&localIdentity(month)===key&&
     !(typeof p79WorkOvertimeMonths!=='undefined'&&p79WorkOvertimeMonths.get(month)?.previewInvalidated);
   const onLocal=()=>{localDisplay.revision++;if(id('viewAdmin')?.classList.contains('p79-ref-active')&&!document.hidden)refresh();};
   const cache=window.Port79DataCache;
@@ -47,7 +48,7 @@
    }
   }).catch(()=>{});
   void Promise.all([roster,raw]).finally(()=>{
-   if(localDisplay.key===key){localDisplay.loading=false;localDisplay.done=true;localDisplay.revision++;}
+   if(localDisplay.generation===generation&&localDisplay.key===key){localDisplay.loading=false;localDisplay.done=true;localDisplay.revision++;}
   });
   return localDisplay;
  }
@@ -238,7 +239,7 @@
   // Query is local-first. Do not start another full month read for filtering,
   // and throttle explicit retry after a lock/timeout instead of piling up GAS calls.
   const before=getOfficialMonth();
-  const retry=force&&before?.error&&!before.pending&&Date.now()-Number(before.at||0)>=10000;
+  const retry=force&&before&&!before.pending&&Date.now()-Number(before.at||0)>=(before.error?10000:30000);
   if((retry||(!verified()&&!before?.error&&!before?.pending))&&typeof p79LoadWorkOvertimeMonths==='function'&&
       typeof records!=='undefined'&&Array.isArray(records))
    p79LoadWorkOvertimeMonths(records,month,!!retry);
@@ -279,7 +280,7 @@
   const freshRaw=isVerified?verifiedAttendance(month):null;
   // Use the already loaded local raw data first, but do not turn a missing
   // month into a false zero. A locally available subset is labeled a preview.
-  const localLoaded=!invalidated&&window.P79WorkhoursCache?.enabled?.()&&typeof records!=='undefined'&&Array.isArray(records)
+  const localLoaded=!invalidated&&rosterAvailable&&window.P79WorkhoursCache?.enabled?.()&&typeof records!=='undefined'&&Array.isArray(records)
    ?records.filter(r=>String(r.timeStr||r.dateKey||'').replaceAll('/','-').slice(0,7)===month):[];
   const sourceRecords=Array.isArray(freshRaw)?freshRaw:Array.isArray(local?.raw)?local.raw:localLoaded.length?records:null;
   if(!reportsAvailable&&!Array.isArray(sourceRecords)){
@@ -493,7 +494,13 @@
   },600);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshOnChange()});
   window.addEventListener('focus',refreshOnChange);
-  window.addEventListener('p79-workhours-data-changed',refreshOnChange);
+  window.addEventListener('p79-workhours-data-changed',event=>{
+   if(event?.detail?.invalidated&&event.detail.month===localDisplay.month){
+    Object.assign(localDisplay,{key:'',roster:null,raw:null,loading:false,done:false,revision:localDisplay.revision+1,generation:localDisplay.generation+1});
+    Object.assign(rawCloud,{rows:null,fingerprint:'',readAt:0,attemptAt:0,inflight:null,error:'',revision:''});
+   }
+   refreshOnChange();
+  });
   // A changed official revision triggers paint; unchanged snapshots stay put.
   setInterval(refreshOnChange,12000);
  }
