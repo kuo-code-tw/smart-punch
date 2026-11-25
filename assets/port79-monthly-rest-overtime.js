@@ -331,6 +331,43 @@ function documentedFutureRestCategory(roster,date,month,category){
  return code===category||(['早','中','晚'].includes(code)&&m.restCategory===category&&
   (m.restQuotaOvertime===true||m.restCategoryLocked===true||m.restAllocationLocked===true||m.restAllocationSource==='manual'));
 }
+// Adjacent months are used only for weekly validation and shift inference;
+// monthly quota and write payloads remain scoped to the selected month.
+function weeklyRoster(snapshot,empId,roster){
+ const merged={...roster,__meta:{...roster?.__meta}};
+ for(const row of snapshot?.adjacentSchedules||[]){
+  if(id(row.empId)!==id(empId))continue;
+  for(const [d,code] of Object.entries(row.schedule||{})){
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||Object.prototype.hasOwnProperty.call(merged,d))continue;
+   merged[d]=code;
+   if(row.schedule.__meta?.[d])merged.__meta[d]=row.schedule.__meta[d];
+  }
+ }
+ return merged;
+}
+// Rest-day overtime retains its scheduled rest-day designation. Requiring
+// a SECOND rest day after overtime wrongly prohibits the first rest-day plan.
+// An actual protected regular holiday is still required; incomplete weeks
+// are never silently assumed to be complete.
+function weeklyPlanIssue(roster,date,anchor){
+ const week=weeklyCycleWindow(date,anchor);
+ if(!week)return '無法計算七日週期';
+ const label='（'+week.start+'～'+week.end+'）';
+ let regular=0,rest=0;
+ for(let i=0;i<7;i++){
+  const d=new Date(Date.parse(week.start+'T00:00:00Z')+i*86400000).toISOString().slice(0,10);
+  if(!roster[d])return '缺少正式班表 '+d+label;
+  const m=roster.__meta?.[d]||{},report=m.overtimeReport;
+  const code=String(roster[d]).trim();
+  const original=String(m.overtimeOriginalShift||'').trim();
+  const marked=m.restCategoryLocked===true||m.restAllocationLocked===true||m.restAllocationSource==='manual'||m.restQuotaOvertime===true;
+  if(code==='例'&&!report&&!m.overtime&&!m.restQuotaOvertime&&!m.forEmpId&&!m.coverAssignmentId)regular++;
+  if(code==='休'||original==='休'||report?.category==='休'||marked&&m.restCategory==='休')rest++;
+ }
+ if(!regular)return '七日週期無受保護的例假'+label;
+ if(!rest)return '七日週期無原排休息日'+label;
+ return '';
+}
 function futureRestPlanIssue(roster,date,month,emp,category){
  const m=roster?.__meta?.[date]||{},anchor=weeklyCycleAnchor(emp);
  if(!anchor)return '未設定約定七日週期';
@@ -338,10 +375,7 @@ function futureRestPlanIssue(roster,date,month,emp,category){
  if(!documentedFutureRestCategory(roster,date,month,category))return '原班表沒有可證明此日期為'+category+'假別的紀錄（正常班不能直接改列休假加班）';
  if(emp?.flexibleWorkHours===true||emp?.workTimeSystem&& !['standard','normal','一般','一般工時','固定'].includes(String(emp.workTimeSystem).trim()))return '特殊工時制度須另行核對';
  if(m.forEmpId||m.coverAssignmentId||m.overtimeReport||m.overtime||m.overtimeExcluded)return '已有申報、代班或排除紀錄';
- const protectedRoster={...roster,[date]:'加班'};
- for(const [d,meta] of Object.entries(roster.__meta||{}))if(meta?.overtimeReport||meta?.restQuotaOvertime===true)protectedRoster[d]='加班';
- if(!futureWeekRestProtected(protectedRoster,date,anchor))return '預排後一例一休不足或跨月班表缺漏（'+weeklyCycleWindow(date,anchor)?.start+'～'+weeklyCycleWindow(date,anchor)?.end+'）';
- return '';
+ return weeklyPlanIssue(roster,date,anchor);
 }
 function canAutoSuggestFuture(roster,date,month,emp,category){
  if(futureRestPlanIssue(roster,date,month,emp,category))return false;
@@ -440,8 +474,8 @@ function plan(snapshot,people,month,rules,options={}){
   const lastReported=latestReportedDate(roster,month),nextReportDate=forwardReportStart(month,options.cutoff,currentDate);
   balances.push({emp,...b,lastReported,nextReportDate});
   b.conflicts.forEach(x=>issues.push(emp.name+' '+x.date+'：'+x.reason));
-  const cycleStart=weeklyCycleAnchor(emp);
-  const restIssues=weeklyRestReview(roster,month,cycleStart);
+  const cycleStart=weeklyCycleAnchor(emp),weekRoster=weeklyRoster(snapshot,emp.empId,roster);
+  const restIssues=weeklyRestReview(weekRoster,month,cycleStart);
   for(const week of restIssues)issues.push(emp.name+' 週期起點 '+week.start+'：'+
    (week.confirmedCycle?'約定週期':'暫以週日為起點預覽')+
    ' 例假'+week.regular+'日、休息日'+week.rest+'日；請先核對原排班，勿用加班申報補足休假');
@@ -464,13 +498,13 @@ function plan(snapshot,people,month,rules,options={}){
    // 未來日期不要求先有打卡，否則全員只能看到「今天」而漏掉月底預排。
    const todayState=g.P79RestAttendance?.state(snapshot,emp.empId,date);
    const todayPending=!historical&&date===currentDate&&!verified&&
-     ['open','missing'].includes(todayState)&&canAutoSuggestFuture(roster,date,month,emp,originalCategory);
+     ['open','missing'].includes(todayState)&&canAutoSuggestFuture(weekRoster,date,month,emp,originalCategory);
    const upcoming=!historical&&date>currentDate&&!pairs.length&&
-     (canAutoSuggestFuture(roster,date,month,emp,originalCategory)||!!manualRuleByDate.get(date));
+     (canAutoSuggestFuture(weekRoster,date,month,emp,originalCategory)||!!manualRuleByDate.get(date));
    if(!verified&&!todayPending&&!upcoming){
     if(date<currentDate||historical)blocked(date,originalCategory,pairs.length>1?'出勤配對重複':pairs.length?'出勤未核實完整8小時':'無完整出勤配對');
     else if(date===currentDate&&!['open','missing'].includes(todayState))blocked(date,originalCategory,'當日出勤狀態未符合預排');
-    else blocked(date,originalCategory,futureRestPlanIssue(roster,date,month,emp,originalCategory)||'未找到原班表的8小時時段，且前後班別不一致或不足以推估');
+    else blocked(date,originalCategory,futureRestPlanIssue(weekRoster,date,month,emp,originalCategory)||'未找到原班表的8小時時段，且前後班別不一致或不足以推估');
     continue;
    }
    // Earlier weeks are eligible only with genuine completed attendance, never synthetic backfill.
@@ -482,7 +516,7 @@ function plan(snapshot,people,month,rules,options={}){
     const rule=ruleFor(date,roster,pair,category,rules)||(!pair&&manualRule?.[0]===category?manualRule:null);if(rule)byCategory.set(category,rule);}
    if(!byCategory.size)blocked(date,originalCategory,'無相符的正式8小時加班時段');
    if(byCategory.size){
-    const restProtected=!!pair||!futureRestPlanIssue(roster,date,month,emp,originalCategory);
+    const restProtected=!!pair||!futureRestPlanIssue(weekRoster,date,month,emp,originalCategory);
     if(!pair&&!restProtected)continue;
     candidates.push({date,pair,byCategory,restProtected,week:weeklyCycleWindow(date,cycleStart)?.start||''});
    }
@@ -668,9 +702,8 @@ function manualRestPlanIssue(snapshot,emp,month,date,rule,asOf=today(),cutoff=''
  const anchor=weeklyCycleAnchor(person);
  if(!anchor)return '未設定約定七日週期，請先核對排班';
  if(person.flexibleWorkHours===true||person.workTimeSystem&&!['standard','normal','一般','一般工時','固定'].includes(String(person.workTimeSystem).trim()))return '特殊工時制度須另行核對';
- const protectedRoster={...roster,[date]:'加班'};
- for(const [d,m] of Object.entries(roster.__meta||{}))if(m?.overtimeReport||m?.restQuotaOvertime===true)protectedRoster[d]='加班';
- if(!futureWeekRestProtected(protectedRoster,date,anchor))return '預排後一例一休週期不足或跨月班表缺漏，請先核對排班';
+ const weekIssue=weeklyPlanIssue(weeklyRoster(snapshot,emp.empId,roster),date,anchor);
+ if(weekIssue)return weekIssue;
  let b;try{b=balance(person,roster,month,snapshot);}catch(e){return String(e.message||e);}
  if(!b.dates.includes(date)||b.typhoonDates.includes(date)||!(b.remaining[category]>0))return '該日不在可用額度或本月已無此假別缺額';
  return '';
@@ -683,7 +716,8 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
  if(!roster||!b)return [];
  const shifts={早:['08:00','16:00'],中:['16:00','24:00'],晚:['24:00','08:00']};
  const minute=x=>{const m=String(x||'').match(/^(\d{1,2})(?::(\d{2}))?$/);return m?Number(m[1])*60+Number(m[2]||0):NaN;};
- const days=(b.dates||[]).slice().sort(),out=[];
+ const days=(b.dates||[]).slice().sort(),out=[],weekRoster=weeklyRoster(snapshot,emp.empId,roster);
+ const shiftDays=Object.keys(weekRoster).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
  const employee=id(emp.empId),blocked=new Set(snapshot.leaveDates||[]);
  const pairsByDate=new Map();
  for(const p of snapshot.pairs||[])if(id(p.empId)===employee){
@@ -721,10 +755,10 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
    if(Number.isFinite(minute(m.overtimeStart))&&Number.isFinite(minute(m.overtimeEnd))&&(minute(m.overtimeEnd)-minute(m.overtimeStart)+1440)%1440===480){
     period=[m.overtimeStart,m.overtimeEnd];source='原班表註記時段';
    }else{
-    const prior=days.filter(d=>d<date&&shifts[roster[d]]).at(-1),next=days.find(d=>d>date&&shifts[roster[d]]);
+    const prior=shiftDays.filter(d=>d<date&&shifts[weekRoster[d]]).at(-1),next=shiftDays.find(d=>d>date&&shifts[weekRoster[d]]);
     // A neighboring shift is an estimate, not actual attendance. Do not guess
     // when the two sides of the rest day disagree.
-    if(prior&&next&&roster[prior]===roster[next]){period=shifts[roster[prior]];source='前後班表同為'+roster[prior]+'班（推估）';}
+    if(prior&&next&&weekRoster[prior]===weekRoster[next]){period=shifts[weekRoster[prior]];source='前後班表同為'+weekRoster[prior]+'班（推估）';}
    }
   }
   if(!period)continue;
@@ -1677,6 +1711,6 @@ async function open(settings={}){
  // 開啟時只讀核對，沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').click();
 }
-g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
 
 })(window);
