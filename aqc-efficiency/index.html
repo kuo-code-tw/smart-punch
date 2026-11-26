@@ -7310,21 +7310,28 @@ function workloadPersonInfoFromRecord(r){
   return {key:empId?`EMP:${empId}`:`NAME:${normalizePersonName(name)}`,empId,name:displayPersonName(roster?.name||name)||name};
 }
 function workloadRecordMatchesPerson(r,key){return !!key && String(r?.__workloadPersonKey||workloadPersonInfoFromRecord(r)?.key||'')===String(key);}
-function populatePersonStatPeople(){
+function populatePersonStatPeople(sourceRows){
   const sel=document.getElementById('personStatPerson');
   if(!sel)return;
-  const prev=sel.value;
+  const prev=sel.value||'';
   const prevLabel=sel.selectedOptions?.[0]?.textContent||'';
-  const idx=buildWorkloadIndex();
-  const {start,end}=workloadDateRange();
-  const arr=idx.people.filter(p=>{
-    if(!start&&!end)return true;
-    return (idx.byPerson.get(p.key)||[]).some(r=>{const d=String(r?.workDate||'').slice(0,10);return d&&(!start||d>=start)&&(!end||d<=end)});
-  });
-  // Keep the selected person even when a newly picked day has no records.
-  const missing=prev&&!arr.some(p=>p.key===prev)?`<option value="${esc(prev)}">${esc(prevLabel||'所選人員')}（此日期無作業）</option>`:'';
+  const group=document.getElementById('weeklyGroupFilter')?.value||'';
+  // Use the same month/date and organization scope as the detailed report,
+  // without applying the currently selected person to the list of choices.
+  const base=Array.isArray(sourceRows)?sourceRows:weeklyFilteredRecords(true);
+  const byKey=new Map();
+  for(const r of base){
+    if(group&&operationGroupForRecord(r)!==group)continue;
+    const p=workloadPersonInfoFromRecord(r);
+    if(p?.key&&!byKey.has(p.key))byKey.set(p.key,p);
+  }
+  const arr=[...byKey.values()].sort((a,b)=>compareDriverNames(a.name,b.name));
+  const selected=prev&&byKey.has(prev);
+  // Do not keep an employee from another group as a hidden active filter.
+  // With no group filter, retain the explicit no-work-date selection as before.
+  const missing=!group&&prev&&!selected?`<option value="${esc(prev)}">${esc(prevLabel.replace(/（此日期無作業）$/,'')||'所選人員')}（此日期無作業）</option>`:'';
   sel.innerHTML='<option value="">全部人員</option>'+arr.map(p=>`<option value="${esc(p.key)}">${esc(p.name)}</option>`).join('')+missing;
-  sel.value=prev||'';
+  sel.value=selected||missing?prev:'';
 }
 // 舊函式名稱保留相容，實際已不再使用船舶篩選。
 function populatePersonShipFilter(){populatePersonStatPeople();}
@@ -7637,11 +7644,11 @@ function clearWeeklyRange(){
   document.getElementById('weeklyDateRangePicker')?.removeAttribute('open');
   renderPersonnelAndRanking();
 }
-function preparePersonnelFilters(){
+function preparePersonnelFilters(sourceRows){
   const start=document.getElementById('weeklyStart')?.value||'',end=document.getElementById('weeklyEnd')?.value||'';
   const from=document.getElementById('workloadStart'),to=document.getElementById('workloadEnd');
   if(from)from.value=start;if(to)to.value=end;
-  populatePersonStatPeople();
+  populatePersonStatPeople(sourceRows);
 }
 function personnelRecordRemark(r){
   const note=String(r?.note??'');
@@ -8007,10 +8014,10 @@ function renderWeeklyEfficiency(){
   if(typeof syncPersonnelStatisticsMonthFilter==='function')syncPersonnelStatisticsMonthFilter();
   if(typeof p79EnsureFreshOfficialAqcRoster==='function')p79EnsureFreshOfficialAqcRoster();
   updateWeeklyDateRangeSummary();
-  preparePersonnelFilters();
   const baseRows=weeklyFilteredRecords(true);
   ensureOperationScheduleGroups(baseRows);
   refreshWeeklyGroupFilter(baseRows);
+  preparePersonnelFilters(baseRows);
   const sourceRows=weeklyFilteredRecords();
   // Historical WORKING REPORT quantities remain visible even when HR is offline.
   // Only live personnel names/rankings require a freshly verified HR roster.

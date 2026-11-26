@@ -13,7 +13,26 @@ el('personStatPerson').value='EMP:A';c.renderWeeklyEfficiency();assert.equal(det
 el('weeklyStart').value='2026-10-04';c.renderWeeklyEfficiency();assert.equal(detailRows.length,0);assert.equal(el('wkContainers').textContent,0);
 vm.runInContext(fn('personnelRecordRemark'),c);vm.runInContext(fn('renderPersonnelRecords'),c);c.renderPersonnelRecords(rows.slice(0,3));assert.equal(drills,0);assert.equal((el('personnelRecordBody').innerHTML.match(/<tr>/g)||[]).length,3);assert.equal((el('personnelRecordBody').innerHTML.match(/SECRET REMARK/g)||[]).length,3,'all rows retain remarks');assert.equal(c.personnelRecordRemark({note:'原始\n備註',stopRemark1:'備援'}),'原始\n備註');assert.equal(c.personnelRecordRemark({stopRemark1:'停工',stopRemark2:'停工',stopRemark3:'設備'}),'停工；設備');assert.equal(c.personnelRecordRemark({}),'');c.renderPersonnelRecords([{...rows[0],note:'<img src=x>'}]);assert(el('personnelRecordBody').innerHTML.includes('&lt;img src=x>'));assert(!el('personnelRecordBody').innerHTML.includes('<img src=x>'));c.renderPersonnelRecords(rows.slice(0,3));assert(el('personnelRecordBody').innerHTML.includes('林先生'));
 assert(!/<button[^>]*data-tab="workload"/.test(html));assert(/data-tab="weekly"[^>]*>👥 人員統計/.test(html));const weekly=html.slice(html.indexOf('<section id="view-weekly"'),html.indexOf('<dialog id="vesselMonthlyExportDialog"'));assert(weekly.includes('id="view-workload"'));assert(weekly.includes('Remark（備註）'));assert.equal((html.match(/id="personStatPerson"/g)||[]).length,1);
-console.log(JSON.stringify({passed:7,failed:0,scope:'Unified personnel totals, all-person default, shared filters, drilldown and per-record remarks'}));
+// Group/person cascade uses the same date/month/org scoped rows as report details.
+c.workloadPersonInfoFromRecord=r=>({key:'EMP:'+r.empId,name:r.name});
+vm.runInContext(fn('populatePersonStatPeople'),c);
+el('weeklyStart').value='';el('weeklyEnd').value='';el('weeklyGroupFilter').value='A組';
+el('personStatPerson').value='EMP:B';c.populatePersonStatPeople();
+assert(el('personStatPerson').innerHTML.includes('王先生'));
+assert(!el('personStatPerson').innerHTML.includes('林先生'));
+assert.equal(el('personStatPerson').value,'','incompatible group selection must reset');
+el('personStatPerson').value='EMP:A';c.populatePersonStatPeople();
+assert.equal(el('personStatPerson').value,'EMP:A','compatible person remains selected');
+el('weeklyGroupFilter').value='B組';c.populatePersonStatPeople();
+assert(el('personStatPerson').innerHTML.includes('林先生')&&el('personStatPerson').innerHTML.includes('王先生'),'people with actual B group rows remain eligible');
+el('weeklyStart').value='2026-10-02';el('weeklyEnd').value='2026-10-02';c.populatePersonStatPeople();
+assert(!el('personStatPerson').innerHTML.includes('王先生'),'date scope limits available group members');
+assert(el('personStatPerson').innerHTML.includes('林先生'));
+el('weeklyGroupFilter').value='';el('weeklyStart').value='';el('weeklyEnd').value='';c.populatePersonStatPeople();
+assert(el('personStatPerson').innerHTML.includes('王先生')&&el('personStatPerson').innerHTML.includes('林先生'));
+assert(!el('personStatPerson').innerHTML.includes('Other')&&!el('personStatPerson').innerHTML.includes('Manual'));
+assert(html.indexOf('preparePersonnelFilters(baseRows);')<html.indexOf('const sourceRows=weeklyFilteredRecords();',html.indexOf('function renderWeeklyEfficiency()')));
+console.log(JSON.stringify({passed:15,failed:0,scope:'Unified personnel totals, cascading group/person filters, date scope and per-record remarks'}));
 
 for(const key of ['view-weekly-2','view-weekly-3'])assert(html.includes('class="p79-section hidden" data-section-key="'+key+'"'),'legacy summary is hidden: '+key);
 assert(html.includes('class="p79pr-details" data-section-key="view-weekly-5"'),'original detailed personnel table remains available');
