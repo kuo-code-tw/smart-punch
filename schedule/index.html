@@ -4027,6 +4027,17 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
       });
     }, {once:true});
 
+    // Edit the stored roster, not the computed attendance/overtime presentation.
+    // A heartbeat must not reset a choice while an edit is being processed.
+    function p79ApplyRosterEditorValue(el,editable) {
+      if(!Object.prototype.hasOwnProperty.call(el.dataset,'p79RosterValue'))return;
+      const mode=editable?'edit':'view';
+      if(el.dataset.p79RosterMode===mode)return;
+      if(!el.dataset.p79RosterMode)el.dataset.p79ReadValue=el.value;
+      const target=editable?el.dataset.p79RosterValue:el.dataset.p79ReadValue;
+      if(Array.from(el.options).some(option=>option.value===target&&(!editable||!option.disabled)))el.value=target;
+      el.dataset.p79RosterMode=mode;
+    }
     function applyScheduleAccessUi() {
       const manage = canManageSchedule();
       const editable = scheduleCanEditNow();
@@ -4075,6 +4086,7 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
         const personnelChange=!code.includes('updateDailyShift');
         el.disabled = personnelChange?(!manage||lockedByOther||!p79ScheduleHasOfficialData()):!editable;
           el.title = el.disabled?disabledTitle:personnelChange?'調任時自動取得編輯權，保留既有班表':(el.dataset.p79RosterEditTitle||'');
+          if(!personnelChange)p79ApplyRosterEditorValue(el,editable);
         }
       });
 
@@ -6917,6 +6929,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
           // Separate the read-only actual shift from saved roster choices.
           const actualDisplayOption=showMainShiftSelection&&!!actualShift&&shownShift===actualShift&&rosterShift!==actualShift;
           const selectRosterOption=showMainShiftSelection&&!actualDisplayOption;
+          const storedRosterMeta=monthlyScheduleMeta[emp.id]?.[dayStr]||{};
+          const editorRosterValue=rosterShift==='休'&&['例','國'].includes(storedRosterMeta.restCategory)?storedRosterMeta.restCategory:rosterShift;
+          const showRosterDifference=!ownApprovedLeave&&!p79LeaveCoverOnDay(emp.id,dayStr).length&&['早','中','晚','休','例','國'].includes(editorRosterValue)&&editorRosterValue!==selected.visibleCode;
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
@@ -6998,6 +7013,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           cellsHtml += `
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-rest-date="${dayStr}" data-rest-visible="${visibleRestKind}" data-typhoon-count="${typhoonCounted?(typhoonWorked?'work':'off'):''}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
+                data-p79-roster-value="${scheduleEscapeHtml(editorRosterValue)}"
                 data-p79-roster-edit-title="${scheduleEscapeHtml(selected.visibleCode+'｜來源：'+shiftSource+'｜正式原排：'+rosterShift+(actualDisplayOption?'｜選擇實際班別可修正正式原排；考勤不變':''))}"
                 title="${scheduleEscapeHtml(selected.visibleCode+'｜來源：'+shiftSource+(attendanceRosterConflict?'｜原排'+rosterShift+'，實際'+actualShift:''))}"
                 class="clean-shift-select p79-shift-select ${visibleSubstituteLabel&&!earlyExtensionWithRegularShift ? 'p79-substitute-time'+(visibleSubstituteLabel.length>5?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
@@ -7018,6 +7034,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
               ${earlyExtensionWithRegularShift?
                 '<span class="block text-[9px] font-bold text-indigo-700 leading-tight" title="加班04:00–08:00；本班08:00–16:00；兩者均已核對正式出勤與報單">延04-08</span>':''}
               ${combinedMarker}
+              ${showRosterDifference?`<span class="block text-[9px] text-slate-600 leading-tight" title="正式原排與考勤／加班顯示分開，編輯時選擇正式原排">原排${scheduleEscapeHtml(editorRosterValue)}｜${scheduleEscapeHtml(selected.visibleCode)}</span>`:''}
               ${'' /* 班別差異僅保留在日期格 title 與全員考勤對帳明細，避免誤把「原排中」當成目前班別。 */}
               ${'' /* 完整出勤已核實：不以無法推定早／中／晚班誤標「班別待核」；保留原始排班與真實缺卡提示。 */}
               ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="全員颱風日標記；原排班、例休和加班紀錄不改動">颱日</span>':''}
@@ -7427,7 +7444,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
       if(!p79ScheduleAllowedEditShift(val)){alert('此帳號未經超級管理員在人資開放此排班假別；請假申請仍請到「請假管理」。');renderRoleScheduleView();return;}
       if(approvedLeaveForEmployee(empId,dayStr)||p79LeaveCoverOnDay(empId,dayStr).length){alert('此日期仍連結請假或代班，請先到請假管理完成連動刪除，再修改排班。');renderRoleScheduleView();return;}
       if(p79OvertimeShiftEditBusy){renderRoleScheduleView();return;}
-      if(!requireScheduleEditLock())return;
+      if(!requireScheduleEditLock()){renderRoleScheduleView();return;}
       const meta=monthlyScheduleMeta[empId]?.[dayStr]||{};
       const cover=p79LeaveCoverOnDay(empId,dayStr).find(c=>c.kind==='worker');
       if(!meta.overtimeReport&&!meta.overtime&&!meta.forEmpId&&meta.type!=='substitute'&&!cover){p79SetDailyShift(empId,dayStr,val);return;}
