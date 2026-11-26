@@ -43,6 +43,27 @@ function launch(){
  assert.match(ui,/data-p79-retry/);assert.match(home,/id="p79HomeBackgroundDownload"/);
 }
 
+function verifyNoticeNavigation(){
+ const store=new Map();let now=100000;
+ const key='p79BrowserCacheProgressV1',viewer='QA@admin';
+ const put=(phase,startedAt,updatedAt=now)=>store.set(key,JSON.stringify({viewer,phase,startedAt,updatedAt,completed:6,total:6}));
+ const page=()=>{
+  const children=new Map(),node=()=>({hidden:false,style:{},textContent:'',setAttribute(){},addEventListener(name,fn){this[name]=fn}});
+  const panel={...node(),querySelector(s){if(!children.has(s))children.set(s,node());return children.get(s)}};
+  const win={Port79DataCache:{viewerKey:()=>viewer},addEventListener(){},setInterval:f=>{win.tick=f}};
+  const document={readyState:'complete',body:{appendChild(){}},head:{appendChild(){}},createElement:t=>t==='aside'?panel:node()};
+  vm.runInNewContext(ui,{window:win,document,localStorage:{getItem:k=>store.get(k)||null,setItem:(k,v)=>store.set(k,v)},Date:{now:()=>now},JSON,Math,Number,String,Object,encodeURIComponent});
+  return {panel,tick:win.tick,dismiss:()=>children.get('[data-p79-dismiss]').click()};
+ };
+ put('complete',90000);const first=page();assert.equal(first.panel.hidden,false,'fresh completion shown once');
+ assert.equal(page().panel.hidden,true,'navigation cannot replay same completion');
+ now+=8000;first.tick();assert.equal(first.panel.hidden,true,'shared completion expires');
+ put('complete',98000,now-9000);assert.equal(page().panel.hidden,true,'old completion not replayed');
+ put('downloading',now);const active=page();assert.equal(active.panel.hidden,false,'active progress still visible');
+ put('partial',now);active.tick();assert.equal(active.panel.hidden,false,'partial state visible');active.dismiss();assert.equal(page().panel.hidden,true,'dismissal shared across pages');
+ now+=1000;put('complete',now);assert.equal(page().panel.hidden,false,'new job announces completion');
+}
+
 async function executeWorker({role='admin',mode='all',session=true}={}){
  const scripts=[...worker.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(x=>x[1]).filter(Boolean);
  const code=scripts.at(-1);
@@ -77,6 +98,7 @@ async function executeWorker({role='admin',mode='all',session=true}={}){
 }
 (async()=>{
  launch();
+ verifyNoticeNavigation();
  const manager=await executeWorker();
  assert.equal(manager.calls.length,6);
  assert.equal(manager.progress.phase,'complete');

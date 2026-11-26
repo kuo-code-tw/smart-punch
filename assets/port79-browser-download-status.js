@@ -4,7 +4,12 @@
  if(window.__p79BrowserBackgroundWorker||window.__p79BrowserProgressUI)return;
  window.__p79BrowserProgressUI=true;
  const KEY='p79BrowserCacheProgressV1';
- let panel=null,lastDismissed=0,completedAt=0,completedJob=0;
+ let panel=null,visibleCompletion='',dismissedJob='',currentRecord=null;
+ const NOTICE_KEY='p79BrowserCacheNoticeV2:';
+ function noticeKey(record){return NOTICE_KEY+encodeURIComponent(String(record.viewer||''))}
+ function jobKey(record){return String(record.startedAt)+'|'+String(record.phase)}
+ function readNotice(record){try{return JSON.parse(localStorage.getItem(noticeKey(record))||'null')||{}}catch(_){return {}}}
+ function saveNotice(record,patch){try{localStorage.setItem(noticeKey(record),JSON.stringify({...readNotice(record),...patch}))}catch(_){}}
  function read(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(_){return null}}
  function build(){
   if(panel||!document.body)return;
@@ -24,19 +29,29 @@
   const detail=panel.querySelector('[data-p79-detail]'),toggle=panel.querySelector('[data-p79-toggle]');
   toggle.addEventListener('click',()=>{detail.hidden=!detail.hidden;toggle.textContent=detail.hidden?'查看下載明細':'收合下載明細';toggle.setAttribute('aria-expanded',String(!detail.hidden))});
   panel.querySelector('[data-p79-retry]').addEventListener('click',()=>window.Port79DataCache?.startBackgroundDownload?.());
-  panel.querySelector('[data-p79-dismiss]').addEventListener('click',()=>{lastDismissed=Date.now();panel.hidden=true});
+  panel.querySelector('[data-p79-dismiss]').addEventListener('click',()=>{if(currentRecord){dismissedJob=jobKey(currentRecord);saveNotice(currentRecord,{dismissed:dismissedJob});}panel.hidden=true});
  }
  function update(record){
   build();if(!panel)return;
   record=record||read();
   const user=window.Port79DataCache?.viewerKey?.();
-  if(!record||record.viewer!==user||!record.startedAt||record.startedAt<=lastDismissed||
-     Date.now()-Number(record.updatedAt||0)>3600000){panel.hidden=true;return}
+  if(!record||!user||record.viewer!==user||!record.startedAt||
+     Date.now()-Number(record.updatedAt||0)>3600000){currentRecord=null;panel.hidden=true;return}
+  currentRecord=record;
+  const key=jobKey(record),notice=readNotice(record);
+  if(!['starting','downloading'].includes(record.phase)&&(notice.dismissed===key||dismissedJob===key)){panel.hidden=true;return}
   const active=['downloading','starting'].includes(record.phase),stalled=active&&Date.now()-record.updatedAt>90000;
   const state=active?(stalled?'進度暫未更新':record.phase==='starting'?'準備中':'下載中'):
     ({complete:'已完成',partial:'部分完成',failed:'失敗',interrupted:'已中斷'})[record.phase]||'待確認';
   const completed=Math.max(0,Number(record.completed)||0),total=Math.max(0,Number(record.total)||0);
-  if(record.phase==='complete'){if(completedJob!==record.startedAt){completedJob=record.startedAt;completedAt=Date.now();}if(Date.now()-completedAt>8000){panel.hidden=true;return;}}
+  // Completion time belongs to the shared job, not to the page displaying it.
+  if(record.phase==='complete'){
+   if(Date.now()-Number(record.updatedAt||0)>=8000){panel.hidden=true;return;}
+   if(visibleCompletion!==key){
+    if(notice.seen===key){panel.hidden=true;return;}
+    visibleCompletion=key;saveNotice(record,{seen:key});
+   }
+  }else visibleCompletion='';
   const names={attendance:'考勤',workhours:'工時統計',leave:'請假',schedule:'排班',efficiency:'效率',hr:'人資',history:'歷史資料'};
   panel.querySelector('[data-p79-title]').textContent='☁ 背景資料下載｜'+state;
   panel.querySelector('[data-p79-count]').textContent=total?completed+'/'+total+'（'+Math.round(Math.min(1,completed/total)*100)+'%）':'預載中';
@@ -58,7 +73,7 @@
  }
  function start(){
   build();update();
-  window.addEventListener('storage',e=>{if(e.key===KEY)update()});
+  window.addEventListener('storage',e=>{if(e.key===KEY||e.key?.startsWith(NOTICE_KEY))update()});
   try{if(typeof BroadcastChannel==='function'){const channel=new BroadcastChannel('p79-browser-cache-progress');channel.onmessage=e=>update(e.data)}}catch(_){}
   window.setInterval?.(()=>update(),5000);
  }
