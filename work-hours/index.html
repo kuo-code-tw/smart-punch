@@ -13473,6 +13473,20 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 p79WorkOvertimeLoadQueue=Promise.all([...p79WorkOvertimeLoadLanes,state.promise]);
             });
         }
+        function p79RememberArrangedCover(map,workDate,cover,plan=null){
+            const target=String(cover?.leaveEmpId||'').trim().toUpperCase();
+            if(!target||!/^\d{4}-\d{2}-\d{2}$/.test(workDate||''))return;
+            const prior=map[workDate]||{};
+            if(prior.overtimeExcluded||prior.overtimeReport)return;
+            const relation={forEmpId:target,leaveDate:plan?.leaveDate||workDate,
+                overtimeDate:plan?.overtimeDate||workDate,
+                leaveId:String(cover.leaveId||''),
+                periodMode:plan?.periodMode||'',
+                overtimeStart:plan?.overtimeStart||'',overtimeEnd:plan?.overtimeEnd||''};
+            const list=prior.p79ArrangedCovers||[];
+            if(list.some(item=>JSON.stringify(item)===JSON.stringify(relation)))return;
+            map[workDate]={...prior,p79ArrangedCovers:[...list,relation]};
+        }
         function p79MergeWorkOvertimeSnapshot(state,metaByEmp){
             if(!state.ready||state.token!==currentPort79SsoToken())return;
             const roster=new Map(state.rows.map(r=>[String(r.empId||'').trim().toUpperCase(),r.schedule||{}]));
@@ -13502,12 +13516,19 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                         if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||date<cover.startDate||date>cover.endDate)return;
                         const originalShift=[target[date],target.__meta?.[date]?.leaveOriginalShift,
                             target.__meta?.[date]?.reportOriginalShift].find(v=>['早','中','晚'].includes(v))||'';
-                        const linked=window.P79LeaveCoverSuggest?.coverWorkday?.(date,originalShift,cover.mode,index);
+                        // Respect explicitly stored same-day arrangements, not legacy cross-day inference.
+                        const sameDay=cover.coverPeriodMode==='same-day'||cover.periodMode==='same-day';
+                        const linked=window.P79LeaveCoverSuggest?.coverWorkday?.(date,originalShift,cover.mode,index,sameDay?'same-day':'legacy');
+                        if(linked?.sameDayCover){
+                            p79RememberArrangedCover(map,date,cover,linked);
+                            return;
+                        }
                         if(linked){
                             // Clock-in and normal 08-16 stay on NEXT morning's workDate.
                             // The 04-08 overtime belongs to the ORIGINAL night overtimeDate.
                             // Never re-date punch records or silently write the cloud report.
                             if(own[linked.workDate]!==linked.normalShift||map[linked.workDate]?.overtimeReport)return;
+                            p79RememberArrangedCover(map,linked.workDate,cover,linked);
                             const configured=window.P79Overtime?.activeReportRules?.().find(r=>r[0]==='延'&&r[1]===linked.code);
                             if(!configured)return;
                             map[linked.workDate]={...map[linked.workDate],forEmpId:cover.leaveEmpId,
@@ -13516,11 +13537,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                                 overtimeReport:{...window.P79Overtime.report(configured),overtimeDate:linked.overtimeDate}};
                             return;
                         }
-                        if(map[date]?.overtimeReport)return;
-                        const shift=ranges[own[date]]?own[date]:target[date];let times=ranges[shift];if(!times)return;
-                        if(cover.mode==='two'){const halves={早:[['08','12'],['12','16']],中:[['16','20'],['20','24']],晚:[['24','04'],['04','08']]};times=halves[shift][index===1?1:0];}
-                        // A cover relationship alone cannot create an overtime detail.
-                        // Open the shared report dialog to select an enabled configured period.
+                        // Keep the confirmed cover relationship even when no rule/report exists.
+                        // Read-only metadata, not an overtime declaration or payable hours.
+                        p79RememberArrangedCover(map,date,cover);
                     });
                 });
             });
@@ -13566,7 +13585,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             // historical report, an active report, or any cover assignment.
             return !!row&&p79WorkOvertimeMonthVerified(row.monthKey)&&
                 !row.savedOvertimeHistory&&!row.reportVerified&&!row.planned&&!row.overtimeReport&&
-                !row.coverCandidate&&!row.coverAlreadyArranged&&!row.forEmpId&&
+                !row.coverCandidate&&!row.coverAlreadyArranged&&!row.forEmpId&&!row.p79ArrangedCovers?.length&&
                 (Number(row.overtimeMinutes)>0||Number(row.specialOvertimeMinutes)>0);
         }
         async function p79DeleteWorkOvertimeRow(index,button){
@@ -13813,13 +13832,14 @@ async function p79ExportOvertimeComparison(printMode){
             if(!editExisting&&row.reportVerified){alert('此筆已有正式加班申報，請點選「修改申報」，避免重複新增。');return;}
             if(row.timeCheckRequired){alert('此班次出勤時間待核對，請先點選上下班時間更正，再申報加班。');return;}
             const date=row.rosterDate||normalizeScheduleDateKey(row.dateKey),category=row.overtimeReport?.category||(row.specialOvertimeMinutes?'國':'延');
+            const coverTarget=!editExisting&&!row.overtimeReport&&row.p79ArrangedCovers?.length===1&&row.p79ArrangedCovers[0].leaveDate===date?row.p79ArrangedCovers[0].forEmpId:'';
             const start=p79DirectAttendanceTimestamp(row.clockIn),end=p79DirectAttendanceTimestamp(row.clockOut),roster=p79WorkOvertimeRoster(row.empId,date);
             const kinds=(globalThis.P79SpecialOvertime?.overlap(start,end)||[]).flatMap(p=>p.kinds);
             const inferred=row.overtimeReport?null:P79Overtime.suggestRule(start,end,date,roster,P79Overtime.reportRules(),kinds);
             // Editing starts from the saved code, rather than applying a new inferred code silently.
             const periodReview=editExisting?null:p79WorkOvertimePeriodReview(row);
             const amendment=!editExisting&&periodReview?.mismatch&&periodReview.state==='completed'&&periodReview.confirmed?periodReview.suggested:null;
-            P79Overtime.openReport({empId:row.empId,date,roster,coverDate:row.overtimeReport?.coverDate||date,overtimeDate:row.overtimeReport?.overtimeDate||date,leaveHandoffId:row.overtimeReport?.leaveId||'',savedReport:editExisting,reportId:editExisting?row.overtimeReport?.id||'':'',lockOriginal:editExisting,note:row.overtimeReport?.note||'',attendance:{start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)},forEmpId:row.forEmpId||'',code:amendment?.code||row.overtimeReport?.code||inferred?.[1]||'',category:amendment?.category||row.overtimeReport?.category||inferred?.[0]||category,preferredType:row.overtimeReport?.typeName||(inferred?P79Overtime.ruleType(inferred):''),requirePeriodSelection:!amendment&&!row.overtimeReport&&!inferred});
+            P79Overtime.openReport({empId:row.empId,date,roster,coverDate:row.overtimeReport?.coverDate||date,overtimeDate:row.overtimeReport?.overtimeDate||date,leaveHandoffId:row.overtimeReport?.leaveId||'',savedReport:editExisting,reportId:editExisting?row.overtimeReport?.id||'':'',lockOriginal:editExisting,note:row.overtimeReport?.note||'',attendance:{start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)},forEmpId:row.forEmpId||coverTarget||'',code:amendment?.code||row.overtimeReport?.code||inferred?.[1]||'',category:amendment?.category||row.overtimeReport?.category||inferred?.[0]||category,preferredType:row.overtimeReport?.typeName||(inferred?P79Overtime.ruleType(inferred):''),requirePeriodSelection:!amendment&&!row.overtimeReport&&!inferred});
         }
         function p79OvertimeAttendanceIssue(session,start,end) {
             // Do not estimate/pay two intervals for the same person while their
@@ -14010,6 +14030,7 @@ async function p79ExportOvertimeComparison(printMode){
                     const matchedReport=p79WorkOvertimeMatchWorkday(start,end,workDate,reportMap);
                     const restMeta=matchedReport.meta;
                     if(restMeta?.overtimeExcluded)return null;
+                    const arrangedCovers=restMeta?.p79ArrangedCovers||[];
                     const reportMinutes=matchedReport.minutes;
                     // 自動未休假配對不是申報；未有申報或代班時，只計打卡超過8小時且超過30分的部分。
                     const attendanceIssue=p79OvertimeAttendanceIssue(session,start,end)||
@@ -14031,7 +14052,15 @@ async function p79ExportOvertimeComparison(printMode){
                     }
                     // A saved report whose old interval no longer overlaps a moved shift must stay visible for correction.
                     // Never turn the unmatched interval into paid hours or silently recreate the report.
-                    if(!overtimeMinutes&&!specialOvertimeMinutes&&!attendanceIssue&&!restMeta?.overtimeReport)return null;
+                    // Only completed punches overlapping an explicit same-day period may
+                    // add a review row below the ordinary overtime threshold. Never add paid hours.
+                    const observedAssignedPeriod=!attendanceIssue&&arrangedCovers.some(cover=>{
+                        if(cover.periodMode!=='same-day')return false;
+                        const base=Date.parse(workDate+'T00:00:00+08:00');
+                        const a=base+Number(cover.overtimeStart)*3600000,b=base+Number(cover.overtimeEnd)*3600000;
+                        return !!cover.overtimeStart&&!!cover.overtimeEnd&&Number.isFinite(a)&&b>a&&start<b&&end>a;
+                    });
+                    if(!overtimeMinutes&&!specialOvertimeMinutes&&!attendanceIssue&&!restMeta?.overtimeReport&&!observedAssignedPeriod)return null;
                     // Attendance month remains the physical punch month. Overtime
                     // accounting month is separate; do not move 11/08 normal shift.
                     const workMonthKey=String(matchedReport.date||session.dateKey||'').slice(0,7);
@@ -14055,6 +14084,7 @@ async function p79ExportOvertimeComparison(printMode){
                         savedOvertimeHistory:typeof p79WorkOvertimeSavedHistory==='function'?p79WorkOvertimeSavedHistory(restMeta):null,
                         rosterDate:matchedReport.date,overtimeDate:restMeta?.overtimeDate||restMeta?.overtimeReport?.overtimeDate||'',
                         forEmpId:restMeta?.forEmpId||'',coverCandidate:!!restMeta?.coverCandidate,coverAlreadyArranged:!!restMeta?.coverAlreadyArranged,
+                        p79ArrangedCovers:arrangedCovers,
                         overDailyLimit: totalMinutes > 720
                     };
                 })
@@ -15380,6 +15410,7 @@ function p79OvertimePeriodLabel(report){
                     row.overtimeReport&&row.reportVerified&&!savedPlan?'換'+p79OvertimeConversionFull.replace(/\s*小時/g,'h'):'',
                     p79OvertimePlanState,
                     row.specialOvertimeMinutes>0?'特殊日'+(row.specialReportMinutes===null?'待核':String(row.specialReportMinutes/60)+'h'):'',
+                    !row.overtimeReport&&row.p79ArrangedCovers?.length?'已安排代班・出勤待核':'',
                     !row.overtimeReport&&pendingPunchOvertime?'出勤加班'+formatDurationMinutes(row.overtimeMinutes):'',
                     !row.overtimeReport&&history?'歷史待核':'',
                     inlineCandidate?'可申報 '+inlineCandidate.rule[1]+' '+inlineCandidate.rule[2]+'h':changingPeriod?'時段待核':''
@@ -15394,6 +15425,7 @@ function p79OvertimePeriodLabel(report){
                     p79ExtendedBreakdown||p79OvertimePeriodFull,
                     row.overtimeReport?((row.reportVerified?(savedPlan?'已儲存預排申報':'已申報'):'尚未正式申報')+' '+String(row.overtimeReport.declaredHours??'')+'小時｜換算 '+p79OvertimeConversionFull):'',
                     row.specialOvertimeMinutes>0?'特殊日出勤 '+formatDurationMinutes(row.specialOvertimeMinutes):'',
+                    !row.overtimeReport&&row.p79ArrangedCovers?.length?'已安排代班｜原請假日期 '+[...new Set(row.p79ArrangedCovers.map(c=>c.leaveDate))].join('、')+'｜尚未確認正式申報':'',
                     !row.overtimeReport&&pendingPunchOvertime?'加班出勤 '+formatDurationMinutes(row.overtimeMinutes):'',
                     history?'歷史加班紀錄待核對':'',
                     changingPeriod?'申報時段與最新考勤不同，待核對':''
