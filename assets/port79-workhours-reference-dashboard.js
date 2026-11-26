@@ -387,10 +387,20 @@
  function listCategory(r){
   return r.category==='延'?'平日加班':r.category==='休'?'休息日加班':r.category==='例'?'例假日加班':r.category==='國'?'國定假日加班':'其他加班';
  }
+ function listPeople(rows,unit,job){
+  const people=new Map();
+  for(const r of rows){
+   if((unit!=='ALL'&&r.unit!==unit)||(job!=='ALL'&&r.job!==job)||!r.empId||!r.name)continue;
+   if(!people.has(r.empId))people.set(r.empId,{value:r.empId,label:r.name});
+  }
+  const names=new Map();
+  for(const p of people.values())names.set(p.label,(names.get(p.label)||0)+1);
+  return [...people.values()].sort((a,b)=>stroke.compare(a.label,b.label)||stroke.compare(a.value,b.value))
+   .map(p=>({value:p.value,label:names.get(p.label)>1?p.label+'（'+p.value+'）':p.label}));
+ }
  function filterApplications(rows,f){
-  const name=String(f.name||'').trim().toLocaleLowerCase('zh-TW');
   return rows.filter(r=>(f.unit==='ALL'||r.unit===f.unit)&&(f.job==='ALL'||r.job===f.job)&&
-   (!name||String(r.name||'').toLocaleLowerCase('zh-TW').includes(name))&&
+   (f.name==='ALL'||r.empId===f.name)&&
    (f.type==='ALL'||listCategory(r)===f.type));
  }
  function listFilters(rows){
@@ -399,14 +409,16 @@
   options(unitControl,choices(rows.map(r=>r.unit)),'全部單位');
   const unit=unitControl?.value||'ALL';
   options(jobControl,choices(rows.filter(r=>unit==='ALL'||r.unit===unit).map(r=>r.job)),'全部職稱');
+  const job=jobControl?.value||'ALL',nameControl=id('prListName');
+  options(nameControl,listPeople(rows,unit,job),'全部姓名');
   options(typeControl,choices(rows.map(listCategory)),'全部類型');
-  return {unit,job:jobControl?.value||'ALL',name:id('prListName')?.value||'',type:typeControl?.value||'ALL'};
+  return {unit,job,name:nameControl?.value||'ALL',type:typeControl?.value||'ALL'};
  }
  function drawTable(rows){
   state.all=rows;
   const filters=listFilters(rows);
   const filtered=filterApplications(rows,filters);
-  const count=[filters.unit!=='ALL',filters.job!=='ALL',!!filters.name.trim(),filters.type!=='ALL'].filter(Boolean).length;
+  const count=[filters.unit!=='ALL',filters.job!=='ALL',filters.name!=='ALL',filters.type!=='ALL'].filter(Boolean).length;
   const indicator=id('prListFilterCount'),toggle=id('prListFilterToggle');
   if(indicator){indicator.hidden=!count;indicator.textContent=String(count);}
   if(toggle)toggle.dataset.active=count?'true':'false';
@@ -481,7 +493,7 @@
   const host=id('viewAdmin')?.querySelector('.admin-desktop-content');
   if(!host||id('p79WorkhoursReference'))return;
   let markup;
-  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1&listFilters=20261126-compact-v2',{cache:'default'});
+  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1&listFilters=20261126-person-v3',{cache:'default'});
    if(!resp.ok)throw Error('HTTP '+resp.status);markup=await resp.text();
    if(!markup.includes('id="p79WorkhoursReference"')||!markup.includes('id="prTableBody"'))throw Error('版型檔格式錯誤');
   }catch(e){console.warn('工時版型尚未讀取完成，保留原本功能',e);return}
@@ -507,14 +519,14 @@
    if(event.key==='Escape'&&filterMenu.open){event.preventDefault();filterMenu.open=false;id('prListFilterToggle')?.focus();}
   });
   for(const key of ['prListUnit','prListJob','prListType','prListName']){
-   id(key)?.addEventListener(key==='prListName'?'input':'change',()=>{
+   id(key)?.addEventListener('change',()=>{
     if(key==='prListUnit'&&id('prListJob'))id('prListJob').value='ALL';
+    if((key==='prListUnit'||key==='prListJob')&&id('prListName'))id('prListName').value='ALL';
     state.page=1;drawTable(state.all);
    });
   }
   id('prListReset')?.addEventListener('click',()=>{
-   for(const key of ['prListUnit','prListJob','prListType'])if(id(key))id(key).value='ALL';
-   if(id('prListName'))id('prListName').value='';
+   for(const key of ['prListUnit','prListJob','prListType','prListName'])if(id(key))id(key).value='ALL';
    state.page=1;drawTable(state.all);
   });
   document.querySelectorAll('#p79WorkhoursReference [data-pr-tab]').forEach(b=>b.addEventListener('click',()=>{state.tab=b.dataset.prTab;state.page=1;drawTable(state.all)}));
