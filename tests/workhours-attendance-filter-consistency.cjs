@@ -8,7 +8,9 @@ assert(html.includes("const build=window.P79AttendanceV6?.buildShifts||buildDail
 assert(html.includes('let dailyRows = p79WorkhoursListAttendanceShifts(filtered);'),'main work-hours attendance table uses shared pairing');
 assert(html.includes('let rows = p79WorkhoursListAttendanceShifts(records.filter(canCurrentAdminViewDataRow));'),'work-hours filter options use shared pairing');
 assert(html.includes('dailyRows = p79WorkhoursFilterAttendanceRows(dailyRows,statusFilter);'),'visible status and table use one classifier');
-assert(html.includes('attendanceSessions=(window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows)(sourceRecords);'),'main overtime ledger uses the same V6 pairing as attendance');
+assert(html.includes('attendanceSessions=p79WorkhoursListAttendanceShifts(sourceRecords);'),'main overtime ledger uses the same normalized V6 pairing as attendance');
+assert(html.includes('totalMinutes:observedMinutes??0,overtimeMinutes:0'),'existing official report preserves actual attendance duration without inventing payable overtime');
+assert(html.includes('if(!shared&&evidenceRevision===lastAttendanceCloudRevision&&!p79WorkhoursIsEditing())'),'verified raw-month fallback updates visible records without racing edits');
 assert(html.includes('const sessions=(window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows)(attendanceRows).map(row=>{'),'official no-punch evidence also uses V6');
 assert(html.includes('<option value="PENDING">待確認</option>'));
 const names=['ABNORMAL','PENDING','NORMAL'];
@@ -30,5 +32,15 @@ assert.equal(ctx.p79WorkhoursFilterAttendanceRows(shifts,'NORMAL').length,1);
 assert.equal(ctx.p79WorkhoursFilterAttendanceRows(shifts,'ABNORMAL').length,2);
 assert.equal(ctx.p79WorkhoursFilterAttendanceRows(shifts,'PENDING').length,0);
 assert.equal(raw[3].__p79PairIdentity,undefined,'raw punch is not mutated');
+ctx.p79DirectAttendanceTimestamp=r=>Date.parse(String(r?.timeStr||'').replaceAll('/','-').replace(' ','T')+'+08:00');
+for(const name of ['p79WorkOvertimeObservedMinutes','p79WorkOvertimePreferAttendance'])vm.runInContext(fn(name),ctx);
+const overnight=ctx.p79WorkhoursListAttendanceShifts([
+ {id:'night-in',empId:'E1',attNo:'01',name:'甲',status:'上班簽到',timeStr:'2026/11/23 23:36'},
+ {id:'night-out',attNo:'01',name:'甲',status:'下班簽退',timeStr:'2026/11/24 07:46'}
+]);
+assert.equal(overnight.length,1,'cross-midnight records with missing ID share the HR identity');
+assert.equal(ctx.p79WorkOvertimeObservedMinutes(overnight[0]),490,'23:36 to next day 07:46 is 8h10m');
+assert.equal(ctx.p79WorkOvertimePreferAttendance({clockIn:overnight[0].clockIn,sortTime:Number.MAX_SAFE_INTEGER},overnight[0]),false,'newer incomplete record cannot replace a complete shift');
+assert.equal(ctx.p79WorkOvertimePreferAttendance(overnight[0],{clockIn:overnight[0].clockIn,sortTime:Number.MAX_SAFE_INTEGER}),true);
 for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(script[1].trim())new vm.Script(script[1]);
 console.log('PASS work-hours and attendance share V6 pairing: completed/orphan/conflicting punches, status filters and source immutability');
