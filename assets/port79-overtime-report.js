@@ -223,7 +223,8 @@
     continue;
    }
    byId.set(id,{source,epoch});
-   normalized.push({...source,timeStr:reportPunchText(epoch)});
+   // The report is scoped by employee ID, even when historical punches use different badge numbers.
+   normalized.push({...source,__p79PairIdentity:employee,timeStr:reportPunchText(epoch)});
   }
   const builder=buildRows||global.P79AttendanceV6?.buildShifts;
   if(typeof builder!=='function')throw Error('正式出勤配對元件尚未就緒，未送出申報');
