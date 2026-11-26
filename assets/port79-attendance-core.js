@@ -581,6 +581,8 @@ async function p79AuditPausedAttendanceQueue(reportProgress,options={}){
    }
    const records=(await Promise.all(months.map(officialMonth))).flat();
    if(token()!==access||gasUrl()!==base)throw Error('登入或正式資料來源已變更，原修改保留');
+   // A user may withdraw a paused edit while this read-only audit awaits the cloud.
+   if(!readQueue().some(x=>x.key===candidate.key&&JSON.stringify(x.payload)===JSON.stringify(payload)))continue;
    const sameId=records.filter(row=>String(row.id)===id);
    const matches=sameId.filter(row=>['empId','attNo'].every(k=>
      !String(expected[k]??'').trim()||normalizeCompareValue(row[k])===normalizeCompareValue(expected[k]))&&

@@ -24648,7 +24648,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 
 
 <script src="../assets/port79-punch-device-state.js?v=20261022-self-binding"></script>
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2&dup=20261124-final-two-v1&sync=20261125-local-first-edit-v2&identical=20261125-v1&lane=20261126-v1&retryBudget=20261126-v2"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2&dup=20261124-final-two-v1&sync=20261125-local-first-edit-v2&identical=20261125-v1&lane=20261126-v1&retryBudget=20261126-v2&withdraw=20261126-v1"></script>
 
 
 
@@ -25440,7 +25440,7 @@ document.addEventListener('visibilitychange',()=>{
 setInterval(()=>{
  if(!document.hidden)window.p79RefreshAttendanceSyncCompactStatus?.();
 },2000);
-let reviewBusy=false,auditBusy=false;
+let reviewBusy=false,auditBusy=false,withdrawRevision=0;
 let verifiedPausedBatch=[];
 let ambiguousPausedBatch=[];
 function p79ReviewNext(message){
@@ -25460,11 +25460,13 @@ async function auditAllPaused(){
  if(typeof window.p79V5AuditPausedQueue!=='function'){
   el.textContent='同步核對功能尚未載入，請強制重新整理此頁。';return;
  }
+ const auditRevision=withdrawRevision;
  auditBusy=true;verifiedPausedBatch=[];ambiguousPausedBatch=[];if(button)button.disabled=true;
  el.textContent='正在查詢正式月份主表，核對全部待同步及暫停修改；不會強制寫入。';
  let resolved=0;
  try{
   const result=await window.p79V5AuditPausedQueue(progress=>{
+   if(auditRevision!==withdrawRevision)return;
    const finished=Number(progress.confirmed||0)+Number(progress.archived||0);
    if(finished!==resolved){
     resolved=finished;
@@ -25476,6 +25478,7 @@ async function auditAllPaused(){
     '｜舊修改已備份 '+progress.archived+'｜需要人工核對 '+progress.needsReview+
     '｜仍待同步 '+Number(progress.pending||0)+'｜核對失敗 '+progress.errors;
   },{includePending:true});
+  if(auditRevision!==withdrawRevision){show(false);return;}
   show(false);
   verifiedPausedBatch=(Array.isArray(result.verifiedConflicts)?result.verifiedConflicts:[])
    .filter(row=>row&&shownDrafts.has(row.key))
@@ -25526,7 +25529,7 @@ async function auditAllPaused(){
    else el.innerHTML='<strong>'+safe(overview)+'</strong>'+ambiguousHtml;
   }
  }catch(error){
-  el.textContent='自動核對未完成：'+String(error?.message||error)+'。原始修改仍保留，可按上方重新核對。';
+  if(auditRevision===withdrawRevision)el.textContent='自動核對未完成：'+String(error?.message||error)+'。原始修改仍保留，可按上方重新核對。';
  }finally{
   auditBusy=false;if(button)button.disabled=false;
   inspectorQueueSnapshot=queueSnapshot();
@@ -25650,13 +25653,18 @@ async function handleInspectorClick(event){
   if(!reviewBusy&&!auditBusy){const next=shownDrafts.keys().next().value;if(next)void reviewEntry(next);}return;
  }
  if(button.dataset.reviewKey){void reviewEntry(decodeURIComponent(button.dataset.reviewKey));return;}
- if(reviewBusy||auditBusy)return;
  const status=document.getElementById('p79OutboxReview');
+ const withdrawing=button.hasAttribute('data-withdraw-key')||button.hasAttribute('data-withdraw-all');
+ if(reviewBusy||(!withdrawing&&auditBusy)){if(status)status.textContent='目前正在核對其他修改，請完成後再操作。';return;}
  try{
-  if(button.hasAttribute('data-withdraw-key')||button.hasAttribute('data-withdraw-all')){
+  if(withdrawing){
    const selected=button.hasAttribute('data-withdraw-all')?[...shownDrafts].map(([key,payload])=>({key,payload})):[{key:decodeURIComponent(button.dataset.withdrawKey),payload:shownDrafts.get(decodeURIComponent(button.dataset.withdrawKey))}];
    if(!confirm('撤回 '+selected.length+' 筆暫停修改？草稿會先保存為可恢復備份，雲端考勤不會刪除或改寫。'))return;
-   const result=window.p79V5WithdrawPausedWrites(selected);show(false);
+   if(typeof window.p79V5WithdrawPausedWrites!=='function')throw Error('撤回功能未載入，請重新整理');
+   const result=window.p79V5WithdrawPausedWrites(selected);
+   if(!result?.ok||!result.count)throw Error('沒有可撤回的修改，請重新核對清單');
+   withdrawRevision++;verifiedPausedBatch=[];ambiguousPausedBatch=[];
+   show(false);
    status.textContent='已撤回 '+result.count+' 筆待傳修改，已從待處理清單移除；雲端考勤保留。';
   }else if(button.dataset.checkDraft||button.dataset.restoreDraft){
    reviewBusy=true;button.disabled=true;status.textContent='正在核對這份撤回草稿與雲端資料…';

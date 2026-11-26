@@ -23,13 +23,15 @@ const node=id=>{
  return nodes.get(id);
 };
 for(const id of ['p79OutboxInspectPanel','p79OutboxInspectCard','p79OutboxInspectBody','p79OutboxReview','p79OutboxInspectClose','p79OutboxInspectRefresh','attendanceSyncCompactStatus'])node(id);
-let audits=0;
+let audits=0,holdAudit=false,finishAudit=null;
 const window={
  addEventListener(name,fn){events[name]=fn;},
  p79RefreshAttendanceSyncCompactStatus(){},
  p79V5ReadPendingQueue:()=>queue.slice(),
+ p79V5WithdrawPausedWrites:selected=>{queue=queue.filter(x=>!selected.some(s=>s.key===x.key));return {ok:true,count:selected.length};},
  p79V5AuditPausedQueue:async progress=>{
   audits++;
+  if(holdAudit)return new Promise(resolve=>{finishAudit=()=>{const result={total:1,checked:1,confirmed:0,archived:0,needsReview:1,errors:0,lastError:''};progress(result);resolve(result);};});
   const total=queue.length;
   if(!total)return{total:0,checked:0,confirmed:0,archived:0,needsReview:0,errors:0,lastError:''};
   queue.shift();
@@ -45,7 +47,7 @@ const document={
  createElement(tag){return{id:'',tag,style:{},type:'',addEventListener(k,f){this.events??={};this.events[k]=f;}};},
  addEventListener(name,fn){events['doc:'+name]=fn;}
 };
-const context={document,window,localStorage:{getItem(){return '[]';}},MutationObserver:class{observe(){}},setInterval(fn){intervals.push(fn);}};
+const context={document,window,confirm:()=>true,localStorage:{getItem(){return '[]';}},MutationObserver:class{observe(){}},setInterval(fn){intervals.push(fn);}};
 vm.createContext(context);
 vm.runInContext(match[1],context);
 assert(node('p79OutboxInspectBtn').events.click,'inspector opening button must exist');
@@ -70,5 +72,13 @@ assert(node('p79OutboxInspectBtn').events.click,'inspector opening button must e
  assert(node('p79OutboxInspectPanel').classList.contains('p79-show'));
  assert.match(node('p79OutboxReview').textContent,/需要人工核對|仍需人工核對/);
  assert(intervals.length>=1,'cross-tab polling remains as a fallback');
+ holdAudit=true;node('p79OutboxInspectRefresh').events.click();assert(finishAudit,'audit is waiting for cloud');
+ const key=queue[0].key,btn={dataset:{withdrawKey:encodeURIComponent(key)},hasAttribute:n=>n==='data-withdraw-key',disabled:false};
+ await node('p79OutboxInspectBody').events.click({target:{closest:()=>btn}});
+ assert.equal(queue.length,0,'withdraw works even while read-only audit waits');
+ assert.match(node('p79OutboxReview').textContent,/已撤回 1 筆/);
+ finishAudit();await new Promise(setImmediate);
+ assert.match(node('p79OutboxReview').textContent,/已撤回 1 筆/,'late audit cannot replace success');
+ assert.match(node('p79OutboxInspectBody').innerHTML,/新版考勤快速同步：0 筆/);
  console.log('PASS inspector live audit: one opening audits all, events refresh in place, scroll retained, manual retry works');
 })().catch(e=>{console.error(e);process.exitCode=1;});
