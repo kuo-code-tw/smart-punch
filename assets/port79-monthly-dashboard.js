@@ -1045,7 +1045,8 @@ async function load(forceCloud=false){
   // The independent bounded audit above owns this card; do not overwrite a
   // confirmed result with this reporting loop's unrelated boundary error.
   loadedKey=ym;
-  statusText('p79DashMessage',failures.length?failures.join('；'):'已讀取 '+selectedMonthTitle()+' 的可用歷史資料。');
+  const visibleFailures=failures.filter(message=>message!=='考勤：歷史資料讀取逾時，尚未取得完整資料；請稍後重新讀取。');
+  statusText('p79DashMessage',failures.length?visibleFailures.join('；'):'已讀取 '+selectedMonthTitle()+' 的可用歷史資料。');
  }finally{loading=false;if(button)button.disabled=false;if(month()!==ym&&$('systems')?.classList.contains('show')){loadedKey='';root.setTimeout(()=>load(false).catch(()=>{}),0);}}
 }
 function showWhenAdmin(){

@@ -181,7 +181,7 @@ function show(){
  feedback.hidden=false;
  const list=$('p79AllBackupResults');
  if(!batch&&allowed(session())){try{restore({actor:session().empId,endpoint:endpoint()});}catch(e){message(e.message);}}
- if(batch){render();if(batch.restored)message('先前備份進度已保留；按「備份資料庫」接續，會先向雲端核對，已完成分類不重跑。');}
+ if(batch){render();if(batch.restored)message('');}
  else if(list&&!list.children.length){
   const fresh=d.createDocumentFragment();
   for(const [type,label] of HOME_TYPES){

@@ -86,7 +86,7 @@ assert.equal(b.node('p79HomeYardReeferCapTotal').textContent,'未設定');
 assert.equal(b.node('p79HomeYardReeferChartPct').textContent,'—','never fabricate reefer occupancy without a valid cap');
 assert.match(b.node('p79HomeYardReeferRing').attributes['aria-label'],/上限未設定/);
 assert.equal(b.node('p79HomeYardHeavyWarning').hidden,true);
-assert.match(b.node('p79HomeYardSource').textContent,/yard.xlsx/);
+assert.equal(b.node('p79HomeYardSource').textContent,'','successful yard data has no verbose source note');
 
 const withLimit=build({allowed:{heavy:200,empty:100,reefer:14,reeferTeu:32}});
 withLimit.context.renderHomeYardSummary(session);
