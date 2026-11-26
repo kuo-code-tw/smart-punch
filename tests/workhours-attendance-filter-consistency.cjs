@@ -68,5 +68,26 @@ assert(recovered.overtimeReport.attendanceReview,'original period must still be 
 assert.equal(JSON.stringify(saved),original,'official declaration not mutated');
 assert.equal(ctx.p79WorkOvertimeReconcileAttendanceMeta(saved,null,date,{}),saved,'no evidence cannot create attendance');
 assert(html.includes("const noPunchRest=row.reportVerified&&row.overtimeReport?.attendanceState==='rest'&&!row.clockIn&&!row.clockOut;"));
+// Adjacent-day reports must never attach to a different workday, even when
+// the end of a normal night shift overlaps the next calendar day's report.
+vm.runInContext(fn('p79WorkOvertimeMatchWorkday'),ctx);
+const reportContext={window:{},Date,Intl,Set,Map};
+vm.runInNewContext(fs.readFileSync('assets/port79-overtime-report.js','utf8'),reportContext);
+ctx.P79Overtime=reportContext.window.P79Overtime;
+const start=Date.parse('2026-11-23T23:36:00+08:00'),end=Date.parse('2026-11-24T07:46:00+08:00');
+const nextDate='2026-11-24',nextMeta={overtimeReport:{id:'REPORT-24',category:'休',code:'休04-08',overtimeStart:'04',overtimeEnd:'08',position:'full'}};
+const map24={[nextDate]:nextMeta};
+assert.equal(ctx.P79Overtime.matchReport(start,end,date,map24).date,nextDate,'old adjacent search reproduces wrong-day matching');
+const normal=ctx.p79WorkOvertimeMatchWorkday(start,end,date,map24);
+assert.equal(normal.date,date);
+assert.equal(normal.meta,null,'23rd normal night shift cannot borrow a 24th report');
+assert.equal(normal.minutes,null);
+const actual24=ctx.p79WorkOvertimeMatchWorkday(Date.parse('2026-11-24T03:35:00+08:00'),Date.parse('2026-11-24T08:00:00+08:00'),nextDate,map24);
+assert.equal(actual24.meta.overtimeReport.id,'REPORT-24');
+assert.equal(actual24.minutes,240,'24th retains its own four-hour test report');
+const linked={overtimeReport:{...nextMeta.overtimeReport,overtimeDate:date,workDate:nextDate}};
+assert.equal(ctx.p79WorkOvertimeMatchWorkday(start,end,nextDate,{[nextDate]:linked}).meta.overtimeReport.overtimeDate,date,'explicit dual-date credit preserved');
+assert(html.includes('p79WorkOvertimeMatchWorkday(start,end,workDate,reportMap)'));
+assert(html.includes('p79WorkOvertimeMatchWorkday(start,end,row.accountingDateKey||row.dateKey'));
 for(const script of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi))if(script[1].trim())new vm.Script(script[1]);
 console.log('PASS work-hours and attendance share V6 pairing: completed/orphan/conflicting punches, status filters and source immutability');

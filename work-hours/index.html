@@ -12017,13 +12017,22 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 </div>`;
         }
 
+        // Match a declaration by the same employee's authoritative workday,
+        // never by an adjacent calendar day's overlap with a night shift.
+        // The original report's overtimeDate remains a separate payroll date.
+        function p79WorkOvertimeMatchWorkday(start,end,workDate,reportMap){
+            const day=normalizeScheduleDateKey(workDate);
+            const meta=reportMap?.[day]||null;
+            if(!meta?.overtimeReport)return {meta,date:day,minutes:null};
+            return P79Overtime.matchReport(start,end,day,{[day]:meta});
+        }
         function attendanceRowOvertimeMinutes(row) {
             if (!row?.clockIn || !row?.clockOut) return 0;
             const start = getAttendanceTimestamp(row.clockIn);
             const end = getAttendanceTimestamp(row.clockOut);
             const totalMinutes = Math.floor((end - start) / 60000);
             const employee=findEmployeeForAttendanceIdentity(row,employees);
-            const matchedReport=P79Overtime.matchReport(start,end,normalizeScheduleDateKey(row.dateKey),employee?employeeScheduleMetaMap(employee):{});
+            const matchedReport=p79WorkOvertimeMatchWorkday(start,end,row.accountingDateKey||row.dateKey,employee?employeeScheduleMetaMap(employee):{});
             const meta=matchedReport.meta,reported=matchedReport.minutes;
             return reported===null?p79RestActualOvertimeMinutes(totalMinutes,meta):reported;
         }
@@ -13988,11 +13997,7 @@ async function p79ExportOvertimeComparison(printMode){
                     if (!employee||!p79EmployeeDateEligible(employee,session.accountingDateKey||session.dateKey)) return null;
                     const workDate=normalizeScheduleDateKey(session.accountingDateKey||session.dateKey);
                     const reportMap=restMetaByEmp.get(String(employee.empId).trim().toUpperCase());
-                    // A saved declaration on this exact accounting workday takes
-                    // priority over an adjacent day's overlapping declaration.
-                    const matchedReport=P79Overtime.matchReport(start,end,workDate,
-                        p79WorkOvertimeOfficialReport(reportMap?.[workDate]?.overtimeReport,reportMap?.[workDate])
-                            ?{[workDate]:reportMap[workDate]}:reportMap);
+                    const matchedReport=p79WorkOvertimeMatchWorkday(start,end,workDate,reportMap);
                     const restMeta=matchedReport.meta;
                     if(restMeta?.overtimeExcluded)return null;
                     const reportMinutes=matchedReport.minutes;
@@ -14023,6 +14028,7 @@ async function p79ExportOvertimeComparison(printMode){
                     const monthKey = String(restMeta?.overtimeReport?.overtimeDate||matchedReport.date||session.dateKey||'').slice(0,7);
                     return {
                         ...session,
+                        dateKey:workDate,
                         empId: employee.empId,
                         name: employee.name || session.name || '未命名',
                         dept: employee.dept || session.dept || '一般',
