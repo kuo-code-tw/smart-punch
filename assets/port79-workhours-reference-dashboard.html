@@ -29,6 +29,13 @@
   <button type="button" class="pr-tab" data-pr-tab="review" id="prTabreview">待審核</button>
   <button type="button" class="pr-tab" data-pr-tab="approved" id="prTabapproved">已核准</button>
   <button type="button" class="pr-tab" data-pr-tab="rejected" id="prTabrejected">已駁回</button>
+ </div>
+ <div class="pr-list-filters" role="group" aria-label="加班申請列表篩選">
+  <label>單位<select id="prListUnit"><option value="ALL">全部單位</option></select></label>
+  <label>職稱<select id="prListJob"><option value="ALL">全部職稱</option></select></label>
+  <label>姓名<input id="prListName" type="search" placeholder="搜尋姓名" autocomplete="off"></label>
+  <label>加班類型<select id="prListType"><option value="ALL">全部類型</option></select></label>
+  <button type="button" id="prListReset">↻ 清除篩選</button>
  </div><div class="pr-table-scroll"><table aria-label="正式加班申報紀錄"><thead><tr><th>□</th><th>申請日期</th><th>姓名</th><th>單位</th><th>職稱</th><th>加班日期</th><th>加班時數</th><th>加班類型</th><th>申請原因</th><th>狀態</th><th>操作</th></tr></thead><tbody id="prTableBody"></tbody></table></div>
  <div class="pr-table-footer"><strong id="prShown">尚未讀取資料</strong><div class="pr-pages" id="prPages"></div></div></section>
  <div class="pr-side">

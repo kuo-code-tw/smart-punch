@@ -384,14 +384,33 @@
   say('prPersonalMissing',em); // never invent absences from raw punch intervals.
   drawTable(hasReports?data.reports:[]);
  }
+ function listCategory(r){
+  return r.category==='延'?'平日加班':r.category==='休'?'休息日加班':r.category==='例'?'例假日加班':r.category==='國'?'國定假日加班':'其他加班';
+ }
+ function filterApplications(rows,f){
+  const name=String(f.name||'').trim().toLocaleLowerCase('zh-TW');
+  return rows.filter(r=>(f.unit==='ALL'||r.unit===f.unit)&&(f.job==='ALL'||r.job===f.job)&&
+   (!name||String(r.name||'').toLocaleLowerCase('zh-TW').includes(name))&&
+   (f.type==='ALL'||listCategory(r)===f.type));
+ }
+ function listFilters(rows){
+  const choices=values=>[...new Set(values.filter(Boolean))].sort(stroke.compare).map(x=>({value:x,label:x}));
+  const unitControl=id('prListUnit'),jobControl=id('prListJob'),typeControl=id('prListType');
+  options(unitControl,choices(rows.map(r=>r.unit)),'全部單位');
+  const unit=unitControl?.value||'ALL';
+  options(jobControl,choices(rows.filter(r=>unit==='ALL'||r.unit===unit).map(r=>r.job)),'全部職稱');
+  options(typeControl,choices(rows.map(listCategory)),'全部類型');
+  return {unit,job:jobControl?.value||'ALL',name:id('prListName')?.value||'',type:typeControl?.value||'ALL'};
+ }
  function drawTable(rows){
   state.all=rows;
+  const filtered=filterApplications(rows,listFilters(rows));
   for(const [key,label]of [['all','全部'],['review','待審核'],['approved','已核准'],['rejected','已駁回']]){
    const button=id('prTab'+key);
-   button.textContent=label+' ('+(state.current?.ok&&state.current.reportsAvailable!==false?rows.filter(r=>key==='all'||r.status===key).length:em)+')';
+   button.textContent=label+' ('+(state.current?.ok&&state.current.reportsAvailable!==false?filtered.filter(r=>key==='all'||r.status===key).length:em)+')';
    button.classList.toggle('is-current',state.tab===key);
   }
-  const selected=rows.filter(r=>state.tab==='all'||r.status===state.tab);
+  const selected=filtered.filter(r=>state.tab==='all'||r.status===state.tab);
   const pages=Math.max(1,Math.ceil(selected.length/5));state.page=Math.min(pages,Math.max(1,state.page));
   const shown=selected.slice((state.page-1)*5,state.page*5);
   const body=id('prTableBody');body.replaceChildren();
@@ -400,7 +419,7 @@
    const tr=body.insertRow();
    const cells=['□',r.submitDate||em,r.name,r.unit||em,r.job,r.workDate,
     r.rawHours==null?em:format(r.rawHours)+' 小時',
-    r.category==='延'?'平日加班':r.category==='休'?'休息日加班':r.category==='例'?'例假日加班':r.category==='國'?'國定假日加班':'其他加班',
+    listCategory(r),
     r.reason||em];
    for(const label of cells){tr.insertCell().textContent=label}
    const badge=document.createElement('span');badge.className='pr-chip';badge.dataset.status=r.status;
@@ -457,7 +476,7 @@
   const host=id('viewAdmin')?.querySelector('.admin-desktop-content');
   if(!host||id('p79WorkhoursReference'))return;
   let markup;
-  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1',{cache:'default'});
+  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1&listFilters=20261126-v1',{cache:'default'});
    if(!resp.ok)throw Error('HTTP '+resp.status);markup=await resp.text();
    if(!markup.includes('id="p79WorkhoursReference"')||!markup.includes('id="prTableBody"'))throw Error('版型檔格式錯誤');
   }catch(e){console.warn('工時版型尚未讀取完成，保留原本功能',e);return}
@@ -475,6 +494,17 @@
   const now=dateTaipei();const [y,m]=now.slice(0,7).split('-').map(Number);
   id('prEnd').value=y+'-'+String(m).padStart(2,'0')+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0');
   id('prForm').addEventListener('submit',event=>{event.preventDefault();state.page=1;refresh(true)});
+  for(const key of ['prListUnit','prListJob','prListType','prListName']){
+   id(key)?.addEventListener(key==='prListName'?'input':'change',()=>{
+    if(key==='prListUnit'&&id('prListJob'))id('prListJob').value='ALL';
+    state.page=1;drawTable(state.all);
+   });
+  }
+  id('prListReset')?.addEventListener('click',()=>{
+   for(const key of ['prListUnit','prListJob','prListType'])if(id(key))id(key).value='ALL';
+   if(id('prListName'))id('prListName').value='';
+   state.page=1;drawTable(state.all);
+  });
   document.querySelectorAll('#p79WorkhoursReference [data-pr-tab]').forEach(b=>b.addEventListener('click',()=>{state.tab=b.dataset.prTab;state.page=1;drawTable(state.all)}));
   document.querySelectorAll('#p79WorkhoursReference [data-pr-open]').forEach(b=>b.addEventListener('click',()=>legacy(b.dataset.prOpen)));
   for(const filter of ['prUnit','prJob','prPerson'])id(filter).addEventListener('change',()=>{

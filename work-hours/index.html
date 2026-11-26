@@ -18283,8 +18283,8 @@ window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261101-workhours-bleed-fix-v3&menu=20261112-clean-v1">
 <script src="../assets/port79-management-workspace.js?v=20261115-shared-user-activity-v3&sidebar=20261118-overtime-label-v1"></script>
 <!-- User-approved work-hours dashboard: private to this page; original controller stays intact. -->
-<link rel="stylesheet" href="../assets/port79-workhours-reference-dashboard.css?v=20261123-reference-home-tabs-v3">
-<script defer src="../assets/port79-workhours-reference-dashboard.js?v=20261123-reference-home-tabs-v3&reuse=20261117-local-first-v3&refresh=20261118-stable-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1&query=20261125-official-retry-v1&overviewLocal=20261125-v1"></script>
+<link rel="stylesheet" href="../assets/port79-workhours-reference-dashboard.css?v=20261123-reference-home-tabs-v3&listFilters=20261126-v1">
+<script defer src="../assets/port79-workhours-reference-dashboard.js?v=20261123-reference-home-tabs-v3&reuse=20261117-local-first-v3&refresh=20261118-stable-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1&query=20261125-official-retry-v1&overviewLocal=20261125-v1&listFilters=20261126-v1"></script>
 <script>window.Port79OrgContext.configure({system:'workhours',container:()=>document.getElementById('viewAdmin'),people:()=>employees,render:()=>{if(typeof p79RenderOnlyVisibleAttendanceView==='function')p79RenderOnlyVisibleAttendanceView();}});</script>
 <script>window.p79WorkhoursRosterForVisibility=()=>typeof employees==='undefined'||!Array.isArray(employees)?[]:employees;</script>
 <!-- PORT79 approved overtime workspace: visual-only tabs; original records and handlers retained. -->

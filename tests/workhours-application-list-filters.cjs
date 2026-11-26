@@ -1,0 +1,15 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const src=fs.readFileSync('assets/port79-workhours-reference-dashboard.js','utf8');
+const html=fs.readFileSync('assets/port79-workhours-reference-dashboard.html','utf8');
+new vm.Script(src);
+const start=src.indexOf(' function listCategory('),end=src.indexOf(' function listFilters(',start);
+assert(start>=0&&end>start);const ctx={};vm.createContext(ctx);vm.runInContext(src.slice(start,end),ctx);
+const rows=[{id:1,unit:'A',job:'ARMG',name:'王甲',category:'休',status:'review'},{id:2,unit:'B',job:'FL',name:'李乙',category:'延',status:'applied'},{id:3,unit:'A',job:'FL',name:'王丙',category:'國',status:'approved'}];
+const f={unit:'ALL',job:'ALL',name:'',type:'ALL'};
+const ids=opts=>Array.from(ctx.filterApplications(rows,{...f,...opts}),r=>r.id);
+assert.deepEqual(ids({}),[1,2,3]);assert.deepEqual(ids({unit:'A',job:'FL'}),[3]);assert.deepEqual(ids({name:'王'}),[1,3]);assert.deepEqual(ids({type:'休息日加班'}),[1]);assert.deepEqual(ids({unit:'B',name:'王'}),[]);
+const markup=html.slice(html.indexOf('class="pr-list-filters"'),html.indexOf('class="pr-table-scroll"'));
+for(const k of ['prListUnit','prListJob','prListName','prListType','prListReset'])assert(markup.includes('id="'+k+'"'));
+assert(!markup.includes('type="date"'));assert(src.includes("const selected=filtered.filter"));assert(src.includes('filtered.filter(r=>key'));assert(src.includes('state.page=1;drawTable(state.all)'));assert(src.includes('applicationMetrics(data.reports)'));
+console.log('PASS list-only filters, combined matching, reset and filtered status counts; no date filter or cloud mutation');
