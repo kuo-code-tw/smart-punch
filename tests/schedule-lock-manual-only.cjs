@@ -35,6 +35,7 @@ const ctx={
  scheduleEditLockRefreshBusy:false,scheduleManualLockBusy:false,scheduleLockRequestEpoch:0,
  scheduleLockLastError:'',scheduleLockFailureCount:0,scheduleLockFirstFailureAt:0,
  canManageSchedule:()=>true,
+ p79ScheduleHasOfficialData:()=>true,
  scheduleLockGet:async()=>{calls.push('GET');return{...server};},
  scheduleLockPost:async action=>{calls.push(action);
    if(action==='scheduleAcquireEditLock'){server.locked=true;server.mine=true;}

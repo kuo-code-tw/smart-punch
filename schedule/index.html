@@ -2591,7 +2591,10 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
         scheduleLockLastError='';scheduleLockFailureCount=0;scheduleLockFirstFailureAt=0;
         scheduleManualEditIntent=!!(data?.mine||data?.acquired);
         setScheduleEditLockState(data);
-        if (scheduleEditLockState.mine) return true;
+        if (scheduleEditLockState.mine) {
+          if(!p79ScheduleHasOfficialData())void loadScheduleCloudWithRetry('manual',2).then(()=>applyScheduleAccessUi()).catch(error=>console.warn('取得編輯權後班表讀取未完成',error));
+          return true;
+        }
 
         updateScheduleLockBadge();
         return false;
@@ -4071,7 +4074,7 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
           if(el.dataset.p79LeaveLocked==='1'){el.disabled=true;el.title='請先在請假管理完成連動刪除，再修改班別';return;}
         const personnelChange=!code.includes('updateDailyShift');
         el.disabled = personnelChange?(!manage||lockedByOther||!p79ScheduleHasOfficialData()):!editable;
-          el.title = el.disabled?disabledTitle:personnelChange?'調任時自動取得編輯權，保留既有班表':'';
+          el.title = el.disabled?disabledTitle:personnelChange?'調任時自動取得編輯權，保留既有班表':(el.dataset.p79RosterEditTitle||'');
         }
       });
 
@@ -4638,11 +4641,11 @@ function p79EmployeeDateEligible(emp,date) {
       }
       try {
         const token = requestToken;
-        // V10.16：雲端整包讀取最多等 10 秒，避免 GAS 冷啟動或網路異常時
-        // port79ScheduleAutoSyncBusy 永久卡住；失敗交由背景重試，不阻擋進頁。
+        // Match the attendance roster reader's 25s deadline. A valid slow
+        // official response must not leave an authorized editor read-only.
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
         p79ScheduleCloudReadController=controller;
-        const timer = controller ? setTimeout(() => controller.abort(), 10000) : null;
+        const timer = controller ? setTimeout(() => controller.abort(), 25000) : null;
         let data;
         try {
           const res = await fetch(
@@ -4744,6 +4747,8 @@ function p79EmployeeDateEligible(emp,date) {
           p79ScheduleGroupHistoryUnverifiedMonth='';
         }
         p79ConfirmScheduleSource(data,requestMonth,requestStartedAt,requestViewer,token);
+        // Re-enable authorized controls as soon as the official receipt arrives.
+        applyScheduleAccessUi();
         // The cloud receipt and its formal overtime metadata are now trusted.
         // Refresh the left monthly counts IMMEDIATELY; attendance recheck may
         // be delayed or fail and must not strand the counters at cached 3/2.
@@ -6904,6 +6909,9 @@ async function p79SaveScheduleOvertimeDraft(draft){
             approvedLeaveCode,specialNoPunch,shownShift,visibleSubstituteLabel,
             visibleRestKind,verifiedRestAttendance,shortWorkMinutes,attendanceRosterConflict,shiftSource,nightSplitLabel,unworkedOvertime,oldNationalLabel,earlyExtensionWithRegularShift}=selected;
           const showMainShiftSelection=!visibleSubstituteLabel||earlyExtensionWithRegularShift;
+          // Separate the read-only actual shift from saved roster choices.
+          const actualDisplayOption=showMainShiftSelection&&!!actualShift&&shownShift===actualShift&&rosterShift!==actualShift;
+          const selectRosterOption=showMainShiftSelection&&!actualDisplayOption;
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
@@ -6985,14 +6993,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
           cellsHtml += `
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-rest-date="${dayStr}" data-rest-visible="${visibleRestKind}" data-typhoon-count="${typhoonCounted?(typhoonWorked?'work':'off'):''}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
               <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
+                data-p79-roster-edit-title="${scheduleEscapeHtml(selected.visibleCode+'｜來源：'+shiftSource+'｜正式原排：'+rosterShift+(actualDisplayOption?'｜選擇實際班別可修正正式原排；考勤不變':''))}"
                 title="${scheduleEscapeHtml(selected.visibleCode+'｜來源：'+shiftSource+(attendanceRosterConflict?'｜原排'+rosterShift+'，實際'+actualShift:''))}"
                 class="clean-shift-select p79-shift-select ${visibleSubstituteLabel&&!earlyExtensionWithRegularShift ? 'p79-substitute-time'+(visibleSubstituteLabel.length>5?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
                 ${visibleSubstituteLabel&&!earlyExtensionWithRegularShift ? `<option value="__overtime__" selected>${scheduleEscapeHtml(visibleSubstituteLabel)}</option>` : ''}
-                ${showMainShiftSelection&&!['早','中','晚','休','例','國','離',...p79EditorLeaveKinds].includes(shownShift)?
-                  `<option value="__display__" selected>${scheduleEscapeHtml(shownShift)}</option>`:''}
-                <option value="早" ${showMainShiftSelection && shownShift==='早'?'selected':''}>早</option>
-                <option value="中" ${!visibleSubstituteLabel && shownShift==='中'?'selected':''}>中</option>
-                <option value="晚" ${!visibleSubstituteLabel && shownShift==='晚'?'selected':''}>晚</option>
+                ${actualDisplayOption?
+                  `<option value="__display__" selected disabled>${scheduleEscapeHtml(shownShift)}</option>`:
+                  showMainShiftSelection&&!['早','中','晚','休','例','國','離',...p79EditorLeaveKinds].includes(shownShift)?
+                  `<option value="__display__" selected disabled>${scheduleEscapeHtml(shownShift)}</option>`:''}
+                <option value="早" ${selectRosterOption && shownShift==='早'?'selected':''}>早</option>
+                <option value="中" ${selectRosterOption && shownShift==='中'?'selected':''}>中</option>
+                <option value="晚" ${selectRosterOption && shownShift==='晚'?'selected':''}>晚</option>
                 <option value="休" ${!visibleSubstituteLabel && shownShift==='休'?'selected':''}>休</option>
                 <option value="例" ${!visibleSubstituteLabel && shownShift==='例'?'selected':''}>例</option>
                 ${p79RestQuota(yearMonth).counts.國>0 ? `<option value="國" ${!visibleSubstituteLabel && shownShift==='國'?'selected':''}>國</option>` : ''}
@@ -7398,7 +7409,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
     }
     let p79OvertimeShiftEditBusy=false;
     async function updateDailyShift(empId,dayStr,val){
-      if(val==='__overtime__')return;
+      if(val==='__overtime__'||val==='__display__')return;
       // Validate before acquiring the edit lock or cancelling a formal report.
       if(val==='國'&&p79RestQuota(dayStr.slice(0,7)).counts.國===0){
         alert('此月份沒有國定假日額度，不能新增「國」。請依實際班別選擇「休」或「例」。');

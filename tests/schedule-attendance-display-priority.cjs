@@ -59,3 +59,11 @@ assert.equal(roster.E1['2026-10-30'],'中','preserve original saved middle shift
 assert(!html.includes("attendanceRosterConflict?'<span"),'do not put misleading 原排中 label inside the day cell');
 assert(html.includes("attendanceRosterConflict?'考勤與原排班不一致"),'retain conflict explanation in cell hover tooltip');
 console.log('PASS: verified 早/晚 shown; misleading 原排 label hidden; saved roster and protected leave intact');
+
+assert(html.includes('const actualDisplayOption=showMainShiftSelection&&!!actualShift&&shownShift===actualShift&&rosterShift!==actualShift;'));
+assert(html.includes('const selectRosterOption=showMainShiftSelection&&!actualDisplayOption;'));
+assert(html.includes('value="__display__" selected disabled'));
+assert(html.includes("if(val==='__overtime__'||val==='__display__')return;"));
+assert(html.includes('data-p79-roster-edit-title='));
+assert(html.includes('controller.abort(), 25000'));
+assert(html.includes("if(!p79ScheduleHasOfficialData())void loadScheduleCloudWithRetry('manual',2)"));
