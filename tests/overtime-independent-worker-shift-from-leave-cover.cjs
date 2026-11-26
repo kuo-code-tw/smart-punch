@@ -63,7 +63,7 @@ async function submit({officialShift='早',selected=valid}={}){
    normalStart:row[4],normalEnd:row[5],overtimeStart:row[6],overtimeEnd:row[7],position:row[8],typeName:row[9]}),
   validateLeaveLinkedOvertimeDate:()=>{},ruleAttendanceIssue:()=>null,
   reportPair:(cat,emp,forEmp)=>{throw Error('Independently filed period must not call reportPair');},
-  people:[{empId:'WORKER'}],approvedDates:[],
+  people:[{empId:'WORKER'}],approvedDates:[date],
   auth:()=>({url:'test'}),sessionStorage:{
     getItem:key=>storage.get(key)||null,
     setItem:(key,value)=>{storage.set(key,value);if(key==='independent-overtime')resultDraft=JSON.parse(value);},
@@ -109,11 +109,11 @@ async function submit({officialShift='早',selected=valid}={}){
  result=await submit({selected:other});
  assert.equal(result.writes,0,'24–04 is not an extension from an early shift');
  assert.match(result.status,/08-16/);
- assert(source.includes('const pair=independentFiling?{forEmpId:'),'automatic branch clears original leave person even though shown in the modal');
+ assert(source.includes("independentFiling?{forEmpId:'',forName:''}"),'automatic branch clears original leave person even though shown in the modal');
  assert(source.includes("leaveHandoffId:independentFiling?'':"),'no leave handoff in preflight for unrelated chosen period');
  assert(source.includes("leaveHandoffId:validationRequest.leaveHandoffId"),'draft cannot reattach prior leave');
  assert(source.includes('chosenMatchesLeaveSplit(chosen,expected)'),'system automatically separates original cover from chosen actual period');
- assert(leave.includes('if(previous?.id&&String(previous.id)!==String(draft.id))'),'host refuses overwriting another same-day report');
+ assert(leave.includes('if(previous?.id&&String(previous.id)!==String(draft.id)&&!orphanId)'),'host refuses overwriting another same-day report');
  assert(leave.includes('P79Overtime.ruleAttendanceIssue'),'host validates actual punches and selected time');
  new vm.Script(source);
  console.log('PASS independently file 08–16/16–20 overtime without false night-cover attribution; live roster and punch guards maintained');

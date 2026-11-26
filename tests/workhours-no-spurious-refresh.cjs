@@ -21,11 +21,11 @@ assert.equal(fpContext.fingerprint([rowA,rowB]),fpContext.fingerprint([rowB,rowA
 assert.notEqual(fpContext.fingerprint([rowA,rowB]),fpContext.fingerprint([rowA,{...rowB,timeStr:'2026-11-18 18:00'}]),
  'actual time changes must invalidate the signature');
 const monthState={revision:'rev-1',appliedCacheBundle:'v1',at:100,pending:false};
-const sigContext={
+const sigContext={recordFingerprint:fpContext.fingerprint,
  id:()=>({value:'2026-11-01'}),p79WorkOvertimeMonths:new Map([['2026-11',monthState]]),
  currentPort79SsoToken:()=> 'token',lastAttendanceCloudRevision:'rev-1',
  window:{sessionStorage:{getItem:()=>''},Port79JobTitleVisibility:{status:()=> 'ready',revision:()=>1}},
- rawCloud:{readAt:123, fingerprint:'same',error:''},JSON
+ localDisplay:{revision:0},rawCloud:{readAt:123, fingerprint:'same',error:''},JSON
 };
 vm.createContext(sigContext);vm.runInContext(sigSource+'\nthis.signature=autoSignature;',sigContext);
 const unchanged=sigContext.signature();
@@ -35,6 +35,9 @@ assert.equal(sigContext.signature(),unchanged,
 sigContext.rawCloud.fingerprint='new-verified-records';
 assert.notEqual(sigContext.signature(),unchanged,'changed verified records must repaint');
 sigContext.rawCloud.fingerprint='same';
+monthState.rows=[{empId:'A01',schedule:{'2026-11-01':'早'}}];
+assert.notEqual(sigContext.signature(),unchanged,'actual roster contents must repaint even when its revision is unchanged');
+monthState.rows=[];
 sigContext.window.Port79JobTitleVisibility.revision=()=>2;
 assert.notEqual(sigContext.signature(),unchanged,'a newly hidden job title must repaint');
 

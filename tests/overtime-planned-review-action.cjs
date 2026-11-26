@@ -11,7 +11,7 @@ const row={empId:'A-1',dateKey:'2026/10/28',rosterDate:'2026-10-28',reportVerifi
  clockOut:{timeStr:'2026/10/28 16:00:00',id:'OUT501'}};
 let permitted=true,issue='';
 const ctx={console,Date,Number,Math,String,Array,
- window:null,alerts,opened,
+ window:null,alerts,opened,p79PlannedBulkBusy:false,
  p79OvertimePlannedDisplayedRows:[row],
  p79CanReportOvertime:()=>permitted,
  normalizeScheduleDateKey:x=>String(x||'').replaceAll('/','-'),
@@ -25,7 +25,7 @@ const ctx={console,Date,Number,Math,String,Array,
  ]}
 };
 ctx.window=ctx;
-vm.createContext(ctx);
+vm.createContext(ctx);require('../scripts/test-page-functions.cjs').loadFunctions(ctx,html,['p79OvertimeCoverDateWarning']);
 vm.runInContext(fs.readFileSync('assets/port79-overtime-shift-match.js','utf8'),ctx);
 const helperStart=html.indexOf('function p79ResolvePlannedOvertimePeriod(');
 const helperEnd=html.indexOf('\n        }',helperStart);

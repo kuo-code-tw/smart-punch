@@ -11,8 +11,8 @@ assert(html.includes('id="p79OvertimePlannedBody"'),'planned section gets its ow
 assert(html.includes('id="p79OvertimePlannedCount"'),'planned count displayed independently');
 assert(html.includes('id="overtimeTableBody"'),'main confirmed overtime table remains');
 assert(html.includes('rows:confirmedPageRows, plannedRows:plannedPageRows'),'source splits confirmed and planned once');
-assert(html.includes('p79RenderOvertimePlannedRows(p79OvertimeCalculationCache?.plannedRows||[],month,dept,jobTitle,employeeId)'),'render planned section with filters, not source filter');
-assert(html.includes("const allOvertimeRows = buildOvertimeStatisticsRows().filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))"),'official rows stay unplanned');
+assert(html.includes('p79RenderOvertimePlannedRows(allOvertimeRows,month,dept,jobTitle,employeeId)'),'render planned section with filters, not source filter');
+assert(html.includes("const completedRows=rows.filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row))"),'official rows stay unplanned');
 const element={innerHTML:'',textContent:''},nodes={
  p79OvertimePlannedBody:{...element},p79OvertimePlannedCount:{...element},p79OvertimePlannedPagination:{...element}};
 const ctx={console,Number,String,Array,Set,Map,Math,Date,
@@ -25,7 +25,7 @@ const ctx={console,Number,String,Array,Set,Map,Math,Date,
  document:{getElementById:x=>nodes[x]||null},
  escapeHtml:s=>String(s??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])),
  p79OvertimePlannedPage:1};
-vm.createContext(ctx);
+vm.createContext(ctx);ctx.document.querySelectorAll=()=>[];ctx.window=ctx;Object.assign(ctx,{p79CanReportOvertime:()=>true,p79PlannedBulkBusy:false,p79PlannedBulkSelected:new Set(),p79OvertimePlannedFilteredRows:[],normalizeScheduleDateKey:v=>String(v||'').replaceAll('/','-'),p79OvertimeUnitForRow:r=>r.dept||''});require('../scripts/test-page-functions.cjs').loadFunctions(ctx,html,['getAttendanceTimestamp','p79DirectAttendanceTimestamp','p79OvertimeAttendanceIssue','p79OvertimeCoverDateWarning','p79PlannedBulkKey','p79PlannedBulkCandidate','p79CanManuallyReviewPlannedRow','p79RefreshPlannedBulkControls']);
 for(const name of ['p79WorkOvertimeIsUnconfirmedPlan','p79OvertimePlannedVisibleRows','p79OvertimePendingReason','p79OvertimePendingPunchCell','p79RenderOvertimePlannedRows'])vm.runInContext(extract(name),ctx);
 const report={id:'P123',planned:true,code:'休24-08',declaredHours:8};
 const planned={empId:'A',name:'測試甲',dateKey:'2026-10-28',monthKey:'2026-10',dept:'第一事業處',jobTitle:'ARMG',overtimeReport:report,planned:true,reportVerified:true};

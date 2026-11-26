@@ -45,7 +45,7 @@ const variants=[['休10-18',t(date,9,49),t(date,17,49)],
 for(const [code,start,end]of variants)assert.equal(resolve({start,end}).code,code,'all configured periods, not only three shift slots: '+code);
 const originalAll=JSON.stringify(reports);
 for(const category of ['休','國']){
- const old={...previous,category,code:category+'16-24'};
+ const old={...previous,category,typeName:category==='國'?'國定假日加班':'休息日加班',code:category+'16-24'};
  const variant=api.resolve({date,rules:reports,report:old,roster:rosters.early,
   start:t(date,7,42),end:t(date,15,51)});
  assert.equal(variant.code,category+'08-16','preserve the existing legal category: '+category);
@@ -75,7 +75,7 @@ const addedRules=[
  ['例','例10-18',8,8,'','','10','18','full'],
  ['休','自訂18-02',8,12.7,'','','18','02','full','特殊班休息日加班']
 ];
-const custom={...previous,category:'例',code:'例16-24'};
+const custom={...previous,category:'例',typeName:'例假加班',code:'例16-24'};
 assert.equal(api.resolve({date,rules:[...reports,...addedRules],roster:rosters.rest,report:custom,
  start:t(date,9,48),end:t(date,17,49)}).code,'例10-18');
 const unusual={...previous,category:'休',typeName:'特殊班休息日加班',code:'自訂16-24'};

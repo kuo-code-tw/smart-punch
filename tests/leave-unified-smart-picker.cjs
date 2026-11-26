@@ -26,8 +26,8 @@ assert.deepEqual(Array.from(picker.recommend(params,'two')).sort(),['REST','REST
 assert.deepEqual(Array.from(picker.recommend({...params,rosters:null},'one')),[],'no blind recommendation without official roster');
 assert.equal(picker.candidates({...params,covers,excludeLeaveId:'another-leave'}).find(x=>x.id==='COVER').disabled,false,'same leave replacement scope does not self-conflict');
 assert.equal(picker.isRest('排休'),true);assert.equal(picker.isRest('早班'),false);
-assert.match(picker.period(people[0],date,rosters,'two',0),/08:00/);
-assert.match(picker.period(people[0],date,rosters,'two',1),/12:00/);
+assert.match(picker.period(people[0],date,rosters,'two',0),/16:00/);
+assert.match(picker.period(people[0],date,rosters,'two',1),/20:00/);
 let html=picker.render({...params,selected:['REST','REST2'],mode:'two',scope:'new'});
 assert.match(html,/data-smart-action="pick"/);
 assert.match(html,/data-smart-action="recommend"/);

@@ -11,9 +11,9 @@ const c={document:{getElementById:el,addEventListener(){}},console,Map,Set,Date,
  sessionStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
  p79UpdateLeaveHandoffBanner:()=>{},p79LaunchLeaveOvertimeAfterSave:()=>{redirects++;},p79ReadCurrentLeaveCoverState:async()=>{reads++;return fresh;},
  p79PlanLeaveCoverRequest:(records,covers,r)=>({leaveId:r.id,existing:records.some(x=>x.id===r.id),covered:covers.some(x=>x.leaveId===r.id)}),
- postCloud:async request=>{posts++;if(request.action==='saveLeaveCoverAssignment'&&request.leaveId==='L2'&&fail)throw Error('second day offline');return {ok:true};},
+ postCloud:async request=>{posts++;if(request.action==='saveLeaveCoverAssignment'&&request.leaveId==='L2'&&fail)throw Error('second day offline');return {ok:true,...(request.action==='saveLeaveCoverAssignment'?{dailyAssignmentsSaved:true}:{})};},
  setStatus(){},loadCloud:async()=>true,alert(){throw Error('permission denied');}};
-c.window=c;vm.createContext(c);
+c.window=c;vm.createContext(c);require('../scripts/test-page-functions.cjs').loadFunctions(c,page,['normalizeLeaveFilterDate']);
 const start=page.indexOf('const P79_HANDOFF_KEY='),end=page.indexOf('function p79LeaveHandoffEntryState',start);
 vm.runInContext(page.slice(start,end),c);vm.runInContext(source,c);
 for(const [i,date] of dates.entries())c.seedDaily(date,{id:'L'+(i+1),applicant:i===1?'LEAVER2':'LEAVER',applicantOverride:i===1,first:'WORKER',second:''});
