@@ -2246,7 +2246,8 @@ async function p79SaveWorkOvertimeDraft(draft){
  if(!planned&&['休','國'].includes(draft.rule.category)){const cutoff=P79Overtime.interval(draft.date,draft.rule.overtimeStart,draft.rule.overtimeEnd)[1]-15*60000;if(pairs[0].end<cutoff)throw Error('國定假日／休息日加班須於所選時段結束前15分鐘起簽退（例如08–16須15:45起），尚未符合申報條件');}
  const previous=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
  const roster=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule||{},dayMeta=roster.__meta?.[draft.date]||{},normal=dayMeta.reportOriginalShift??dayMeta.overtimeOriginalShift??roster[draft.date];
- if(previous?.id&&String(previous.id)!==String(draft.id))throw Error('此人當日已有申報或預排，請開啟原紀錄處理，避免覆蓋。');
+ const orphanId=cloud.capabilities?.deletedLeaveOrphanPlanV1===true&&!draft.preventReplace&&previous?.planned===true&&previous?.id&&String(previous.id)!==String(draft.id)&&String(cloud.orphanPlannedReportId||'')===String(previous.id)?String(previous.id):'';
+ if(previous?.id&&String(previous.id)!==String(draft.id)&&!orphanId)throw Error('此人當日已有申報或預排，請開啟原紀錄處理，避免覆蓋。');
  if(draft.preventReplace&&String(previous?.id||'')!==String(draft.id))throw Error('原申報已變更或不存在，請重新讀取核對。');
  if(!planned){
   const rule=[draft.rule.category,draft.rule.code,draft.rule.declaredHours,draft.rule.convertedHours??'',draft.rule.normalStart||'',draft.rule.normalEnd||'',draft.rule.overtimeStart,draft.rule.overtimeEnd,draft.rule.position||'full',draft.rule.typeName||''];
@@ -2258,7 +2259,7 @@ async function p79SaveWorkOvertimeDraft(draft){
   date:draft.date,workDate:draft.date,overtimeDate,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,
   forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',coverDate:draft.coverDate||draft.date,
    coverPeriodMode:draft.coverPeriodMode||'',
-  expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,
+  expectedRevision:cloud.revision,replaceReportId:orphanId?'':previous?.id||'',orphanPlannedReportId:orphanId,planned,
   attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
  try{
