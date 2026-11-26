@@ -125,7 +125,7 @@ function installWorkhoursAttendanceBridge(){
    },250);
   };
   g.addEventListener('storage',event=>{
-   if(event.key==='sp_records_v5')refresh();
+   if(event.key==='sp_records_v5'||event.key==='port79_attendance_sync_notice_v1')refresh();
    if(event.key==='sp_cloud_outbox_v1'&&!hasPendingAttendanceWrites())refresh();
   });
   g.addEventListener('focus',refresh);

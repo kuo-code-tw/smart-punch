@@ -8,6 +8,8 @@ assert(html.includes("const build=window.P79AttendanceV6?.buildShifts||buildDail
 assert(html.includes('let dailyRows = p79WorkhoursListAttendanceShifts(filtered);'),'main work-hours attendance table uses shared pairing');
 assert(html.includes('let rows = p79WorkhoursListAttendanceShifts(records.filter(canCurrentAdminViewDataRow));'),'work-hours filter options use shared pairing');
 assert(html.includes('dailyRows = p79WorkhoursFilterAttendanceRows(dailyRows,statusFilter);'),'visible status and table use one classifier');
+assert(html.includes('attendanceSessions=(window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows)(sourceRecords);'),'main overtime ledger uses the same V6 pairing as attendance');
+assert(html.includes('const sessions=(window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows)(attendanceRows).map(row=>{'),'official no-punch evidence also uses V6');
 assert(html.includes('<option value="PENDING">待確認</option>'));
 const names=['ABNORMAL','PENDING','NORMAL'];
 for(const name of names)assert(main.includes('<option value="'+name+'">')&&html.includes('<option value="'+name+'">'),'both interfaces offer '+name);
