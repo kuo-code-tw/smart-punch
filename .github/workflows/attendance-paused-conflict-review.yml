@@ -39,3 +39,5 @@ jobs:
           node tests/attendance-paused-batch-decision.cjs
           node tests/attendance-inspector-live-audit.cjs
           node tests/attendance-last-two-duplicate-resolution.cjs
+          node tests/attendance-identical-edit-v1.cjs
+          node tests/attendance-held-recovery.cjs

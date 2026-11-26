@@ -9,7 +9,10 @@ function apply(source,helper=fs.readFileSync(path.join(__dirname,'../backend/att
  const old="      case 'editRecord':\n      case 'updateRecord':\n        return jsonOutput(editRecord_(ss, data));";
  if(router.split(old).length!==2||!router.includes('LockService.getScriptLock()'))throw Error('router or lock changed; inspect current deployment before applying');
  const next=router.replace(old,"      case 'p79RepairIdenticalAttendanceEditV1':\n        return jsonOutput(p79RepairIdenticalAttendanceEditV1_(ss, data));\n"+old);
- return source.slice(0,start)+next+source.slice(end)+'\n'+helper+'\n';
+ const ping="        scheduleSaveReceiptVersion: 1,";
+ if(next.split(ping).length!==2)throw Error('pingPost capability anchor changed; inspect deployed source');
+ const advertised=next.replace(ping,ping+"\n        attendanceIdenticalEditVersion: 1,");
+ return source.slice(0,start)+advertised+source.slice(end)+'\n'+helper+'\n';
 }
 module.exports={apply};
 if(require.main===module){const [input,output]=process.argv.slice(2);if(!input||!output||input===output)throw Error('Provide separate current GAS input and patched output');fs.writeFileSync(output,apply(fs.readFileSync(input,'utf8')));}
