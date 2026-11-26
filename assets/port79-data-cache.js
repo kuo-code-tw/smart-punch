@@ -1349,12 +1349,14 @@ function startBrowserBackgroundDownload(action,system){
  if(prior?.viewer===viewerKey()&&['downloading','starting'].includes(prior.phase)&&
    Date.now()-Number(prior.updatedAt||0)<90000){
   setProgress('背景下載仍在進行：'+String(prior.detail||'').slice(0,110)+'。請查看右下角進度並保留背景下載分頁。');
+  if(action==='resume')window.alert?.('背景資料下載已在進行中，不會重複啟動。');
   return true;
  }
  const loader=document.querySelector('script[src*="port79-data-cache.js"]');
  if(!loader?.src)return false;
  const url=new URL('port79-browser-background.html',loader.src);
- url.searchParams.set('mode',action);
+ url.searchParams.set('mode',action==='resume'?'all':action);
+ if(action==='resume')url.searchParams.set('resume','1');
  if(action==='current')url.searchParams.set('system',system);
  // The direct user click must synchronously open the tab or popup blockers win.
  // Each run uses a new browsing context so it cannot reuse another login's
@@ -1362,16 +1364,25 @@ function startBrowserBackgroundDownload(action,system){
  const tab=window.open(url.href,'_blank');
  if(!tab){
   setProgress('瀏覽器封鎖了背景下載分頁。請允許此網站開啟彈出式視窗後再按一次下載。');
+  if(action==='resume')window.alert?.('瀏覽器封鎖背景下載分頁，請允許彈出式視窗後再試。');
   return true;
  }
  try{tab.opener=null}catch(_){}
  try{const now=Date.now();localStorage.setItem(key,JSON.stringify({
   phase:'starting',viewer:viewerKey(),startedAt:now,updatedAt:now,
-  completed:0,total:action==='all'?6:action==='current'?1:0,
+  completed:0,total:['all','resume'].includes(action)?6:action==='current'?1:0,
   detail:'已開啟獨立下載分頁，正在確認權限。'
  }))}catch(_){}
  setProgress('下載已交給背景分頁；可關閉此視窗、切換排班或考勤。請保持背景下載分頁開啟，右下角會顯示目前進度。');
  return true;
+}
+function startBackgroundDownload(){
+ let session=null;try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')}catch(_){}
+ const role=String(session?.adminRole||session?.role||'').toLowerCase();
+ if(!session||session.punchOnly===true||!['admin','superadmin'].includes(role)||!token()||window.__port79CachedSessionRefreshPending===true){window.alert?.('請完成管理登入及權限核對後再下載。');return false;}
+ if(window.navigator?.onLine===false){window.alert?.('目前離線，已下載的本機資料保持不變。');return false;}
+ if(window.chrome?.webview?.postMessage){window.chrome.webview.postMessage(JSON.stringify({kind:'port79-cache-command-v1',action:'download-resume'}));return true;}
+ return startBrowserBackgroundDownload('resume',currentSystem());
 }
 function ensureModal(){
  ensureStyle();let b=document.getElementById('p79CacheBackdrop');if(b)return b;
@@ -1525,13 +1536,13 @@ if(typeof window.addEventListener==='function'){
  window.__port79NativeCloudSyncReady=true;
 }
 
-window.Port79DataCache={preloadCurrent,getDisplaySnapshot,getAttendanceStartupPreview,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
+window.Port79DataCache={preloadCurrent,startBackgroundDownload,getDisplaySnapshot,getAttendanceStartupPreview,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 if(!window.__p79BrowserBackgroundWorker&&!window.chrome?.webview?.postMessage&&typeof document!=='undefined'&&document?.head?.appendChild&&document?.createElement){
  // Shared by every management page without changing its own navigation flow.
  const src=document.querySelector?.('script[src*="port79-data-cache.js"]')?.src;
  if(src){
   const tag=document.createElement('script');
-  tag.src=new URL('port79-browser-download-status.js?v=20261125-history-on-demand-v2',src).href;
+  tag.src=new URL('port79-browser-download-status.js?v=20261125-history-on-demand-v2&manualBg=20261126-v1',src).href;
   tag.defer=true;
   document.head.appendChild(tag);
  }

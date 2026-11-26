@@ -5,6 +5,7 @@
  'use strict';
  const d=document,win=window;
  const button=d.getElementById('p79HomeDatabaseDownload');
+ const background=d.getElementById('p79HomeBackgroundDownload');
  const bar=d.getElementById('sessionBar');
  const systems=d.getElementById('systems');
  if(!button||!bar||!systems)return;
@@ -23,6 +24,7 @@
   // That setting hides only #p79WindowsDownloadLink.
   button.hidden=!permitted();
   button.disabled=button.hidden;
+  if(background){background.hidden=button.hidden;background.disabled=button.hidden;}
  }
  function openDatabase(){
   if(!permitted()){update();return;}
@@ -63,6 +65,11 @@
   }
  }
  button.addEventListener('click',openDatabase);
+ background?.addEventListener('click',()=>{
+  if(!permitted()){update();return;}
+  if(typeof win.Port79DataCache?.startBackgroundDownload!=='function'){win.alert?.('背景下載功能尚未載入，請重新整理網頁。');return;}
+  win.Port79DataCache.startBackgroundDownload();
+ });
  const observer=new MutationObserver(update);
  observer.observe(bar,{attributes:true,attributeFilter:['class']});
  observer.observe(systems,{attributes:true,attributeFilter:['class']});

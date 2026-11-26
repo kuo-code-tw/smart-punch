@@ -46,12 +46,14 @@
   // Reparent existing controls; do not clone, rebind or replace their handlers.
   const download=d.getElementById('p79WindowsDownloadLink');
   const database=d.getElementById('p79HomeDatabaseDownload');
+  const background=d.getElementById('p79HomeBackgroundDownload');
   const menu=d.getElementById('p79HomeFunctionMenu');
   const theme=toolbar.querySelector('.p79-toolbar-theme')||compact.querySelector('.p79-toolbar-theme');
   if(download&&download.parentNode!==compact)compact.append(download);
   // Independent browser database entry stays beside Windows even when the
   // superadmin has disabled the Windows ZIP button.
   if(database&&database.parentNode!==compact)compact.append(database);
+  if(background&&background.parentNode!==compact)compact.append(background);
   if(menu&&menu.parentNode!==compact)compact.append(menu);
   if(theme&&theme.parentNode!==compact)compact.append(theme);
   return compact;

@@ -73,6 +73,7 @@
  html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79WindowsDownloadLink:hover{
   background:#0769bb!important;
  }
+ html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79HomeBackgroundDownload:not([hidden]),
  html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79HomeDatabaseDownload:not([hidden]){
   display:inline-flex!important;align-items:center!important;justify-content:center!important;
   min-height:35px!important;height:35px!important;flex:0 0 auto!important;
@@ -82,9 +83,11 @@
   font-size:12px!important;font-weight:800!important;line-height:1!important;
   white-space:nowrap!important;cursor:pointer!important;
  }
+ html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79HomeBackgroundDownload:hover,
  html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79HomeDatabaseDownload:hover{
   background:#07665c!important;
  }
+ html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79HomeBackgroundDownload[hidden],
  html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79HomeDatabaseDownload[hidden]{
   display:none!important;
  }
@@ -129,6 +132,7 @@
   html body.p79-workspace:has(#systems.show) #p79HomeCompactActions{width:100%;justify-content:flex-end!important;gap:5px!important}
   html body.p79-workspace:has(#systems.show) #p79HomeDownloadProgress{flex-basis:112px;min-width:112px}
   html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79WindowsDownloadLink:not([hidden]){padding:6px 8px!important;font-size:11px!important}
+  html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79HomeBackgroundDownload:not([hidden]),
   html body.p79-workspace:has(#systems.show) #p79HomeCompactActions #p79HomeDatabaseDownload:not([hidden]){padding:6px 8px!important;font-size:11px!important}
  }
 }

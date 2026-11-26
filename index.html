@@ -199,7 +199,7 @@ html.dark #port79CalendarModeBox,html[data-theme="dark"] #port79CalendarModeBox{
 
 <!-- PORT79 v2026.09.29.10.19 MOBILE-ADMIN-LOGIN-WARM-CACHE -->
 
-<script src="./assets/port79-data-cache.js?v=20261123-quick-preload-shared-v1&bg=20261123-progress-v1&startup=20261125-history-on-demand-v3&workhours=20261125-prewarm-v1"></script>
+<script src="./assets/port79-data-cache.js?v=20261123-quick-preload-shared-v1&bg=20261123-progress-v1&startup=20261125-history-on-demand-v3&workhours=20261125-prewarm-v1&manualBg=20261126-v1"></script>
 <script src="./assets/port79-workhours-cache.js?v=20261125-workhours-prewarm-v1"></script>
 <script src="./assets/port79-browser-auto-start.js?v=20261125-history-on-demand-v2&workhours=20261125-prewarm-v1"></script>
 <script src="./assets/port79-ui-trim.js"></script>
@@ -406,6 +406,7 @@ html[data-theme="dark"] .p79-yard-count-line>span{color:#18314e}
       <div class="p79-windows-download-slot">
         <a id="p79WindowsDownloadLink" class="p79-windows-download-link" target="_blank" rel="noopener noreferrer" hidden aria-label="79號碼頭電腦版下載（完整程式 ZIP）" title="下載最新79號碼頭電腦版，更新檔包含版本編號及 SHA-256 校驗">⬇ 電腦版下載</a>
         <button id="p79HomeDatabaseDownload" class="p79-home-db-download" type="button" hidden aria-label="下載資料庫並選擇儲存位置" title="開啟79號碼頭雲端資料庫，選擇電腦資料夾並下載有權限的快取">⬇ 下載資料庫</button>
+        <button id="p79HomeBackgroundDownload" class="p79-home-db-download" type="button" hidden title="手動啟動背景下載；優先沿用本機資料，補抓未完成項目">☁ 背景資料下載</button>
         <button id="logoutBtn" class="logout" type="button">登出</button>
       </div>
     </div>
@@ -2370,6 +2371,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 .p79-home-db-download[hidden]{display:none!important}
 .p79-home-db-guide{margin:10px 0 4px;padding:12px 14px;border:1px solid #83c9bf;border-radius:12px;background:#ecfaf7;color:#174d46;line-height:1.7;font-size:13px;font-weight:650}
 .dark .p79-home-db-guide{background:#103b36;color:#ddfff8;border-color:#296b61}
+html body.p79-workspace #p79WorkspaceTopbar #p79HomeBackgroundDownload:not([hidden]),
 html body.p79-workspace #p79WorkspaceTopbar #p79HomeDatabaseDownload:not([hidden]){display:inline-flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto;min-height:37px;padding:7px 10px;margin-right:7px;box-sizing:border-box;background:#087d70!important;color:#fff!important;font-size:12px!important;line-height:1.2!important;border-radius:10px!important;white-space:nowrap!important;z-index:2}
 html body.p79-workspace #p79WorkspaceTopbar #p79WindowsDownloadLink:not([hidden]){display:inline-flex!important;align-items:center!important;flex:0 0 auto;min-height:37px;padding:7px 10px;margin-right:7px;max-width:250px;box-sizing:border-box;background:#0d81ce!important;color:#fff!important;font-size:12px!important;line-height:1.2!important;border-radius:10px!important;white-space:nowrap;z-index:2}
 html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar .p79-toolbar-tools>#p79WindowsDownloadLink:not([hidden]){display:inline-flex!important}
@@ -2378,9 +2380,9 @@ html.p79-admin-phone-two-panels body.p79-workspace #p79WorkspaceTopbar .p79-tool
 </style>
 <script defer src="./assets/port79-login-version-check.js?v=20261122-naming-v2&webUpdate=20261126-v2"></script>
 <!-- Compact homepage top controls: visual layout only, original download/login handlers preserved. -->
-<link rel="stylesheet" href="./assets/port79-home-compact-controls.css?v=20261123-db-download-v2">
-<script defer src="./assets/port79-home-compact-controls.js?v=20261123-db-download-v2"></script>
+<link rel="stylesheet" href="./assets/port79-home-compact-controls.css?v=20261123-db-download-v2&manualBg=20261126-v1">
+<script defer src="./assets/port79-home-compact-controls.js?v=20261123-db-download-v2&manualBg=20261126-v1"></script>
 <script defer src="./assets/port79-windows-download.js?v=20261123-superadmin-cloud-v2&visible=20261123"></script>
-<script defer src="./assets/port79-home-database-download.js?v=20261123-db-folder-v1&manager=20261123"></script>
+<script defer src="./assets/port79-home-database-download.js?v=20261123-db-folder-v1&manager=20261123&manualBg=20261126-v1"></script>
 </body>
 </html>

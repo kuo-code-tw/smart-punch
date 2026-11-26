@@ -39,6 +39,8 @@ function launch(){
  store.set('p79BrowserCacheProgressV1',JSON.stringify({viewer:'QA@admin',phase:'downloading',updatedAt:Date.now(),detail:'考勤 3/10 月'}));
  context.startBrowserBackgroundDownload('all','attendance');
  assert.equal(opens.length,1,'An active job cannot be replaced by a second download');
+ store.clear();context.startBrowserBackgroundDownload('resume','attendance');assert.equal(opens.length,2);assert.equal(new URL(opens[1].url).searchParams.get('resume'),'1');
+ assert.match(ui,/data-p79-retry/);assert.match(home,/id="p79HomeBackgroundDownload"/);
 }
 
 async function executeWorker({role='admin',mode='all',session=true}={}){

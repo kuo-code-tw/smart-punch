@@ -19,10 +19,11 @@
   (document.head||document.body).appendChild(style);
   panel=document.createElement('aside');panel.id='p79BrowserBgProgress';panel.hidden=true;
   panel.setAttribute('role','status');
-  panel.innerHTML='<div class="p79-head" data-p79-title>☁ 背景資料下載</div><div><span data-p79-count>0/6</span> <progress data-p79-bar max="1" value="0"></progress></div><div data-p79-systems></div><div data-p79-month hidden><span data-p79-month-count></span><progress data-p79-month-bar max="1" value="0"></progress></div><div data-p79-summary></div><button type="button" data-p79-toggle aria-expanded="false">查看下載明細</button><div class="p79-detail" data-p79-detail hidden></div><button type="button" data-p79-dismiss hidden>關閉完成通知</button>';
+  panel.innerHTML='<div class="p79-head" data-p79-title>☁ 背景資料下載</div><div><span data-p79-count>0/6</span> <progress data-p79-bar max="1" value="0"></progress></div><div data-p79-systems></div><div data-p79-month hidden><span data-p79-month-count></span><progress data-p79-month-bar max="1" value="0"></progress></div><div data-p79-summary></div><button type="button" data-p79-toggle aria-expanded="false">查看下載明細</button><div class="p79-detail" data-p79-detail hidden></div><button type="button" data-p79-retry hidden>補抓未完成資料</button><button type="button" data-p79-dismiss hidden>關閉完成通知</button>';
   document.body.appendChild(panel);
   const detail=panel.querySelector('[data-p79-detail]'),toggle=panel.querySelector('[data-p79-toggle]');
   toggle.addEventListener('click',()=>{detail.hidden=!detail.hidden;toggle.textContent=detail.hidden?'查看下載明細':'收合下載明細';toggle.setAttribute('aria-expanded',String(!detail.hidden))});
+  panel.querySelector('[data-p79-retry]').addEventListener('click',()=>window.Port79DataCache?.startBackgroundDownload?.());
   panel.querySelector('[data-p79-dismiss]').addEventListener('click',()=>{lastDismissed=Date.now();panel.hidden=true});
  }
  function update(record){
@@ -52,6 +53,7 @@
   panel.querySelector('[data-p79-month-bar]').value=record.monthTotal?Math.min(1,(record.monthCompleted||0)/record.monthTotal):0;
   panel.querySelector('[data-p79-detail]').textContent=String(record.detail||'');
   panel.querySelector('[data-p79-dismiss]').hidden=active;
+  panel.querySelector('[data-p79-retry]').hidden=active||!['partial','failed','interrupted'].includes(record.phase);
   panel.hidden=false;
  }
  function start(){

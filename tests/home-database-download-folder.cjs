@@ -29,8 +29,9 @@ function fixture({role='admin',loggedIn=true,punchOnly=false,folder=true}={}){
   prepend(node){this.added.push({node});records.set(node.id,node);}
  };
  const button={hidden:true,disabled:false,listeners:new Map(),addEventListener(name,cb){this.listeners.set(name,cb);}};
+ const background={hidden:true,disabled:false,listeners:new Map(),addEventListener(name,cb){this.listeners.set(name,cb);}};
  const nodes={
-  p79HomeDatabaseDownload:button,sessionBar:bar,systems,
+  p79HomeBackgroundDownload:background,p79HomeDatabaseDownload:button,sessionBar:bar,systems,
   p79CacheModal:dialog
  };
  const session=new Map();
@@ -46,6 +47,7 @@ function fixture({role='admin',loggedIn=true,punchOnly=false,folder=true}={}){
  };
  const window={
   Port79DataCache:{
+   startBackgroundDownload(){calls.downloads++;},
    openCenter(){calls.opens++;return Promise.resolve()},
    connectFolder(){calls.folder++},
    downloadAll(){calls.downloads++}
@@ -56,7 +58,7 @@ function fixture({role='admin',loggedIn=true,punchOnly=false,folder=true}={}){
  if(folder)window.showDirectoryPicker=()=>null;
  class MutationObserver{constructor(cb){this.cb=cb;observers.push(this);}observe(){}disconnect(){}}
  vm.runInNewContext(source,{document,window,sessionStorage,MutationObserver,JSON,String,Promise,Error}, {filename:'assets/port79-home-database-download.js'});
- return {document,window,sessionStorage,button,calls,controls,records,observers,events,alerts,picker,persist};
+ return {document,window,sessionStorage,button,background,calls,controls,records,observers,events,alerts,picker,persist};
 }
 
 (async()=>{
@@ -67,6 +69,7 @@ function fixture({role='admin',loggedIn=true,punchOnly=false,folder=true}={}){
  assert.equal(admin.calls.opens,1);
  assert.equal(admin.calls.folder,0,'Opening modal must NOT implicitly choose a folder');
  assert.equal(admin.calls.downloads,0,'Opening modal must NOT download the entire database');
+ assert.equal(admin.background.hidden,false);admin.background.listeners.get('click')();assert.equal(admin.calls.downloads,1,'Only explicit background button starts download');
  assert(admin.picker.focused,'Folder selection should be the first highlighted action');
  assert.match(admin.records.get('p79HomeDatabaseGuide').textContent,/選擇電腦資料夾/);
  assert.match(admin.records.get('p79HomeDatabaseGuide').textContent,/下載六項基本資料/);
@@ -77,6 +80,7 @@ function fixture({role='admin',loggedIn=true,punchOnly=false,folder=true}={}){
  assert.equal(superadmin.calls.opens,1,'Superadmin can open database centre even if Windows ZIP is locked');
 
  const employee=fixture({role:'employee'});
+ assert.equal(employee.background.hidden,true);employee.background.listeners.get('click')();assert.equal(employee.calls.downloads,0);
  assert.equal(employee.button.hidden,true,'Employee may not export management cache');
  employee.button.listeners.get('click')();
  assert.equal(employee.calls.opens,0);
