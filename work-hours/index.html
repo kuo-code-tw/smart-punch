@@ -17751,7 +17751,12 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const existingReport=existingMeta.overtimeReport;
  const independentAdjusted=draft.adjustedIndependentReview===true;
  if(independentAdjusted&&(cloud?.capabilities?.adjustedOvertimeReviewV1!==true||!draft.plannedReview||!draft.preventReplace||!draft.sourceLeaveHandoffId||!draft.sourceForEmpId||draft.leaveHandoffId||draft.forEmpId||draft.coverDate!==draft.date||overtimeDate!==draft.date||existingReport?.planned!==true||String(existingReport?.leaveId||'')!==draft.sourceLeaveHandoffId||String(existingMeta.forEmpId||existingReport?.forEmpId||'').trim().toUpperCase()!==String(draft.sourceForEmpId).trim().toUpperCase()))throw Error('原代班關聯已變更或正式 GAS 尚未支援調班改為本人加班，未送出');
- if(existingReport?.id&&String(existingReport.id)!==String(draft.id))throw Error('此人當日已有申報或預排，請開啟原紀錄處理，避免覆蓋。');
+ const orphanId=cloud.capabilities?.deletedLeaveOrphanPlanV1===true&&String(cloud.empId||'').trim().toUpperCase()===employeeId&&String(cloud.date||'')===String(draft.date)&&!!cloud.revision&&!draft.preventReplace&&!draft.editPlannedOnly&&!draft.plannedReview&&existingReport?.planned===true&&existingReport?.id&&String(existingReport.id)!==String(draft.id)&&String(cloud.orphanPlannedReportId||'')===String(existingReport.id)?String(existingReport.id):'';
+ if(existingReport?.id&&String(existingReport.id)!==String(draft.id)&&!orphanId){
+  if(existingReport.planned===true&&existingReport.leaveId&&cloud.capabilities?.deletedLeaveOrphanPlanV1!==true)throw Error('此人當日有請假代班預排；正式後端尚未支援已刪請假核對，未覆蓋原紀錄。');
+  if(existingReport.planned===true)throw Error('此人當日有未解除的加班預排，原紀錄仍有效或無法確認已失效，請核對原紀錄，避免覆蓋。');
+  throw Error('此人當日已有申報或預排，請開啟原紀錄處理，避免覆蓋。');
+ }
  if(draft.preventReplace&&(!existingReport?.id||String(existingReport.id)!==String(draft.id)))throw Error('原申報已變更或不存在，未新增另一筆；請重新讀取核對。');
  // 原申報在開窗後若已被別處更新，不可用本機舊 16-24 蓋掉雲端新 08-16。
  if((draft.plannedReview||draft.editPlannedOnly)&&draft.expectedOriginalCode&&
@@ -17773,7 +17778,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
       ['approvalStatus','approvedBy','approvedAt','reviewedBy','reviewedAt'].some(k=>existingReport[k]!=null&&existingReport[k]!==''))
     throw Error('原預排已變更、正式申報或後端尚未部署，未修改原預排。');
  }
- if(draft.manualPlan===true&&existingReport?.id&&String(existingReport.id)!==String(draft.id))throw Error('此人當日已有申報或預排，請開啟原紀錄處理，不能覆蓋。');
+ if(draft.manualPlan===true&&existingReport?.id&&String(existingReport.id)!==String(draft.id)&&!orphanId)throw Error('此人當日已有申報或預排，請開啟原紀錄處理，不能覆蓋。');
  const sameHours=Number(existingReport?.declaredHours)===Number(draft.rule.declaredHours)&&String(existingReport?.convertedHours??'')===String(draft.rule.convertedHours??'');
  const sameNote=String(existingReport?.note??'').trim()===String(draft.note??'').trim();
  // 同一張預排報單完成打卡後，時數/時段不變也必須真的寫回解除 planned。
@@ -17831,7 +17836,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const originalNote=String(draft.note||'').trim(),reasonNote=reason?.exempt?reason.label:'';
  const finalNote=reasonNote&&!originalNote.includes(reasonNote)
    ?[reasonNote,originalNote].filter(Boolean).join('／'):originalNote;
- const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,workDate:draft.date,overtimeDate,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:finalNote,coverDate:draft.coverDate||draft.date,expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,editPlannedOnly:draft.editPlannedOnly===true,manualReviewCoverage:draft.manualReviewCoverage===true,attendanceInId:planned?'':pairs[0]?.row.clockIn.id||'',attendanceOutId:planned?'':pairs[0]?.row.clockOut.id||'',...(independentAdjusted?{adjustedIndependentReview:true,sourceLeaveHandoffId:draft.sourceLeaveHandoffId,sourceForEmpId:draft.sourceForEmpId}:{})};
+ const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,workDate:draft.date,overtimeDate,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:finalNote,coverDate:draft.coverDate||draft.date,expectedRevision:cloud.revision,replaceReportId:orphanId?'':previous?.id||'',orphanPlannedReportId:orphanId,planned,editPlannedOnly:draft.editPlannedOnly===true,manualReviewCoverage:draft.manualReviewCoverage===true,attendanceInId:planned?'':pairs[0]?.row.clockIn.id||'',attendanceOutId:planned?'':pairs[0]?.row.clockOut.id||'',...(independentAdjusted?{adjustedIndependentReview:true,sourceLeaveHandoffId:draft.sourceLeaveHandoffId,sourceForEmpId:draft.sourceForEmpId}:{})};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),draft.directRow?30000:45000);
  try{
   p79AssertDirectReportActive(draft.directOperation);

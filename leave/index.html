@@ -2246,8 +2246,12 @@ async function p79SaveWorkOvertimeDraft(draft){
  if(!planned&&['休','國'].includes(draft.rule.category)){const cutoff=P79Overtime.interval(draft.date,draft.rule.overtimeStart,draft.rule.overtimeEnd)[1]-15*60000;if(pairs[0].end<cutoff)throw Error('國定假日／休息日加班須於所選時段結束前15分鐘起簽退（例如08–16須15:45起），尚未符合申報條件');}
  const previous=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
  const roster=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule||{},dayMeta=roster.__meta?.[draft.date]||{},normal=dayMeta.reportOriginalShift??dayMeta.overtimeOriginalShift??roster[draft.date];
- const orphanId=cloud.capabilities?.deletedLeaveOrphanPlanV1===true&&!draft.preventReplace&&previous?.planned===true&&previous?.id&&String(previous.id)!==String(draft.id)&&String(cloud.orphanPlannedReportId||'')===String(previous.id)?String(previous.id):'';
- if(previous?.id&&String(previous.id)!==String(draft.id)&&!orphanId)throw Error('此人當日已有申報或預排，請開啟原紀錄處理，避免覆蓋。');
+ const orphanId=cloud.capabilities?.deletedLeaveOrphanPlanV1===true&&String(cloud.empId||'').trim().toUpperCase()===employeeId&&String(cloud.date||'')===String(draft.date)&&!!cloud.revision&&!draft.preventReplace&&!draft.editPlannedOnly&&!draft.plannedReview&&previous?.planned===true&&previous?.id&&String(previous.id)!==String(draft.id)&&String(cloud.orphanPlannedReportId||'')===String(previous.id)?String(previous.id):'';
+ if(previous?.id&&String(previous.id)!==String(draft.id)&&!orphanId){
+  if(previous.planned===true&&previous.leaveId&&cloud.capabilities?.deletedLeaveOrphanPlanV1!==true)throw Error('此人當日有請假代班預排；正式後端尚未支援已刪請假核對，未覆蓋原紀錄。');
+  if(previous.planned===true)throw Error('此人當日有未解除的加班預排，原紀錄仍有效或無法確認已失效，請核對原紀錄，避免覆蓋。');
+  throw Error('此人當日已有申報或預排，請開啟原紀錄處理，避免覆蓋。');
+ }
  if(draft.preventReplace&&String(previous?.id||'')!==String(draft.id))throw Error('原申報已變更或不存在，請重新讀取核對。');
  if(!planned){
   const rule=[draft.rule.category,draft.rule.code,draft.rule.declaredHours,draft.rule.convertedHours??'',draft.rule.normalStart||'',draft.rule.normalEnd||'',draft.rule.overtimeStart,draft.rule.overtimeEnd,draft.rule.position||'full',draft.rule.typeName||''];

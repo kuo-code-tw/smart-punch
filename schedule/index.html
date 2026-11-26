@@ -6131,7 +6131,12 @@ async function p79SaveScheduleOvertimeDraft(draft){
  if(pairs.length>1)throw Error('所選時段有多組出勤配對，請先在出勤表核對');
  const previous=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
  const roster=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule||{},dayMeta=roster.__meta?.[draft.date]||{},normal=dayMeta.reportOriginalShift??dayMeta.overtimeOriginalShift??roster[draft.date];
- if(previous?.id&&String(previous.id)!==String(draft.id))throw Error('此人當日已有申報或預排，請開啟原紀錄處理，避免覆蓋。');
+ const orphanId=cloud.capabilities?.deletedLeaveOrphanPlanV1===true&&String(cloud.empId||'').trim().toUpperCase()===employeeId&&String(cloud.date||'')===String(draft.date)&&!!cloud.revision&&!draft.preventReplace&&!draft.editPlannedOnly&&!draft.plannedReview&&previous?.planned===true&&previous?.id&&String(previous.id)!==String(draft.id)&&String(cloud.orphanPlannedReportId||'')===String(previous.id)?String(previous.id):'';
+ if(previous?.id&&String(previous.id)!==String(draft.id)&&!orphanId){
+  if(previous.planned===true&&previous.leaveId&&cloud.capabilities?.deletedLeaveOrphanPlanV1!==true)throw Error('此人當日有請假代班預排；正式後端尚未支援已刪請假核對，未覆蓋原紀錄。');
+  if(previous.planned===true)throw Error('此人當日有未解除的加班預排，原紀錄仍有效或無法確認已失效，請核對原紀錄，避免覆蓋。');
+  throw Error('此人當日已有申報或預排，請開啟原紀錄處理，避免覆蓋。');
+ }
  if(draft.preventReplace&&String(previous?.id||'')!==String(draft.id))throw Error('原申報已變更或不存在，請重新讀取核對。');
  if(!planned){
   const rule=[draft.rule.category,draft.rule.code,draft.rule.declaredHours,draft.rule.convertedHours??'',draft.rule.normalStart||'',draft.rule.normalEnd||'',draft.rule.overtimeStart,draft.rule.overtimeEnd,draft.rule.position||'full',draft.rule.typeName||''];
@@ -6139,7 +6144,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
   if(issue)throw Error(issue);
  }
 
- const body={scheduleClientId:getScheduleClientId(),action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',expectedRevision:cloud.revision,replaceReportId:previous?.id||'',planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
+ const body={scheduleClientId:getScheduleClientId(),action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,date:draft.date,category:draft.rule.category,code:draft.rule.code,typeName:draft.rule.typeName,forEmpId:draft.forEmpId||'',leaveHandoffId:draft.leaveHandoffId||'',note:draft.note||'',expectedRevision:cloud.revision,replaceReportId:orphanId?'':previous?.id||'',orphanPlannedReportId:orphanId,planned,attendanceInId:pairs[0]?.row.clockIn.id||'',attendanceOutId:pairs[0]?.row.clockOut.id||''};
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
  try{
   const response=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),signal:ctl.signal});const result=await response.json();
