@@ -42,6 +42,28 @@ function shiftFromClockIn(inRec,outRec,{displayOnly=false}={}){
  if(/^\d{4}-\d{2}-\d{2}$/.test(String(accountingDate||'')))date=accountingDate;
  return{date,shift,start:start.ts,end:end.ts};
 }
+// Use HR identity before the shared V6 engine, as the attendance ledger does.
+function normalizePairingRows(records,employees){
+ const byId=new Map(),byAtt=new Map();
+ const add=(map,key,person)=>{if(!key)return;const list=map.get(key)||[];list.push(person);map.set(key,list);};
+ for(const person of employees||[]){
+   add(byId,upper(person.id||person.empId),person);
+   add(byAtt,att(person.attNo||person.attendanceNo),person);
+ }
+ return (records||[]).map((record,index)=>{
+   if(!record)return record;
+   const ids=byId.get(upper(record.empId))||[],numbers=byAtt.get(att(record.attNo||record.attendanceNo))||[];
+   if(ids.length>1||numbers.length>1||(ids.length===1&&numbers.length===1&&ids[0]!==numbers[0]))
+     return {...record,__p79PairIdentity:'SCHEDULE-CONFLICT:'+index};
+   const master=ids[0]||numbers[0];
+   return master?{...record,empId:master.id||master.empId,attNo:master.attNo||master.attendanceNo||record.attNo,name:master.name||record.name}:record;
+ });
+}
+function buildAttendanceShifts(records,employees){
+ if(!engine?.buildShifts)throw Error('正式考勤配對引擎尚未載入');
+ const normalized=normalizePairingRows(records,employees);
+ return engine.buildShifts(normalized);
+}
 function plan({records=[],employees=[],schedules={},metadata={},month='',today='',allowUnmarked=false,isProtected=()=>false}={}){
  if(!engine?.buildShifts)throw Error('正式考勤配對引擎尚未載入，排班不修改');
  const peopleById=new Map(),peopleByAtt=new Map();
@@ -95,7 +117,7 @@ function plan({records=[],employees=[],schedules={},metadata={},month='',today='
  }
  return{corrections,pairedSessions:byDate.size,ambiguousSessions:ambiguous.size};
 }
-return{plan,shiftFromClockIn,
+return{plan,shiftFromClockIn,normalizePairingRows,buildAttendanceShifts,
  // 只用完整配對打卡顯示實際班別；短時出勤不得自動當成完整班別寫回正式班表。
  displayShiftFromClockIn:(inRec,outRec)=>shiftFromClockIn(inRec,outRec,{displayOnly:true})};
 });

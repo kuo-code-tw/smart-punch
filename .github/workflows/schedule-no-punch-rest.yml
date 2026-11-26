@@ -45,6 +45,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: node tests/schedule-identity-pairing.cjs
       - run: node tests/schedule-night-split-auto.cjs
       - run: node tests/schedule-national-zero-quota.cjs
       - run: node tests/schedule-manual-rest-auto-refill.cjs

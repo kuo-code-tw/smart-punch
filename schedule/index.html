@@ -1461,7 +1461,7 @@ html.dark #app-main-container .p79-month-schedule-table .p79-shift-select.p79-su
 #app-main-container .p79-group-select{grid-column:1 / -1!important;grid-row:2!important}
 </style>
 <script src="../attendance/v6-engine.js?v=20261015.62"></script>
-<script src="../assets/port79-schedule-punch-restore.js?v=20261109-pre08-early-shift-v1"></script>
+<script src="../assets/port79-schedule-punch-restore.js?v=20261126-identity-pairing-v1"></script>
 
 <style id="p79-rest-overtime-visible-v1037">
 /* Compact shift cell: keep exception / un-rested overtime tags visible without adding blank rows. */
@@ -7517,7 +7517,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         token:currentPort79SsoToken,employees:()=>employees,
         dateEligible:(emp,date)=>p79EmployeeDateEligible(emp,date),
         schedules:()=>employees.map(e=>({empId:e.id,schedule:{...(monthlyScheduleData[e.id]||{}),__meta:monthlyScheduleMeta[e.id]||{}}})),
-        buildShifts:rows=>P79AttendanceV6.buildShifts(rows),timestamp:p79DirectAttendanceTimestamp,leaveDates:p79ScheduleRestLeaveDates,
+        buildShifts:rows=>window.P79SchedulePunchRestore.buildAttendanceShifts(rows,employees),timestamp:p79DirectAttendanceTimestamp,leaveDates:p79ScheduleRestLeaveDates,
         shiftForSession:row=>window.P79SchedulePunchRestore?.displayShiftFromClockIn(row.clockIn,row.clockOut)||null,
         read:async(month,token)=>{
           const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
