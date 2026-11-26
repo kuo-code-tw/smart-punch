@@ -194,6 +194,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SITE_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          PUBLISH_EVENT: ${{ github.event_name }}
         run: |
           set -euo pipefail
           # Pages deployment can finish after a newer native-shell change.
@@ -212,6 +213,36 @@ jobs:
           # different V dates for the same commit around midnight.
           manifest="$(unzip -p dist/Port79-Windows-Lite.zip '*/site/smart-punch/port79-version.json')"
           source_day="$(printf '%s' "$manifest" | python3 -c "import json,sys,re;m=json.load(sys.stdin);v=m['version'];c=m['commit'];assert re.fullmatch(r'V[0-9]{6}\.[0-9]{5}',v);assert c=='$SITE_SHA';print('20'+v[1:7])")"
+          # Building Windows on push is fine; publishing it before the website
+          # would advertise a different official version on the homepage.
+          # Require the public site's actual manifest to match the verified ZIP.
+          # The successful Pages workflow_run will retry if the push build wins the race.
+          attempts=1
+          if [[ "$PUBLISH_EVENT" != 'push' ]]; then attempts=6; fi
+          matched=false
+          for attempt in $(seq 1 "$attempts"); do
+            if curl -fsSL --max-time 10 -H 'Cache-Control: no-cache' \
+              "https://kuo-code-tw.github.io/smart-punch/port79-version.json?build=$SITE_SHA&attempt=$attempt" \
+              | python3 -c 'import json,sys; web=json.load(sys.stdin); bundle=json.loads(sys.argv[1]); assert web["commit"]==bundle["commit"] and web["version"]==bundle["version"]' "$manifest"; then
+              matched=true
+              break
+            fi
+            if [[ "$attempt" -lt "$attempts" ]]; then sleep 5; fi
+          done
+          if [[ "$matched" != 'true' ]]; then
+            if [[ "$PUBLISH_EVENT" == 'push' ]]; then
+              echo "Windows package verified; publication deferred until the matching Pages deployment completes"
+              exit 0
+            fi
+            echo "::error::Public web version and verified Windows bundle do not match; release not published"
+            exit 1
+          fi
+          # Check main again after the public manifest verification.
+          latest_main="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+          if [[ "$SITE_SHA" != "$latest_main" ]]; then
+            echo "Skip superseded Windows release $SITE_SHA"
+            exit 0
+          fi
           tag="port79-windows-lite-${source_day}-${SITE_SHA:0:12}"
           # Release asset metadata is served via github.com/releases/latest/download,
           # NOT the rate-limited unauthenticated api.github.com endpoint. The
