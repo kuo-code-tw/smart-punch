@@ -7,8 +7,8 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const fmt=v=>Number(v||0).toLocaleString('zh-TW',{maximumFractionDigits:2});
 const state={model:null,sort:'code',type:'all',view:'table',tab:'basic',collapsed:false,expanded:new Set(),selected:''};
 // Offline fallback must match the main known service directory.
-const names={CIX:'中國－印度快線',CL1:'中國－呂宋一線',FOC:'福州－廈門－台灣航線',HPH:'台灣－海防航線',JSH:'日本－華南－越南航線',JST:'日本關西－泰國航線',JSV:'日本關西－越南航線',JTS:'日本關東－東南亞航線',JTT:'日本關東－泰國航線',KVS:'韓國－越南－東南亞航線',MHT:'民答那峨－香港－台灣航線',NCT:'中國大陸華北－台灣航線',NT2:'華北－台灣二線',TPI:'台灣－中國大陸－印尼航線',TPS:'台灣－菲律賓航線'};
-const name=code=>typeof root.p79RouteChineseName==='function'?root.p79RouteChineseName(code):root.P79RouteNameAuto?.lookup(code)||names[code]||('航線 '+String(code||'')+'（中文名稱查詢中）');
+const names={AP1:'亞太一線（美西航線）',CI5:'中國－印度五線',CIX:'中國－印度快線',CL1:'中國－呂宋一線',FOC:'福州－廈門－台灣航線',HPH:'台灣－海防航線',JSH:'日本－華南－越南航線',JST:'日本關西－泰國航線',JSV:'日本關西－越南航線',JTS:'日本關東－東南亞航線',JTT:'日本關東－泰國航線',KVS:'韓國－越南－東南亞航線',MHT:'民答那峨－香港－台灣航線',NCT:'中國大陸華北－台灣航線',NT2:'華北－台灣二線',TPI:'台灣－中國大陸－印尼航線',TPS:'台灣－菲律賓航線'};
+const name=code=>{const key=String(code||'').trim().toUpperCase();return typeof root.p79RouteChineseName==='function'?root.p79RouteChineseName(code):root.P79RouteNameAuto?.lookup(key)||names[key]||root.P79RouteNameAuto?.english?.(key)||key||'未分類';};
 const num=v=>Number(v)||0;
 const sums=(list,key)=>list.reduce((n,row)=>n+num(row[key]),0);
 const keyMonth=v=>/^\d{4}-\d{2}$/.test(String(v||''))?String(v):'';

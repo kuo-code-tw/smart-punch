@@ -66,7 +66,7 @@ vm.runInContext(html.slice(from,to),ctx);
   const chineseNames=vm.runInContext("Object.entries(P79_ROUTE_CHINESE_NAMES)",ctx);
   assert.equal(chineseNames.length,15);
   for(const [code,name] of chineseNames){assert(code&&name&&!name.includes('待補'));}
-  assert.equal(vm.runInContext("p79RouteChineseName('OTHER')",ctx),'航線 OTHER（中文名稱查詢中）');
+  assert.equal(vm.runInContext("p79RouteChineseName('OTHER')",ctx),'OTHER');
   for(const [code,expected] of Object.entries({"JSH":"日本－華南－越南航線","JTS":"日本關東－東南亞航線","KVS":"韓國－越南－東南亞航線","NT2":"華北－台灣二線","TPS":"台灣－菲律賓航線"})){
     assert.equal(vm.runInContext("p79RouteChineseName("+JSON.stringify(code)+")",ctx),expected);
   }

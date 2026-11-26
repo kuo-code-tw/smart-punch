@@ -1217,7 +1217,7 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
   </div>
 </section>
 <script src="../assets/port79-route-name-autofill.js?v=20261118-v2"></script>
-<script src="./route-management-dashboard.js?v=20261118-autofill-v3"></script>
+<script src="./route-management-dashboard.js?v=20261126-names-v4"></script>
 
 <style id="p79-terminal-ops-style-v1">
 #efficiencyMainTabs .tab[data-tab="terminal"]:not(.active){background:#dcfce7!important;color:#065f46!important;border:1px solid #86efac}
@@ -11794,6 +11794,8 @@ function routeStatsForShips(masters){
   })).sort((a,b)=>a.route==='未分類'?1:b.route==='未分類'?-1:a.route.localeCompare(b.route,'en',{numeric:true}));
 }
 const P79_ROUTE_CHINESE_NAMES=Object.freeze({
+  AP1:'亞太一線（美西航線）',
+  CI5:'中國－印度五線',
   CIX:'中國－印度快線',
   CL1:'中國－呂宋一線',
   FOC:'福州－廈門－台灣航線',
@@ -11816,7 +11818,7 @@ function p79RouteChineseName(code){
   // The periodically refreshed same-origin catalogue can add newly verified routes.
   const english=catalog?.english?.(key);
   return catalog?.lookup(key)||P79_ROUTE_CHINESE_NAMES[key]||
-    (english?('航線 '+key+'（'+english+'；中文待核實）'):key?('航線 '+key+'（中文名稱查詢中）'):'未分類');
+    (english||key||'未分類');
 }
 if(typeof window!=='undefined')window.addEventListener?.('p79-route-name-updated',()=>{
   if(document.getElementById('view-compare')?.classList?.contains('hidden'))return;

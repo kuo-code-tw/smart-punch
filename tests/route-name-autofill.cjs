@@ -2,7 +2,9 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const source=fs.readFileSync('assets/port79-route-name-autofill.js','utf8');
 const catalog=JSON.parse(fs.readFileSync('data-sources/route-service-names.json','utf8'));
-assert.equal(Object.keys(catalog.routes).length,15);
+assert(Object.keys(catalog.routes).length>=17);
+assert.equal(catalog.routes.AP1.zh,'亞太一線（美西航線）');
+assert.equal(catalog.routes.CI5.zh,'中國－印度五線');
 const fetches=[],events=[],memory=new Map();
 const window={localStorage:{getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,v)},
  fetch:async(u)=>{fetches.push(u);return {ok:true,json:async()=>catalog}},
@@ -14,7 +16,7 @@ vm.createContext(ctx);vm.runInContext(source,ctx);
  const [one,two]=await Promise.all([window.P79RouteNameAuto.ensure(),window.P79RouteNameAuto.ensure()]);
  assert.equal(fetches.length,1,'concurrent renders share one request');
  assert.equal(one,true);
- for(const c of ['JSH','JTS','KVS','NT2','TPS'])assert.equal(window.P79RouteNameAuto.lookup(c),catalog.routes[c].zh);
+ for(const c of ['AP1','CI5','JSH','JTS','KVS','NT2','TPS'])assert.equal(window.P79RouteNameAuto.lookup(c),catalog.routes[c].zh);
  assert.equal(window.P79RouteNameAuto.lookup('UNSEEN'),'');
  assert(events.includes('p79-route-name-updated'),'redraw after catalog update');
  await window.P79RouteNameAuto.ensure();
@@ -27,5 +29,5 @@ vm.createContext(ctx);vm.runInContext(source,ctx);
  assert.equal(window.P79RouteNameAuto.english('NEW'),'TAIWAN NEW SHIPPING SERVICE');
  window.P79RouteNameAuto._apply({schema_version:1,routes:{BAD:{zh:'<script>BAD</script>'}}});
  assert.equal(window.P79RouteNameAuto.lookup('BAD'),'','invalid source must not inject HTML');
- console.log('PASS 15 routes, concurrency, daily cache, new-code auto-fill and unsafe name rejection');
+ console.log('PASS verified routes, concurrency, daily cache, new-code auto-fill and unsafe name rejection');
 })().catch(e=>{console.error(e);process.exitCode=1});

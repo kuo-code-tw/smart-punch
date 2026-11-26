@@ -1,7 +1,17 @@
 {
   "schema_version": 1,
-  "updated_at": "2026-11-18",
+  "updated_at": "2026-11-26",
   "routes": {
+    "AP1": {
+      "zh": "亞太一線（美西航線）",
+      "english": "ASIA PACIFIC SERVICE",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3AAP1"
+    },
+    "CI5": {
+      "zh": "中國－印度五線",
+      "english": "CHINA-INDIA SERVICE V",
+      "source": "https://atlas.flexport.com/service/code%3AWHLC%3ACI5"
+    },
     "CIX": {
       "zh": "中國－印度快線",
       "source": "https://atlas.flexport.com/service/code%3AWHLC%3ACIX"
