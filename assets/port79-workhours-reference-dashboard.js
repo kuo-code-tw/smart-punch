@@ -418,10 +418,6 @@
   state.all=rows;
   const filters=listFilters(rows);
   const filtered=filterApplications(rows,filters);
-  const count=[filters.unit!=='ALL',filters.job!=='ALL',filters.name!=='ALL',filters.type!=='ALL'].filter(Boolean).length;
-  const indicator=id('prListFilterCount'),toggle=id('prListFilterToggle');
-  if(indicator){indicator.hidden=!count;indicator.textContent=String(count);}
-  if(toggle)toggle.dataset.active=count?'true':'false';
   for(const [key,label]of [['all','全部'],['review','待審核'],['approved','已核准'],['rejected','已駁回']]){
    const button=id('prTab'+key);
    button.textContent=label+' ('+(state.current?.ok&&state.current.reportsAvailable!==false?filtered.filter(r=>key==='all'||r.status===key).length:em)+')';
@@ -493,7 +489,7 @@
   const host=id('viewAdmin')?.querySelector('.admin-desktop-content');
   if(!host||id('p79WorkhoursReference'))return;
   let markup;
-  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1&listFilters=20261126-person-v3',{cache:'default'});
+  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1&listFilters=20261126-inline-v4',{cache:'default'});
    if(!resp.ok)throw Error('HTTP '+resp.status);markup=await resp.text();
    if(!markup.includes('id="p79WorkhoursReference"')||!markup.includes('id="prTableBody"'))throw Error('版型檔格式錯誤');
   }catch(e){console.warn('工時版型尚未讀取完成，保留原本功能',e);return}
@@ -511,13 +507,6 @@
   const now=dateTaipei();const [y,m]=now.slice(0,7).split('-').map(Number);
   id('prEnd').value=y+'-'+String(m).padStart(2,'0')+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0');
   id('prForm').addEventListener('submit',event=>{event.preventDefault();state.page=1;refresh(true)});
-  const filterMenu=id('prListFilterMenu');
-  document.addEventListener('click',event=>{
-   if(filterMenu?.open&&!filterMenu.contains(event.target))filterMenu.open=false;
-  });
-  filterMenu?.addEventListener('keydown',event=>{
-   if(event.key==='Escape'&&filterMenu.open){event.preventDefault();filterMenu.open=false;id('prListFilterToggle')?.focus();}
-  });
   for(const key of ['prListUnit','prListJob','prListType','prListName']){
    id(key)?.addEventListener('change',()=>{
     if(key==='prListUnit'&&id('prListJob'))id('prListJob').value='ALL';
