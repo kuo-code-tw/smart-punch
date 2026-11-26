@@ -7,6 +7,7 @@ on:
       - 'tests/schedule-reference-design.cjs'
       - 'tests/schedule-two-pages.cjs'
       - 'tests/schedule-lock-manual-only.cjs'
+      - 'tests/schedule-roster-editor-value.cjs'
       - '.github/workflows/schedule-manual-edit-lock.yml'
 permissions:
   contents: read
@@ -19,6 +20,7 @@ jobs:
         with:
           node-version: '22'
       - run: node tests/schedule-lock-manual-only.cjs
+      - run: node tests/schedule-roster-editor-value.cjs
       - run: node tests/schedule-edit-lock-lane.cjs
       - run: node tests/schedule-two-pages.cjs
       - run: node tests/schedule-live-month-scope.cjs
