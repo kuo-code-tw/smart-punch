@@ -1876,14 +1876,14 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
     <div class="p79d-roster-toolbar"><h4>四組全部在職人員（自由挑選）</h4><p id="dispatchRosterSelection" role="status">載入人員名冊後可逐人勾選。</p></div>
     <div id="dispatchGroupRoster" class="p79d-roster-grid" aria-label="四組全部在職人員勾選名單"></div>
     <div id="dispatchUnassigned"></div>
-    <div class="p79d-command"><button id="dispatchGenerateButton" type="button" class="btn p79d-primary" onclick="P79PersonnelDispatch.generateRecommendation()">一鍵自動最佳化 A～D 組</button><span>預設納入全部可調人員，也可自由取消勾選；按一次就自動產生四組均衡編組，並直接帶入下方試算，不會修改正式排班。</span></div>
+    <div class="p79d-command"><button id="dispatchGenerateButton" type="button" class="btn p79d-primary" onclick="P79PersonnelDispatch.generateRecommendation()">一鍵自動最佳化 A～D 組</button></div>
     <div id="dispatchConfirmState" role="status"></div>
     <div id="dispatchRecommendation" role="status">按「一鍵自動最佳化 A～D 組」就能直接排列並顯示四組新名單。</div>
   </div>
 
   <div class="p79d-compare-grid">
     <div class="card p79d-panel">
-      <div class="p79d-panel-head"><div><h3><span class="p79d-numb">03</span> 一鍵最佳化前後效率比較</h3><p>同一份歷史作業量與時數重新組合，比較各組效率，不預測未來產能。</p></div></div>
+      <div class="p79d-panel-head"><div><h3><span class="p79d-numb">03</span> 一鍵最佳化前後效率比較</h3></div></div>
       <div id="dispatchGroupVisual" class="p79d-visual" aria-label="四組原始與試算效率圖示"></div>
       <div class="p79d-table-wrap" style="max-height:none"><table class="tbl w-full text-center"><thead><tr><th>組別</th><th>人數（原 → 試算）</th><th>櫃數（原 → 試算）</th><th>時數（原 → 試算）</th><th>櫃／小時（原 → 試算）</th></tr></thead><tbody id="dispatchGroupBody"></tbody></table></div>
       <div class="flex flex-wrap items-center gap-3 mt-3"><p id="dispatchScenarioState" role="status"></p><button type="button" class="btn p79d-action" onclick="P79PersonnelDispatch.clear()">清除試算</button></div>
@@ -1902,7 +1902,7 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
   </div>
 
   <div class="card p79d-panel">
-    <div class="p79d-panel-head"><div><h3><span class="p79d-numb">04</span> 全員詳細資料與個別試算</h3><p>四組人員可在上方完整名冊勾選；此表保留工號、組別、有效櫃數、時數及逐人調組試算。</p></div></div>
+    <div class="p79d-panel-head"><div><h3><span class="p79d-numb">04</span> 全員詳細資料與個別試算</h3></div></div>
     <p class="p79d-table-caption">表格可左右捲動；標題列會固定。搜尋與排序請使用上方「資料月份與查詢」區塊。</p>
     <div class="p79d-table-wrap"><table class="tbl w-full text-center"><thead><tr><th>姓名</th><th>工號</th><th>排班組別</th><th>作業櫃數</th><th>作業時數</th><th>月均效率</th><th>H/C</th><th>作業筆數</th><th>資料狀態</th><th>試算調入組別</th></tr></thead><tbody id="dispatchBody"></tbody></table></div>
   </div>
@@ -17197,7 +17197,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 </style>
 <script src="/smart-punch/assets/port79-management-link.js?v=20261105.1-20261017.official1&rev=20261022-workflow&sync=20261104-leave-roster-v1&syncfix=20261114-no-loop-v1"></script><script src="../assets/port79-personnel-ranking.js?v=20261117-active-hr-v1"></script>
 <link rel="stylesheet" href="../assets/port79-vessel-theme.css?v=20261018-unified-design">
-<script src="../assets/port79-personnel-dispatch.js?v=20261111-current-roster-v6"></script>
+<script src="../assets/port79-personnel-dispatch.js?v=20261111-current-roster-v6&trim=20261126-v1"></script>
 <script src="../assets/port79-full-refresh.js?v=20261105.1"></script>
 <style id="p79-vessel-desktop-fullwidth-v20261019">
 @media(min-width:1000px){
