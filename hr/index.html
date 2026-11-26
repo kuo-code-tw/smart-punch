@@ -226,9 +226,9 @@ body[data-p79-system="hr"]>header.top{display:none!important}
       <button class="btn" onclick="setStatusView('')">📋 全部人員</button>
       <button class="btn" onclick="openEmploymentHistory()">🔄 異動紀錄</button>
     </div>
-    <div class="filters">
-      <input id="q" class="wide-search" placeholder="搜尋工號、姓名、總公司、事業部、事業處、單位、職稱" oninput="render()">
-      <select id="fStatus" onchange="render()"><option value="active">在職人員</option><option value="">全部狀態</option><option value="resigned">離職人員</option><option value="leave">留職停薪</option></select>
+    <input type="hidden" id="q" value="">
+    <input type="hidden" id="fStatus" value="active">
+    <div class="filters hr-people-filters">
       <select id="fHQ" onchange="render()"><option value="">全部總公司</option></select>
       <select id="fDivision" onchange="render()"><option value="">全部事業部</option></select>
       <select id="fOffice" onchange="render()"><option value="">全部事業處</option></select>
@@ -1845,6 +1845,13 @@ html[data-theme="dark"] #editor .btn.danger {background:#451a1a;border-color:#7f
 @media(max-width:480px){#editor .hr-editor-section .grid,#editor .employment-box .grid{grid-template-columns:1fr}#editor .hr-editor-top-actions{justify-content:flex-start}#editor #modalTitle{font-size:18px}}
 </style>
 
+<style id="p79-hr-compact-people-filters-20261126">
+body[data-p79-system="hr"] .hr-people-filters {grid-template-columns:repeat(6,minmax(0,1fr)) minmax(190px,1.4fr) auto!important;}
+body[data-p79-system="hr"] .hr-people-filters>* {min-width:0;}
+@media(max-width:1300px){body[data-p79-system="hr"] .hr-people-filters {grid-template-columns:repeat(4,minmax(0,1fr))!important;}}
+@media(max-width:760px){body[data-p79-system="hr"] .hr-people-filters {grid-template-columns:repeat(2,minmax(0,1fr))!important;}}
+@media(max-width:480px){body[data-p79-system="hr"] .hr-people-filters {grid-template-columns:minmax(0,1fr)!important;}}
+</style>
 </body></html>
 
 
