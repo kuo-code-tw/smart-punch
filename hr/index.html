@@ -208,7 +208,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
 </div></header>
 <main class="wrap">
   <div id="status" class="banner">正在驗證人資系統權限...</div>
-  <div class="stats">
+  <div class="stats hr-people-summary">
     <div class="stat"><div class="k">在職人員</div><div class="v" id="stActive">0</div></div>
     <div class="stat"><div class="k">離職人員</div><div class="v" id="stResigned">0</div></div>
     <div class="stat"><div class="k">留職停薪</div><div class="v" id="stLeave">0</div></div>
@@ -1851,6 +1851,27 @@ body[data-p79-system="hr"] .hr-people-filters>* {min-width:0;}
 @media(max-width:1300px){body[data-p79-system="hr"] .hr-people-filters {grid-template-columns:repeat(4,minmax(0,1fr))!important;}}
 @media(max-width:760px){body[data-p79-system="hr"] .hr-people-filters {grid-template-columns:repeat(2,minmax(0,1fr))!important;}}
 @media(max-width:480px){body[data-p79-system="hr"] .hr-people-filters {grid-template-columns:minmax(0,1fr)!important;}}
+</style>
+<style id="p79-hr-compact-people-summary-20261126">
+/* Compact employee-list statistics only; retain the existing values and palette. */
+html body[data-p79-system="hr"] main.wrap>.hr-people-summary {
+  grid-template-columns:repeat(6,minmax(0,1fr))!important;
+  gap:7px!important;margin:6px 0!important;
+}
+html body[data-p79-system="hr"] main.wrap>.hr-people-summary>.stat {
+  display:flex!important;align-items:center;justify-content:space-between;gap:7px;
+  min-height:38px!important;height:auto!important;padding:6px 10px!important;
+  border-radius:8px!important;box-shadow:none!important;
+}
+html body[data-p79-system="hr"] main.wrap>.hr-people-summary>.stat>.k {
+  font-size:12px!important;line-height:1.35!important;font-weight:650!important;margin:0!important;min-width:0;
+}
+html body[data-p79-system="hr"] main.wrap>.hr-people-summary>.stat>.v {
+  font-size:19px!important;line-height:1.15!important;font-weight:800!important;
+  margin:0!important;flex:0 0 auto;font-variant-numeric:tabular-nums;
+}
+@media(max-width:1150px){html body[data-p79-system="hr"] main.wrap>.hr-people-summary{grid-template-columns:repeat(3,minmax(0,1fr))!important;}}
+@media(max-width:550px){html body[data-p79-system="hr"] main.wrap>.hr-people-summary{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:5px!important;}html body[data-p79-system="hr"] main.wrap>.hr-people-summary>.stat{padding:5px 7px!important;}}
 </style>
 </body></html>
 
