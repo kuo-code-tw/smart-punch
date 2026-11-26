@@ -29,6 +29,11 @@ for(const times of cases){
  assert.equal(api.ruleAttendanceIssue(start,end,day,['延','延20-08',4,6.02,'24','08','20','24','before','平日延時加班']),'');
  assert.equal(pairs[0].row.clockIn.id,'IN');assert.equal(pairs[0].row.clockOut.id,'OUT');
 }
+const changedBadge=cases[0].map((time,i)=>({...record(time,i),attNo:i?'200':'100'}));
+const changedBadgePairs=api.reportAttendancePairs(changedBadge,'WORKER',day,r);
+assert.equal(changedBadgePairs.length,1);
+assert.equal(api.overtimeMinutes(changedBadgePairs[0].start,changedBadgePairs[0].end,day,{overtimeReport:r}),240);
+assert.equal(api.reportAttendancePairs([changedBadge[0],{...changedBadge[1],empId:'OTHER'}],'WORKER',day,r).length,0);
 const isoPairs=engine.buildShifts(cases[3].map((t,i)=>record(t,i)));assert.equal(isoPairs.filter(row=>row.clockIn&&row.clockOut).length,1);
 assert.equal(api.reportAttendancePairs([record(cases[0][0],0)],'WORKER',day,r).length,0);
 assert.equal(api.reportAttendancePairs(cases[0].map((t,i)=>record(t,i,'OTHER')),'WORKER',day,r).length,0);
