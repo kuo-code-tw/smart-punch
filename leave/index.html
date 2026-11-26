@@ -1187,9 +1187,12 @@ async function p79ReportSavedLeaveCover(id){
     reported===entries.length&&planned===0&&pending.length===0&&restCovers===0&&unverified===0;
    p79LeaveOvertimeVerified.set(String(id),{signature:coverage.signature,complete,at:Date.now()});
    p79ApplyCompletion(id,coverage.complete,complete);
-   continueButton.hidden=!pending.length||unverified>0;
+   // An unresolved report belongs to its own employee/day. It must not
+   // prevent another verified, unfiled worker from continuing. Only the
+   // pending entries are enqueued; the original completion guard stays intact.
+   continueButton.hidden=!pending.length||!p79CanReportOvertime();
    continueButton.onclick=async()=>{
-    if(!pending.length||unverified>0)return;
+    if(!pending.length||!p79CanReportOvertime()||!leaveRequestToken())return;
     sessionStorage.setItem('port79_leave_overtime_handoff_v1',JSON.stringify({
      id:String(id),createdAt:Date.now(),entries:pending
     }));
