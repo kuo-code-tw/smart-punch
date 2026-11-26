@@ -761,12 +761,40 @@ async function send(payload,timeout=25000){
 }
 
 // Coordinate the actual preflight + write across attendance/home/work-hours tabs.
-async function p79SendAttendanceInBrowserLane(payload,timeout){
+async function p79SendAttendanceInBrowserLane(payload,timeout,expectedKey=null){
   const locks=typeof navigator!=='undefined'?navigator.locks:null;
-  if(!locks||typeof locks.request!=='function')return send(payload,timeout);
-  return locks.request('port79-attendance-cloud-write-v1',{mode:'exclusive',ifAvailable:true},lock=>{
-    if(!lock)throw Object.assign(new Error('考勤同步通道忙碌，其他分頁正在同步'),{retryable:true});
+  const access=expectedKey!==null?token():null,endpoint=expectedKey!==null?gasUrl():null;
+  const deferred=message=>Object.assign(new Error(message),{retryable:true,browserLaneDeferred:true});
+  const transmit=()=>{
+    // Another tab may have completed, replaced or paused this intent while
+    // we waited. Never send a stale payload or one under a changed session.
+    if(expectedKey!==null){
+      if(token()!==access||gasUrl()!==endpoint)throw deferred('登入或雲端位置已變更，保留修改等待重新核對');
+      const latest=readQueue().find(x=>x.key===expectedKey);
+      if(!latest||latest.paused||!samePayload(latest.payload,payload))throw deferred('待同步修改已變更，重新核對佇列');
+    }
     return send(payload,timeout);
+  };
+  if(!locks||typeof locks.request!=='function')return transmit();
+  const edit=['updateRecord','editRecord'].includes(String(payload?.action||''));
+  // Let already-queued edits acquire the exclusive lane in order, instead
+  // of repeatedly racing other tabs. Bound the wait and keep punch fast path.
+  if(edit&&typeof AbortController==='function'){
+    const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),10000);
+    let acquired=false;
+    try{
+      return await locks.request('port79-attendance-cloud-write-v1',{mode:'exclusive',signal:ctl.signal},async lock=>{
+        if(!lock)throw deferred('考勤同步通道忙碌，等待其他分頁完成');
+        acquired=true;clearTimeout(timer);return transmit();
+      });
+    }catch(error){
+      if(!acquired&&ctl.signal.aborted)throw deferred('考勤同步通道忙碌，等待其他分頁完成');
+      throw error;
+    }finally{clearTimeout(timer);}
+  }
+  return locks.request('port79-attendance-cloud-write-v1',{mode:'exclusive',ifAvailable:true},lock=>{
+    if(!lock)throw deferred('考勤同步通道忙碌，其他分頁正在同步');
+    return transmit();
   });
 }
 function p79TransientAttendanceError(error){
@@ -823,7 +851,7 @@ async function drain(force=false){
       updateUi();
 
       try{
-        const data=await p79SendAttendanceInBrowserLane(item.payload,45000);
+        const data=await p79SendAttendanceInBrowserLane(item.payload,45000,item.key);
         // 寫入 ACK 不能跳過其他人尚未讀取的 Delta；游標只由讀取結果推進。
 
         const rid=item?.payload?.record?.id ?? item?.payload?.id;
@@ -852,7 +880,7 @@ async function drain(force=false){
       }catch(err){
         q=readQueue();
         const cur=q.find(x=>x.key===item.key);
-        if(!cur||!samePayload(cur.payload,item.payload))continue;
+        if(!cur||cur.paused||!samePayload(cur.payload,item.payload))continue;
 
         const nonRetryable = err?.retryable === false;
         const serverData = err?.serverData || {};
@@ -885,20 +913,20 @@ async function drain(force=false){
           continue;
         }
 
-        const attempts=Number(cur.attempts||0)+1;
+        const attempts=Number(cur.attempts||0)+(err?.browserLaneDeferred===true?0:1);
         cur.attempts=attempts;
         cur.state='pending';
         cur.lastError=String(err?.message||err||'失敗');
         cur.lastFailureRetryable=err?.retryable!==false;
-        cur.paused=p79PauseAttendanceWrite(cur.payload,err,attempts);
-        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts,err);
+        cur.paused=err?.browserLaneDeferred!==true&&p79PauseAttendanceWrite(cur.payload,err,attempts);
+        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+(err?.browserLaneDeferred===true?5000+Math.floor(Math.random()*5000):p79AttendanceRetryDelay(cur.payload,attempts,err));
         saveQueue(q.map(x=>x.key===cur.key?cur:x));
         activeSyncRecordId='';
         currentOpText=cur.paused?'已暫停，等待核對':'等待重試';
         updateUi();
         // A record-specific conflict must not block unrelated records. A shared
         // transport/lock failure yields instead of flooding the busy cloud.
-        if(!cur.paused&&p79TransientAttendanceError(err))break;
+        if(!cur.paused&&(err?.browserLaneDeferred===true||p79TransientAttendanceError(err)))break;
       }
     }
   }finally{
@@ -929,7 +957,7 @@ async function drainFast(force=true, concurrency=4){
 
   const processOne=async(item)=>{
     try{
-      const data=await p79SendAttendanceInBrowserLane(item.payload,45000);
+      const data=await p79SendAttendanceInBrowserLane(item.payload,45000,item.key);
 
       // 保留未讀 Delta，讓其他人的同時修改仍可同步。
 
@@ -952,7 +980,7 @@ async function drainFast(force=true, concurrency=4){
     }catch(err){
       const current=readQueue();
       const cur=current.find(x=>x.key===item.key);
-      if(!cur||!samePayload(cur.payload,item.payload))return {ok:false,item,error:err,removed:true};
+      if(!cur||cur.paused||!samePayload(cur.payload,item.payload))return {ok:false,item,error:err,removed:true};
 
       const nonRetryable=err?.retryable===false;
       const rid=cur?.payload?.record?.id ?? cur?.payload?.id;
@@ -970,15 +998,15 @@ async function drainFast(force=true, concurrency=4){
         return {ok:false,item,error:err,nonRetryable:true};
       }
 
-      const attempts=Number(cur.attempts||0)+1;
+      const attempts=Number(cur.attempts||0)+(err?.browserLaneDeferred===true?0:1);
       cur.attempts=attempts;
       cur.state='pending';
       cur.lastError=String(err?.message||err||'失敗');
         cur.lastFailureRetryable=err?.retryable!==false;
-      cur.paused=p79PauseAttendanceWrite(cur.payload,err,attempts);
-        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(cur.payload,attempts,err);
+      cur.paused=err?.browserLaneDeferred!==true&&p79PauseAttendanceWrite(cur.payload,err,attempts);
+        cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+(err?.browserLaneDeferred===true?5000+Math.floor(Math.random()*5000):p79AttendanceRetryDelay(cur.payload,attempts,err));
       saveQueue(current.map(x=>x.key===cur.key?cur:x));
-      return {ok:false,item,error:err,retryable:!cur.paused&&p79TransientAttendanceError(err)};
+      return {ok:false,item,error:err,retryable:!cur.paused&&(err?.browserLaneDeferred===true||p79TransientAttendanceError(err))};
     }
   };
 
@@ -1375,7 +1403,7 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
     updateUi();
 
     try{
-      const data=await p79SendAttendanceInBrowserLane(payload,45000);
+      const data=await p79SendAttendanceInBrowserLane(payload,45000,opKey(payload));
       const latestConfirmed=remove(opKey(payload),payload);
       // 保留未讀 Delta，讓其他人的同時修改仍可同步。
 
@@ -1417,7 +1445,7 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
     }catch(err){
       const reason=String(err?.message||err||'雲端寫入失敗');
       const current=readQueue().find(x=>x.key===opKey(payload));
-      if(current&&!samePayload(current.payload,payload))return {ok:false,queued:true,error:reason};
+      if(current&&(current.paused||!samePayload(current.payload,payload)))return {ok:false,queued:true,error:reason};
 
       if(err?.retryable===false && err?.duplicatePunch===true){
         remove(opKey(payload),payload);
@@ -1448,10 +1476,10 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
 
       // 直送前已持久化；失敗時不能用舊 payload 覆蓋使用者後續修改。
       if(current){
-        current.attempts=Number(current.attempts||0)+1;
+        current.attempts=Number(current.attempts||0)+(err?.browserLaneDeferred===true?0:1);
         current.lastError=reason;current.lastFailureRetryable=err?.retryable!==false;current.state='pending';
-        current.paused=p79PauseAttendanceWrite(payload,err,current.attempts);
-        current.nextRetryAt=current.paused?Number.MAX_SAFE_INTEGER:Date.now()+p79AttendanceRetryDelay(payload,current.attempts,err);
+        current.paused=err?.browserLaneDeferred!==true&&p79PauseAttendanceWrite(payload,err,current.attempts);
+        current.nextRetryAt=current.paused?Number.MAX_SAFE_INTEGER:Date.now()+(err?.browserLaneDeferred===true?5000+Math.floor(Math.random()*5000):p79AttendanceRetryDelay(payload,current.attempts,err));
         saveQueue(readQueue().map(x=>x.key===current.key&&samePayload(x.payload,payload)?current:x));
       }
       currentOpText=current?.paused?'已暫停，等待核對':'等待自動重試';
