@@ -1730,7 +1730,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                   </div>
                   <div class="p79-overtime-compact-filters">
                     <div class="flex flex-nowrap gap-2 overflow-x-auto">
-                        <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部加班（含已儲存預排）</option><option value="arranged">已申報／已儲存預排</option><option value="pending">出勤待申報</option><option value="review">🔴 疑似多報（整班無卡）</option></select></div>
+                        <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部非預排加班</option><option value="arranged">已申報</option><option value="pending">出勤待申報</option><option value="review">🔴 疑似多報（整班無卡）</option></select></div>
                         <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">📅 年月</label><select id="overtimeMonthFilter" onchange="onOvertimeMonthChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部月份</option></select></div>
                         <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 單位</label><select id="overtimeDeptFilter" onchange="onOvertimeDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部單位</option></select></div>
                         <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職稱</label><select id="overtimeJobTitleFilter" onchange="onOvertimeJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
@@ -1751,14 +1751,14 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                 </div>
 
                 <div class="p79-overtime-metrics grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
-                    <div class="rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/30 p-3"><div class="text-xs font-semibold text-indigo-600 dark:text-indigo-400">清單人數（含預排）</div><div id="overtimeEmployeeCount" class="mt-1 text-xl font-bold text-indigo-700 dark:text-indigo-300">0</div></div>
-                    <div class="rounded-2xl border border-sky-100 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/30 p-3"><div class="text-xs font-semibold text-sky-600 dark:text-sky-400">清單筆數（含預排）</div><div id="overtimeShiftCount" class="mt-1 text-xl font-bold text-sky-700 dark:text-sky-300">0</div></div>
+                    <div class="rounded-2xl border border-indigo-100 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-950/30 p-3"><div class="text-xs font-semibold text-indigo-600 dark:text-indigo-400">清單人數</div><div id="overtimeEmployeeCount" class="mt-1 text-xl font-bold text-indigo-700 dark:text-indigo-300">0</div></div>
+                    <div class="rounded-2xl border border-sky-100 dark:border-sky-900 bg-sky-50 dark:bg-sky-950/30 p-3"><div class="text-xs font-semibold text-sky-600 dark:text-sky-400">清單筆數</div><div id="overtimeShiftCount" class="mt-1 text-xl font-bold text-sky-700 dark:text-sky-300">0</div></div>
                     <div class="rounded-2xl border border-emerald-100 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/30 p-3"><div class="text-xs font-semibold text-emerald-600 dark:text-emerald-400">加班時數（未換算）</div><div id="overtimeRawReportedHours" class="mt-1 text-xl font-bold text-emerald-700 dark:text-emerald-300">0 小時</div></div>
                     <div class="rounded-2xl border border-amber-100 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3"><div class="text-xs font-semibold text-amber-700 dark:text-amber-400">換算加班時數</div><div id="overtimeTotalHours" class="mt-1 text-xl font-bold text-amber-800 dark:text-amber-300">0.00 小時</div></div>
                     <div class="rounded-2xl border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/30 p-3"><div class="text-xs font-semibold text-orange-700 dark:text-orange-400">加班出勤時數</div><div id="overtimePendingEstimateHours" class="mt-1 text-xl font-bold text-orange-800 dark:text-orange-300">0 小時</div></div>
                     <div class="rounded-2xl border border-rose-100 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-3"><div class="text-xs font-semibold text-rose-600 dark:text-rose-400">超過每日 12 小時</div><div id="overtimeOver12Count" class="mt-1 text-xl font-bold text-rose-700 dark:text-rose-300">0</div></div>
                 </div>
-                <p id="p79OvertimeMainListExplanation" class="text-xs text-slate-600 dark:text-slate-300 mt-2" role="note">已儲存的加班申報會直接顯示在本頁，不需要先核准。未完成出勤的預排另外標示，不會提前列入已完成的加班時數。</p>
+                <p id="p79OvertimeMainListExplanation" class="text-xs text-slate-600 dark:text-slate-300 mt-2" role="note">非預排加班申報不需要先核准即可顯示；預排統一在「預排／待核對」視窗查看，不列入主清單及正式加班統計。</p>
                 <div id="p79OvertimeMissingConversionPanel" class="hidden mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100" role="region" aria-label="待換算加班申報清單"></div>
                 </div>
 
@@ -13830,13 +13830,16 @@ async function p79ExportOvertimeComparison(printMode){
         }
         let p79OvertimeCalculationCache = null;
         // 預排即使已有雲端申報 ID，也不等於完成打卡或可計薪。
-        // 但「每日加班人員統計」必須顯示已儲存的申報，不能把資料藏在另個視窗。
+        // 預排依管理者要求移至專用視窗，正式明細只顯示非預排項目。
         function p79WorkOvertimeIsUnconfirmedPlan(row) {
             return row?.planned === true || row?.overtimeReport?.planned === true;
         }
-        // Keep saved plans in the SAME main ledger as recorded overtime.
+        // Merge both data sets for shared filters, audit and the separate dialog.
         // Only a verified cloud report ID grants a plan a row; suggestions,
         // deleted/revoked reports and local-only plans must never appear as filed.
+        function p79OvertimeVisibleMainRows(rows){
+            return (rows||[]).filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row));
+        }
         function p79OvertimeMainLedgerRows(formalRows,plannedRows){
             const rows=[],seenIds=new Set();
             for(const row of [...(formalRows||[]),...(plannedRows||[])]){
@@ -15177,10 +15180,11 @@ function p79OvertimePeriodLabel(report){
             const jobTitle = document.getElementById('overtimeJobTitleFilter')?.value || 'ALL';
             const employeeId = document.getElementById('overtimeEmployeeFilter')?.value || 'ALL';
             const source = document.getElementById('overtimeSourceFilter')?.value || 'ALL';
-            // The separate planned dialog remains for punch corrections and batch
-            // tools, but cloud-saved plan IDs ALSO appear in the main ledger.
-            p79RenderOvertimePlannedRows(plannedRows,month,dept,jobTitle,employeeId);
-            const jobTitleRows = allOvertimeRows.filter(row =>
+            // Keep all verified plans accessible in the existing dialog, including
+            // any plan present only in the merged ledger. Main display and export
+            // exclude plans regardless of the selected source filter.
+            p79RenderOvertimePlannedRows(allOvertimeRows,month,dept,jobTitle,employeeId);
+            const jobTitleRows = p79OvertimeVisibleMainRows(allOvertimeRows).filter(row =>
                 (source==='ALL' || (source==='review' ? (row.overtimeReport?.attendanceState==='rest'&&!row.clockIn&&!row.clockOut) : source==='arranged' ? !!(row.overtimeReport || row.coverCandidate) : !(row.overtimeReport || row.coverCandidate))) &&
                 (month === 'ALL' || p79WorkOvertimeLedgerMonth(row) === month) &&
                 (dept === 'ALL' || p79OvertimeUnitForRow(row) === dept) &&
@@ -15255,9 +15259,9 @@ function p79OvertimePeriodLabel(report){
             const noPunchAutoNotice=noPunchAutoStatus?.running?'｜無卡預排正在雲端自動取消…':
                 noPunchAutoStatus?.lastError?'｜⚠ 無卡預排取消未完成，請核對雲端版本或管理權限':'';
             const pendingEstimateCount=pendingEstimate.count;
-            const savedPlanCount=rows.filter(row=>p79WorkOvertimeIsUnconfirmedPlan(row)&&row.reportVerified).length;
+            const savedPlanCount=p79OvertimePlannedVisibleRows(allOvertimeRows,month,dept,jobTitle,employeeId).length;
             document.getElementById('overtimeFilterResultCount').textContent =
-                '(清單 '+rows.length+' 筆｜已儲存預排 '+savedPlanCount+' 筆；預排不算已完成時數)'+
+                '(清單 '+rows.length+' 筆｜預排視窗 '+savedPlanCount+' 筆)'+
                 (pendingEstimateCount?'｜加班出勤 '+pendingEstimateCount+' 班':'')+
                 reportStatus+restStatus+noPunchAutoNotice+
                 (rows.some(row=>row.reportVerified&&row.overtimeReport?.attendanceState==='rest'&&!row.clockIn&&!row.clockOut)

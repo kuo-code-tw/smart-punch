@@ -1,13 +1,13 @@
 'use strict';
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const page=fs.readFileSync('work-hours/index.html','utf8');
-const start=page.indexOf('        function p79OvertimeMainLedgerRows(');
+const start=page.indexOf('        function p79OvertimeVisibleMainRows(');
 const end=page.indexOf('        function buildOvertimeStatisticsRows()',start);
 assert(start>0&&end>start,'main overtime ledger merger should exist');
 const candidate=page.slice(start,end);
 const isPlanned=row=>row?.planned===true||row?.overtimeReport?.planned===true;
 const isOfficial=row=>!!String(row?.id||'').trim();
-const fn=vm.runInNewContext('(function(){'+candidate+'return p79OvertimeMainLedgerRows})()',{
+const fn=vm.runInNewContext('(function(){'+candidate+'return {merge:p79OvertimeMainLedgerRows,visible:p79OvertimeVisibleMainRows}})()',{
  p79WorkOvertimeIsUnconfirmedPlan:isPlanned,p79WorkOvertimeOfficialReport:isOfficial
 });
 const item=(emp,date,id,planned,verified=true)=>({
@@ -20,8 +20,12 @@ const planned=[
  item('B','2026-11-03','two',false),item('E','2026-11-08','',true),
  item('F','2026-11-09','invalid',true,false)
 ];
-const result=fn(official,planned);
-assert.equal(result.length,4,'two completed + two saved plans only');
+const result=fn.merge(official,planned);
+assert.equal(result.length,4,'shared data retains two completed and two saved plans');
+assert.deepEqual(Array.from(fn.visible(result),r=>r.empId),['B','A'],'main ledger never displays planned rows');
+assert.equal(fn.visible([planned[0],{...official[0],overtimeReport:{id:'one',planned:true}}]).length,0,'both planned flags excluded');
+assert(page.includes('p79RenderOvertimePlannedRows(allOvertimeRows,month,dept,jobTitle,employeeId)'),'all saved plans remain available in the dialog');
+assert(page.includes('const jobTitleRows = p79OvertimeVisibleMainRows(allOvertimeRows).filter(row =>'),'main filters and export share the non-plan list');
 assert.equal(result.filter(r=>r.overtimeReport?.id==='two').length,1,'duplicate report ID must not appear twice');
 assert(result.some(r=>r.empId==='C'&&isPlanned(r)),'saved planned report must be visible');
 assert(result.some(r=>r.empId==='D'&&isPlanned(r)),'future plan with cloud ID must be visible');
@@ -36,4 +40,4 @@ assert(page.includes('不需要先核准'),'main screen does not gate saved repo
 assert(page.includes('row.reportVerified||row.coverCandidate||row.coverAlreadyArranged'),'existing delete action is preserved');
 const scripts=[...page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].filter(m=>! /\bsrc=|application\/json|importmap/.test(m[1]));
 for(const script of scripts)new vm.Script(script[2]);
-console.log('PASS saved overtime and cloud-identified plans visible on main page, report ID dedup, no approval gate, completed hours isolated');
+console.log('PASS saved plans retained in dialog, main list and metrics exclude plans, report ID dedup and no approval gate');

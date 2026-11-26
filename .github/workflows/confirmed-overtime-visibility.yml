@@ -49,6 +49,7 @@ jobs:
         run: |
           node tests/overtime-confirmed-report-auto-close.cjs
           node tests/overtime-pending-attendance.cjs
+          node tests/overtime-main-ledger-includes-saved-plans.cjs
           node tests/overtime-planned-separate-section.cjs
           node tests/overtime-planned-review-action.cjs
           node tests/overtime-pending-reasons-punch-edit.cjs
