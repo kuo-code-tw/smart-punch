@@ -363,7 +363,7 @@ body[data-p79-system="hr"]>header.top{display:none!important}
       <div class="field wide"><label>離職原因／備註</label><input id="terminationReason" placeholder="例如：自願離職、退休、契約期滿（可留空）"></div>
     </div>
   </div>
-<section class="hr-editor-section hr-editor-security" aria-label="帳號與權限"><h3 class="hr-editor-section-title"><span aria-hidden="true">🔑</span>帳號與權限</h3><div class="grid"><div class="field"><label>後台角色</label><select id="adminRole" onchange="onRoleChange()"><option value="employee">一般員工</option><option value="admin">管理員</option><option value="superadmin">超級管理員</option></select></div><div class="field"><label>管理員登入密碼</label><input id="password" type="password" placeholder="一般員工不可設定密碼；管理員留空＝維持原密碼"><div class="muted">只有管理員／超級管理員可設定；一般員工此欄鎖定。</div></div><div class="field"><label>裝置綁定</label><input id="deviceState" disabled></div><div class="field wide" id="p79EditorLeavePermissionBox">
+<section class="hr-editor-section hr-editor-security" aria-label="帳號與權限"><h3 class="hr-editor-section-title"><span aria-hidden="true">🔑</span>帳號與權限</h3><div class="grid"><div class="field"><label>後台角色</label><select id="adminRole" onchange="onRoleChange()"><option value="employee">一般員工</option><option value="admin">管理員</option><option value="superadmin">超級管理員</option></select></div><div class="field"><label for="password">管理員登入密碼</label><div class="hr-password-row"><input id="password" type="text" autocomplete="new-password" spellcheck="false" autocapitalize="off" placeholder="輸入新密碼；留空維持原密碼"><button type="button" class="hr-password-toggle" id="hrPasswordToggle" aria-controls="password" aria-pressed="true" onclick="p79ToggleHrPassword()">隱藏</button></div><div class="muted">只有管理員／超級管理員可設定；一般員工此欄鎖定。</div></div><div class="field"><label>裝置綁定</label><input id="deviceState" disabled></div><div class="field wide" id="p79EditorLeavePermissionBox">
     <label style="font-weight:850;font-size:15px">🔐 排班假別選取權限（此員工）</label>
     <div class="muted" style="margin:4px 0 10px">由超級管理員在人資替每位管理員決定可選的假別。管理員／超級管理員可依勾選權限在排班操作；一般員工鎖定。正式請假仍走請假管理。</div>
     <div id="p79EditorLeavePermissionChecks" style="display:flex;flex-wrap:wrap;gap:10px">
@@ -1339,8 +1339,14 @@ function buildPermGrid(e){
   }
   $('permGrid').innerHTML=cards+ranges;
   SYS.forEach(k=>{$('perm_'+k).value=superRole?'manage':employeeRole?'none':p[k];});
-  const pwd=$('password');if(pwd){pwd.disabled=employeeRole||!canGrant;if(employeeRole)pwd.value='';}
+  const pwd=$('password');if(pwd){pwd.disabled=employeeRole||!canGrant;if(employeeRole)pwd.value='';const toggle=$('hrPasswordToggle');if(toggle)toggle.disabled=pwd.disabled;}
   p79RenderEditorLeavePermission();
+}
+function p79ToggleHrPassword(){
+  const pwd=$('password'),button=$('hrPasswordToggle');
+  if(!pwd||!button||pwd.disabled)return;
+  const reveal=pwd.type==='password';pwd.type=reveal?'text':'password';
+  button.textContent=reveal?'隱藏':'顯示';button.setAttribute('aria-pressed',String(reveal));
 }
 function onRoleChange(){
   // Preserve unsaved per-employee checkboxes when a superadmin changes the role
@@ -1387,6 +1393,9 @@ function openEditor(id=''){
   $('terminationReason').value=editing?.terminationReason||'';
   $('adminRole').value=editing?.adminRole||'employee';
   $('password').value='';
+  $('password').type='text';
+  $('hrPasswordToggle').textContent='隱藏';
+  $('hrPasswordToggle').setAttribute('aria-pressed','true');
   $('deviceState').value=editing?.deviceBound?'已綁定':'未綁定';
   $('resignBtn').classList.toggle('hidden',!editing||normalizeEmploymentStatus(editing.employmentStatus)==='resigned');
   $('restoreBtn').classList.toggle('hidden',!editing||normalizeEmploymentStatus(editing.employmentStatus)==='active');
@@ -1872,6 +1881,13 @@ html body[data-p79-system="hr"] main.wrap>.hr-people-summary>.stat>.v {
   margin:0!important;flex:0 0 auto;font-variant-numeric:tabular-nums;
 }
 @media(max-width:550px){html body[data-p79-system="hr"] main.wrap>.hr-people-summary{gap:5px!important;}html body[data-p79-system="hr"] main.wrap>.hr-people-summary>.stat{padding:5px 7px!important;}}
+</style>
+<style id="p79-hr-password-visibility-20261126">
+#editor .hr-password-row{display:flex;align-items:stretch;gap:5px;min-width:0;}
+#editor .hr-password-row #password{flex:1 1 0;min-width:0;width:0;}
+#editor .hr-password-toggle{flex:0 0 auto;border:1px solid var(--hr-edge,var(--border));border-radius:8px;background:var(--panel);color:var(--hr-ink,var(--text));font-size:12px;font-weight:750;padding:0 9px;min-height:40px;}
+#editor .hr-password-toggle:disabled{opacity:.5;cursor:not-allowed;}
+#editor .hr-password-toggle:focus-visible{outline:2px solid var(--hr-accent,#8860cf);outline-offset:2px;}
 </style>
 </body></html>
 
