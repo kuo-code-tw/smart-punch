@@ -10582,7 +10582,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const norm=v=>String(v??'').trim().replace(/^0+/,'')||String(v??'').trim();
             const byAtt=new Map();
             people.forEach(emp=>{const key=norm(emp.attNo);if(!key)return;if(!byAtt.has(key))byAtt.set(key,[]);byAtt.get(key).push(emp);});
-            return (Array.isArray(sourceRecords)?sourceRecords:[]).map((r,index)=>{
+            const normalized = (Array.isArray(sourceRecords)?sourceRecords:[]).map((r,index)=>{
                 if(!r)return r;
                 const id=String(r.empId||'').trim().toUpperCase(),att=norm(r.attNo);
                 const byEmployeeId=byId.get(id)||null,byAttendance=byAtt.get(att)||[];
@@ -10590,6 +10590,27 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                     return {...r,__p79PairIdentity:'CONFLICT:'+index};
                 const master=byEmployeeId||(byAttendance.length===1?byAttendance[0]:null);
                 return master?{...r,empId:master.empId||r.empId,attNo:master.attNo??r.attNo,name:master.name||r.name}:r;
+            });
+
+            // Raw monthly reads can contain both the corrected punch and an older
+            // copy from an archive. Keep the newest verified edit for this
+            // employee, record ID and punch direction before pairing shifts.
+            const identityKey = record => {
+                if (!record?.empId || !record.id || record.__p79PairIdentity) return '';
+                const type = getAttendanceRecordType(record);
+                return type === 'OTHER' ? '' : JSON.stringify([String(record.empId).trim().toUpperCase(),String(record.id),type]);
+            };
+            const editTime = record => isManuallyEditedAttendanceRecord(record)
+                ? Date.parse(record.manuallyEditedAt || '') || 0 : 0;
+            const newestEdits = new Map();
+            for (const record of normalized) {
+                const key = identityKey(record);
+                const time = editTime(record);
+                if (key && time > (newestEdits.get(key) || 0)) newestEdits.set(key,time);
+            }
+            return normalized.filter(record => {
+                const newest = newestEdits.get(identityKey(record));
+                return !newest || editTime(record) >= newest;
             });
         }
         function p79WorkhoursAssessAttendanceRow(row,now=Date.now()) {
@@ -13326,12 +13347,18 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const token=state.token;
             try{
                 const shared=typeof window!=='undefined'&&window.P79WorkhoursCache?.enabled()?await window.P79WorkhoursCache.load(month):null;
-                if(shared&&currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state)window.P79WorkhoursCacheContext.applyBundle(shared,state);
-                const batches=shared?p79WorkRestMonths(month).map(m=>shared.raw[m]):await Promise.all(p79WorkRestMonths(month).map(m=>p79ReadWorkRestMonth(m,token)));
+                const currentBundle=shared&&Number(shared.meta?.revisions?.attendance||0)>=Number(lastAttendanceCloudRevision||0)?shared:null;
+                if(currentBundle&&currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state)window.P79WorkhoursCacheContext.applyBundle(currentBundle,state);
+                const batches=currentBundle?p79WorkRestMonths(month).map(m=>currentBundle.raw[m]):await Promise.all(p79WorkRestMonths(month).map(m=>p79ReadWorkRestMonth(m,token)));
                 if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
+                if(batches.some(data=>Number(data.revision||0)<Number(lastAttendanceCloudRevision||0))){
+                    state.attendanceEvidence={complete:false,days:{}};
+                    state.restEvidenceLoaded=false;
+                    return;
+                }
                 const rows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
                 // Apply verified raw month data to the visible ledger as well as the rest audit.
-                if(!shared&&evidenceRevision===lastAttendanceCloudRevision&&!p79WorkhoursIsEditing()){
+                if(!currentBundle&&evidenceRevision===lastAttendanceCloudRevision&&!p79WorkhoursIsEditing()){
                     const loadedMonths=new Set(p79WorkRestMonths(month));
                     const incoming=rows.map(normalizeAttendanceRecordIdentifiers).filter(r=>!isLocallyDeletedAttendanceRecord(r));
                     const normalized=applyPendingOperationsToCloudData({records:incoming,employees});
@@ -13343,10 +13370,9 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 state.restEvidenceRevision=evidenceRevision;state.restEvidenceLoaded=true;
                 p79OvertimeCalculationCache=null;
             }catch(error){
-                if(currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state){state.attendanceEvidence={complete:false,days:{}};state.restEvidenceError=error?.name==='AbortError'?'無卡休假核對逾時，請重新讀取':String(error?.message||error);}
+                if(currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state){state.attendanceEvidence={complete:false,days:{}};state.restEvidenceLoaded=true;state.restEvidenceError=error?.name==='AbortError'?'無卡休假核對逾時，請重新讀取':String(error?.message||error);}
             }finally{
                 state.restEvidencePending=false;
-                state.restEvidenceLoaded=true;
                 if(currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state){
                     if(p79WorkhoursIsEditing())p79DeferredOvertimeDisplay=true;
                     else{clearTimeout(p79WorkOvertimeRenderTimer);p79WorkOvertimeRenderTimer=setTimeout(()=>renderOvertimeStats(),50);}
@@ -17939,6 +17965,12 @@ window.P79WorkhoursCacheContext={
    // version month to loading when a background metadata check begins.
    if(bundle.preview&&state.ready&&!state.pending&&!state.error&&!state.cachePreview&&state.appliedCacheBundle===bundle.version)return;
    if(state.ready&&!state.error&&state.appliedCacheBundle===bundle.version&&state.cachePreview===(bundle.preview===true)&&state.at>0&&(bundle.preview||!state.pending))return;
+  const attendanceRevision = Number(bundle.meta?.revisions?.attendance || 0);
+  if (attendanceRevision && attendanceRevision < Number(lastAttendanceCloudRevision || 0)) {
+   // Retain the newer cloud punches while the older month request is retried.
+   state.pending=false;state.at=0;state.restEvidenceLoaded=false;
+   return;
+  }
   const roster=bundle.roster;
   if(Array.isArray(roster.employees))employees=mergeCloudEmployees(roster.employees.map(normalizeEmployeeIdentifiers));
   const raw=Object.values(bundle.raw||{}),loadedMonths=new Set(raw.map(x=>x.month));
