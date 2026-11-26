@@ -7,7 +7,7 @@ assert(start>0&&end>start,'main overtime ledger merger should exist');
 const candidate=page.slice(start,end);
 const isPlanned=row=>row?.planned===true||row?.overtimeReport?.planned===true;
 const isOfficial=row=>!!String(row?.id||'').trim();
-const fn=vm.runInNewContext('(function(){'+candidate+'return {merge:p79OvertimeMainLedgerRows,visible:p79OvertimeVisibleMainRows}})()',{
+const fn=vm.runInNewContext('(function(){'+candidate+'return {merge:p79OvertimeMainLedgerRows,visible:p79OvertimeVisibleMainRows,source:p79OvertimeSourceMatches}})()',{
  p79WorkOvertimeIsUnconfirmedPlan:isPlanned,p79WorkOvertimeOfficialReport:isOfficial
 });
 const item=(emp,date,id,planned,verified=true)=>({
@@ -22,7 +22,7 @@ const planned=[
 ];
 const result=fn.merge(official,planned);
 assert.equal(result.length,4,'shared data retains two completed and two saved plans');
-assert.deepEqual(Array.from(fn.visible(result),r=>r.empId),['B','A'],'main ledger never displays planned rows');
+assert.deepEqual(Array.from(fn.visible(result),r=>r.empId),['B','A'],'main ledger never displays unworked planned rows');
 assert.equal(fn.visible([planned[0],{...official[0],overtimeReport:{id:'one',planned:true}}]).length,0,'both planned flags excluded');
 assert(page.includes('p79RenderOvertimePlannedRows(allOvertimeRows,month,dept,jobTitle,employeeId)'),'all saved plans remain available in the dialog');
 assert(page.includes('const jobTitleRows = p79OvertimeVisibleMainRows(allOvertimeRows).filter(row =>'),'main filters and export share the non-plan list');
@@ -36,7 +36,12 @@ assert(page.includes('const completedRows=rows.filter(row=>!p79WorkOvertimeIsUnc
 assert(page.includes("const savedPlan=p79WorkOvertimeIsUnconfirmedPlan(row)"),'rows carry visible planned status');
 assert(page.includes("已儲存申報｜預排未出勤"),'saved future plans explicitly labeled');
 assert(page.includes('p79OpenMainPlannedOvertimeRow('),'saved plan buttons route into existing management');
-assert(page.includes('不需要先核准'),'main screen does not gate saved reports on approval');
+assert(fn.source(official[0],'arranged'),'confirmed report remains in arranged');
+const actual={...planned[0],clockIn:{},clockOut:{},totalMinutes:735};
+assert.equal(fn.visible([actual]).length,1,'completed planned attendance must be visible for review');
+assert(fn.source(actual,'pending'),'completed plan appears in attendance pending');
+assert(fn.source({coverCandidate:true,reportVerified:false},'pending'),'cover without official report is pending');
+assert(!fn.source({coverCandidate:true,reportVerified:false},'arranged'),'cover proposal is not a confirmed report');
 assert(page.includes('row.reportVerified||row.coverCandidate||row.coverAlreadyArranged'),'existing delete action is preserved');
 const scripts=[...page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].filter(m=>! /\bsrc=|application\/json|importmap/.test(m[1]));
 for(const script of scripts)new vm.Script(script[2]);

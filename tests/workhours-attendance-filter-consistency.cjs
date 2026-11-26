@@ -35,6 +35,19 @@ assert.equal(ctx.p79WorkhoursFilterAttendanceRows(shifts,'PENDING').length,0);
 assert.equal(raw[3].__p79PairIdentity,undefined,'raw punch is not mutated');
 ctx.p79DirectAttendanceTimestamp=r=>Date.parse(String(r?.timeStr||'').replaceAll('/','-').replace(' ','T')+'+08:00');
 for(const name of ['p79WorkOvertimeObservedMinutes','p79WorkOvertimePreferAttendance'])vm.runInContext(fn(name),ctx);
+vm.runInContext(fn('p79WorkOvertimeScopedPunches'),ctx);
+const scopeRaw=[
+ {id:'24-in',empId:'E1',attNo:'01',status:'上班簽到',timeStr:'2026/11/24 19:35'},
+ {id:'24-out',empId:'LEGACY-E1',attNo:'01',status:'下班簽退',timeStr:'2026/11/25 07:50'},
+ {id:'foreign',empId:'E2',attNo:'02',status:'下班簽退',timeStr:'2026/11/25 07:50'},
+ {id:'conflict',empId:'E2',attNo:'01',status:'下班簽退',timeStr:'2026/11/25 08:00'}
+];
+const scoped=ctx.p79WorkOvertimeScopedPunches(scopeRaw,new Set(['E1']));
+assert.equal(scoped.length,2,'legacy ID resolved before scope, foreign and conflicting IDs excluded');
+const coverPair=ctx.p79WorkhoursListAttendanceShifts(scoped);
+assert.equal(coverPair.length,1);
+assert.equal(ctx.p79WorkOvertimeObservedMinutes(coverPair[0]),735,'24th 19:35 to 25th 07:50 is 12h15');
+assert.equal(coverPair[0].accountingDateKey,'2026-11-24');
 const overnight=ctx.p79WorkhoursListAttendanceShifts([
  {id:'night-in',empId:'E1',attNo:'01',name:'甲',status:'上班簽到',timeStr:'2026/11/23 23:36'},
  {id:'night-out',attNo:'01',name:'甲',status:'下班簽退',timeStr:'2026/11/24 07:46'}

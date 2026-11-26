@@ -1730,7 +1730,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                   </div>
                   <div class="p79-overtime-compact-filters">
                     <div class="flex flex-nowrap gap-2 overflow-x-auto">
-                        <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部非預排加班</option><option value="arranged">已申報</option><option value="pending">出勤待申報</option><option value="review">🔴 疑似多報（整班無卡）</option></select></div>
+                        <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部加班出勤／申報</option><option value="arranged">已申報</option><option value="pending">出勤待申報</option><option value="review">🔴 疑似多報（整班無卡）</option></select></div>
                         <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">📅 年月</label><select id="overtimeMonthFilter" onchange="onOvertimeMonthChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部月份</option></select></div>
                         <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">🏢 單位</label><select id="overtimeDeptFilter" onchange="onOvertimeDeptChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部單位</option></select></div>
                         <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">💼 職稱</label><select id="overtimeJobTitleFilter" onchange="onOvertimeJobTitleChange()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部職稱</option></select></div>
@@ -1758,7 +1758,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     <div class="rounded-2xl border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/30 p-3"><div class="text-xs font-semibold text-orange-700 dark:text-orange-400">加班出勤時數</div><div id="overtimePendingEstimateHours" class="mt-1 text-xl font-bold text-orange-800 dark:text-orange-300">0 小時</div></div>
                     <div class="rounded-2xl border border-rose-100 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-3"><div class="text-xs font-semibold text-rose-600 dark:text-rose-400">超過每日 12 小時</div><div id="overtimeOver12Count" class="mt-1 text-xl font-bold text-rose-700 dark:text-rose-300">0</div></div>
                 </div>
-                <p id="p79OvertimeMainListExplanation" class="text-xs text-slate-600 dark:text-slate-300 mt-2" role="note">非預排加班申報不需要先核准即可顯示；預排統一在「預排／待核對」視窗查看，不列入主清單及正式加班統計。</p>
+                <p id="p79OvertimeMainListExplanation" class="text-xs text-slate-600 dark:text-slate-300 mt-2" role="note">未出勤預排在「預排／待核對」視窗查看；已有完整打卡的預排列為出勤待核，未確認前不計正式申報時數。</p>
                 <div id="p79OvertimeMissingConversionPanel" class="hidden mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100" role="region" aria-label="待換算加班申報清單"></div>
                 </div>
 
@@ -13847,7 +13847,24 @@ async function p79ExportOvertimeComparison(printMode){
         // Only a verified cloud report ID grants a plan a row; suggestions,
         // deleted/revoked reports and local-only plans must never appear as filed.
         function p79OvertimeVisibleMainRows(rows){
-            return (rows||[]).filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row));
+            // Hide unworked plans, not observed completed attendance. A saved
+            // plan with completed punches is an actual attendance review,
+            // still excluded from confirmed totals until its original ID is verified.
+            return (rows||[]).filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row)||
+                (!!row.clockIn&&!!row.clockOut&&Number(row.totalMinutes)>0));
+        }
+        function p79OvertimeSourceMatches(row,source){
+            if(source==='ALL')return true;
+            if(source==='review')return row.overtimeReport?.attendanceState==='rest'&&!row.clockIn&&!row.clockOut;
+            const filed=row.reportVerified===true&&!p79WorkOvertimeIsUnconfirmedPlan(row);
+            return source==='arranged'?filed:!filed;
+        }
+        function p79WorkOvertimeScopedPunches(raw,visibleIds){
+            // Resolve with the FULL HR master before applying the authorized
+            // work-hours scope, so a known out-of-scope ID or conflict never
+            // becomes visible through another employee's attendance number.
+            return p79WorkhoursDisplayPairingRows(raw).filter(record=>record&&
+                !record.__p79PairIdentity&&visibleIds.has(String(record.empId||'').trim().toUpperCase()));
         }
         function p79OvertimeMainLedgerRows(formalRows,plannedRows){
             const rows=[],seenIds=new Set();
@@ -13909,21 +13926,14 @@ async function p79ExportOvertimeComparison(printMode){
         function buildOvertimeStatisticsRows() {
             const visibleEmployees = p79WorkhoursEligibleEmployees();
             const visibleEmployeeIds = new Set(visibleEmployees.map(emp => String(emp.empId || '').trim().toUpperCase()).filter(Boolean));
-            const visibleAttendanceNumbers = new Set(visibleEmployees.map(emp => normalizeAttendanceStatsAttNo(emp.attNo)).filter(Boolean));
             // The overtime roster already has the validated workhours dataScope.
             // Do not apply the unrelated attendance-admin "employee only" filter:
             // a 領班 may also be an admin account and still be explicitly authorized.
             const selectedMonth=typeof document!=='undefined'?document.getElementById('overtimeMonthFilter')?.value:'';
             const visibleMonths=/^\d{4}-\d{2}$/.test(selectedMonth||'')?new Set(p79WorkRestMonths(selectedMonth)):null;
             const scopedSchedules=(schedules||[]).filter(r=>!visibleMonths||visibleMonths.has(String(r.month||'')));
-            const sourceRecords = records.filter(record => {
-                if(visibleMonths&&!visibleMonths.has(attendanceRecordMonthKey(record)))return false;
-                const rowId=String(record.empId||'').trim().toUpperCase();
-                const attNo = normalizeAttendanceStatsAttNo(record.attNo);
-                // A known but disallowed employee ID must never be rescued by
-                // another person's attendance number or an unverified name match.
-                return rowId ? visibleEmployeeIds.has(rowId) : !!attNo&&visibleAttendanceNumbers.has(attNo);
-            });
+            const sourceRecords = p79WorkOvertimeScopedPunches(records.filter(record=>
+                !visibleMonths||visibleMonths.has(attendanceRecordMonthKey(record))),visibleEmployeeIds);
 
             p79LoadWorkOvertimeMonths(sourceRecords);
             // 一次掃描可見員工的加班 metadata；不逐位重掃全部月份班表。
@@ -15188,10 +15198,10 @@ function p79OvertimePeriodLabel(report){
             const source = document.getElementById('overtimeSourceFilter')?.value || 'ALL';
             // Keep all verified plans accessible in the existing dialog, including
             // any plan present only in the merged ledger. Main display and export
-            // exclude plans regardless of the selected source filter.
+            // exclude unworked plans regardless of the selected source filter.
             p79RenderOvertimePlannedRows(allOvertimeRows,month,dept,jobTitle,employeeId);
             const jobTitleRows = p79OvertimeVisibleMainRows(allOvertimeRows).filter(row =>
-                (source==='ALL' || (source==='review' ? (row.overtimeReport?.attendanceState==='rest'&&!row.clockIn&&!row.clockOut) : source==='arranged' ? !!(row.overtimeReport || row.coverCandidate) : !(row.overtimeReport || row.coverCandidate))) &&
+                p79OvertimeSourceMatches(row,source) &&
                 (month === 'ALL' || p79WorkOvertimeLedgerMonth(row) === month) &&
                 (dept === 'ALL' || p79OvertimeUnitForRow(row) === dept) &&
                 (jobTitle === 'ALL' || row.jobTitle === jobTitle)
