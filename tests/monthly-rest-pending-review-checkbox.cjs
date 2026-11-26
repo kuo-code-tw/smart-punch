@@ -70,7 +70,10 @@ assert.match(src,/pointerenter[\s\S]*?event\.pointerType===\x27mouse\x27\)reason
 assert.match(src,/pointerleave[\s\S]*?event\.pointerType===\x27mouse\x27\)reasonHelp\.open=false/);
 assert.match(src,/\.mr-ux-reason-popup\{position:absolute/);
 for(const label of ['時段衝突','缺少必要資料','人員異動']) assert(reasonHelp[1].includes(label),'reason remains accessible: '+label);
-assert(!reasonHelp[1].includes('mrUxReviewSummary'),'live review summary remains outside the collapsed help');
+assert(reasonHelp[1].includes('mrUxReviewSummary'),'live review summary is hidden inside the help popup');
+assert(!src.includes('<aside class="mr-ux-card mr-ux-reasons"'),'no separate right-hand review card');
+assert.match(src,/<div class="mr-ux-tools">[\s\S]*?id="mrUxExport"[\s\S]*?id="mrUxReasonHelp"[\s\S]*?<div class="mr-ux-grid">/);
+assert.match(src,/\.mr-ux-grid\{display:grid;grid-template-columns:minmax\(0,1fr\)/);
 assert.match(src,/q\('#mrUxAll'\)\.onchange/);
 assert.match(src,/!submit\.disabled&&\/申報\//,'official submission still checks native button');
 assert.match(src,/if\(!submit\|\|!sourceRows\(el\)\.ready\.some/,'audit-only selection cannot submit');

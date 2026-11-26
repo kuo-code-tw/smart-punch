@@ -265,7 +265,7 @@ function mount(el){
  #p79MonthlyRest .mr-ux-primary{background:linear-gradient(#2581ff,#055de5)!important;color:#fff!important;box-shadow:0 4px 8px #125de324;font-weight:800}
  #p79MonthlyRest .mr-ux-outline{background:#f8fbff!important;border:1px solid #bed1e9!important;color:#245077!important;font-weight:750}
  #p79MonthlyRest .mr-ux-tools button{min-height:40px;white-space:nowrap;padding:7px 11px}
- #p79MonthlyRest .mr-ux-grid{display:grid;grid-template-columns:minmax(0,3fr) minmax(245px,1fr);gap:13px;min-height:0;align-items:start}
+ #p79MonthlyRest .mr-ux-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:13px;min-height:0;align-items:start}
  #p79MonthlyRest .mr-ux-card{min-width:0;background:white;border:1px solid #dce7f6;border-radius:16px;padding:14px;box-shadow:0 3px 11px #174f850d}
  #p79MonthlyRest .mr-ux-tabs{display:flex;border-bottom:1px solid #d9e6f6;gap:18px;padding:0 4px 10px}
  #p79MonthlyRest .mr-ux-tabs button{background:none!important;border:0!important;padding:6px 10px!important;font-size:15px!important;font-weight:800!important;color:#637894!important}
@@ -285,9 +285,8 @@ function mount(el){
  #p79MonthlyRest .mr-ux-table button{padding:4px 5px!important;color:#2e588e!important;background:transparent!important;font-size:12px!important;font-weight:800}
  #p79MonthlyRest .mr-ux-table button:disabled{opacity:.35}
  #p79MonthlyRest #mrUxReviewSummary{max-height:200px;overflow:auto;grid-column:1/-1}
- #p79MonthlyRest .mr-ux-reason-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;grid-column:1/-1;margin:5px 2px 8px}
- #p79MonthlyRest .mr-ux-reasons h3{font-size:17px;margin:0;color:#123359}
- #p79MonthlyRest .mr-ux-reason-help{position:relative;flex:0 0 auto}
+ #p79MonthlyRest .mr-ux-reason-popup-title{font-size:14px;font-weight:800;color:#123359;margin:4px 3px 6px}
+ #p79MonthlyRest .mr-ux-reason-help{position:relative;flex:0 0 auto;margin-left:auto}
  #p79MonthlyRest .mr-ux-reason-help>summary{display:grid;place-items:center;list-style:none;width:26px;height:26px;box-sizing:border-box;cursor:help;font-size:17px;font-weight:700;line-height:1;color:#315986;background:#eaf3ff;border:1px solid #dce7f6;border-radius:50%;padding:0}
  #p79MonthlyRest .mr-ux-reason-help>summary::-webkit-details-marker{display:none}
  #p79MonthlyRest .mr-ux-reason-help>summary::marker{content:''}
@@ -305,8 +304,8 @@ function mount(el){
  #p79MonthlyRest #mrUxHint{color:#334155;font-size:12px;white-space:nowrap;min-width:0;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis}
  #p79MonthlyRest #mrUxProgress{max-height:100px;overflow:auto;overscroll-behavior:contain}
  #p79MonthlyRest .mr-ux-eligibility{display:block;white-space:normal;max-width:210px;font-size:11px;line-height:1.3;color:#92400e;margin-top:3px}
- @media(max-width:1100px){#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}#p79MonthlyRest .mr-ux-reasons h3{grid-column:1/-1}#p79MonthlyRest .mr-ux-reason{margin:0}}
- @media(max-width:750px){#p79MonthlyRest #mrUxRoot{padding:10px;gap:10px}#p79MonthlyRest .mr-ux-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#p79MonthlyRest .mr-ux-stat{padding:9px;min-height:76px}#p79MonthlyRest .mr-ux-stat strong{font-size:22px}#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-reasons{display:block}#p79MonthlyRest .mr-ux-tools>label{flex:1 1 40%}#p79MonthlyRest .mr-ux-tools input,#p79MonthlyRest .mr-ux-tools select{min-width:0;max-width:100%}#p79MonthlyRest .mr-ux-tools .mr-ux-spacer{display:none}#p79MonthlyRest #mrUxFooter{flex-wrap:wrap}#p79MonthlyRest #mrUxHint{white-space:normal;overflow:visible;flex:1 1 140px}}
+
+ @media(max-width:750px){#p79MonthlyRest #mrUxRoot{padding:10px;gap:10px}#p79MonthlyRest .mr-ux-stats{grid-template-columns:repeat(2,minmax(0,1fr))}#p79MonthlyRest .mr-ux-stat{padding:9px;min-height:76px}#p79MonthlyRest .mr-ux-stat strong{font-size:22px}#p79MonthlyRest .mr-ux-grid{grid-template-columns:1fr}#p79MonthlyRest .mr-ux-tools>label{flex:1 1 40%}#p79MonthlyRest .mr-ux-tools input,#p79MonthlyRest .mr-ux-tools select{min-width:0;max-width:100%}#p79MonthlyRest .mr-ux-tools .mr-ux-spacer{display:none}#p79MonthlyRest #mrUxFooter{flex-wrap:wrap}#p79MonthlyRest #mrUxHint{white-space:normal;overflow:visible;flex:1 1 140px}}
  `;
  el.appendChild(style);
  const subtitle=document.createElement('div');subtitle.id='mrUxSubtitle';subtitle.textContent='自動編排、快速核對、正式申報一頁完成';
@@ -332,6 +331,14 @@ function mount(el){
  <button type="button" id="mrUxAuto" class="mr-ux-primary">✦ 自動配對日期</button>
  <button type="button" id="mrUxBatch" class="mr-ux-outline">☑ 批次核對</button>
  <button type="button" id="mrUxExport" class="mr-ux-outline">⇧ 匯出</button>
+ <details class="mr-ux-reason-help" id="mrUxReasonHelp"><summary aria-label="待核對原因說明，滑鼠移入查看或點擊展開">ⓘ</summary>
+ <div class="mr-ux-reason-popup">
+ <div class="mr-ux-reason-popup-title">待核對原因</div>
+ <div id="mrUxReviewSummary" role="status" aria-live="polite" style="font-size:12px;color:#476587;line-height:1.55;margin:8px 2px">勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。</div>
+ <div class="mr-ux-reason"><b>▤ 時段衝突</b><small>建議時段與既有排班／打卡不一致時需重新核對。</small></div>
+ <div class="mr-ux-reason"><b>▧ 缺少必要資料</b><small>班表、出勤或人員資料缺漏時不允許直接申報。</small></div>
+ <div class="mr-ux-reason"><b>♙ 人員異動</b><small>到職、離職、職稱或權限變更時依正式資料重新確認。</small></div>
+ </div></details>
  </div>
  <div class="mr-ux-grid">
  <section class="mr-ux-card"><div class="mr-ux-tabs">
@@ -345,15 +352,7 @@ function mount(el){
  </tr></thead><tbody id="mrUxRows"></tbody></table></div>
  <p id="mrUxListHint" style="font-size:11px;color:#617e9f;margin:9px 3px 0">所有數字均取自當月正式來源，尚未核實的預排不等於已申報。</p>
  </section>
- <aside class="mr-ux-card mr-ux-reasons"><div class="mr-ux-reason-heading"><h3>待核對原因</h3>
- <details class="mr-ux-reason-help" id="mrUxReasonHelp"><summary aria-label="待核對原因說明，滑鼠移入查看或點擊展開">ⓘ</summary>
- <div class="mr-ux-reason-popup">
- <div class="mr-ux-reason"><b>▤ 時段衝突</b><small>建議時段與既有排班／打卡不一致時需重新核對。</small></div>
- <div class="mr-ux-reason"><b>▧ 缺少必要資料</b><small>班表、出勤或人員資料缺漏時不允許直接申報。</small></div>
- <div class="mr-ux-reason"><b>♙ 人員異動</b><small>到職、離職、職稱或權限變更時依正式資料重新確認。</small></div>
- </div></details></div>
- <div id="mrUxReviewSummary" role="status" aria-live="polite" style="font-size:12px;color:#476587;line-height:1.55;margin:8px 2px">勾選待核對資料後，可在這裡檢視所選項目；不會直接申報。</div>
- </aside></div>
+</div>
  <footer id="mrUxFooter"><span id="mrUxSelected">已勾選 0 筆</span>
  <span id="mrUxHint" role="status" aria-live="polite"></span><button type="button" id="mrUxSavePlan" class="mr-ux-outline" disabled>▣ 儲存預排</button>
  <button type="button" id="mrUxSubmit" class="mr-ux-primary" disabled>➤ 正式申報</button></footer>`;
@@ -572,7 +571,7 @@ function mount(el){
    state.submitting=false;state.hint='請先勾選待核對資料；可以勾選灰色狀態的項目查看原因，但不會直接申報。';
   }else{
    const blocked=selected.filter(r=>selectionMode(r)==='review').length;
-   state.submitting=false;state.hint='已選取 '+selected.length+' 項核對資料，其中 '+blocked+' 項待查核；右側顯示所選項目，尚未修改正式申報狀態。';
+   state.submitting=false;state.hint='已選取 '+selected.length+' 項核對資料，其中 '+blocked+' 項待查核；上方 ⓘ 可檢視所選項目，尚未修改正式申報狀態。';
   }
   render();
  };
