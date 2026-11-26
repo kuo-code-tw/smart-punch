@@ -1443,7 +1443,7 @@ async function open(settings={}){
   paint();
  };
  q('#mrAll').onchange=()=>{if(!model?.workflow?.canSubmit)return;model.quotaPreviewSuppressed=false;visibleRows().forEach(({r})=>{if(!r.saved&&!r.planned)r.checked=q('#mrAll').checked;});paint();};
- q('#mrLoad').onclick=async(options={})=>{
+ q('#mrLoad').onclick=async(loadOptions={})=>{
   if(busy)return;invalidate();busy=true;controls(true);setStatus('正在同時讀取班表、出勤及雲端加班選項…');
   try{const requestedMonth=q('#mrMonth').value;
    if(loadedMonth&&loadedMonth!==requestedMonth)manualPeople.clear();
@@ -1459,7 +1459,7 @@ async function open(settings={}){
     }
     g.p79RestQuota(loadedMonth);
     if(!a.employees().length)throw Error('沒有可檢視的人員');
-   const preferLocal=options?.preferLocal===true&&g.P79WorkhoursCache?.enabled?.()===true&&!!g.P79WorkhoursCache?.verifiedRawMonths?.(loadedMonth,g.p79OvertimeContext?.token?.());
+   const preferLocal=loadOptions?.preferLocal===true&&g.P79WorkhoursCache?.enabled?.()===true&&!!g.P79WorkhoursCache?.verifiedRawMonths?.(loadedMonth,g.p79OvertimeContext?.token?.());
    const readMonth=preferLocal?a.snapshot(loadedMonth,false,false,false,true).catch(()=>a.snapshot(loadedMonth,false,false,true,true)):a.snapshot(loadedMonth,false,false,true,true);
    const [data,ruleResponse]=await Promise.all([readMonth,g.P79Overtime.loadRules()]);
     snapshot=data;rules=ruleResponse.rows;
@@ -1495,7 +1495,7 @@ async function open(settings={}){
    const pendingIssues=[...new Set(model.issues.filter(issue=>!issue.includes('已休、預排休與已申報合計超出額度')))];
    setStatus(isReadOnlySource()?'已顯示 '+loadedMonth+' 來源中的既有申報；'+(snapshot?.provisional===true?'歷史備援非月底核薪版。':'')+(snapshot?.readOnlyDueAttendance===true?'考勤尚未讀取成功。':'')+'目前僅供查看，不能新增、修改或儲存加班。':'已核對 '+loadedPeople.length+' 位授權人員；'+(autoPlan?'自動建議尚未儲存，':'未自動建立預排，')+'正式可申報 '+(model.rows||[]).length+' 筆；切換部門、職稱或姓名會立即篩選，先前勾選保留。'+(pendingIssues.length?'另有 '+pendingIssues.length+' 項仍待核對，請展開「逐人缺額及待核對原因」查看；已完成的項目不重複提示。':'本次沒有其他未解決的提示。'));
 
-  }catch(e){setStatus('讀取失敗：'+e.message);}finally{busy=false;controls(false);}
+  }catch(e){console.warn('每月未休假資料讀取失敗',e);setStatus('讀取失敗：'+String(e?.message||e));}finally{busy=false;controls(false);}
  };
  function choosePlanningMode(automatic){
   if(busy)return;
