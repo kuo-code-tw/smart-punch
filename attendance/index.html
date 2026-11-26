@@ -15648,8 +15648,19 @@ function getManualPairRecordAnchor(record) {
                     month+'-'+String(i+1).padStart(2,'0'));
                 const eligible=d=>(!hire||d>=hire)&&(!end||d<end);
                 const required=days.filter(eligible);
-                if(!required.length||required.some(d=>!String(saved[d]||'').trim()))
-                    return {state:'missing',label:'班表未齊，待核對'};
+                if(!required.length)
+                    return {state:'missing',label:'本月無適用排班日期',detail:'本月無適用的在職排班日期；與當日考勤完整性無關'};
+                const missingDates=required.filter(d=>!String(saved[d]||'').trim());
+                if(missingDates.length){
+                    // The quota column is monthly, not the attendance verdict.
+                    // Keep incomplete official totals unavailable instead of
+                    // inventing shift codes from punches or forcing a roster edit.
+                    const result={state:'missing',month,missingDates,
+                        label:'月統計缺 '+missingDates.length+' 日',
+                        detail:month+' 正式月班表缺少日期：'+missingDates.join('、')+'；僅影響例／休／國月統計，不代表當日缺卡。'};
+                    view?.restSummary?.set(key,result);
+                    return result;
+                }
                 const election=new Set((window.P79SpecialOvertime?.electionDates?.()||[])
                     .filter(d=>d.startsWith(month+'-')));
                 for(const d of days){
@@ -16630,7 +16641,7 @@ function getManualPairRecordAnchor(record) {
                 const rosterRest=p79AttendanceOfficialRestCategory(row,displayEmp,overtimeView);
                 const rosterRestTitle=rosterRest.state==='ready'
                     ? rosterRest.month+' 正式排班月統計；例／休／國＝已分配／剩餘，選＝選舉日事件；只供核對，不是加班申報或核准'
-                    : rosterRest.label;
+                    : (rosterRest.detail||rosterRest.label);
                 const rosterRestHtml=rosterRest.state==='ready'
                     ? '<div data-p79-rest-month="'+escapeHtml(rosterRest.month)+'" class="inline-flex items-center justify-center gap-2 text-[11px] font-bold whitespace-nowrap">'+
                       ['例','休','國'].map((kind,i)=>'<span data-rest-category="'+kind+'" class="'+
@@ -16639,8 +16650,8 @@ function getManualPairRecordAnchor(record) {
                       (rosterRest.typhoon?'<span data-rest-category="颱" class="text-cyan-700">颱 '+rosterRest.typhoon+'</span>':'')+
                       (rosterRest.election?'<span data-rest-category="選" class="text-indigo-700">選 '+rosterRest.election+'</span>':'')+
                       '</div>'
-                    : '<span class="text-[11px] text-amber-700" title="'+escapeHtml(rosterRestTitle)+'">'+
-                      escapeHtml(rosterRest.label)+'</span>';
+                    : '<span class="text-[11px] '+(rosterRest.missingDates?'text-slate-500':'text-amber-700')+'" title="'+escapeHtml(rosterRestTitle)+'">'+
+                      escapeHtml(rosterRest.label)+(rosterRest.missingDates?'<span class="block text-[10px]">缺 '+escapeHtml(rosterRest.missingDates.slice(0,4).map(d=>d.slice(5).replace('-','/')).join('、'))+(rosterRest.missingDates.length>4?'…':'')+'</span>':'')+'</span>';
 
                 const visibleAssessmentReasons=(row.attendanceAssessmentReasons||[]).filter(reason=>!String(reason).startsWith('上班時間與班表不符')&&!String(reason).startsWith('上班時間需核對：')&&String(reason)!=='下班分鐘未在45–60');
                 const hiddenTimeOnly=row.attendanceStatus==='時間需核對'&&(row.attendanceAssessmentReasons||[]).length>0&&!visibleAssessmentReasons.length;
