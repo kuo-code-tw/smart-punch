@@ -7,7 +7,7 @@
 <script defer src="../assets/port79-hidden-job-titles.js?v=20261117-hr-hidden-v1&refresh=20261118-stable-v1"></script>
 <script defer src="../assets/port79-workhours-hidden-job-ui.js?v=20261117-hr-filter-v1&refresh=20261118-stable-v1"></script>
 <script defer src="../assets/port79-overtime-upload-queue.js?v=20261125-local-outbox-v1"></script>
-<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v7-write-priority&outbox=20261125-v1&bulkReview=20261125-v2&pendingEdit=20261125-v1"></script>
+<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v7-write-priority&outbox=20261125-v1&bulkReview=20261125-v2&pendingEdit=20261125-v1&punchTime=20261126-v1"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261124-planned-review-v3"></script>
 <script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
@@ -17793,7 +17793,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  }
  if(draft.preventReplace&&['approvalStatus','approvedBy','approvedAt','reviewedBy','reviewedAt'].some(key=>existingReport[key]!=null&&existingReport[key]!==''))throw Error('這筆申報已有審核紀錄，為避免覆蓋審核資料，請先完成正式審核變更程序。');
  const raw=(attendance.records||[]).filter(record=>String(record.empId||'').trim().toUpperCase()===employeeId);
- const pairs=buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
+ const pairs=P79Overtime.reportAttendancePairs?P79Overtime.reportAttendancePairs(raw,employeeId,draft.date,draft.rule,buildDailyAttendanceRows):buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
  if(draft.manualPlan===true&&draft.editPlannedOnly!==true&&draft.date<today)throw Error('不能為過去日期新增預排');
  const planned=draft.manualPlan===true||!pairs.length&&draft.date>=today;
@@ -17823,7 +17823,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
      matched?.suggested?.code!==draft.rule.code||matched?.suggested?.category!==draft.rule.category))
      throw Error('申報時段與最新完整打卡不符，請重新核對。');
  }
- if(!planned){const issue=P79Overtime.ruleAttendanceIssue(pairs[0].start,pairs[0].end,draft.date,[draft.rule.category,draft.rule.code,draft.rule.declaredHours,draft.rule.convertedHours??'',draft.rule.normalStart||'',draft.rule.normalEnd||'',draft.rule.overtimeStart,draft.rule.overtimeEnd,draft.rule.position||'full',draft.rule.typeName||''],cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule);if(issue)throw Error(issue);}
+ if(!planned){const issue=P79Overtime.ruleAttendanceIssue(pairs[0].start,pairs[0].end,draft.date,[draft.rule.category,draft.rule.code,draft.rule.declaredHours,draft.rule.convertedHours??'',draft.rule.normalStart||'',draft.rule.normalEnd||'',draft.rule.overtimeStart,draft.rule.overtimeEnd,draft.rule.position||'full',draft.rule.typeName||''],cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule);if(issue)throw Error(P79Overtime.reportAttendanceIssueDetail?.(issue,pairs[0].start,pairs[0].end,draft.date,draft.rule)||issue);}
  const previous=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]?.overtimeReport;
  const roster=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule||{},dayMeta=roster.__meta?.[draft.date]||{},normal=dayMeta.reportOriginalShift??dayMeta.overtimeOriginalShift??roster[draft.date];
  if(draft.preventReplace&&(!previous||String(previous.id)!==String(draft.id)))throw Error('原申報已變更或不存在，停止修改以免建立重複申報');
@@ -17967,7 +17967,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   void p79OpenLeaveOvertimeHandoff();
 });
 </script>
-<script src="../attendance/v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102"></script>
+<script src="../attendance/v6-engine.js?v=20261101-ship-workday-tooltip&overlap=20261102&punchTime=20261126-v1"></script>
 
 <script src="../assets/port79-workhours-cache.js?v=20261116-attendance-preview-v1&reuse=20261117-local-first-v2&prewarm=20261125-v1"></script>
 <script>

@@ -2181,8 +2181,8 @@ async function saveAdminCreateLeave(){
 }
 </script>
 
-<script src="../attendance/v6-engine.js?v=20261014.109"></script>
-<script src="../assets/port79-overtime-report.js?v=20261119-overtime-safe-queue-date-names-v2"></script>
+<script src="../attendance/v6-engine.js?v=20261014.109&punchTime=20261126-v1"></script>
+<script src="../assets/port79-overtime-report.js?v=20261119-overtime-safe-queue-date-names-v2&punchTime=20261126-v1"></script>
 <script>
 function p79DirectAttendanceTimestamp(record){
  const raw=String(record?.timeStr||'').trim();
@@ -2239,7 +2239,7 @@ async function p79SaveWorkOvertimeDraft(draft){
   throw Error('正式 GAS 尚未確認可將 '+draft.date+' 凌晨的加班歸屬 '+overtimeDate+'；不寫入錯日申報。需先部署後端配套。');
  const employeeId=String(draft.empId).trim().toUpperCase();
  const raw=(attendance.records||[]).filter(record=>String(record.empId||'').trim().toUpperCase()===employeeId);
- const pairs=buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
+ const pairs=P79Overtime.reportAttendancePairs?P79Overtime.reportAttendancePairs(raw,employeeId,draft.date,draft.rule,buildDailyAttendanceRows):buildDailyAttendanceRows(raw).filter(row=>row.clockIn&&row.clockOut).map(row=>({row,start:p79DirectAttendanceTimestamp(row.clockIn),end:p79DirectAttendanceTimestamp(row.clockOut)})).filter(pair=>P79Overtime.overtimeMinutes(pair.start,pair.end,draft.date,{overtimeReport:draft.rule})>0);
  const today=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date()),planned=!pairs.length&&draft.date>=today;
  if(!pairs.length&&!planned)throw Error('過去日期須有包含所選時段的完整出勤；未生成實際加班');
  if(pairs.length>1)throw Error('所選時段有多組出勤配對，請先在出勤表核對');
@@ -2256,7 +2256,7 @@ async function p79SaveWorkOvertimeDraft(draft){
  if(!planned){
   const rule=[draft.rule.category,draft.rule.code,draft.rule.declaredHours,draft.rule.convertedHours??'',draft.rule.normalStart||'',draft.rule.normalEnd||'',draft.rule.overtimeStart,draft.rule.overtimeEnd,draft.rule.position||'full',draft.rule.typeName||''];
   const issue=P79Overtime.ruleAttendanceIssue(pairs[0].start,pairs[0].end,draft.date,rule,roster);
-  if(issue)throw Error(issue);
+  if(issue)throw Error(P79Overtime.reportAttendanceIssueDetail?.(issue,pairs[0].start,pairs[0].end,draft.date,draft.rule)||issue);
  }
 
  const body={action:'saveOvertimeReportDirect',token,gcToken:token,id:draft.id,empId:draft.empId,

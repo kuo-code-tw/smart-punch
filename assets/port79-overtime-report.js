@@ -190,6 +190,68 @@
    return b-a===Number(r[2])*3600000&&start<=a&&end>=b;
   }catch(_){return false;}
  }
+ function canonicalReportPunchEpoch(record){
+  const raw=String(record?.timeStr??record?.['出勤時間']??'').trim();
+  // Explicit timezone means an absolute instant. Never strip the date suffix
+  // or reinterpret UTC as Taiwan wall-clock time.
+  const iso=/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(Z|[+-]\d{2}:?\d{2})$/i.exec(raw);
+  const local=/^(\d{2,4})[/-](\d{1,2})[/-](\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?$/.exec(raw);
+  const m=iso||local;if(!m)return NaN;
+  let y=Number(m[1]);if(!iso&&y<1911)y+=1911;
+  const month=Number(m[2]),day=Number(m[3]),h=Number(m[4]),n=Number(m[5]),sec=Number(m[6]||0),ms=Number(String(m[7]||'').padEnd(3,'0'));
+  const wall=Date.UTC(y,month-1,day,h,n,sec,ms),check=new Date(wall);
+  if(check.getUTCFullYear()!==y||check.getUTCMonth()!==month-1||check.getUTCDate()!==day||h>23||n>59||sec>59)return NaN;
+  if(!iso)return wall-8*3600000;
+  const z=m[8].toUpperCase();
+  if(z==='Z')return wall;
+  const digits=z.slice(1).replace(':',''),oh=Number(digits.slice(0,2)),om=Number(digits.slice(2));
+  if(oh>23||om>59)return NaN;
+  return wall-(z[0]==='-'?-1:1)*(oh*60+om)*60000;
+ }
+ function reportPunchText(epoch){
+  return Number.isFinite(epoch)?new Date(epoch+8*3600000).toISOString().slice(0,19).replace(/-/g,'/').replace('T',' '):'無法解析';
+ }
+ function reportAttendancePairs(records,empId,date,rule,buildRows){
+  const employee=String(empId||'').trim().toUpperCase(),byId=new Map(),normalized=[];
+  for(const source of Array.isArray(records)?records:[]){
+   if(String(source.empId||'').trim().toUpperCase()!==employee)continue;
+   const id=String(source.id||'').trim(),epoch=canonicalReportPunchEpoch(source);
+   if(!id||!Number.isFinite(epoch))continue;
+   if(byId.has(id)){
+    const old=byId.get(id);
+    if(old.epoch!==epoch||String(old.source.status||'')!==String(source.status||''))throw Error('同一打卡識別碼有不同時間或狀態，請先核對正式出勤');
+    continue;
+   }
+   byId.set(id,{source,epoch});
+   normalized.push({...source,timeStr:reportPunchText(epoch)});
+  }
+  const builder=buildRows||global.P79AttendanceV6?.buildShifts;
+  if(typeof builder!=='function')throw Error('正式出勤配對元件尚未就緒，未送出申報');
+  const result=[],seen=new Set();
+  for(const row of builder(normalized)||[]){
+   if(!row.clockIn||!row.clockOut)continue;
+   const inId=String(row.clockIn.id||'').trim(),outId=String(row.clockOut.id||'').trim(),a=byId.get(inId),b=byId.get(outId);
+   if(!a||!b||inId===outId||!(b.epoch>a.epoch)||b.epoch-a.epoch>24*3600000)continue;
+   // Read back the exact original IDs/instants, not a display-time conversion.
+   if(overtimeMinutes(a.epoch,b.epoch,date,{overtimeReport:rule})<=0)continue;
+   const key=JSON.stringify([inId,outId]);if(seen.has(key))continue;seen.add(key);
+   result.push({row:{...row,clockIn:{...row.clockIn,id:a.source.id,timeStr:reportPunchText(a.epoch)},clockOut:{...row.clockOut,id:b.source.id,timeStr:reportPunchText(b.epoch)}},start:a.epoch,end:b.epoch});
+  }
+  return result;
+ }
+ function reportAttendanceIssueDetail(issue,start,end,date,rule){
+  if(!issue)return '';
+  let expected='';
+  try{
+   let ot=interval(date,rule.overtimeStart,rule.overtimeEnd);
+   if(rule.category==='延'){
+    const normal=interval(date,rule.normalStart,rule.normalEnd),offset=rule.position==='after'?normal[1]-ot[0]:normal[0]-ot[1];
+    ot=ot.map(t=>t+offset);
+   }
+   expected='；選定加班 '+reportPunchText(ot[0])+' ～ '+reportPunchText(ot[1]);
+  }catch(_){}
+  return issue+'（正式配對 '+reportPunchText(start)+' ～ '+reportPunchText(end)+expected+'；出勤日 '+date+'）';
+ }
  function ruleAttendanceIssue(start,end,date,row,roster=null){
   if(!(Number.isFinite(start)&&Number.isFinite(end)&&end>start))return '尚未完成上下班打卡，請核對';
   const r=validate([row])[0];let ot=interval(date,r[6],r[7]);
@@ -2159,7 +2221,17 @@
      if(prefill.editPlannedOnly!==true&&!independentFiling&&!originalExtensionReview&&['代','延'].includes(chosen?.[0]))validateLeaveLinkedOvertimeDate(
       date,forSelect.value,approvedDates,prefill.leaveHandoffId?String(prefill.workDate||prefill.date):'',
       prefill.leaveHandoffId?String(prefill.coverDate||prefill.overtimeDate||''):'');
-     if(prefill.attendance&&String(prefill.empId)===String(empId)&&prefill.date===date){const issue=ruleAttendanceIssue(prefill.attendance.start,prefill.attendance.end,date,chosen);if(issue)throw Error(issue);}
+     if(prefill.attendance&&String(prefill.empId)===String(empId)&&prefill.date===date){
+      if(editingOriginal){const issue=ruleAttendanceIssue(prefill.attendance.start,prefill.attendance.end,date,chosen);if(issue)throw Error(issue);}
+      else if(global.P79AttendanceV6?.buildShifts){
+       const rule=report(chosen),freshPairs=reportAttendancePairs(validation.cloud.records,empId,date,rule);
+       if(freshPairs.length>1)throw Error('所選時段有多組正式出勤配對，請先在出勤表核對');
+       if(freshPairs.length===1){
+        const pair=freshPairs[0],issue=ruleAttendanceIssue(pair.start,pair.end,date,chosen);
+        if(issue)throw Error(reportAttendanceIssueDetail(issue,pair.start,pair.end,date,rule));
+       }else if(date<new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date()))throw Error('正式雲端未讀到所選時段的完整打卡，未使用開窗時的舊資料');
+      }else{const issue=ruleAttendanceIssue(prefill.attendance.start,prefill.attendance.end,date,chosen);if(issue)throw Error(issue);}
+     }
      const editingExisting=Boolean(prefill.savedReport&&prefill.reportId&&String(prefill.empId)===String(empId)&&prefill.date===date);
      if(editingOriginal&&!editingExisting)throw Error('修改正式申報不可更換員工或日期，請重新開啟原紀錄。');
      if(editingExisting&&prefill.editPlannedOnly!==true&&!(prefill.attendance?.end>prefill.attendance?.start))throw Error('原申報需完成上下班打卡才能確認修改時段；目前只顯示暫估');
@@ -2266,7 +2338,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={runQueuedReview,checkQueuedReview,chosenMatchesLeaveSplit,independentShiftOvertimeIssue,RECOVERY_STORAGE,overtimeRecoverySnapshot,rememberOvertimeOptions,recoverableOvertimeOptions,ruleGuide,prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,ruleAttendanceIssue,manualPlannedReviewCovers,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={runQueuedReview,checkQueuedReview,chosenMatchesLeaveSplit,independentShiftOvertimeIssue,RECOVERY_STORAGE,overtimeRecoverySnapshot,rememberOvertimeOptions,recoverableOvertimeOptions,ruleGuide,prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,canonicalReportPunchEpoch,reportAttendancePairs,reportAttendanceIssueDetail,ruleAttendanceIssue,manualPlannedReviewCovers,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 

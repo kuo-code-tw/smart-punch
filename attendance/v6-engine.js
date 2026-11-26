@@ -19,7 +19,13 @@
     return 'OTHER';
   }
   function normalizeTime(v){
-    let x=s(v).replace(/-/g,'/').replace(/\s+/g,' ');
+    const original=s(v);
+    // Convert an explicitly zoned ISO punch to Taiwan time before replacing
+    // separators; the former path corrupted ISO into unpairable strings.
+    if(/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})$/i.test(original)){
+      const t=Date.parse(original);if(Number.isFinite(t))return new Date(t+8*3600000).toISOString().slice(0,19).replace(/-/g,'/').replace('T',' ');
+    }
+    let x=original.replace(/-/g,'/').replace(/(\d)T(?=\d)/,'$1 ').replace(/\s+/g,' ');
     const m=x.match(/^(\d{2,4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
     if(!m){
       const date=x.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
