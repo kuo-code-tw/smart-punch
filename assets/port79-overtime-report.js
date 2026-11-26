@@ -2150,7 +2150,8 @@
      // cover split becomes a separate filing, without completing that cover.
      const expected=prefill.leaveHandoffId?prefill.expectedSplitRule:null;
      let deletedLeaveIndependent=false;
-     if(prefill.leaveHandoffId&&!editingOriginal&&chosen[0]==='延'&&!prefill.savedReport&&!prefill.reportId){
+     if(prefill.leaveHandoffId&&!editingOriginal&&chosen[0]==='延'&&!prefill.savedReport&&!prefill.reportId&&
+        !approvedDates.includes(String(prefill.coverDate||prefill.overtimeDate||date))){
       const beforeSelection=JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value]);
       const freshLeave=await officialOvertimeMonthData(date,true);
       if(!el.isConnected||beforeSelection!==JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value]))throw Error('核對期間申報內容已變更，請重新儲存');
