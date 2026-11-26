@@ -81,6 +81,8 @@ assert(host.classList.contains('hidden'),'test starts with the overtime panel hi
 assert.equal(host.dataset.p79UxReady,'1','original action bar only hidden after new one installed');
 const tabs=root.querySelectorAll('[data-p79-overtime-tab]');
 assert.equal(tabs.length,9,'reference homepage plus all eight approved actions are visible');
+for(const tab of tabs){const key=tab.dataset.p79OvertimeTab;assert(css.includes('[data-p79-overtime-tab="'+key+'"]{--p79-ot-icon:')||css.includes('[data-p79-overtime-tab="'+key+'"],\n'),'distinct vector icon for '+key);assert(!/^[▤▥▦☷＋⚙✓↻]/.test(tab.textContent),'no legacy duplicate glyph');}
+assert(css.includes('background:currentColor'));assert(css.includes('mask:var(--p79-ot-icon)'));
 assert(tabs.find(x=>x.dataset.p79OvertimeTab==='home').classList.contains('is-active'),
  'on first visit the real landing page tab is selected');
 for(const action of ['history','detail','report','rules','planned','reset']){
