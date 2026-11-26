@@ -94,6 +94,12 @@ function setup(items,cloudRecords,{failRead=false,failArchive=false}={}){
  assert.equal(retry.errors,1);
  assert.equal(failed.queue.length,1,'failed cloud read cannot discard pending data');
  assert.equal(failed.archives.length,0);
+ const stalled=setup([makeItem('H'),makeItem('I')],[]);
+ stalled.c.fetch=async()=>({ok:true,json:()=>new Promise(()=>{})});
+ const timed=await stalled.c.p79AuditPausedAttendanceQueue(null,{maxWaitMs:10});
+ assert.equal(timed.checked,2);assert.equal(timed.errors,2);assert.equal(timed.archived,0);
+ assert.equal(stalled.queue.length,2,'a hung response body cannot erase drafts or leave the audit open');
+ assert.match(timed.lastError,/逾時/);
  const backup=setup([makeItem('M')],[],{failArchive:true});
  const blocked=await backup.run();
  assert.equal(blocked.errors,1);

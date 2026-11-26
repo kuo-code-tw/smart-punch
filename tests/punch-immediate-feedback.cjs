@@ -10,7 +10,9 @@ function fixture(path,{busy=false,reject=false}={}){
   markRecentAttendanceMutationCloudConfirmed(){},p79PauseAttendanceWrite:()=>false,p79AttendanceRetryDelay:()=>8000,saveQueue(){},
   p79RenderOnlyVisibleAttendanceView:()=>events.push('visible'),renderAdminRecordsTable:()=>events.push('table'),renderAdminLiveTable:()=>events.push('live'),
   showToast:()=>events.push('toast'),setTimeout:fn=>timers.push(fn),drain(){},scheduleDelta(){}};
- c.p79SendAttendanceInBrowserLane=(...args)=>c.send(...args);vm.createContext(c);const start=source.indexOf('async function submitAttendanceWrite('),end=source.indexOf('\nwindow.p79V5SubmitAttendanceWrite=',start);assert(start>=0&&end>start);vm.runInContext(source.slice(start,end),c);
+ c.p79SendAttendanceInBrowserLane=(...args)=>c.send(...args);vm.createContext(c);const start=source.indexOf('async function submitAttendanceWrite('),end=source.indexOf('\nwindow.p79V5SubmitAttendanceWrite=',start);assert(start>=0&&end>start);if(source.includes('function p79TrackAttendanceCloudFailure(')){
+  const retryStart=source.indexOf('function p79TransientAttendanceError('),retryEnd=source.indexOf('function p79PauseAttendanceWrite(',retryStart);assert(retryStart>=0&&retryEnd>retryStart);vm.runInContext(source.slice(retryStart,retryEnd),c);
+ }vm.runInContext(source.slice(start,end),c);
  return {c,events,frames,timers,finish:()=>finish(),submit:payload=>c.submitAttendanceWrite(payload,'done',()=>events.push('ack'),()=>events.push('error'))};
 }
 const punch={action:'addRecord',record:{id:'1',source:'employee-punch'}};

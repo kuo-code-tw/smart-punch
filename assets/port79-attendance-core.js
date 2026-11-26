@@ -538,18 +538,33 @@ async function p79AuditPausedAttendanceQueue(reportProgress,options={}){
   try{reportProgress?.({...summary})}catch(_){ }
   return summary;
  }
+ // Bound the entire interactive audit, not only each monthly fetch. A stalled
+ // response/body must never keep the modal busy or count as an empty month.
+ const auditDeadline=Date.now()+Math.min(30000,Math.max(1,Number(options.maxWaitMs)||30000));
  const monthCache=new Map();
  function officialMonth(month){
   if(!monthCache.has(month)){
    monthCache.set(month,(async()=>{
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),25000);
+    const remaining=Math.min(25000,auditDeadline-Date.now());
+    if(remaining<=0)throw Error('正式資料核對已逾時，原修改保留');
+    const controller=new AbortController();
+    let timer;
     try{
-     const url=base+(base.includes('?')?'&':'?')+'action=getAttendanceMainDirect&month='+encodeURIComponent(month)+'&token='+encodeURIComponent(access)+'&t='+Date.now();
-     const response=await fetch(url,{cache:'no-store',signal:controller.signal});
-     const data=await response.json();
-     if(!response.ok||!data?.ok||String(data.month)!==month||!Array.isArray(data.records))
-      throw new Error(data?.error||month+' 正式月份主表核對失敗');
-     return data.records;
+     const read=(async()=>{
+      const url=base+(base.includes('?')?'&':'?')+'action=getAttendanceMainDirect&month='+encodeURIComponent(month)+'&token='+encodeURIComponent(access)+'&t='+Date.now();
+      const response=await fetch(url,{cache:'no-store',signal:controller.signal});
+      const data=await response.json();
+      if(!response.ok||!data?.ok||String(data.month)!==month||!Array.isArray(data.records))
+       throw new Error(data?.error||month+' 正式月份主表核對失敗');
+      return data.records;
+     })();
+     const timeout=new Promise((_,reject)=>{
+      timer=setTimeout(()=>{
+       reject(Error('正式資料核對已逾時，原修改保留'));
+       controller.abort();
+      },remaining);
+     });
+     return await Promise.race([read,timeout]);
     }finally{clearTimeout(timer);}
    })());
   }
