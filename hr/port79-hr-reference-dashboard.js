@@ -87,12 +87,12 @@ function mountDashboard(){
  d.innerHTML=[
  '<div class="p79r-kpis">',
  card('👥','在職人數','p79rActive','正式人資主檔',''),
- card('👤＋','本月到職','p79rHires','依到職日期',''),
- card('👤−','本月離職','p79rLeavers','依生效離職日期','purple'),
+ card('👤＋','本月到職','p79rHires','',''),
+ card('👤−','本月離職','p79rLeavers','','purple'),
  card('☑','當日出勤率','p79rAttendance','以考勤系統為準',''),
- card('📅','本月請假人次','p79rLeaves','以請假系統為準','green'),
- card('◷','本月加班時數','p79rOvertime','正式申報，不含預排','purple'),
- card('⏸','留職停薪','p79rLeaveStatus','依現有人資主檔','amber'),
+ card('📅','本月請假人次','p79rLeaves','','green'),
+ card('◷','本月加班時數','p79rOvertime','','purple'),
+ card('⏸','留職停薪','p79rLeaveStatus','','amber'),
  '</div>',
  '<div class="p79r-grid-top">',
  panel('各單位人員統計（在職）','<div class="p79r-dept-scroller" role="region" tabindex="0" aria-label="職稱統計表，可水平捲動"><table aria-label="各單位依職稱統計在職人數"><thead><tr id="p79rDeptHead"><th>單位</th><th>合計</th><th>占比</th></tr></thead><tbody id="p79rDepts"><tr><td colspan="3">讀取人資主檔中…</td></tr></tbody></table></div>'),
@@ -106,8 +106,8 @@ function mountDashboard(){
  '</div>',
  '<div class="p79r-grid-bottom">',
  panel('重要提醒','<div id="p79rAlerts" role="status">正在核對人員資料…</div>'),
- panel('近30日到／離職趨勢','<div class="p79r-note">以人資主檔中有效的到職日、離職日計算</div><div class="p79r-chart" id="p79rHistoryChart"></div><div class="p79r-note" style="text-align:center;padding-top:8px">藍色：到職　紫色：離職</div>'),
- panel('快速功能','<div class="p79r-quick"><button type="button" data-hr-view="employees"><span class="icon">👤</span>員工資料</button><a href="../attendance/"><span class="icon">☑</span>考勤管理</a><a href="../schedule/"><span class="icon">♧</span>排班管理</a><a href="../leave/"><span class="icon">▣</span>請假管理</a><a href="../work-hours/"><span class="icon">◷</span>加班管理</a><button type="button" data-hr-command="add"><span class="icon">＋</span>員工新增</button><button type="button" data-hr-command="org"><span class="icon">♙</span>組織管理</button><button type="button" data-hr-command="report"><span class="icon">▥</span>人資報表</button></div><div class="p79r-note">所有人數皆以人資主檔及目前權限範圍為準；考勤、核准請假及正式加班申報使用雲端唯讀資料；讀取失敗會顯示原因。</div>'),
+ panel('近30日到／離職趨勢','<div class="p79r-chart" id="p79rHistoryChart"></div><div class="p79r-note" style="text-align:center;padding-top:8px">藍色：到職　紫色：離職</div>'),
+ panel('快速功能','<div class="p79r-quick"><button type="button" data-hr-view="employees"><span class="icon">👤</span>員工資料</button><a href="../attendance/"><span class="icon">☑</span>考勤管理</a><a href="../schedule/"><span class="icon">♧</span>排班管理</a><a href="../leave/"><span class="icon">▣</span>請假管理</a><a href="../work-hours/"><span class="icon">◷</span>加班管理</a><button type="button" data-hr-command="add"><span class="icon">＋</span>員工新增</button><button type="button" data-hr-command="org"><span class="icon">♙</span>組織管理</button><button type="button" data-hr-command="report"><span class="icon">▥</span>人資報表</button></div>'),
  '</div>'
  ].join('');
  var stats=main.querySelector(':scope>.stats');if(stats)main.insertBefore(d,stats);else main.appendChild(d);
@@ -135,8 +135,8 @@ function updateCounts(records,anchor,ready){
  text('p79rHires',ready||records.length?n(hires.length):'—');
  text('p79rLeavers',ready||records.length?n(leavers.length):'—');
  text('p79rActiveSub',isCloudReady()?'雲端主檔已核對':'快取／待雲端核對');
- text('p79rHiresSub',month+' 到職紀錄');
- text('p79rLeaversSub',month+' 生效離職');
+ text('p79rHiresSub','');
+ text('p79rLeaversSub','');
  text('p79rLeaveStatus',ready||records.length?n(records.filter(function(e){return status(e,today)==='leave'}).length):'—');
  text('p79rAttendance','—');text('p79rLeaves','—');text('p79rOvertime','—');
  return {active:active,resigned:resigned,hires:hires,leavers:leavers};

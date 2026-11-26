@@ -37,7 +37,8 @@ function selection(){return M.date($('p79rWorkDate')?.value)||M.date(new Date().
 function todayTaipei(){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())}
 function authority(){const s=sess();return String(s?.empId||'')+'|'+activeToken()+'|'+apiBase()+'|'+JSON.stringify([s?.adminRole,s?.systemPermissions,s?.finePermissions])}
 function identity(){return authority()+'|'+selection()}
-function sourceText(id,msg){const el=$(id+'Sub');if(el)el.textContent=msg}
+function displayReason(msg){return String(msg??'').replaceAll('正式班表未包含所有授權範圍的在職人員','班表待核對')}
+function sourceText(id,msg){const el=$(id+'Sub');if(el)el.textContent=displayReason(msg)}
 function readFailure(result){
  const e=result?.reason;
  if(e?.name==='AbortError')return '雲端回應逾時';
@@ -48,7 +49,7 @@ function readFailure(result){
 }
 function setVal(id,num,sub){
  const el=$(id);if(el)el.textContent=num;
- if(sub)sourceText(id,sub);
+ if(sub!==undefined)sourceText(id,sub);
 }
 async function get(action,month,auth,ms=30000){
  const base=apiBase();if(!base)throw Error('未確認正式資料服務網址');
@@ -165,7 +166,7 @@ function panels(payload,scope,day,leave,ot,attendance){
  const month=day.slice(0,7),staff=emp(),ids=new Set(staff.map(e=>String(e.empId||'').trim().toUpperCase())),take=r=>ids.has(String(r.empId||r.employeeId||'').trim().toUpperCase());
  if(leave?.ready)summaryChart('p79rLeaveSummary',leave.count,Object.entries(leave.typeCounts),'人次','本月沒有已核准請假申請');
  else note('p79rLeaveSummary',$('p79rLeavesSub')?.textContent||'核准請假資料待核對');
- if(ot?.ready){summaryChart('p79rOvertimeSummary',ot.hours,Object.entries(ot.byType||{}),'小時','本月沒有正式加班申報');const el=$('p79rOvertimeSummary');if(el)el.innerHTML+='<div class="p79r-live-note">正式申報，不含預排／撤銷；另有 '+ot.planned+' 筆預排。</div>'}
+ if(ot?.ready){summaryChart('p79rOvertimeSummary',ot.hours,Object.entries(ot.byType||{}),'小時','本月沒有正式加班申報')}
  else note('p79rOvertimeSummary',$('p79rOvertimeSub')?.textContent||'正式加班申報待核對');
  const a=payload.attendance?.status==='fulfilled'?payload.attendance.value:null,s=payload.schedule?.status==='fulfilled'?payload.schedule.value:null,l=payload.leave?.status==='fulfilled'?payload.leave.value:null;
  let rows=null,paired=[];
@@ -196,7 +197,7 @@ function panels(payload,scope,day,leave,ot,attendance){
     if(d>todayTaipei())calc={ready:false,reason:'未來日期'};
     else if(!calc.ready){const observed=punchCoverage(a,staff,d);if(observed.total)calc={...calc,punchPercent:observed.count/observed.total*100};}
     return {day:d,...calc};});
-   content('p79rAttendanceTrend',timeline.map(r=>'<div class="p79r-trend-row" title="'+esc(r.reason||r.clocked+' 人已到／'+r.expected+' 人應到')+'"><span>'+r.day.slice(5)+'</span><div class="p79r-trend-track"><div class="p79r-trend-bar'+(!r.ready&&r.punchPercent!==undefined?' p79r-trend-provisional':'')+'" style="width:'+(r.ready&&r.percent!==null?r.percent:(r.punchPercent??0))+'%"></div></div><b>'+(r.ready?(r.percent===null?'無應到':r.percent.toFixed(1)+'%'):(r.punchPercent===undefined?'待核對':r.punchPercent.toFixed(1)+'%*'))+'</b></div>').join('')+'<div class="p79r-live-note">已簽到人數 ÷ 正式應到人數；排定休假與全日核准請假不列入應到。未排班或來源不齊的日期不計算正式出勤率；* 為打卡人數／在職人數，並非正式出勤率。</div>');
+   content('p79rAttendanceTrend',timeline.map(r=>'<div class="p79r-trend-row" title="'+esc(r.ready?r.clocked+' 人已到／'+r.expected+' 人應到':(r.punchPercent===undefined?'':'打卡覆蓋率（非正式出勤率）｜')+displayReason(r.reason||'待核對'))+'"><span>'+r.day.slice(5)+'</span><div class="p79r-trend-track"><div class="p79r-trend-bar'+(!r.ready&&r.punchPercent!==undefined?' p79r-trend-provisional':'')+'" style="width:'+(r.ready&&r.percent!==null?r.percent:(r.punchPercent??0))+'%"></div></div><b>'+(r.ready?(r.percent===null?'無應到':r.percent.toFixed(1)+'%'):(r.punchPercent===undefined?'待核對':r.punchPercent.toFixed(1)+'%*'))+'</b></div>').join(''));
    }catch(e){renderPendingTrend(day,'出勤率核對失敗：'+e.message)}
  }else{
   const issue=scopeIssues(payload,scope).join('；')||'正式來源仍待核對';
@@ -221,14 +222,14 @@ function display(payload,scope,day){
  let leave=null,ot=null,attendance=null;
  if(scope.leave&&leaveResult){
   try{leave=M.approvedLeaveCount(leaveRows(leaveResult).filter(r=>staffIds.includes(String(r.empId||r.employeeId||'').trim().toUpperCase())),month,staffIds);
-   if(leave.ready)setVal('p79rLeaves',String(leave.count),'正式核准請假申請數（依可檢視範圍）');
+   if(leave.ready)setVal('p79rLeaves',String(leave.count),'');
    else sourceText('p79rLeaves','核准請假紀錄未完全核對');
   }catch(e){sourceText('p79rLeaves','核准請假資料不完整')}
  }else if(scope.leave)sourceText('p79rLeaves','正式請假資料暫不可用：'+readFailure(payload.leave));
  else sourceText('p79rLeaves','目前帳號沒有請假資料檢視權限');
  if(scope.schedule&&scope.workhours&&scheduleResult){
   try{ot=M.officialOvertime(officialSchedules(scheduleResult),month,staffIds);
-   if(ot.ready)setVal('p79rOvertime',ot.hours.toFixed(1)+' 小時','正式申報，不含預排／撤銷');
+   if(ot.ready)setVal('p79rOvertime',ot.hours.toFixed(1)+' 小時','');
    else sourceText('p79rOvertime','申報資料含待核或不完整紀錄');
   }catch(e){sourceText('p79rOvertime','正式班表資料不完整')}
  }else if(scope.schedule&&scope.workhours)sourceText('p79rOvertime','正式加班申報讀取失敗：'+readFailure(payload.schedule));
