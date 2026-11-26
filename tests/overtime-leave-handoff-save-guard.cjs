@@ -26,7 +26,7 @@ async function simulate({code='延16-04',mode='success'}={}){
  const el={isConnected:true,open:true,querySelector:node},drafts=[];let validationCalls=0,postCalls=0,posts=[];
  const credentials={url:'https://fixture.invalid'};
  const ctx={Promise,Error,JSON,Math,Date,Number,String,Boolean,Object,console,
-  crypto:{randomUUID:()=> 'SAME-ID'},setTimeout:callback=>{callback();return 0;},clearTimeout:()=>{},
+  advanceLeaveHandoff:async()=>{},CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},crypto:{randomUUID:()=> 'SAME-ID'},setTimeout:callback=>{callback();return 0;},clearTimeout:()=>{},
   el,editingOriginal:false,prefill:{leaveHandoffId:'L1',date:day,workDate:day,coverDate:day,overtimeDate:day,empId:'FIRST',forEmpId:'LEAVER',expectedSplitRule:split.expectedSplitRule},
   dateInput:node('#p79OtDate'),empSelect:node('#p79OtEmp'),kind:node('#p79OtKind'),select:node('#p79OtCode'),forSelect:node('#p79OtForEmp'),
   selectedRow:()=>chosen,chosenMatchesLeaveSplit:api.chosenMatchesLeaveSplit,independentShiftOvertimeIssue:api.independentShiftOvertimeIssue,verifyPlannedReviewSelection:()=>{},approvedDates:[day],people:[{empId:'FIRST'},{empId:'LEAVER'}],
@@ -59,8 +59,8 @@ async function simulate({code='延16-04',mode='success'}={}){
  assert.deepEqual(t.posts,['SAME-ID','SAME-ID','SAME-ID'],'all safe retries preserve the idempotent report identity');
  assert.equal(t.el.open,false,'confirmed save closes after lock release');
  t=await simulate({mode:'lock-forever'});
- assert.equal(t.postCalls,3,'bounded lock retry never loops indefinitely');
- assert.equal(t.el.open,true);assert.match(t.status,/排班編輯鎖仍被占用/);
+ assert.equal(t.postCalls,5,'bounded lock retry never loops indefinitely');
+ assert.equal(t.el.open,true);assert.match(t.status,/雲端仍忙碌/);
  assert.equal(t.drafts.length,1,'draft survives lock refusal');
  t=await simulate({mode:'unknown'});
  assert.equal(t.postCalls,1,'unknown write results must NEVER be submitted twice');

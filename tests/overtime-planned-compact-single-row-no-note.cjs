@@ -29,7 +29,7 @@ const c={console,Number,String,Array,Set,Map,Math,Date,
  document:{getElementById:id=>nodes[id]||null},
  escapeHtml:s=>String(s??'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])),
  p79OvertimePlannedPage:1};
-vm.createContext(c);
+vm.createContext(c);c.document.querySelectorAll=()=>[];c.window=c;Object.assign(c,{p79CanReportOvertime:()=>true,p79PlannedBulkBusy:false,p79PlannedBulkSelected:new Set(),p79OvertimePlannedFilteredRows:[],normalizeScheduleDateKey:v=>String(v||'').replaceAll('/','-'),p79OvertimeUnitForRow:r=>r.dept||''});require('../scripts/test-page-functions.cjs').loadFunctions(c,html,['getAttendanceTimestamp','p79DirectAttendanceTimestamp','p79OvertimeAttendanceIssue','p79OvertimeCoverDateWarning','p79PlannedBulkKey','p79PlannedBulkCandidate','p79CanManuallyReviewPlannedRow','p79RefreshPlannedBulkControls']);
 for(const name of ['p79WorkOvertimeIsUnconfirmedPlan','p79OvertimePlannedVisibleRows',
  'p79OvertimePendingReason','p79OvertimePendingPunchCell','p79RenderOvertimePlannedRows'])
  vm.runInContext(extract(name),c);

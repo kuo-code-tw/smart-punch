@@ -7,7 +7,7 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
   GAS_URL:'https://fixture.invalid',leaveRequestToken:()=> 'MANAGER',
   jsonFetch:async()=>{reads++;return fresh;},postCloud:async()=>{writes++;throw Error('unexpected mutation');},
   $:el,normalizeLeaveFilterDate:v=>v,setStatus(){},loadCloud:async()=>true,p79ToggleCreateNoCover(){}};
- vm.createContext(c);
+ vm.createContext(c);require('../scripts/test-page-functions.cjs').loadFunctions(c,html,['p79ReadOfficialLeaveWithRetry']);
  vm.runInContext(html.slice(html.indexOf('async function p79ReadCurrentLeaveCoverState(){'),html.indexOf('function leaveBalanceNumber')),c);
  vm.runInContext(html.slice(html.indexOf('async function p79SaveCreateLeaveWithoutCover('),html.indexOf('async function saveAdminCreateLeave(')),c);
  el('adminCreateLeaveStart').value=el('adminCreateLeaveEnd').value='2026-11-28';el('adminCreateLeaveType').value='特休假';

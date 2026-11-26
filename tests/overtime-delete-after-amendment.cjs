@@ -47,7 +47,7 @@ async function simulate(mode){
      })};
    }
  };
- context.globalThis=context;context.p79OvertimePlannedDisplayedRows=[row];context.p79PlannedBulkBusy=false;vm.createContext(context);vm.runInContext(html.slice(html.indexOf('function p79WorkOvertimeIsUnconfirmedPlan('),html.indexOf('        function buildOvertimeStatisticsRows(')),context);vm.runInContext(fn,context);
+ context.globalThis=context;context.p79OvertimePlannedDisplayedRows=[row];context.p79PlannedBulkBusy=false;vm.createContext(context);require('../scripts/test-page-functions.cjs').loadFunctions(context,html,['p79WorkOvertimeMonthVerified','p79CanExcludeOvertimeEstimate']);vm.runInContext(html.slice(html.indexOf('function p79WorkOvertimeIsUnconfirmedPlan('),html.indexOf('        function buildOvertimeStatisticsRows(')),context);vm.runInContext(fn,context);
  if(mode==='planned'){const a=html.indexOf('        async function p79DeletePlannedOvertimeRow('),b=html.indexOf('        function p79OvertimePlannedVisibleRows(',a);vm.runInContext(html.slice(a,b),context);await context.p79DeletePlannedOvertimeRow(0,button);}else await context.p79DeleteWorkOvertimeRow(0,button);
  return{calls,messages,notice,button,state};
 }
@@ -55,12 +55,12 @@ async function simulate(mode){
  let saved=await simulate('ok');
  assert.equal(saved.calls.filter(x=>x.action==='deleteOvertimeAssignment').length,1,'authorized deletion must proceed after any earlier edit');
  assert.equal(saved.notice.length,1,'broadcast only after verified removal');
- assert.match(saved.messages.at(-1),/已由雲端確認刪除/);
+ assert.match(saved.messages.at(-1),/加班已刪除，並已同步雲端班表/);
  assert.equal(saved.button.textContent,'刪除加班');assert.equal(saved.button.disabled,false);
  const planned=await simulate('planned');
  assert.equal(planned.calls.filter(x=>x.action==='deleteOvertimeAssignment').length,1,'manual saved plan uses the cloud-verified deletion route');
  assert.equal(planned.calls.find(x=>x.action==='deleteOvertimeAssignment').expectedReportId,'REPORT-1');
- assert.match(planned.messages.at(-1),/已由雲端確認刪除/);
+ assert.match(planned.messages.at(-1),/加班已刪除，並已同步雲端班表/);
  for(const m of ['server-disabled','replaced']){
    const guarded=await simulate(m);
    assert.equal(guarded.calls.filter(x=>x.action==='deleteOvertimeAssignment').length,0,'unsafe deletion must not be sent: '+m);

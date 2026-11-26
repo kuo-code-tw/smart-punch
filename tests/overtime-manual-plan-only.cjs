@@ -10,8 +10,8 @@ a.equal(vm.runInContext('p79MonthlyRestDraftsByMonth.size',ctx),0,'reading quota
 modes.p79PlanModeAuto.checked=true;ctx.p79ChoosePlanningMode('auto');a.equal(automatic.length,1);a.equal(automatic[0].autoPlan,true);a.equal(modes.p79PlanModeManual.checked,false);
 ctx.p79ChoosePlanningMode('manual');a.equal(modes.p79PlanModeManual.checked,true);a.equal(modes.p79PlanModeAuto.checked,false);
 ctx.p79OpenManualOvertimePlan();a.equal(opened.length,1);a.equal(opened[0].manualPlan,true,'only the explicit add button starts manual planning');
-a(monthly.includes('plan(snapshot,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan})'));
-a(monthly.includes('plan(latest,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan})'),'post-save refresh cannot repopulate automatic plans');
+a(monthly.includes("plan(snapshot,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan,cutoff:q('#mrCutoff').value})"));
+a(monthly.includes("plan(snapshot,loadedPeople,loadedMonth,rules,{manualOnly:!autoPlan,cutoff:q('#mrCutoff').value})"),'post-save refresh cannot repopulate automatic plans');
 const openParameter=/async function open\((\w+)=\{\}\)/.exec(monthly)[1];
 a(!new RegExp('function '+openParameter+'\\(').test(monthly.slice(monthly.indexOf('async function open('))),'mode parameter must not be shadowed by the options helper');
 const save=html.slice(html.indexOf('async function p79SaveWorkOvertimeDraft('),html.indexOf('window.p79OvertimeContext='));
@@ -21,7 +21,7 @@ async function attempt({date='2026-10-29',existing=null,ack=true}={}){
  buildDailyAttendanceRows:()=>[{clockIn:{id:'IN',timeStr:date+' 08:00:00'},clockOut:{id:'OUT',timeStr:date+' 16:00:00'}}],
  p79DirectAttendanceTimestamp:r=>Date.parse(r.timeStr.replace(' ','T')+'+08:00'),P79Overtime:{overtimeMinutes:()=>480,ruleAttendanceIssue:()=>''},
  p79WorkOvertimeMonths:new Map(),p79OvertimeCalculationCache:null,renderOvertimeStats(){},localStorage:{setItem(){}},
- fetch:async(url,opts)=>{if(opts.method==='POST'){const body=JSON.parse(opts.body);posts.push(body);return {ok:true,json:async()=>({ok:true,directOvertimeSaved:true,id:body.id,report:{id:body.id,category:body.category,code:body.code,planned:ack}})}}return {ok:true,json:async()=>({ok:true,revision:1,schedules:[roster],records:[{empId:'E1'}]})}}};c.window=c;vm.createContext(c);vm.runInContext(save,c);
+ fetch:async(url,opts)=>{if(opts.method==='POST'){const body=JSON.parse(opts.body);posts.push(body);return {ok:true,json:async()=>({ok:true,directOvertimeSaved:true,id:body.id,report:{id:body.id,category:body.category,code:body.code,planned:ack}})}}return {ok:true,json:async()=>({ok:true,revision:1,schedules:[roster],records:[{empId:'E1'}]})}}};c.window=c;vm.createContext(c);require('../scripts/test-page-functions.cjs').loadFunctions(c,html,['p79AssertDirectReportActive']);vm.runInContext(save,c);
  const draft={manualPlan:true,empId:'E1',id:'PLAN',date,rule:{category:'國',code:'國08-16',declaredHours:8,convertedHours:8}};
  let error='';try{await c.p79SaveWorkOvertimeDraft(draft)}catch(e){error=e.message}return {posts,error};
 }

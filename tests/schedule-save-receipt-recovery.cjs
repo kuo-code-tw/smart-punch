@@ -1,7 +1,7 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert');
 const html=fs.readFileSync(process.env.SCHEDULE_RECEIPT_SOURCE||'schedule/index.html','utf8');
 const start=html.indexOf('    async function p79ConfirmScheduleSaveReceipt(');
-const end=html.indexOf('\n    // 完整考勤僅可修復',start);
+const end=html.indexOf('\n    // 無卡改休假由正式 GAS',start);
 assert(start>=0&&end>start);
 const source=html.slice(start,end);
 const receipt={ok:true,found:true,completed:true,saveRequestId:'request123',month:'2026-11'};

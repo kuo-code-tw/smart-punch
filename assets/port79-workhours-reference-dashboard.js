@@ -464,7 +464,7 @@
    typeof lastAttendanceCloudRevision==='undefined'?'':lastAttendanceCloudRevision,
    window.sessionStorage?.getItem?.('port79_cache_mutated_at')||'',
    window.Port79JobTitleVisibility?.status?.()||'',window.Port79JobTitleVisibility?.revision?.()||0,
-    official?.at||0,official?.previewInvalidated||false,localDisplay.revision,
+    recordFingerprint(official?.rows||[]),official?.previewInvalidated||false,localDisplay.revision,
    typeof records!=='undefined'&&Array.isArray(records)?records.length:0,rawCloud.fingerprint,rawCloud.error]);
  }
  let lastAutoSignature='';

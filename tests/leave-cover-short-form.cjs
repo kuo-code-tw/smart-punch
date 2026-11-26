@@ -42,7 +42,7 @@ assert(create.includes("action.slot===1&&!entry.secondVisible"),'one-person sour
 assert(approved.includes("action.slot===1&&row.mode!=='two'"),'approved source can use direct slot 0');
 assert(page.includes('p79-leave-short-form-v1'),'compact CSS is shipped');
 for(const name of ['port79-smart-cover-picker.js','port79-approved-cover-auto.js','port79-leave-daily-simple.js'])
- assert(page.includes(name+'?v='+(name==='port79-leave-daily-simple.js'?'20261106-job-name-filter-v3-two-slots-20261116-short-v1-jobfirst-v1':'20261116-sameday-4h-stroke-v1')),name+' must bust old browser cache');
+ assert(page.includes(name+'?v='+(name==='port79-leave-daily-simple.js'?'20261119-group-consecutive-leave-close-v1':'20261116-sameday-4h-stroke-v1')),name+' must bust old browser cache');
 for(const js of [code,create,approved])new vm.Script(js);
 for(const match of page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))
  if(!/\bsrc=|application\/json|importmap/.test(match[1])&&match[2].trim())new vm.Script(match[2]);

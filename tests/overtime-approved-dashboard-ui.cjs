@@ -7,8 +7,8 @@ const refCss=fs.readFileSync('assets/port79-workhours-reference-dashboard.css','
 const refJs=fs.readFileSync('assets/port79-workhours-reference-dashboard.js','utf8');
 const code=fs.readFileSync('assets/port79-overtime-approved-dashboard.js','utf8');
 new vm.Script(code);
-assert(html.includes('port79-overtime-approved-dashboard.css?v=20261123-reference-home-tabs-v3'),'approved stylesheet loaded');
-assert(html.includes('port79-overtime-approved-dashboard.js?v=20261123-reference-home-tabs-v3'),'approved tab navigation loaded');
+assert(html.includes('port79-overtime-approved-dashboard.css?v=20261125-color-toolbar-v5'),'approved stylesheet loaded');
+assert(html.includes('port79-overtime-approved-dashboard.js?v=20261125-no-redundant-heading-v4'),'approved tab navigation loaded');
 assert(html.includes('port79-workhours-reference-dashboard.css?v=20261123-reference-home-tabs-v3'),'reference overview stylesheet updated');
 assert(html.includes('port79-workhours-reference-dashboard.js?v=20261123-reference-home-tabs-v3'),'reference overview controller updated');
 assert.equal((html.match(/id="adminContentOvertime"/g)||[]).length,1,'existing overtime tab is kept');

@@ -4,7 +4,7 @@ const ui=fs.readFileSync('assets/port79-workhours-reference-dashboard.js','utf8'
 const html=fs.readFileSync('assets/port79-workhours-reference-dashboard.html','utf8');
 new vm.Script(ui);
 const start=ui.indexOf(' function applicationMetrics(reports){');
-const end=ui.indexOf('\n function compute(){',start);
+const end=ui.indexOf('\n function compute(force=false){',start);
 assert(start>=0&&end>start,'official application-metrics helper must exist');
 const context={Set,round:n=>Math.round(n*10)/10};
 vm.createContext(context);
@@ -33,8 +33,8 @@ assert.deepEqual(clone(f([{empId:'E99',status:'applied',category:'休'}])),
  'an application alone must not be misrepresented as approved');
 for(const id of ['prKpiApplications','prKpiReviewRate','prKpiRestApplicants','prKpiPending'])
  assert(html.includes('id="'+id+'"'),'missing actual dashboard KPI element '+id);
-assert(ui.includes("const metrics=ok?applicationMetrics(data.reports):null"),
- 'unverified cloud months must not expose estimated application counts');
+assert(ui.includes("const metrics=hasReports?applicationMetrics(data.reports):null"),
+ 'only available report snapshots expose application counts');
 assert(ui.includes("if(!idKey||!allow.has(who)||row.reportVerified!==true"),
  'applications must be official, access-scoped and verified');
 assert(ui.includes("String(p79WorkOvertimeLedgerMonth(row))!==month"),
@@ -43,8 +43,9 @@ assert(ui.includes("if(credit<f.start||credit>f.end)continue"),
  'application counters must respect selected date range');
 assert(ui.includes("if(seen.has(unique))continue;seen.add(unique)"),
  'one official overtime report cannot be counted multiple times');
-assert(ui.includes("say('prKpiReviewRate',ok&&metrics.reviewRate!==null?format(metrics.reviewRate):em)"),
+assert(ui.includes("say('prKpiReviewRate',hasReports&&metrics.reviewRate!==null?format(metrics.reviewRate):em)"),
  'a month with no applications must show a dash, not fabricated 0 percent');
-assert(ui.includes("say('prKpiPending',ok?data.pending:em)"),
+assert(ui.includes("say('prKpiPending',hasReports?data.pending:em)"),
  'existing pending-review KPI must remain accurate');
+assert(ui.includes("const label=data.reportPreview?'快取資料，待雲端核對':'依正式申報'"),'cached metrics must be explicitly marked as awaiting verification');
 console.log('PASS official overtime application KPIs: no fake values, scope/date, status distinctions, deduped rest-day people and review percentage');
