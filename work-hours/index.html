@@ -10597,10 +10597,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             // employee, record ID and punch direction before pairing shifts.
             const identityKey = record => {
                 if (!record?.empId || !record.id || record.__p79PairIdentity) return '';
-                const type = getAttendanceRecordType(record);
+                const type = (window.P79AttendanceV6?.recordType || getAttendanceRecordType)(record);
                 return type === 'OTHER' ? '' : JSON.stringify([String(record.empId).trim().toUpperCase(),String(record.id),type]);
             };
-            const editTime = record => isManuallyEditedAttendanceRecord(record)
+            const editTime = record => String(record?.manuallyEdited || '').toLowerCase() === 'true'
                 ? Date.parse(record.manuallyEditedAt || '') || 0 : 0;
             const newestEdits = new Map();
             for (const record of normalized) {
@@ -13346,10 +13346,10 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
             const evidenceRevision=lastAttendanceCloudRevision;state.restEvidenceError='';
             const token=state.token;
             try{
-                const shared=typeof window!=='undefined'&&window.P79WorkhoursCache?.enabled()?await window.P79WorkhoursCache.load(month):null;
-                const currentBundle=shared&&Number(shared.meta?.revisions?.attendance||0)>=Number(lastAttendanceCloudRevision||0)?shared:null;
-                if(currentBundle&&currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state)window.P79WorkhoursCacheContext.applyBundle(currentBundle,state);
-                const batches=currentBundle?p79WorkRestMonths(month).map(m=>currentBundle.raw[m]):await Promise.all(p79WorkRestMonths(month).map(m=>p79ReadWorkRestMonth(m,token)));
+                let shared=typeof window!=='undefined'&&window.P79WorkhoursCache?.enabled()?await window.P79WorkhoursCache.load(month):null;
+                if(shared&&Number(shared.meta?.revisions?.attendance||0)<Number(lastAttendanceCloudRevision||0))shared=null;
+                if(shared&&currentPort79SsoToken()===token&&p79WorkOvertimeMonths.get(month)===state)window.P79WorkhoursCacheContext.applyBundle(shared,state);
+                const batches=shared?p79WorkRestMonths(month).map(m=>shared.raw[m]):await Promise.all(p79WorkRestMonths(month).map(m=>p79ReadWorkRestMonth(m,token)));
                 if(currentPort79SsoToken()!==token||p79WorkOvertimeMonths.get(month)!==state)return;
                 if(batches.some(data=>Number(data.revision||0)<Number(lastAttendanceCloudRevision||0))){
                     state.attendanceEvidence={complete:false,days:{}};
@@ -13358,7 +13358,7 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
                 }
                 const rows=batches.reduce((all,data)=>mergeAttendanceRecordCollections(all,data.records),[]);
                 // Apply verified raw month data to the visible ledger as well as the rest audit.
-                if(!currentBundle&&evidenceRevision===lastAttendanceCloudRevision&&!p79WorkhoursIsEditing()){
+                if(!shared&&evidenceRevision===lastAttendanceCloudRevision&&!p79WorkhoursIsEditing()){
                     const loadedMonths=new Set(p79WorkRestMonths(month));
                     const incoming=rows.map(normalizeAttendanceRecordIdentifiers).filter(r=>!isLocallyDeletedAttendanceRecord(r));
                     const normalized=applyPendingOperationsToCloudData({records:incoming,employees});
