@@ -1307,6 +1307,23 @@
   }
   return [...dates].sort();
  }
+ // Never detach an active leave, a residual cover, an original report edit,
+ // or an incomplete/unauthorized month response.
+ function deletedLeaveExtensionEligible(data,prefill,empId,date,chosen,editingOriginal){
+  const id=String(prefill.leaveHandoffId||''),norm=v=>String(v||'').trim().toUpperCase();
+  const target=norm(prefill.forEmpId),worker=norm(empId);
+  if(!id||!target||!worker||target===worker||editingOriginal||prefill.savedReport||prefill.reportId||
+     prefill.editPlannedOnly||prefill.plannedReview||prefill.manualPlan||chosen?.[0]!=='延'||
+     String(prefill.date||'')!==date||norm(prefill.empId)!==worker||
+     String(prefill.coverDate||date)!==date||String(prefill.overtimeDate||date)!==date||
+     data?.ok!==true||String(data.month||'')!==date.slice(0,7)||
+     !Array.isArray(data.leaveRecords)||!Array.isArray(data.leaveCoverAssignments)||!Array.isArray(data.schedules))return false;
+  const roster=data.schedules.find(r=>norm(r.empId)===worker)?.schedule;
+  if(!roster||!data.schedules.some(r=>norm(r.empId)===target))return false;
+  if(data.leaveRecords.some(r=>String(r.id)===id)||data.leaveCoverAssignments.some(r=>String(r.leaveId)===id))return false;
+  if(roster.__meta?.[date]?.overtimeReport?.id)return false;
+  return !independentShiftOvertimeIssue(roster[date],chosen);
+ }
  function validateLeaveLinkedOvertimeDate(date,forEmpId,allowedDates,handoffDate='',coverDate=''){
   if(handoffDate){
    // A two-person night cover credits the original approved leave date, while
@@ -1596,10 +1613,10 @@
      row[6]===matched[6]&&row[7]===matched[7]);
     return candidates.length===1?candidates[0]:null;
    }
-   async function officialOvertimeMonthData(date){
+   async function officialOvertimeMonthData(date,forceFresh=false){
     const {url,token}=auth(),month=date.slice(0,7),current=officialMonthReads.get(month);
     let entry=current;
-    if(!entry||Date.now()-entry.at>15000){
+    if(forceFresh||!entry||Date.now()-entry.at>15000){
      const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),16000);
      const promise=(async()=>{
       try{
@@ -2132,12 +2149,24 @@
      // Save the selected period. A period differing from the approved
      // cover split becomes a separate filing, without completing that cover.
      const expected=prefill.leaveHandoffId?prefill.expectedSplitRule:null;
-     const independentFiling=prefill.independentOvertime===true||
+     let deletedLeaveIndependent=false;
+     if(prefill.leaveHandoffId&&!editingOriginal&&chosen[0]==='延'&&!prefill.savedReport&&!prefill.reportId&&
+        !approvedDates.includes(String(prefill.coverDate||prefill.overtimeDate||date))){
+      const beforeSelection=JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value]);
+      const freshLeave=await officialOvertimeMonthData(date,true);
+      if(!el.isConnected||beforeSelection!==JSON.stringify([dateInput.value,empSelect.value,kind.value,select.value,forSelect.value]))throw Error('核對期間申報內容已變更，請重新儲存');
+      if(Array.isArray(freshLeave.leaveRecords))approvedDates=approvedLeaveDateChoices(freshLeave.leaveRecords,prefill.forEmpId);
+      if(deletedLeaveExtensionEligible(freshLeave,prefill,empId,date,chosen,editingOriginal)){
+       if(!global.confirm('正式資料已無原請假及代班安排。是否依本人正式班別申報延時加班？不會重建原請假或代班。'))throw Error('已取消本人加班申報，未寫入');
+       deletedLeaveIndependent=true;
+      }
+     }
+     const independentFiling=deletedLeaveIndependent||prefill.independentOvertime===true||
       !!(prefill.leaveHandoffId&&(prefill.workdayShiftMismatch===true||
        expected&&!chosenMatchesLeaveSplit(chosen,expected)));
      if(independentFiling&&chosen[0]==='代')
       throw Error('代班類型必須符合請假代班關聯；請選擇實際延時或休假日加班的時段。');
-     if(prefill.sameDayCover&&expected&&!chosenMatchesLeaveSplit(chosen,expected))
+     if(!deletedLeaveIndependent&&prefill.sameDayCover&&expected&&!chosenMatchesLeaveSplit(chosen,expected))
       throw Error('這位代班人員的加班時段固定為 '+expected.overtimeStart+'–'+expected.overtimeEnd+'（同日 4 小時）；目前選擇不符，未送出申報。');
      const manualCoverage=verifyPlannedReviewSelection(chosen)===true;
      if(prefill.editPlannedOnly===true&&((prefill.leaveHandoffId&&!['延','代'].includes(chosen[0]))||(!prefill.leaveHandoffId&&chosen[0]==='代')))throw Error('請保留原代班關聯，另行核對申報類型');
@@ -2179,7 +2208,7 @@
      if(prefill.editPlannedOnly===true&&validation.cloud?.capabilities?.plannedOvertimeEditV1!==true)throw Error('正式後端尚未支援修改預排，原預排保留。');
      if(manualCoverage&&validation.cloud?.capabilities?.manualOvertimeCoverageV1!==true)throw Error('正式後端尚未支援實際加班時段核對，原預排保留。');
      // Older GAS stores only the punch/work date. Never silently credit 04-08 to 11/08.
-     if(prefill.sameDayCover&&validation.cloud?.capabilities?.sameDayCoverFourHourV1!==true)
+     if(!deletedLeaveIndependent&&prefill.sameDayCover&&validation.cloud?.capabilities?.sameDayCoverFourHourV1!==true)
       throw Error('正式 GAS 尚未部署同日兩位各 4 小時代班申報驗證；保留申報資料，禁止寫入錯誤日期或時段。');
      if(validationRequest.overtimeDate!==date&&validation.cloud?.capabilities?.nightCoverOvertimeAccountingV1!==true)
       throw Error('正式 GAS 尚未支援跨日加班歸屬日 '+validationRequest.overtimeDate+'（出勤日 '+date+'）；保留代班安排，禁止錯日送出申報。');
@@ -2317,7 +2346,7 @@
        // asynchronous cloud reconciliation. Otherwise it can race the queue
        // mutation and re-open the first worker instead of the second.
        let progress=null;
-       if(prefill.leaveHandoffId&&prefill.editPlannedOnly!==true&&draft.adjustedIndependentReview!==true){
+       if(!deletedLeaveIndependent&&prefill.leaveHandoffId&&prefill.editPlannedOnly!==true&&draft.adjustedIndependentReview!==true){
         try{progress=advanceLeaveHandoff(draft,prefill);}
         catch(error){console.warn('加班已儲存，但代班佇列更新失敗；保留待核對清單',error);}
        }
@@ -2339,7 +2368,7 @@
    };
   }catch(e){el.querySelector('#p79OtStatus').textContent='❌ '+e.message}
  }
- global.P79Overtime={runQueuedReview,checkQueuedReview,chosenMatchesLeaveSplit,independentShiftOvertimeIssue,RECOVERY_STORAGE,overtimeRecoverySnapshot,rememberOvertimeOptions,recoverableOvertimeOptions,ruleGuide,prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,canonicalReportPunchEpoch,reportAttendancePairs,reportAttendanceIssueDetail,ruleAttendanceIssue,manualPlannedReviewCovers,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
+ global.P79Overtime={runQueuedReview,checkQueuedReview,chosenMatchesLeaveSplit,independentShiftOvertimeIssue,RECOVERY_STORAGE,overtimeRecoverySnapshot,rememberOvertimeOptions,recoverableOvertimeOptions,ruleGuide,prepareSaveValidation,takeSaveContext,ROLE_DEFAULTS_CONFIG,ARCHIVED_CONFIG,HIDDEN_MANAGER_RULES,reportPeriodDiagnostic,managerVisibleRules,normalizeRoleTypeDefaults,preferredOvertimeTypeForRole,DELETED_CONFIG,canonicalType,deletedBuiltins,activeReportRows,activeReportRules,activeSupportPeriods,officialOvertimeTypeHint,matchingReportPeriod,resolvedRule,verifySavedReport,specialRows,ensureSpecialRule,suggestRule,declarationEnd,declarationWindow,canonicalReportPunchEpoch,reportAttendancePairs,reportAttendanceIssueDetail,ruleAttendanceIssue,manualPlannedReviewCovers,advanceLeaveHandoff,KEY,CONFIG,defaults,validate,excelRows,parseExcelRows,report,interval,overtimeMinutes,inferRule,matchReport,reportRules,showReportLoading,loadRules,resolveLeaveCoverReport,normalizeLeaveCoverHandoffEntry,matchesReportType,displayPeriodCode,filterReportEmployees,reportEmployeeRole,prefillReportRole,reportPair,approvedLeaveDateChoices,deletedLeaveExtensionEligible,validateLeaveLinkedOvertimeDate,typeOptions,ruleType,openRules,openReport,time};
 })(typeof window==='undefined'?globalThis:window);
 
 
