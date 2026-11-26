@@ -622,6 +622,19 @@ function normalizeEmploymentStatus(v){
   if(['leave','留職停薪','留停','loa'].includes(s))return 'leave';
   return 'active';
 }
+// Use the same effective termination-date rule as the HR dashboard, without modifying the master record.
+function p79HrEmploymentDate(value){
+  const m=String(value||'').trim().replace(/^民國\s*/,'').replace(/年/g,'/').replace(/月/g,'/').replace(/日/g,'').replace(/\./g,'/').match(/^(\d{2,4})[-/](\d{1,2})[-/](\d{1,2})(?:$|[T\s])/);
+  if(!m)return '';
+  let y=Number(m[1]);if(y<1911)y+=1911;
+  const mo=Number(m[2]),d=Number(m[3]),dt=new Date(y,mo-1,d);
+  if(dt.getFullYear()!==y||dt.getMonth()!==mo-1||dt.getDate()!==d)return '';
+  return String(y)+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+}
+function p79HrEffectiveEmploymentStatus(e,asOf=todayYmd()){
+  const status=normalizeEmploymentStatus(e?.employmentStatus),end=p79HrEmploymentDate(e?.terminationDate);
+  return status==='active'&&end&&end<=asOf?'resigned':status;
+}
 function employmentLabel(v){v=normalizeEmploymentStatus(v);return v==='resigned'?'離職':v==='leave'?'留職停薪':'在職'}
 function employmentClass(v){return normalizeEmploymentStatus(v)}
 function todayYmd(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
@@ -1272,7 +1285,7 @@ function render(){
   const q=$('q').value.trim().toLowerCase(),st=$('fStatus').value,hq=$('fHQ').value,div=$('fDivision').value,off=$('fOffice').value,u=$('fUnit').value,j=$('fJob').value,r=$('fRole').value;
   const dateFrom=$('hrDateFrom')?.value||'',dateTo=$('hrDateTo')?.value||'';
   let list=employees.filter(e=>{
-    const empStatus=normalizeEmploymentStatus(e.employmentStatus);
+    const empStatus=p79HrEffectiveEmploymentStatus(e);
     const txt=`${e.attNo||''} ${e.empId||''} ${e.name||''} ${p79HrOrgValue(e,'headquarters')} ${p79HrOrgValue(e,'divisions')} ${p79HrOrgValue(e,'offices')} ${p79HrOrgValue(e,'sections')} ${e.jobTitle||''} ${normalizePhone(e.phone)} ${e.terminationReason||''}`.toLowerCase();
     const empStart=String(e.startDate||'').slice(0,10).replace(/\//g,'-');
     const dateOk=(!dateFrom&&!dateTo)||!!empStart&&(!dateFrom||empStart>=dateFrom)&&(!dateTo||empStart<=dateTo);
@@ -1281,7 +1294,7 @@ function render(){
   // 人資名冊優先按總公司、事業部、事業處、單位，再以職稱及工號排序。
   list.sort((a,b)=>p79HrCompareOrgPeople(a,b));
   $('body').innerHTML=list.map((e,i)=>{
-    const p=normalizePerms(e),lb=e.leaveBalance||{},can=hrAccess==='manage',stt=normalizeEmploymentStatus(e.employmentStatus);
+    const p=normalizePerms(e),lb=e.leaveBalance||{},can=hrAccess==='manage',stt=p79HrEffectiveEmploymentStatus(e);
     const rowClass=stt==='resigned'?'row-resigned':stt==='leave'?'row-leave':'';
     return`<tr class="${rowClass}">
       <td>${can?`<button class="btn" onclick="openEditor('${esc(e.empId)}')">編輯</button>`:'<span class="muted">查看</span>'}</td>
@@ -1307,11 +1320,11 @@ function render(){
     </tr>`;
   }).join('')||'<tr><td colspan="26" class="muted">沒有符合條件的人員</td></tr>';
   const ps=employees.map(normalizePerms);
-  $('stActive').textContent=employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)==='active').length;
-  $('stResigned').textContent=employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)==='resigned').length;
-  $('stLeave').textContent=employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)==='leave').length;
+  $('stActive').textContent=employees.filter(e=>p79HrEffectiveEmploymentStatus(e)==='active').length;
+  $('stResigned').textContent=employees.filter(e=>p79HrEffectiveEmploymentStatus(e)==='resigned').length;
+  $('stLeave').textContent=employees.filter(e=>p79HrEffectiveEmploymentStatus(e)==='leave').length;
   $('stAdmins').textContent=employees.filter(e=>['admin','superadmin'].includes(String(e.adminRole))).length;
-  $('stDepts').textContent=new Set(employees.filter(e=>normalizeEmploymentStatus(e.employmentStatus)!=='resigned').map(e=>p79HrOrgValue(e,'sections')).filter(Boolean)).size;
+  $('stDepts').textContent=new Set(employees.filter(e=>p79HrEffectiveEmploymentStatus(e)!=='resigned').map(e=>p79HrOrgValue(e,'sections')).filter(Boolean)).size;
   $('stHrManagers').textContent=ps.filter(p=>p.hr==='manage').length;
   try{window.p79HrDashRender?.()}catch(e){console.warn('人資儀表板刷新失敗',e)}
 }
@@ -1387,7 +1400,7 @@ function openEditor(id=''){
   $('reportingDate').value=String(editing?.reportingDate||'').slice(0,10).replace(/\//g,'-');
   $('birthday').value=String(editing?.birthday||'').slice(0,10).replace(/\//g,'-');
   $('leaveRemaining').value=editing?.leaveBalance?.remaining??'';
-  $('employmentStatus').value=normalizeEmploymentStatus(editing?.employmentStatus);
+  $('employmentStatus').value=p79HrEffectiveEmploymentStatus(editing);
   $('terminationDate').value=String(editing?.terminationDate||'').slice(0,10).replace(/\//g,'-');
   $('lastWorkDate').value=String(editing?.lastWorkDate||'').slice(0,10).replace(/\//g,'-');
   $('terminationReason').value=editing?.terminationReason||'';
@@ -1397,14 +1410,14 @@ function openEditor(id=''){
   $('hrPasswordToggle').textContent='隱藏';
   $('hrPasswordToggle').setAttribute('aria-pressed','true');
   $('deviceState').value=editing?.deviceBound?'已綁定':'未綁定';
-  $('resignBtn').classList.toggle('hidden',!editing||normalizeEmploymentStatus(editing.employmentStatus)==='resigned');
-  $('restoreBtn').classList.toggle('hidden',!editing||normalizeEmploymentStatus(editing.employmentStatus)==='active');
+  $('resignBtn').classList.toggle('hidden',!editing||p79HrEffectiveEmploymentStatus(editing)==='resigned');
+  $('restoreBtn').classList.toggle('hidden',!editing||p79HrEffectiveEmploymentStatus(editing)==='active');
   $('unbindBtn').classList.toggle('hidden',!editing?.deviceBound);
   if(String(session?.adminRole||'')!=='superadmin')$('adminRole').disabled=true;else $('adminRole').disabled=false;
   buildPermGrid(editing||{adminRole:'employee',systemPermissions:{attendance:'view',workhours:'view',leave:'view',schedule:'none',efficiency:'none',hr:'none',history:'none'}});
   onEmploymentStatusChange();
   window.Port79CalendarRange?.syncAll?.();
-  $('resignTopBtn').classList.toggle('hidden',!editing||normalizeEmploymentStatus(editing.employmentStatus)==='resigned');
+  $('resignTopBtn').classList.toggle('hidden',!editing||p79HrEffectiveEmploymentStatus(editing)==='resigned');
   editor.showModal();
   void p79LoadEditorLeavePermission();
   const resetEditorTop=()=>{
@@ -1462,6 +1475,7 @@ async function saveCurrent(){
     const data=await apiGet('hrGetEmployees',20000);
     const cloudEmployee=(data.employees||[]).find(item=>String(item.empId||'').trim().toUpperCase()===empId);
     if(!cloudEmployee)throw new Error('儲存回應成功，但雲端主檔尚未讀到此員工；視窗已保留，請核對後再重試');
+    if(normalizeEmploymentStatus(cloudEmployee.employmentStatus)!==st||p79HrEmploymentDate(cloudEmployee.terminationDate)!==p79HrEmploymentDate(employee.terminationDate))throw new Error('雲端離職狀態或離職日期讀回不一致；視窗已保留，請重新核對');
     if(['headquarters','division','office','section'].some(k=>String(cloudEmployee[k]??'').trim()!==String(employee[k]??'').trim()))throw new Error('雲端組織歸屬讀回不一致；視窗已保留，請重新核對');
     if(SYS.some(k=>normalizePerms(cloudEmployee)[k]!==p[k]))throw new Error('雲端讀回的後台權限與設定不一致；視窗已保留');
     const sortedJobs=jobs=>[...(Array.isArray(jobs)?jobs:[])].map(p79AssignedJobTitle).filter(Boolean).sort();
@@ -1478,24 +1492,47 @@ async function saveCurrent(){
   }catch(e){alert('儲存失敗：'+(e.message||e))}
   finally{$('saveTopBtn').disabled=false;button.disabled=false;button.textContent=originalLabel||'儲存'}
 }
+async function p79HrVerifyEmploymentWrite(empId,status,date=''){
+  // Never reuse an earlier in-flight read or a local snapshot to certify a write.
+  const key=String(empId||'').trim().toUpperCase();
+  if(p79HrLoadPromise)await p79HrLoadPromise;
+  p79HrPrefetchPromise=null;
+  for(let i=0;i<3;i++){
+    if(i)await new Promise(resolve=>setTimeout(resolve,500*i));
+    const data=await apiGet('hrGetEmployees',30000);
+    const row=Array.isArray(data?.employees)?data.employees.find(e=>String(e.empId||'').trim().toUpperCase()===key):null;
+    if(row&&normalizeEmploymentStatus(row.employmentStatus)===status&&p79HrEffectiveEmploymentStatus(row)===status&&
+       (status!=='resigned'||p79HrEmploymentDate(row.terminationDate)===p79HrEmploymentDate(date))){
+      p79ApplyHrEmployeesPayload(data,false,'cloud');++p79HrSaveRevision;return;
+    }
+  }
+  throw new Error('雲端主檔尚未確認這位員工的在離職狀態，請核對後再試；編輯視窗已保留');
+}
 async function resignCurrent(){if(!canHr('employment.edit'))return alert('沒有變更在職狀態權限');
   if(!editing)return;
-  if(normalizeEmploymentStatus(editing.employmentStatus)==='resigned')return;
+  if(p79HrEffectiveEmploymentStatus(editing)==='resigned')return;
   const date=$('terminationDate').value||todayYmd();
   const last=$('lastWorkDate').value||date;
   const reason=$('terminationReason').value.trim();
   if(!confirm(`確定辦理 ${editing.name}（${editing.empId}）離職？\n\n離職日期：${date}\n最後工作日：${last}\n\n歷史考勤、請假、排班、效率資料都會保留；登入與新打卡會停止。`))return;
   try{
-    await apiPost({action:'hrSetEmploymentStatus',empId:editing.empId,employmentStatus:'resigned',terminationDate:date,lastWorkDate:last,terminationReason:reason});
-    editor.close();await loadEmployees(false);$('status').textContent=`✅ ${editing.name} 已辦理離職，歷史資料完整保留`
+    const empId=editing.empId,name=editing.name;
+    const result=await apiPost({action:'hrSetEmploymentStatus',empId,employmentStatus:'resigned',terminationDate:date,lastWorkDate:last,terminationReason:reason});
+    if(result?.ok!==true)throw new Error(result?.error||'雲端未確認離職儲存');
+    await p79HrVerifyEmploymentWrite(empId,'resigned',date);
+    editor.close();$('status').textContent=`✅ ${name} 已辦理離職，歷史資料完整保留`
   }catch(e){alert('辦理離職失敗：'+(e.message||e))}
 }
 async function restoreCurrent(){
+  if(!canHr('employment.edit'))return alert('沒有變更在職狀態權限');
   if(!editing)return;
   if(!confirm(`確定將 ${editing.name}（${editing.empId}）恢復為在職？\n\n原本的離職紀錄會保留在任職歷程中。`))return;
   try{
-    await apiPost({action:'hrSetEmploymentStatus',empId:editing.empId,employmentStatus:'active'});
-    editor.close();await loadEmployees(false);$('status').textContent=`✅ ${editing.name} 已恢復在職`
+    const empId=editing.empId,name=editing.name;
+    const result=await apiPost({action:'hrSetEmploymentStatus',empId,employmentStatus:'active'});
+    if(result?.ok!==true)throw new Error(result?.error||'雲端未確認復職儲存');
+    await p79HrVerifyEmploymentWrite(empId,'active');
+    editor.close();$('status').textContent=`✅ ${name} 已恢復在職`
   }catch(e){alert('恢復在職失敗：'+(e.message||e))}
 }
 async function deleteCurrent(){alert('人資主檔不再使用刪除員工；請改用「辦理離職」。')}
