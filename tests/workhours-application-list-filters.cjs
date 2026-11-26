@@ -11,5 +11,7 @@ const ids=opts=>Array.from(ctx.filterApplications(rows,{...f,...opts}),r=>r.id);
 assert.deepEqual(ids({}),[1,2,3]);assert.deepEqual(ids({unit:'A',job:'FL'}),[3]);assert.deepEqual(ids({name:'王'}),[1,3]);assert.deepEqual(ids({type:'休息日加班'}),[1]);assert.deepEqual(ids({unit:'B',name:'王'}),[]);
 const markup=html.slice(html.indexOf('class="pr-list-filters"'),html.indexOf('class="pr-table-scroll"'));
 for(const k of ['prListUnit','prListJob','prListName','prListType','prListReset'])assert(markup.includes('id="'+k+'"'));
-assert(!markup.includes('type="date"'));assert(src.includes("const selected=filtered.filter"));assert(src.includes('filtered.filter(r=>key'));assert(src.includes('state.page=1;drawTable(state.all)'));assert(src.includes('applicationMetrics(data.reports)'));
+assert(!markup.includes('type="date"'));
+assert.match(html,/id="prTabrejected"[^>]*>已駁回<\/button>\s*<details id="prListFilterMenu" class="pr-list-filter-menu">\s*<summary/);
+const css=fs.readFileSync('assets/port79-workhours-reference-dashboard.css','utf8');assert(css.includes('.pr-list-filter-menu:not([open]) .pr-list-filters{display:none}'));assert(css.includes('.pr-list-filters{position:absolute'));assert(src.includes('filterMenu.open=false'));assert(src.includes('indicator.hidden=!count'));assert(src.includes("const selected=filtered.filter"));assert(src.includes('filtered.filter(r=>key'));assert(src.includes('state.page=1;drawTable(state.all)'));assert(src.includes('applicationMetrics(data.reports)'));
 console.log('PASS list-only filters, combined matching, reset and filtered status counts; no date filter or cloud mutation');

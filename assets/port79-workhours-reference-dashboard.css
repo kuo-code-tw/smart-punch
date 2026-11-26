@@ -112,9 +112,18 @@ body.p79-work-hours-page #viewAdmin:not(.p79-ref-active) #p79WorkhoursReference{
  #p79WorkhoursReference .pr-control{flex:1 1 100%}
  #p79WorkhoursReference .pr-period{flex:1 1 100%}
 }
-/* Application-list filters affect the already scoped rows only. */
-#p79WorkhoursReference .pr-list-filters{display:flex;align-items:center;flex-wrap:wrap;gap:7px 10px;padding:8px 12px;background:#f8fbff;border-bottom:1px solid #dce7f4}
-#p79WorkhoursReference .pr-list-filters label{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;white-space:nowrap;min-width:0;flex:1 1 135px}
-#p79WorkhoursReference .pr-list-filters select,#p79WorkhoursReference .pr-list-filters input{min-width:0;width:100%;height:32px;padding:4px 7px;font-size:12px;background:white;color:#183b60;border:1px solid #c6d8ed;border-radius:7px;box-sizing:border-box}
-#p79WorkhoursReference #prListReset{height:32px;padding:4px 9px;background:#e8f3ff;color:#145a99;border:1px solid #c6d8ed;border-radius:7px;font-size:12px;font-weight:800;white-space:nowrap;cursor:pointer}
-#p79WorkhoursReference .pr-list-filters :focus-visible{outline:2px solid #1674cf;outline-offset:1px}
+/* Compact application-list filters; dropdown overlays the table without taking a row. */
+#p79WorkhoursReference .pr-application-panel{overflow:visible}
+#p79WorkhoursReference .pr-application-panel .pr-table-head{position:relative;border-radius:15px 15px 0 0;gap:7px}
+#p79WorkhoursReference .pr-list-filter-menu{flex:0 0 auto}
+#p79WorkhoursReference .pr-list-filter-menu summary{display:inline-flex;align-items:center;gap:4px;list-style:none;cursor:pointer;min-height:27px;padding:3px 7px;box-sizing:border-box;border:1px solid #c6daf2;border-radius:7px;background:#f2f8ff;color:#145a99;font-size:11px;font-weight:800;white-space:nowrap}
+#p79WorkhoursReference .pr-list-filter-menu summary::-webkit-details-marker{display:none}
+#p79WorkhoursReference .pr-list-filter-menu summary::marker{content:''}
+#p79WorkhoursReference .pr-list-filter-menu[open] summary,#p79WorkhoursReference #prListFilterToggle[data-active="true"]{background:#e0efff;border-color:#82b5eb;color:#075ab8}
+#p79WorkhoursReference #prListFilterCount:not([hidden]){display:inline-grid;place-items:center;min-width:15px;height:15px;padding:0 2px;border-radius:8px;color:white;background:#1674cf;font-size:10px}
+#p79WorkhoursReference .pr-list-filter-menu:not([open]) .pr-list-filters{display:none}
+#p79WorkhoursReference .pr-list-filters{position:absolute;z-index:25;top:100%;right:8px;width:min(280px,calc(100% - 16px));box-sizing:border-box;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px;padding:11px;background:#fff;border:1px solid #c6d8ed;border-radius:10px;box-shadow:0 8px 24px #1b477029}
+#p79WorkhoursReference .pr-list-filters label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:800;min-width:0}
+#p79WorkhoursReference .pr-list-filters select,#p79WorkhoursReference .pr-list-filters input{min-width:0;width:100%;height:29px;padding:3px 6px;font-size:12px;background:white;color:#183b60;border:1px solid #c6d8ed;border-radius:6px;box-sizing:border-box}
+#p79WorkhoursReference #prListReset{grid-column:1/-1;justify-self:end;height:28px;padding:3px 8px;background:#e8f3ff;color:#145a99;border:1px solid #c6d8ed;border-radius:6px;font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer}
+#p79WorkhoursReference .pr-list-filter-menu :focus-visible{outline:2px solid #1674cf;outline-offset:1px}
