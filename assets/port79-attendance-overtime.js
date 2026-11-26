@@ -31,13 +31,18 @@ async function requestContext(params){
  }finally{clearTimeout(timer)}
 }
 function ruleRow(r){return [r.category,r.code,r.declaredHours,r.convertedHours??'',r.normalStart||'',r.normalEnd||'',r.overtimeStart,r.overtimeEnd,r.position||'full',r.typeName||''];}
+function buildOfficialOvertimeRows(cloud,empId){
+ const employeeId=id(empId);
+ const records=(cloud?.records||[]).filter(record=>employeeId&&id(record.empId)===employeeId);
+ return buildDailyAttendanceRows(records.map(record=>({...record,__p79PairIdentity:employeeId})));
+}
 async function save(draft){
  if(!p79CanReportOvertime()||!getAdminVisibleEmployees().some(e=>id(e.empId)===id(draft.empId)))throw Error('沒有此人員的加班申報權限');
  const cloud=await readContext(draft.empId,draft.date);if(cloud.revision==null)throw Error('班表版本尚未確認，未送出申報');
  const roster=cloud.schedules?.find(r=>id(r.empId)===id(draft.empId))?.schedule||{};
  const previous=roster.__meta?.[draft.date]?.overtimeReport;
  if(previous?.id===draft.id&&previous.category===draft.rule.category&&previous.code===draft.rule.code)return {ok:true,directOvertimeSaved:true,id:draft.id,report:previous};
- const officialRows=buildDailyAttendanceRows((cloud.records||[]).filter(r=>id(r.empId)===id(draft.empId)));
+ const officialRows=buildOfficialOvertimeRows(cloud,draft.empId);
  if(officialRows.some(row=>row.overlapIssue && String(row.accountingDateKey||row.dateKey||'').replaceAll('/','-')===draft.date))throw Error('同一工作日有重疊出勤班次，已停止加班申報；請先核對完整原始打卡');
  const pairs=officialRows.filter(r=>r.clockIn&&r.clockOut).map(row=>({row,start:getAttendanceTimestamp(row.clockIn),end:getAttendanceTimestamp(row.clockOut)})).filter(p=>P79Overtime.overtimeMinutes(p.start,p.end,draft.date,{overtimeReport:draft.rule})>0);
  if(pairs.length!==1)throw Error(pairs.length?'有多組出勤配對，請先核對考勤':'尚無包含所選時段的完整出勤，請先核對考勤');
@@ -57,11 +62,10 @@ async function save(draft){
 // A cached table cell may retain the old clock-out after manual correction.
 // Always prefll from the authoritative complete pair returned by cloud context.
 function p79OfficialOvertimePair(cloud,empId,date,visible,roster,saved){
- const records=(cloud?.records||[]).filter(r=>id(r.empId)===id(empId));
  const base=Date.parse(date+'T00:00:00+08:00');
  if(!Number.isFinite(base))throw Error('加班工作日期無效，已停止申報');
  const next=new Date(Date.parse(date+'T00:00:00Z')+86400000).toISOString().slice(0,10);
- const sessions=buildDailyAttendanceRows(records)
+ const sessions=buildOfficialOvertimeRows(cloud,empId)
   .filter(p=>p.clockIn&&p.clockOut&&!p.pairingIssue)
   .map(row=>({row,start:getAttendanceTimestamp(row.clockIn),end:getAttendanceTimestamp(row.clockOut)}))
   .filter(p=>{
