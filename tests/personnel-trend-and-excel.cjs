@@ -4,8 +4,8 @@ const html=fs.readFileSync(path.join(__dirname,'../aqc-efficiency/index.html'),'
 const source=fs.readFileSync(path.join(__dirname,'../aqc-efficiency/personnel-reference-dashboard.js'),'utf8');
 function fn(s,name){const asyncStart=s.indexOf('async function '+name+'('),i=asyncStart>=0?asyncStart:s.indexOf('function '+name+'(');assert(i>=0,'missing '+name);const e=s.indexOf('\n}',i);assert(e>i);return s.slice(i,e+2);}
 const rows=[
- {workDate:'2026-11-01',name:'甲',empId:'1',group:'A組',source:'working-report',disc:4,load:3,hatches:1,hours:2,workingNo:'NO1',number:'A1',startTime:'07:00',endTime:'09:00'},
- {workDate:'2026-11-30',name:'甲',empId:'1',group:'A組',source:'working-report',disc:6,load:1,hatches:0,hours:2,workingNo:'NO2',number:'A1',startTime:'07:00',endTime:'09:00'},
+ {workDate:'2026-11-01',name:'甲',empId:'1',group:'A組',source:'working-report',disc:4,load:3,hatches:1,hours:2,workingNo:'NO1',number:'A1',startTime:'07:00',endTime:'09:00',note:'Remark A'},
+ {workDate:'2026-11-30',name:'甲',empId:'1',group:'A組',source:'working-report',disc:6,load:1,hatches:0,hours:2,workingNo:'NO2',number:'A1',startTime:'07:00',endTime:'09:00',stopRemark1:'Remark B'},
  {workDate:'2026-10-31',name:'乙',empId:'2',group:'B組',source:'working-report',disc:100,load:100,hatches:1,hours:1,workingNo:'NO3'}
 ];
 let period={month:'2026-11',start:'2026-11-01',end:'2026-11-30',custom:false},write=null;
@@ -24,9 +24,10 @@ const mock={
  compareWorkingReportChronology:(a,b)=>a.workDate.localeCompare(b.workDate),
  requireEfficiencyAccess:()=>true,
  toast(){},Date,Number,String,Array,Map,
- XLSX:{utils:{book_new:()=>({sheets:[]}),aoa_to_sheet:data=>({data}),encode_cell:({r,c})=>'O'+(r+1),book_append_sheet:(book,sheet,name)=>book.sheets.push({name,sheet})},writeFile:(book,name)=>{write={book,name}}}
+ XLSX:{utils:{book_new:()=>({sheets:[]}),aoa_to_sheet:data=>({data}),encode_cell:({r,c})=>String.fromCharCode(65+c)+(r+1),book_append_sheet:(book,sheet,name)=>book.sheets.push({name,sheet})},writeFile:(book,name)=>{write={book,name}}}
 };
 vm.createContext(mock);
+vm.runInContext(fn(html,'personnelRecordRemark'),mock);
 vm.runInContext(fn(html,'buildPersonnelStatisticsExcelData'),mock);
 vm.runInContext(fn(html,'exportPersonnelStatisticsExcel'),mock);
 (async()=>{
@@ -35,6 +36,7 @@ vm.runInContext(fn(html,'exportPersonnelStatisticsExcel'),mock);
  assert.equal(report.summary.find(x=>x[0]==='作業櫃數')[1],14);
  assert.equal(report.days.length,31,'30 dates plus header; no last-12 truncation');
  assert.equal(report.detail.length,3);
+ assert.equal(report.detail[0][15],'Remark（備註）');assert.equal(report.detail[1][15],'Remark A');assert.equal(report.detail[2][15],'Remark B');
  assert(!report.detail.some(r=>r.join(' ').includes('100')),'previous month must not leak');
  await mock.exportPersonnelStatisticsExcel();
  assert.equal(write.book.sheets.length,4);

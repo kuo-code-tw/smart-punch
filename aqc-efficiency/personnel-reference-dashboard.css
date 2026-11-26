@@ -78,7 +78,9 @@
 #view-weekly .p79pr-data-table th{background:#e6f0ff!important;color:#254c77!important;font-weight:900;padding:10px 6px}
 #view-weekly .p79pr-data-table td{padding:9px 6px;border-bottom:1px solid #e3ebf5;color:#415571;background:#fff!important}
 #view-weekly .p79pr-data-table tr:nth-child(even) td{background:#f7fbff!important}
-#view-weekly .p79pr-data-table td:last-child{font-weight:900;color:#0b8753}
+#view-weekly .p79pr-data-table td:nth-child(14){font-weight:900;color:#0b8753}
+#view-weekly #p79PersonnelRecordDisclosure .p79pr-data-table{min-width:1300px}
+#view-weekly #p79PersonnelRecordDisclosure .p79pr-record-remark{min-width:180px;max-width:380px;white-space:pre-wrap;overflow-wrap:anywhere;text-align:left;vertical-align:middle;font-weight:400;color:#415571}
 #view-weekly .p79pr-data-table :is(th,td):nth-child(7),#view-weekly .p79pr-data-table :is(th,td):nth-child(8){display:none}
 #view-weekly .p79pr-footnote{margin:9px 0 0;font-size:10px;color:#73859c;display:flex;justify-content:space-between;gap:9px;flex-wrap:wrap}
 #view-weekly .p79pr-group-alert{margin:-3px 0 13px;padding:9px 12px;border:1px solid #f7dba4;background:#fffbeb;color:#92400e;border-radius:9px;font-size:11px}

@@ -1762,7 +1762,7 @@ html[data-p79-home-vessel-import="1"] #p79WorkspaceTopbar{display:none!important
           <span class="p79pr-toggle-pill"><span class="p79pr-label-closed">展開明細</span><span class="p79pr-label-open">收合明細</span></span>
         </summary>
         <div class="p79pr-detail-table-scroll">
-          <table class="p79pr-data-table"><thead><tr><th>日期</th><th>姓名</th><th>排班組別</th><th>WORKING NO.</th><th>船名／航次</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th></tr></thead><tbody id="personnelRecordBody"></tbody></table>
+          <table class="p79pr-data-table"><thead><tr><th>日期</th><th>姓名</th><th>排班組別</th><th>WORKING NO.</th><th>船名／航次</th><th>AQC</th><th>開始</th><th>結束</th><th>時數</th><th>DISC</th><th>LOAD</th><th>H/C</th><th>櫃數</th><th>效率（含 H/C）</th><th class="p79pr-record-remark">Remark（備註）</th></tr></thead><tbody id="personnelRecordBody"></tbody></table>
         </div>
       </details>
     </div>
@@ -7643,10 +7643,16 @@ function preparePersonnelFilters(){
   if(from)from.value=start;if(to)to.value=end;
   populatePersonStatPeople();
 }
+function personnelRecordRemark(r){
+  const note=String(r?.note??'');
+  if(note.trim())return note;
+  const remarks=[r?.stopRemark1,r?.stopRemark2,r?.stopRemark3].map(v=>String(v??'')).filter(v=>v.trim());
+  return [...new Set(remarks)].join('；')||String(r?.bundleRemark??'');
+}
 function renderPersonnelRecords(rows){
   const body=document.getElementById('personnelRecordBody');if(!body)return;
   const ordered=[...rows].sort(compareWorkingReportChronology);
-  body.innerHTML=ordered.map(r=>{const m=workloadRecordMetrics(r);return `<tr><td>${esc(r.workDate||'')}</td><td class="font-bold">${esc(displayPersonName(r.name))}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(r.workingNo||'—')}</td><td>${esc(vesselLabelForRecord(r))}</td><td>${esc(normalizeAqcNo(r.number||r.gcNo))}</td><td>${esc(r.startTime||'')}</td><td>${esc(r.endTime||'')}</td><td>${m.hours.toFixed(2)}</td><td>${m.disc}</td><td>${m.load}</td><td>${m.hc}</td><td class="font-bold">${m.containers}</td><td>${m.eff.toFixed(2)}</td></tr>`;}).join('')||'<tr><td colspan="14" class="p-5 text-slate-400">此條件沒有作業紀錄</td></tr>';
+  body.innerHTML=ordered.map(r=>{const m=workloadRecordMetrics(r);return `<tr><td>${esc(r.workDate||'')}</td><td class="font-bold">${esc(displayPersonName(r.name))}</td><td>${esc(operationGroupForRecord(r))}</td><td>${esc(r.workingNo||'—')}</td><td>${esc(vesselLabelForRecord(r))}</td><td>${esc(normalizeAqcNo(r.number||r.gcNo))}</td><td>${esc(r.startTime||'')}</td><td>${esc(r.endTime||'')}</td><td>${m.hours.toFixed(2)}</td><td>${m.disc}</td><td>${m.load}</td><td>${m.hc}</td><td class="font-bold">${m.containers}</td><td>${m.eff.toFixed(2)}</td><td class="p79pr-record-remark">${esc(personnelRecordRemark(r))}</td></tr>`;}).join('')||'<tr><td colspan="15" class="p-5 text-slate-400">此條件沒有作業紀錄</td></tr>';
   const count=document.getElementById('personnelRecordCount');if(count)count.textContent=`共 ${rows.length} 筆作業紀錄；與上方人員、船舶統計使用相同篩選條件。`;
   const pid=document.getElementById('personStatPerson')?.value||'',detail=document.getElementById('view-workload');
   if(detail)detail.classList.toggle('hidden',true);
@@ -7954,13 +7960,13 @@ function buildPersonnelStatisticsExcelData(){
     [...byDay.values()].sort((a,b)=>a.date.localeCompare(b.date)).forEach(r=>
       days.push([r.date,r.count,Number(r.hours.toFixed(2)),r.disc,r.load,r.hc,r.disc+r.load,r.hours>0?Number(((r.disc+r.load+r.hc)/r.hours).toFixed(2)):'—']));
   }
-  const detail=[['日期','工號','姓名','組別','WORKING NO.','船舶','AQC','開始','結束','作業時數','DISC','LOAD','H/C','櫃數','效率']];
+  const detail=[['日期','工號','姓名','組別','WORKING NO.','船舶','AQC','開始','結束','作業時數','DISC','LOAD','H/C','櫃數','效率','Remark（備註）']];
   [...rows].sort(compareWorkingReportChronology).forEach(r=>{
     const m=workloadRecordMetrics(r);
     detail.push([String(r.workDate||'').slice(0,10),excelText(r.empId||''),excelText(displayPersonName(r.name)),excelText(operationGroupForRecord(r)),
       excelText(r.workingNo||''),excelText(vesselLabelForRecord(r)),excelText(normalizeAqcNo(r.number||r.gcNo)),
       excelText(r.startTime||''),excelText(r.endTime||''),Number(numSafe(m.hours).toFixed(2)),
-      numSafe(m.disc),numSafe(m.load),numSafe(m.hc),numSafe(m.containers),m.hours>0?Number(numSafe(m.eff).toFixed(2)):'—']);
+      numSafe(m.disc),numSafe(m.load),numSafe(m.hc),numSafe(m.containers),m.hours>0?Number(numSafe(m.eff).toFixed(2)):'—',excelText(personnelRecordRemark(r))]);
   });
   return {period,rowsCount:rows.length,summary,ranking,days,detail};
 }
@@ -7979,7 +7985,7 @@ async function exportPersonnelStatisticsExcel(){
       ['統計摘要',report.summary,[31,49]],
       ['人員效率排行',report.ranking,[11,17,24,16,14,14,12,12,12,14,12]],
       ['每日作業統計',report.days,[18,13,15,13,13,13,14,12]],
-      ['作業明細',report.detail,[16,16,24,14,19,29,13,13,13,15,13,13,12,13,12]]
+      ['作業明細',report.detail,[16,16,24,14,19,29,13,13,13,15,13,13,12,13,12,48]]
     ]){
       const sheet=XLSX.utils.aoa_to_sheet(data);
       sheet['!cols']=widths.map(w=>({wch:w}));
@@ -17239,7 +17245,7 @@ body[data-p79-system="efficiency"] #summaryDashboardTable :is(th,td):nth-child(1
 <script defer src="../assets/port79-aqc-daily-active.js?v=20261111-active-days-desc-v3"></script>
 <link rel="stylesheet" href="../assets/port79-management-workspace.css?v=20261030-compact-content-v1&menu=20261112-clean-v1&nav=20261117-dark-original-v2&harbor=20261117-restored-v1&brand=20261117-restore-v2&ui=20261117-white-reference-v2&theme=20261117-dark-sidebar-coherent-v1">
 <link rel="stylesheet" href="./vessel-tab-palette.css?v=20261109-v115">
-<link rel="stylesheet" href="./personnel-reference-dashboard.css?v=20261111-fold-records-v3">
+<link rel="stylesheet" href="./personnel-reference-dashboard.css?v=20261126-remark-v1">
 <script src="../assets/port79-management-workspace.js?v=20261115-shared-user-activity-v3&nav=20261117-dark-original-v1&brand=20261117-restore-v2&contrast=20261117-inline-v2&ui=20261117-white-reference-v1&sidebar=20261120-settings-menu-visible-v1"></script>
 <script>
 /* Gate management shows the designed dashboard and keeps the original importer. */
