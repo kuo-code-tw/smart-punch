@@ -841,6 +841,8 @@ function p79TrackAttendanceCloudFailure(item,error){
   (/考勤同步通道忙碌/.test(String(item.lastError||''))?0:Math.min(5,Math.max(0,Number(item.attempts||0)-1)));
  item.cloudFailureStreak=p79TransientAttendanceError(error)?prior+1:0;
  item.retryHold=item.cloudFailureStreak>=6;
+ if(item.retryHold)item.retryRecoveryAt=Date.now()+15*60*1000;
+ else delete item.retryRecoveryAt;
  return item.retryHold;
 }
 function p79PauseAttendanceWrite(payload,error,attempts){
@@ -1615,16 +1617,44 @@ function p79ResumeTransientAttendanceEdits(){
   }
   if(changed)saveQueue(q);
 }
-function p79ResumeIdenticalDuplicateEdits(){
- const q=readQueue();let changed=false;
- for(const item of q){
-  if(!item?.paused||!['updateRecord','editRecord'].includes(String(item.payload?.action||'')))continue;
-  if(!/正式主表有多筆共用紀錄編號|相同考勤重複修復尚未部署至雲端/.test(String(item.lastError||'')))continue;
-  // Startup only: re-read the authoritative month. The ordinary conflict guard
-  // still pauses different people, times, notes or other nonidentical events.
-  item.paused=false;item.state='pending';item.nextRetryAt=Date.now()+1500;changed=true;
- }
- if(changed)saveQueue(q);
+// Recheck held transport errors, at most one guarded retry per cooldown.
+function p79RearmHeldAttendanceEdit(now=Date.now()){
+ const q=readQueue();
+ const item=q.find(x=>x?.paused&&x.retryHold===true&&
+  ['updateRecord','editRecord'].includes(String(x.payload?.action||''))&&
+  x.lastFailureRetryable!==false&&p79TransientAttendanceError(x.lastError)&&
+  /^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}/.test(String(x.payload?.originalTimeStr||''))&&
+  Number(x.retryRecoveryAt||0)<=now);
+ if(!item)return false;
+ item.cloudFailureStreak=Math.max(6,Number(item.cloudFailureStreak)||0);
+ item.retryRecoveryAt=now+15*60*1000;
+ item.paused=false;item.state='pending';item.nextRetryAt=now;
+ saveQueue(q);return true;
+}
+let p79DuplicateRecoveryBusy=false,p79DuplicateProbeAt=0;
+async function p79ResumeIdenticalDuplicateEdits(){
+ if(p79DuplicateRecoveryBusy||writing||navigator.onLine===false||!token()||!gasUrl()||Date.now()<p79DuplicateProbeAt)return false;
+ const eligible=x=>x?.paused&&['updateRecord','editRecord'].includes(String(x.payload?.action||''))&&
+  /正式主表有多筆共用紀錄編號|相同考勤重複修復尚未部署至雲端/.test(String(x.lastError||''))&&
+  x.duplicateRecoveryVersion!=='20261126-v3';
+ if(!readQueue().some(eligible))return false;
+ p79DuplicateRecoveryBusy=true;p79DuplicateProbeAt=Date.now()+5*60*1000;
+ const endpoint=gasUrl(),access=token(),ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),12000);
+ try{
+  const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'pingPost'}),cache:'no-store',signal:ctrl.signal});
+  const data=await response.json();
+  if(!response.ok||data?.ok!==true||Number(data.attendanceIdenticalEditVersion)<1||!Number.isFinite(Number(data.attendanceIdenticalEditVersion))||gasUrl()!==endpoint||token()!==access||writing)return false;
+  const q=readQueue(),item=q.find(eligible);if(!item)return false;
+  // send() still reads all physical records and rejects non-identical collisions.
+  item.duplicateRecoveryVersion='20261126-v3';
+  item.paused=false;item.state='pending';item.nextRetryAt=Date.now();
+  saveQueue(q);return true;
+ }catch(_){return false}finally{clearTimeout(timer);p79DuplicateRecoveryBusy=false;}
+}
+async function p79RecoverBlockedAttendanceEdits(){
+ if(writing||navigator.onLine===false||!token()||!gasUrl())return;
+ if(p79RearmHeldAttendanceEdit()){void drain(false);return;}
+ if(await p79ResumeIdenticalDuplicateEdits())void drain(false);
 }
 function p79ShortenTransientEditRetryWait(){
   const q=readQueue(),now=Date.now();let changed=false;
@@ -1649,7 +1679,7 @@ function p79ShortenOldPunchRetryWait(){
 document.addEventListener('DOMContentLoaded',()=>{
   p79PruneVerifiedDeletedRecordRetries20261010();
   p79ResumeTransientAttendanceEdits();
-  p79ResumeIdenticalDuplicateEdits();
+  void p79RecoverBlockedAttendanceEdits();
   p79ShortenTransientEditRetryWait();
   p79ShortenOldPunchRetryWait();
   updateUi();
@@ -1662,6 +1692,7 @@ document.addEventListener('visibilitychange',()=>{
   if(!document.hidden){p79ShortenTransientEditRetryWait();drain(false);pollDelta(true)}
 });
 setInterval(()=>{if(!writing&&readQueue().some(x=>!x.paused))drain(false)},5000);
+setInterval(()=>{if(!document.hidden)void p79RecoverBlockedAttendanceEdits();},60000);
 
 
 // ----- V5.4 HARD BRIDGE -----

@@ -24648,7 +24648,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 
 
 <script src="../assets/port79-punch-device-state.js?v=20261022-self-binding"></script>
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2&dup=20261124-final-two-v1&sync=20261125-local-first-edit-v2&identical=20261125-v1&lane=20261126-v1&retryBudget=20261126-v2&withdraw=20261126-v1"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2&dup=20261124-final-two-v1&sync=20261125-local-first-edit-v2&identical=20261125-v1&lane=20261126-v1&retryBudget=20261126-v2&withdraw=20261126-v1&recovery=20261126-v3"></script>
 
 
 
@@ -25392,7 +25392,7 @@ function show(autoReview=true){
    const names={logSession:'登入／登出紀錄',deleteRecord:'刪除考勤紀錄',addRecord:'新增考勤紀錄',updateRecord:'修改考勤紀錄',editRecord:'修改考勤紀錄',syncRecords:'同步考勤紀錄',persistEmployeePunch:'員工打卡寫入',queueEmployeePunch:'員工打卡補傳'};
    const attempts=entry?.attempts??entry?.retries??0;
    const rawState=String(entry?.state||'pending').toLowerCase();
-   const state=entry?.paused?(entry.retryHold?'雲端連續失敗，已保留修改待核對':'已暫停，等待人工核對'):({syncing:'同步進行中',pending:'待同步（系統自動重試中）',failed:'同步失敗，等待重試',queued:'等待同步',retrying:'自動重試中',done:'已完成'}[rawState]||'待同步（'+rawState+'）');
+   const state=entry?.paused?(entry.retryHold?'雲端連續失敗，保留修改並於冷卻後重新核對':'已暫停，等待人工核對'):({syncing:'同步進行中',pending:'待同步（系統自動重試中）',failed:'同步失敗，等待重試',queued:'等待同步',retrying:'自動重試中',done:'已完成'}[rawState]||'待同步（'+rawState+'）');
    const retryAt=Number(entry?.nextRetryAt||0);
    const retryText=!entry?.paused&&rawState!=='syncing'&&Number.isFinite(retryAt)&&retryAt>0&&retryAt<Number.MAX_SAFE_INTEGER
      ? (retryAt>Date.now()?'下次重試：'+new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(retryAt))+'（台灣時間）':'已到重試時間，等待同步程序處理') : '';
