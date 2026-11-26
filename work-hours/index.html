@@ -13290,10 +13290,14 @@ async function loadAttendanceCoreSyncData(showMessage = false) {
         }
         function p79BuildWorkRestAttendance(month,roster,attendanceRows,complete=true){
             const employees=p79WorkhoursEligibleEmployees(),allowed=new Set(employees.map(e=>String(e.empId).trim().toUpperCase()));
-            const sessions=(window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows)(attendanceRows).map(row=>{
+            const pairedRows=typeof p79WorkhoursListAttendanceShifts==='function'
+                ?p79WorkhoursListAttendanceShifts(attendanceRows)
+                :(window.P79AttendanceV6?.buildShifts||buildDailyAttendanceRows)(attendanceRows);
+            const sessions=pairedRows.filter(row=>!(row.records||[]).some(r=>r.__p79PairIdentity)).map(row=>{
                 const record=row.clockIn||row.clockOut||row.records?.[0]||row;
                 const employee=employees.find(e=>String(e.empId).trim().toUpperCase()===String(row.empId||record.empId||'').trim().toUpperCase())||employees.find(e=>String(record.attNo||'').trim()&&normalizeAttendanceStatsAttNo(e.attNo)===normalizeAttendanceStatsAttNo(record.attNo));
-                return {empId:employee?.empId||'',date:normalizeScheduleDateKey(row.accountingDateKey||row.dateKey),start:row.clockIn?p79DirectAttendanceTimestamp(row.clockIn):null,end:row.clockOut?p79DirectAttendanceTimestamp(row.clockOut):null,time:p79DirectAttendanceTimestamp(record)};
+                const workDate=normalizeScheduleDateKey(row.accountingDateKey||row.dateKey);
+                return {empId:employee?.empId||'',date:workDate,workDate,start:row.clockIn?p79DirectAttendanceTimestamp(row.clockIn):null,end:row.clockOut?p79DirectAttendanceTimestamp(row.clockOut):null,time:p79DirectAttendanceTimestamp(record)};
             }).filter(p=>allowed.has(String(p.empId).toUpperCase()));
             const attendanceEvidence=window.P79RestAttendance.build({complete,month,schedules:roster.schedules,sessions,leaveDates:p79WorkRestLeaveDates(month,roster,employees)});
             const pairs=sessions.map((p,index)=>({...p,date:attendanceEvidence.sessionDates?.[index]||p.date})).filter(p=>p.start!=null&&p.end!=null&&p.end>p.start&&p.date.startsWith(month+'-'));
@@ -13838,6 +13842,32 @@ async function p79ExportOvertimeComparison(printMode){
             const priorComplete=p79WorkOvertimeObservedMinutes(prior)!==null;
             return complete!==priorComplete?complete:Number(candidate.sortTime||0)>Number(prior.sortTime||0);
         }
+        // A stale absence snapshot must never erase real attendance or authorize
+        // cancelling a saved declaration. Only this derived display metadata changes.
+        function p79WorkOvertimeReconcileAttendanceMeta(meta,session,date,roster){
+            const report=meta?.overtimeReport;
+            if(!report||!session||(!session.clockIn&&!session.clockOut))return meta;
+            const state=report.attendanceState,review=String(report.attendanceReview||'');
+            const absenceReview=/整班無|無上下班卡|只有單邊打卡|配對不明/.test(review);
+            if(!['rest','missing'].includes(state)&&!absenceReview)return meta;
+            const start=p79DirectAttendanceTimestamp(session.clockIn),end=p79DirectAttendanceTimestamp(session.clockOut);
+            const issue=p79OvertimeAttendanceIssue(session,start,end);
+            if(issue)return {...meta,overtimeReport:{...report,attendanceState:'missing',attendanceReview:issue}};
+            // Preserve independent audit notes; do not confirm/pay a stale
+            // declaration whose original period no longer matches real punches.
+            let nextReview=absenceReview?'':review;
+            if(!nextReview){
+                try{
+                    const rule=[report.category,report.code,report.declaredHours,report.convertedHours??'',report.normalStart||'',report.normalEnd||'',report.overtimeStart,report.overtimeEnd,report.position||'full',report.typeName||''];
+                    nextReview=globalThis.P79Overtime?.ruleAttendanceIssue
+                        ?P79Overtime.ruleAttendanceIssue(start,end,date,rule,roster)
+                        :'完整出勤已匹配，原申報時段待核對';
+                    if(!nextReview&&!(P79Overtime.overtimeMinutes(start,end,date,meta)>0))
+                        nextReview='原申報時段與實際出勤不重疊，請核對';
+                }catch(_){nextReview='完整出勤已匹配，原申報時段待核對';}
+            }
+            return {...meta,p79AttendanceRestRecovered:true,overtimeReport:{...report,attendanceState:'worked',attendanceReview:nextReview}};
+        }
         function buildOvertimeStatisticsRows() {
             const visibleEmployees = p79WorkhoursEligibleEmployees();
             const visibleEmployeeIds = new Set(visibleEmployees.map(emp => String(emp.empId || '').trim().toUpperCase()).filter(Boolean));
@@ -13907,6 +13937,16 @@ async function p79ExportOvertimeComparison(printMode){
                 const prior=attendanceByEmployeeDate.get(key);
                 if(p79WorkOvertimePreferAttendance(session,prior))attendanceByEmployeeDate.set(key,session);
             }
+            // Reconcile every employee/work-date using the exact same paired
+            // attendance rows as the attendance screen, before any report matching.
+            restMetaByEmp.forEach((map,id)=>{
+                for(const [date,meta] of Object.entries(map)){
+                    const observed=attendanceByEmployeeDate.get(id+'|'+date);
+                    if(observed&&meta.overtimeReport)
+                        map[date]=p79WorkOvertimeReconcileAttendanceMeta(meta,observed,date,
+                            typeof p79WorkOvertimeRoster==='function'?p79WorkOvertimeRoster(id,date):null);
+                }
+            });
             const rows = attendanceSessions
                 .filter(session => session.clockIn && session.clockOut)
                 .map(session => {
@@ -13917,12 +13957,19 @@ async function p79ExportOvertimeComparison(printMode){
                     if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) return null;
                     const employee = indexedEmployee(session);
                     if (!employee||!p79EmployeeDateEligible(employee,session.accountingDateKey||session.dateKey)) return null;
-                    const matchedReport=P79Overtime.matchReport(start,end,normalizeScheduleDateKey(session.dateKey),restMetaByEmp.get(String(employee.empId).trim().toUpperCase()));
+                    const workDate=normalizeScheduleDateKey(session.accountingDateKey||session.dateKey);
+                    const reportMap=restMetaByEmp.get(String(employee.empId).trim().toUpperCase());
+                    // A saved declaration on this exact accounting workday takes
+                    // priority over an adjacent day's overlapping declaration.
+                    const matchedReport=P79Overtime.matchReport(start,end,workDate,
+                        p79WorkOvertimeOfficialReport(reportMap?.[workDate]?.overtimeReport,reportMap?.[workDate])
+                            ?{[workDate]:reportMap[workDate]}:reportMap);
                     const restMeta=matchedReport.meta;
                     if(restMeta?.overtimeExcluded)return null;
                     const reportMinutes=matchedReport.minutes;
                     // 自動未休假配對不是申報；未有申報或代班時，只計打卡超過8小時且超過30分的部分。
-                    const attendanceIssue=p79OvertimeAttendanceIssue(session,start,end)||restMeta?.overtimeReport?.attendanceReview||'';
+                    const attendanceIssue=p79OvertimeAttendanceIssue(session,start,end)||
+                        (restMeta?.p79AttendanceRestRecovered?'':restMeta?.overtimeReport?.attendanceReview)||'';
                     const baseOvertimeMinutes = restMeta?.overtimeReport?.attendanceReview?0:reportMinutes===null?(attendanceIssue?0:(totalMinutes>480+MIN_OVERTIME_MINUTES?totalMinutes-480:0)):reportMinutes;
                     const empKey=String(employee.empId).trim().toUpperCase();
                     const specialParts=attendanceIssue||reportMinutes!==null?[]:(globalThis.P79SpecialOvertime?.overlap(start,end)||[]).filter(part=>{
@@ -13980,7 +14027,7 @@ async function p79ExportOvertimeComparison(printMode){
                      const observedMinutes=p79WorkOvertimeObservedMinutes(observed);
                      const observedIssue=observed?p79OvertimeAttendanceIssue(observed,p79DirectAttendanceTimestamp(observed.clockIn),p79DirectAttendanceTimestamp(observed.clockOut)):'';
                      const stalePlanned=meta.overtimeReport.planned===true&&date<todayTaipei;
-                    const attendanceIssue=meta.overtimeReport.attendanceReview||observedIssue||
+                    const attendanceIssue=(meta.p79AttendanceRestRecovered?'':meta.overtimeReport.attendanceReview)||observedIssue||
                        (stalePlanned&&observedMinutes===null?'已有正式申報；原預排標記未更新，出勤待核對':'');
                     rows.push({empId:employee.empId,attNo:employee.attNo,name:employee.name,dept:employee.dept||'一般',jobTitle:employee.jobTitle||employee.deptDetail||'',dateKey:date,rosterDate:date,
                      overtimeDate:meta.overtimeDate||meta.overtimeReport?.overtimeDate||'',workMonthKey:date.slice(0,7),monthKey:String(meta.overtimeReport?.overtimeDate||date).slice(0,7),sortTime:Date.parse(date+'T00:00:00+08:00'),clockIn:observed?.clockIn||null,clockOut:observed?.clockOut||null,totalMinutes:observedMinutes??0,overtimeMinutes:0,overtimeReport:meta.overtimeReport,amendment:globalThis.P79OvertimeReason?.amended?.(meta.overtimeReport,meta)||null,reportVerified:p79WorkOvertimeOfficialReport(meta.overtimeReport,meta),forEmpId:meta.forEmpId||'',planned:meta.overtimeReport.planned===true&&date>=todayTaipei,attendanceIssue,timeCheckRequired:!!attendanceIssue,overDailyLimit:false});
@@ -15108,7 +15155,7 @@ function p79OvertimePeriodLabel(report){
             // tools, but cloud-saved plan IDs ALSO appear in the main ledger.
             p79RenderOvertimePlannedRows(plannedRows,month,dept,jobTitle,employeeId);
             const jobTitleRows = allOvertimeRows.filter(row =>
-                (source==='ALL' || (source==='review' ? row.overtimeReport?.attendanceState==='rest' : source==='arranged' ? !!(row.overtimeReport || row.coverCandidate) : !(row.overtimeReport || row.coverCandidate))) &&
+                (source==='ALL' || (source==='review' ? (row.overtimeReport?.attendanceState==='rest'&&!row.clockIn&&!row.clockOut) : source==='arranged' ? !!(row.overtimeReport || row.coverCandidate) : !(row.overtimeReport || row.coverCandidate))) &&
                 (month === 'ALL' || p79WorkOvertimeLedgerMonth(row) === month) &&
                 (dept === 'ALL' || p79OvertimeUnitForRow(row) === dept) &&
                 (jobTitle === 'ALL' || row.jobTitle === jobTitle)
@@ -15187,8 +15234,8 @@ function p79OvertimePeriodLabel(report){
                 '(清單 '+rows.length+' 筆｜已儲存預排 '+savedPlanCount+' 筆；預排不算已完成時數)'+
                 (pendingEstimateCount?'｜加班出勤 '+pendingEstimateCount+' 班':'')+
                 reportStatus+restStatus+noPunchAutoNotice+
-                (rows.some(row=>row.reportVerified&&row.overtimeReport?.attendanceState==='rest')
-                  ?'｜🔴 疑似多報 '+rows.filter(row=>row.reportVerified&&row.overtimeReport?.attendanceState==='rest').length+' 筆，請核對後刪除':'');
+                (rows.some(row=>row.reportVerified&&row.overtimeReport?.attendanceState==='rest'&&!row.clockIn&&!row.clockOut)
+                  ?'｜🔴 疑似多報 '+rows.filter(row=>row.reportVerified&&row.overtimeReport?.attendanceState==='rest'&&!row.clockIn&&!row.clockOut).length+' 筆，請核對後刪除':'');
 
             const totalPages = Math.max(1, Math.ceil(rows.length / OVERTIME_PAGE_SIZE));
             overtimeCurrentPage = Math.min(Math.max(1, overtimeCurrentPage), totalPages);
@@ -15204,7 +15251,7 @@ function p79OvertimePeriodLabel(report){
                 const inlineManualReview=savedPlan&&p79CanManuallyReviewPlannedRow(row);
                 const inlineReason=savedPlan?p79OvertimePendingReason(row,mainReviewToday):null;
                 const inlineBlockedLabel=inlineReason?.code==='review'?'時段待核':inlineReason?.label||'待核對';
-                const noPunchRest=row.reportVerified&&row.overtimeReport?.attendanceState==='rest';
+                const noPunchRest=row.reportVerified&&row.overtimeReport?.attendanceState==='rest'&&!row.clockIn&&!row.clockOut;
                 const periodReview=!noPunchRest?p79WorkOvertimePeriodReview(row):null;
                 // Auto-reconcile the DISPLAY for every employee and configured overtime period.
                 // A single IN can suggest a shift but never certifies eight hours / changes a report.
@@ -15273,11 +15320,12 @@ function p79OvertimePeriodLabel(report){
                 const p79CrossDayPunchNotice=p79CrossDayPunchMismatch?
                     '代班04-08打卡不符｜不能認列預排4小時':'';
                 const p79OvertimeConversionFull=row.overtimeReport
-                    ?(row.reportVerified?(savedPlan?'未列入已完成工時':noPunchRest?'0小時':String(p79DisplayedOvertimeConversion(row.overtimeReport))):'尚未申報'):'';
+                    ?(row.reportVerified?(savedPlan?'未列入已完成工時':(noPunchRest||row.overtimeReport?.attendanceReview)?'0小時':String(p79DisplayedOvertimeConversion(row.overtimeReport))):'尚未申報'):'';
                 const p79OvertimePlanState=p79WrongCoverDate?'僅正常班出勤／原預排待修正':savedPlan&&!noPunchRest
                     ?(row.clockIn&&row.clockOut?'出勤待核':row.clockIn?'待簽退':'未出勤'):'';
                 const overtimeShortText=[
                     row.timeCheckRequired?(noPunchRest?'疑似多報・無卡':'出勤待核'):'',
+                    !row.timeCheckRequired&&row.overtimeReport?.attendanceReview?'已出勤・申報時段待核':'',
                     p79WrongCoverDate?'歸屬待核→'+p79WrongCoverDate.date:'',
                     p79AttributionText,
                     p79CrossDayPunchNotice,
@@ -15292,6 +15340,7 @@ function p79OvertimePeriodLabel(report){
                 ].filter(Boolean).join('｜')||'—';
                 const overtimeFullTitle=[
                     row.timeCheckRequired?String(row.attendanceIssue||'出勤待核對'):'',
+                    !row.timeCheckRequired?String(row.overtimeReport?.attendanceReview||''):'',
                     savedPlan&&!noPunchRest?(row.clockIn&&row.clockOut?'已儲存申報｜出勤已完成，時段待核對':row.clockIn?'已儲存申報｜待簽退':'已儲存申報｜預排未出勤'):'',
                     p79WrongCoverDate?p79WrongCoverDate.message:'',
                     p79AttributionText,
