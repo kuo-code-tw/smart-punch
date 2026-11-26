@@ -50,5 +50,27 @@ const response=(data={ok:true},status=200)=>new Response(JSON.stringify(data),{s
   assert.equal(counts.leave,2);for(const sys of ['schedule','efficiency','hr','history'])assert.equal(counts[sys],1);
   assert.equal(second.filter(x=>x.reused).length,6);
  });
+ await test('background batch supplements only transient leave and schedule failures after other modules',async()=>{
+  const calls=[],saved=[];
+  const mocks={attendance:async()=>({recordCount:0}),save:async sys=>{saved.push(sys);return true},system:async(sys,_,opts)=>{
+   calls.push([sys,opts.interactive]);
+   if(['leave','schedule'].includes(sys)&&opts.interactive)throw Object.assign(Error('暫時忙碌'),{code:'P79_CLOUD',retryable:true});
+   return {ok:true};
+  }};
+  const x=setup(()=>response(),{fast:true,mockDownload:mocks});
+  const result=await x.api.downloadAll(null,{quickFirst:true,historyOnDemand:true});
+  assert.equal(result.filter(x=>x.ok).length,6);
+  assert.deepEqual(calls,[['leave',true],['schedule',true],['efficiency',true],['hr',true],['leave',false],['schedule',false]]);
+  assert.equal(saved.filter(sys=>sys==='leave').length,1);
+  assert.equal(saved.filter(sys=>sys==='schedule').length,1);
+ });
+ await test('background supplements never retry a permission denial',async()=>{
+  let leaveCalls=0;
+  const x=setup(()=>response(),{fast:true,mockDownload:{attendance:async()=>({recordCount:0}),save:async()=>true,system:async sys=>{
+   if(sys==='leave'){leaveCalls++;throw Object.assign(Error('沒有權限'),{code:'P79_CLOUD',retryable:false});}return {ok:true};
+  }}});
+  const result=await x.api.downloadAll(null,{quickFirst:true,historyOnDemand:true});
+  assert.equal(leaveCalls,1);assert.equal(result.filter(x=>x.ok).length,5);
+ });
  console.log(JSON.stringify({passed,scope:'Read-only transport recovery, current session, timeouts and bounded batch; no live credentials'}));
 })().catch(e=>{console.error(e);process.exitCode=1});

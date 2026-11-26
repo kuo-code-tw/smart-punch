@@ -1221,6 +1221,7 @@ async function downloadAll(onProgress,options={}){
  const prior=lastAllDownload?.key===batchKey&&Date.now()-lastAllDownload.at<180000&&
              lastAllDownload.result.some(row=>!row.ok)?lastAllDownload.result:null;
  let attendanceSnapshot=null,attendanceError=null,connectionError=null,consecutiveTransportFailures=0;
+ const deferredReadRetries=new Map();
  for(let i=0;i<systems.length;i++){
   const sys=systems[i];
   if(typeof options.startupGuard==='function'&&!options.startupGuard())throw Object.assign(new Error('登入狀態已變更，停止背景下載'),{code:'P79_SCOPE'});
@@ -1298,8 +1299,31 @@ async function downloadAll(onProgress,options={}){
    if(['P79_AUTH','P79_SCOPE'].includes(e?.code)||
       (e?.code==='P79_TRANSPORT'&&(!fastFirst||++consecutiveTransportFailures>=2)))connectionError=e;
    if(sys==='attendance')attendanceError=e;
+   if(fastFirst&&['leave','schedule'].includes(sys)&&e?.retryable===true&&['P79_CLOUD','P79_TRANSPORT'].includes(e?.code))deferredReadRetries.set(sys,e);
    result.push({system:sys,ok:false,error:String(e?.message||e)});
    onProgress?.(sys,i,systems.length,'error',e);
+  }
+ }
+ // Only retry transient, read-only leave/schedule failures once after other modules.
+ // Do not re-download completed modules or retry permission/auth/storage failures.
+ const sameBatch=()=>batchViewer===viewerKey()&&batchToken===token()&&batchScope===displayScope()&&batchGas===gasUrl()&&batchStamp===mutationStamp()&&(typeof options.startupGuard!=='function'||options.startupGuard());
+ if(fastFirst&&result.some(row=>row.ok)&&!['P79_AUTH','P79_SCOPE'].includes(connectionError?.code)){
+  for(const [sys] of deferredReadRetries){
+   if(!sameBatch())break;
+   const index=result.findIndex(row=>row.system===sys&&!row.ok&&!row.skipped);
+   if(index<0)continue;
+   onProgress?.(sys,systems.indexOf(sys),systems.length,'loading',null,'其他系統已處理，正在補抓此項雲端資料');
+   try{
+    const payload=await downloadSystem(sys,null,{...readOptions,interactive:false,startupGuard:sameBatch});
+    if(!sameBatch())throw Object.assign(new Error('登入或管理權限已變更，停止補抓'),{code:'P79_SCOPE'});
+    if(payload?.ok!==true)throw Error('雲端資料尚未完整確認');
+    await saveSystemSnapshot(sys,payload);
+    if(!sameBatch())throw Object.assign(new Error('登入或管理權限已變更，停止補抓'),{code:'P79_SCOPE'});
+    result[index]={system:sys,ok:true};onProgress?.(sys,systems.indexOf(sys),systems.length,'done',null,'補抓完成，已保存本機');
+   }catch(error){
+    result[index]={system:sys,ok:false,error:String(error?.message||error)};onProgress?.(sys,systems.indexOf(sys),systems.length,'error',error);
+    if(['P79_AUTH','P79_SCOPE'].includes(error?.code))break;
+   }
   }
  }
  if(currentSystem()==='attendance'&&attendanceSnapshot)await applyAttendanceSnapshotToPage(attendanceSnapshot,true);
