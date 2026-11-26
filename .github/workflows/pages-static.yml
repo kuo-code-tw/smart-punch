@@ -29,6 +29,7 @@ on:
       - 'tests/**'
       - 'scripts/write-port79-site-files.cjs'
       - '.github/workflows/pages-static.yml'
+      - '.github/workflows/pages-october-roster-hotfix.yml'
       # Version/packaging changes must publish the same commit as Windows.
       - '.github/workflows/port79-windows-updates.yml'
   workflow_dispatch:

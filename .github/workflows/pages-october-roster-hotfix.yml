@@ -1,12 +1,5 @@
 name: Publish October roster and overtime hotfix
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'schedule/index.html'
-      - 'assets/port79-attendance-overtime.js'
-      - 'tests/october-system-roster-overtime.cjs'
-      - '.github/workflows/pages-october-roster-hotfix.yml'
   workflow_dispatch:
 permissions:
   contents: read
