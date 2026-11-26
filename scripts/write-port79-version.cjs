@@ -18,6 +18,15 @@ function create(destination='.'){
  const date=cp.execFileSync('git',['log','-1','--format=%cs'],{encoding:'utf8'}).trim();
  const manifest={version:version(commit,date),commit,kind:'website'};
  const output=path.resolve(destination,'port79-version.json');
+ // Stamp the exact same build into the homepage itself, not the repository source.
+ const home=path.resolve(destination,'index.html');
+ if(fs.existsSync(home)){
+  const html=fs.readFileSync(home,'utf8');
+  const marker='<meta name="port79-build" content="'+manifest.version+'|'+manifest.commit+'">';
+  const placeholder='<meta name="port79-build" content="">';
+  if(!html.includes(placeholder))throw Error('Homepage build identity placeholder missing');
+  fs.writeFileSync(home,html.replace(placeholder,marker),'utf8');
+ }
  fs.writeFileSync(output,JSON.stringify(manifest,null,2)+'\n','utf8');
  process.stdout.write('Published website '+manifest.version+' '+commit+'\n');
  return manifest;

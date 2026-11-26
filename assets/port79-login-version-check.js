@@ -16,6 +16,11 @@ function normalized(v){
  if(!version.endsWith('.'+expected))return null;
  return {version,commit};
 }
+function embeddedBuild(){
+ const raw=String(root.document?.querySelector?.('meta[name="port79-build"]')?.content||'');
+ const [version,commit]=raw.split('|');
+ return normalized({version,commit});
+}
 function releaseVersion(release){
  const m=/^port79-windows-lite-(\d{4})(\d{2})(\d{2})-([a-f0-9]{12})$/.exec(String(release?.tag_name||''));
  if(!m||release.draft)return '';
@@ -150,7 +155,10 @@ async function check(force=false){
   })();
   const localVersion=local?.version||
    (/^V\d{6}\.\d{5}$/.test(installedFromUrl)?installedFromUrl:'');
-  const pageVersion=native?localVersion:browserLoadedBuild(localVersion||(!local&&samePublishedManifest()?web?.version:''));
+  const embedded=embeddedBuild();
+  // An embedded identity belongs to the loaded HTML, even if the remote JSON
+  // changed after this tab loaded. A remote manifest alone is not that proof.
+  const pageVersion=native?localVersion||embedded?.version||'':embedded?.version||browserLoadedBuild(localVersion||(!local&&samePublishedManifest()?web?.version:''));
   const webError=web?'':readFailure(webResult);
   if(pageVersion&&typeof root.p79ApplyBuildVersion==='function')
    root.p79ApplyBuildVersion(pageVersion);
@@ -166,7 +174,7 @@ async function check(force=false){
   ].join('｜');
   const field=$('p79LoginVersionStatus');
   if(field)field.title=details;
-  if(!nativeUpdateRunning)write(brief);
+  if(!nativeUpdateRunning)write(!native&&!web?('🔎 '+(pageVersion||'版本未取得')+'｜'+(webError==='HTTP 404'?'正式版本檔未發布':'更新檢查失敗')+'｜'+time):brief);
   const result={local,web,release,pageVersion,webError};
   lastResult=result;
   // Never interrupt a signed-in dashboard, password entry or an open editor.
@@ -193,7 +201,8 @@ async function startUpdate(){
   }
   return;
  }
- const result=await check(true);
+ // A known missing manifest must not block an explicit reload on another fetch.
+ const result=lastResult&&!lastResult.web&&!isNative()?lastResult:await check(true);
  if(!result?.web?.version){
   if(root.navigator?.onLine===false){write('⚠ 網路未連線，保留目前網頁及本機資料');return;}
   if(!refreshWithoutManifest())write('⚠ 版本尚未核對'+(result?.webError?'：'+result.webError:'')+'；請重新載入網頁');
@@ -223,6 +232,11 @@ function init(){
  root.setInterval(()=>{
   if(!root.document.hidden&&!$('sessionBar')?.classList.contains('show'))void check();
  },INTERVAL);
+ // Retry a missing or temporarily unavailable website manifest without waiting
+ // five minutes, without polling while signed in or interrupting input.
+ root.setInterval(()=>{
+  if(!isNative()&&lastResult&&!lastResult.web&&!homepageBusy())void check(true);
+ },30000);
  void check(true);
 }
 if(root.document?.readyState==='loading')root.document.addEventListener('DOMContentLoaded',init,{once:true});
