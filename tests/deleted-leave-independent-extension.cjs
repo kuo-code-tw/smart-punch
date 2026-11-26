@@ -1,0 +1,15 @@
+'use strict';
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('assets/port79-overtime-report.js','utf8');
+new vm.Script(source);
+const start=source.indexOf(' function deletedLeaveExtensionEligible('),end=source.indexOf(' function validateLeaveLinkedOvertimeDate(',start);
+const ctx={independentShiftOvertimeIssue:(shift,rule)=>shift==='早'&&rule[0]==='延'?'':'invalid'};
+vm.createContext(ctx);vm.runInContext(source.slice(start,end),ctx);
+const day='2026-11-23',p={leaveHandoffId:'OLD',forEmpId:'L',empId:'W',date:day,coverDate:day,overtimeDate:day};
+const data={ok:true,month:'2026-11',leaveRecords:[],leaveCoverAssignments:[],schedules:[{empId:'L',schedule:{}},{empId:'W',schedule:{[day]:'早'}}]};
+const check=(d=data,pf=p,rule=['延'],editing=false)=>ctx.deletedLeaveExtensionEligible(d,pf,'W',day,rule,editing);
+assert(check());assert(!check({...data,leaveRecords:[{id:'OLD'}]}));assert(!check({...data,leaveCoverAssignments:[{leaveId:'OLD'}]}));assert(!check({...data,leaveRecords:null}));assert(!check({...data,month:''}));assert(!check({...data,schedules:data.schedules.slice(1)}));assert(!check({...data,schedules:[data.schedules[0],{empId:'W',schedule:{[day]:'早',__meta:{[day]:{overtimeReport:{id:'OLD-REPORT'}}}}}]}));assert(!check(data,{...p,coverDate:'2026-11-22'}));assert(!check(data,{...p,savedReport:true}));assert(!check(data,p,['代']));assert(!check(data,p,['延'],true));
+assert(source.includes('const independentFiling=deletedLeaveIndependent||'));
+assert(source.includes('officialOvertimeMonthData(date,true)'));
+assert(source.includes('if(!deletedLeaveIndependent&&prefill.leaveHandoffId'));
+console.log('PASS deleted leave independent extension gate; active/residual leave, old report, scope, missing data and cross-date protected');
