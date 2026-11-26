@@ -86,6 +86,9 @@ function setup(items,cloudRecords,{failRead=false,failArchive=false}={}){
  assert.equal(many.archives.length,13,'all thirteen retain individual backups');
  assert.equal(many.reads,1,'thirteen entries must not download the same month thirteen times');
  assert.equal(many.posts,0,'reconciliation must never force attendance writes');
+ const pendingA={...makeItem('PA'),paused:false,state:'pending'},pendingB={...makeItem('PB'),paused:false,state:'pending'},pendingC={...makeItem('PC'),paused:false,state:'syncing'};
+ const live=setup([pendingA,pendingB,pendingC],[cloudFor('PA'),cloudFor('PC')]);
+ const lr=await live.c.p79AuditPausedAttendanceQueue(null,{includePending:true});assert.equal(lr.confirmed,1);assert.equal(lr.pending,2);assert.equal(lr.archived,0);assert.equal(live.reads,1);assert.equal(live.posts,0);assert.deepEqual(live.queue.map(q=>q.key),['KPB','KPC']);
  const failed=setup([makeItem('Z')],[],{failRead:true});
  const retry=await failed.run();
  assert.equal(retry.errors,1);

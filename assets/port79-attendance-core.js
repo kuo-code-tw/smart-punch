@@ -26,7 +26,7 @@ function p79AttendanceRetryDelay(payload, attempts, error=null) {
     return Math.min(3600000, Math.max(300000, 300000*Math.pow(2,Math.min(Math.max(0,attempts-1),4))));
   }
   if (['updateRecord','editRecord'].includes(String(payload?.action||''))) {
-    if(p79TransientAttendanceError(error))return Math.min(60000,15000*Math.pow(2,Math.min(Math.max(0,attempts-1),2)));
+    if(p79TransientAttendanceError(error))return Math.min(60000,Math.max(Number(error?.serverData?.retryAfterMs)||0,15000*Math.pow(2,Math.min(Math.max(0,attempts-1),2))));
     return Math.min(3600000,300000*Math.pow(2,Math.min(Math.max(0,attempts-1),4)));
   }
   if(['addRecord','queueEmployeePunch','persistEmployeePunch'].includes(String(payload?.action||''))) {
@@ -525,11 +525,11 @@ function p79RestoreWithdrawnAttendanceDraft(backupId){
 
 // 只讀核對全部暫停修改：同月份的正式主表只抓取一次，避免重新開窗才核對下一筆。
 // Never POST an old draft here; unresolved identity/time conflicts stay paused.
-async function p79AuditPausedAttendanceQueue(reportProgress){
+async function p79AuditPausedAttendanceQueue(reportProgress,options={}){
  const candidates=readQueue()
-  .filter(x=>x?.paused&&['updateRecord','editRecord'].includes(String(x.payload?.action||'')))
-  .map(x=>({key:x.key,payload:JSON.parse(JSON.stringify(x.payload))}));
- const summary={total:candidates.length,checked:0,confirmed:0,archived:0,needsReview:0,errors:0,lastError:'',verifiedConflicts:[],ambiguousConflicts:[]};
+  .filter(x=>(x?.paused||options.includePending===true)&&['updateRecord','editRecord'].includes(String(x?.payload?.action||'')))
+  .map(x=>({key:x.key,paused:!!x.paused,payload:JSON.parse(JSON.stringify(x.payload))}));
+ const summary={total:candidates.length,checked:0,confirmed:0,archived:0,needsReview:0,pending:0,errors:0,lastError:'',verifiedConflicts:[],ambiguousConflicts:[]};
  if(!candidates.length){try{reportProgress?.({...summary})}catch(_){ }return summary;}
  const base=gasUrl(),access=token();
  if(!base||!access){
@@ -565,6 +565,7 @@ async function p79AuditPausedAttendanceQueue(reportProgress){
     summary.needsReview++;continue;
    }
    const records=(await Promise.all(months.map(officialMonth))).flat();
+   if(token()!==access||gasUrl()!==base)throw Error('登入或正式資料來源已變更，原修改保留');
    const sameId=records.filter(row=>String(row.id)===id);
    const matches=sameId.filter(row=>['empId','attNo'].every(k=>
      !String(expected[k]??'').trim()||normalizeCompareValue(row[k])===normalizeCompareValue(expected[k]))&&
@@ -572,6 +573,19 @@ async function p79AuditPausedAttendanceQueue(reportProgress){
        ?getAttendanceRecordType(row)===getAttendanceRecordType(expected)
        :String(row.status)===String(expected.status)));
    const unique=[...new Map(matches.map(row=>[JSON.stringify(row),row])).values()];
+   if(!candidate.paused){
+    const live=readQueue().find(x=>x.key===candidate.key&&JSON.stringify(x.payload)===JSON.stringify(payload));
+    if(live&&!live.paused&&live.state!=='syncing'&&sameId.length===1&&unique.length===1&&
+      /^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?$/.test(String(unique[0].timeStr||'').trim())&&
+      p79PausedReviewIdentity(payload,unique[0])&&p79AttendanceEditAlreadySaved(payload,unique[0])){
+      if(remove(candidate.key,payload)){
+       try{markRecentAttendanceMutationCloudConfirmed?.(unique[0].id)}catch(_){}
+       if(typeof p79CompleteLocalFirstEdit==='function')p79CompleteLocalFirstEdit(live,{ok:true,alreadySaved:true});
+       lastDoneAt=Date.now();summary.confirmed++;continue;
+      }
+    }
+    summary.pending++;continue;
+   }
    if(!sameId.length){
     const current=p79PausedReviewItem(candidate.key,payload);
     if(p79ArchiveObsoleteAttendanceEdits([current],'official-main-month-verified-absent')!==1)
@@ -699,7 +713,7 @@ async function send(payload,timeout=25000){
   if(tk&&!body.token)body.token=tk;
 
   const ctrl=new AbortController();
-  const timer=setTimeout(()=>ctrl.abort(),timeout);
+  let timer=setTimeout(()=>ctrl.abort(),timeout);
   try{
     if(['updateRecord','editRecord'].includes(String(payload.action||''))){
       const cloud=await p79ReadAttendanceEditCloud(payloadRecordId(payload),ctrl.signal,payload,true);
@@ -716,7 +730,7 @@ async function send(payload,timeout=25000){
         body.action='p79RepairIdenticalAttendanceEditV1';
         body.expectedDuplicateCount=cloud.p79IdenticalDuplicateCount;
       }
-
+      clearTimeout(timer);timer=setTimeout(()=>ctrl.abort(),Math.max(timeout,60000));
     }
     const r=await fetch(url,{
       method:'POST',
@@ -802,6 +816,15 @@ function p79TransientAttendanceError(error){
   const message=String(error?.message||error||'');
   if(/CONFLICT|STALE_RECORD|原時間|原始時間|身分|權限|登入|已被|已由|已刪除|找不到|不存在|缺少/i.test(message))return false;
   return /雲端目前正在處理其他資料|Failed to fetch|NetworkError|network request failed|Load failed|雲端.*忙碌|考勤同步通道忙碌|讀取逾時|寫入逾時/i.test(message)||error?.name==='AbortError';
+}
+function p79TrackAttendanceCloudFailure(item,error){
+ if(error?.browserLaneDeferred===true)return false;
+ if(!['updateRecord','editRecord'].includes(String(item?.payload?.action||'')))return false;
+ const prior=Number.isFinite(item.cloudFailureStreak)?item.cloudFailureStreak:
+  (/考勤同步通道忙碌/.test(String(item.lastError||''))?0:Math.min(5,Math.max(0,Number(item.attempts||0)-1)));
+ item.cloudFailureStreak=p79TransientAttendanceError(error)?prior+1:0;
+ item.retryHold=item.cloudFailureStreak>=6;
+ return item.retryHold;
 }
 function p79PauseAttendanceWrite(payload,error,attempts){
   const edit=['updateRecord','editRecord'].includes(String(payload?.action||''));
@@ -916,9 +939,9 @@ async function drain(force=false){
         const attempts=Number(cur.attempts||0)+(err?.browserLaneDeferred===true?0:1);
         cur.attempts=attempts;
         cur.state='pending';
-        cur.lastError=String(err?.message||err||'失敗');
+        const retryHold=p79TrackAttendanceCloudFailure(cur,err);        cur.lastError=String(err?.message||err||'失敗');
         cur.lastFailureRetryable=err?.retryable!==false;
-        cur.paused=err?.browserLaneDeferred!==true&&p79PauseAttendanceWrite(cur.payload,err,attempts);
+        cur.paused=err?.browserLaneDeferred!==true&&(retryHold||p79PauseAttendanceWrite(cur.payload,err,attempts));
         cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+(err?.browserLaneDeferred===true?5000+Math.floor(Math.random()*5000):p79AttendanceRetryDelay(cur.payload,attempts,err));
         saveQueue(q.map(x=>x.key===cur.key?cur:x));
         activeSyncRecordId='';
@@ -1001,9 +1024,9 @@ async function drainFast(force=true, concurrency=4){
       const attempts=Number(cur.attempts||0)+(err?.browserLaneDeferred===true?0:1);
       cur.attempts=attempts;
       cur.state='pending';
-      cur.lastError=String(err?.message||err||'失敗');
+      const retryHold=p79TrackAttendanceCloudFailure(cur,err);      cur.lastError=String(err?.message||err||'失敗');
         cur.lastFailureRetryable=err?.retryable!==false;
-      cur.paused=err?.browserLaneDeferred!==true&&p79PauseAttendanceWrite(cur.payload,err,attempts);
+      cur.paused=err?.browserLaneDeferred!==true&&(retryHold||p79PauseAttendanceWrite(cur.payload,err,attempts));
         cur.nextRetryAt=cur.paused?Number.MAX_SAFE_INTEGER:Date.now()+(err?.browserLaneDeferred===true?5000+Math.floor(Math.random()*5000):p79AttendanceRetryDelay(cur.payload,attempts,err));
       saveQueue(current.map(x=>x.key===cur.key?cur:x));
       return {ok:false,item,error:err,retryable:!cur.paused&&(err?.browserLaneDeferred===true||p79TransientAttendanceError(err))};
@@ -1477,8 +1500,9 @@ async function submitAttendanceWrite(payload,successMsg,onSuccess,onError){
       // 直送前已持久化；失敗時不能用舊 payload 覆蓋使用者後續修改。
       if(current){
         current.attempts=Number(current.attempts||0)+(err?.browserLaneDeferred===true?0:1);
+        const retryHold=p79TrackAttendanceCloudFailure(current,err);
         current.lastError=reason;current.lastFailureRetryable=err?.retryable!==false;current.state='pending';
-        current.paused=err?.browserLaneDeferred!==true&&p79PauseAttendanceWrite(payload,err,current.attempts);
+        current.paused=err?.browserLaneDeferred!==true&&(retryHold||p79PauseAttendanceWrite(payload,err,current.attempts));
         current.nextRetryAt=current.paused?Number.MAX_SAFE_INTEGER:Date.now()+(err?.browserLaneDeferred===true?5000+Math.floor(Math.random()*5000):p79AttendanceRetryDelay(payload,current.attempts,err));
         saveQueue(readQueue().map(x=>x.key===current.key&&samePayload(x.payload,payload)?current:x));
       }
@@ -1565,7 +1589,7 @@ window.p79PruneVerifiedDeletedRecordRetries20261010=p79PruneVerifiedDeletedRecor
 function p79ResumeTransientAttendanceEdits(){
   const q=readQueue();let changed=false;
   for(const item of q){
-    if(!item?.paused||!['updateRecord','editRecord'].includes(String(item.payload?.action||'')))continue;
+    if(!item?.paused||item.retryHold===true||!['updateRecord','editRecord'].includes(String(item.payload?.action||'')))continue;
     // Only known transport/lock failures. Unknown, withdrawn and conflict drafts stay paused.
     if(item.lastFailureRetryable===false||!p79TransientAttendanceError(item.lastError))continue;
     if(!/^\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}/.test(String(item.payload.originalTimeStr||'')))continue;

@@ -24648,7 +24648,7 @@ window.p79UpdateAttendanceLiveProgress=update;
 
 
 <script src="../assets/port79-punch-device-state.js?v=20261022-self-binding"></script>
-<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2&dup=20261124-final-two-v1&sync=20261125-local-first-edit-v2&identical=20261125-v1&lane=20261126-v1"></script>
+<script id="p79-attendance-v5-clean-core" src="../assets/port79-attendance-core.js?v=20261116-bounded-retry-v2&dup=20261124-final-two-v1&sync=20261125-local-first-edit-v2&identical=20261125-v1&lane=20261126-v1&retryBudget=20261126-v2"></script>
 
 
 
@@ -25392,7 +25392,7 @@ function show(autoReview=true){
    const names={logSession:'登入／登出紀錄',deleteRecord:'刪除考勤紀錄',addRecord:'新增考勤紀錄',updateRecord:'修改考勤紀錄',editRecord:'修改考勤紀錄',syncRecords:'同步考勤紀錄',persistEmployeePunch:'員工打卡寫入',queueEmployeePunch:'員工打卡補傳'};
    const attempts=entry?.attempts??entry?.retries??0;
    const rawState=String(entry?.state||'pending').toLowerCase();
-   const state=entry?.paused?'已暫停，等待人工核對':({syncing:'同步進行中',pending:'待同步（系統自動重試中）',failed:'同步失敗，等待重試',queued:'等待同步',retrying:'自動重試中',done:'已完成'}[rawState]||'待同步（'+rawState+'）');
+   const state=entry?.paused?(entry.retryHold?'雲端連續失敗，已保留修改待核對':'已暫停，等待人工核對'):({syncing:'同步進行中',pending:'待同步（系統自動重試中）',failed:'同步失敗，等待重試',queued:'等待同步',retrying:'自動重試中',done:'已完成'}[rawState]||'待同步（'+rawState+'）');
    const retryAt=Number(entry?.nextRetryAt||0);
    const retryText=!entry?.paused&&rawState!=='syncing'&&Number.isFinite(retryAt)&&retryAt>0&&retryAt<Number.MAX_SAFE_INTEGER
      ? (retryAt>Date.now()?'下次重試：'+new Intl.DateTimeFormat('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(retryAt))+'（台灣時間）':'已到重試時間，等待同步程序處理') : '';
@@ -25461,7 +25461,7 @@ async function auditAllPaused(){
   el.textContent='同步核對功能尚未載入，請強制重新整理此頁。';return;
  }
  auditBusy=true;verifiedPausedBatch=[];ambiguousPausedBatch=[];if(button)button.disabled=true;
- el.textContent='正在查詢正式月份主表，逐筆核對暫停修改；不會強制寫入。';
+ el.textContent='正在查詢正式月份主表，核對全部待同步及暫停修改；不會強制寫入。';
  let resolved=0;
  try{
   const result=await window.p79V5AuditPausedQueue(progress=>{
@@ -25474,8 +25474,8 @@ async function auditAllPaused(){
    }
    el.textContent='雲端核對 '+progress.checked+'/'+progress.total+' 筆｜已確認 '+progress.confirmed+
     '｜舊修改已備份 '+progress.archived+'｜需要人工核對 '+progress.needsReview+
-    '｜核對失敗 '+progress.errors;
-  });
+    '｜仍待同步 '+Number(progress.pending||0)+'｜核對失敗 '+progress.errors;
+  },{includePending:true});
   show(false);
   verifiedPausedBatch=(Array.isArray(result.verifiedConflicts)?result.verifiedConflicts:[])
    .filter(row=>row&&shownDrafts.has(row.key))
@@ -25484,7 +25484,7 @@ async function auditAllPaused(){
    .filter(row=>row&&shownDrafts.has(row.key)&&Array.isArray(row.candidates)&&row.candidates.length>1)
    .map(row=>({...row,payload:JSON.parse(JSON.stringify(shownDrafts.get(row.key)))}));
   const overview='核對完成：已確認同步 '+result.confirmed+' 筆；正式紀錄不存在、已備份 '+result.archived+
-   ' 筆；仍需人工核對 '+result.needsReview+' 筆；讀取失敗 '+result.errors+' 筆。';
+   ' 筆；仍待同步 '+Number(result.pending||0)+' 筆；仍需人工核對 '+result.needsReview+' 筆；讀取失敗 '+result.errors+' 筆。';
   if(verifiedPausedBatch.length){
    el.innerHTML='<strong>'+safe(overview)+'</strong>'+
     '<p>下列 '+verifiedPausedBatch.length+' 筆已核實為相同員工、相同打卡紀錄，但雲端與原修改內容不同。' +
