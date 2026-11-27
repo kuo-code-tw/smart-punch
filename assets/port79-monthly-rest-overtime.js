@@ -1352,22 +1352,29 @@ function showPreplanProgress(parent,total){
  #p79MonthlyRestPreplanProgress [data-detail]{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--progress-accent);font-size:13px;margin:8px 0}
  #p79MonthlyRestPreplanProgress [data-detail]:empty{display:none}
  #p79MonthlyRestPreplanProgress button{padding:9px 20px!important;border:0!important;border-radius:9px!important;background:var(--progress-accent)!important;color:#fff!important;font-weight:700!important;cursor:pointer}
+ #p79MonthlyRestPreplanProgress [data-continue]{background:#2563eb!important;color:#fff!important}
+ #p79MonthlyRestPreplanProgress [data-continue][hidden]{display:none!important}
  #p79MonthlyRestPreplanProgress button:disabled{background:#cbd5e1!important;color:#475569!important;cursor:default;opacity:1!important}
  @keyframes p79-pp-spin{to{transform:rotate(360deg)}}
  @media(prefers-reduced-motion:reduce){#p79MonthlyRestPreplanProgress .p79-pp-spinner{animation:none}#p79MonthlyRestPreplanProgress .p79-pp-fill{transition:none}}
- </style><div class="p79-pp-head"><span class="p79-pp-icon" data-icon aria-hidden="true">↻</span><h2 id="mrPreplanProgressTitle">正在儲存預排</h2></div><div class="p79-pp-summary"><span data-count></span><span data-percent></span></div><div class="p79-pp-track" role="progressbar" aria-label="雲端已確認筆數" aria-valuemin="0" aria-valuenow="0"><div class="p79-pp-fill"></div></div><div class="p79-pp-activity"><span class="p79-pp-spinner" aria-hidden="true"></span><span>正在處理，請勿關閉視窗</span></div><p id="mrPreplanProgressStatus" role="status" aria-live="polite"></p><p data-detail></p><div style="display:flex;justify-content:flex-end;margin-top:16px"><button type="button" disabled>確定</button></div>`;
- const title=dialog.querySelector('h2'),count=dialog.querySelector('[data-count]'),percent=dialog.querySelector('[data-percent]'),bar=dialog.querySelector('[role=progressbar]'),fill=dialog.querySelector('.p79-pp-fill'),icon=dialog.querySelector('[data-icon]'),status=dialog.querySelector('[role=status]'),detail=dialog.querySelector('[data-detail]'),button=dialog.querySelector('button');
+ </style><div class="p79-pp-head"><span class="p79-pp-icon" data-icon aria-hidden="true">↻</span><h2 id="mrPreplanProgressTitle">正在儲存預排</h2></div><div class="p79-pp-summary"><span data-count></span><span data-percent></span></div><div class="p79-pp-track" role="progressbar" aria-label="雲端已確認筆數" aria-valuemin="0" aria-valuenow="0"><div class="p79-pp-fill"></div></div><div class="p79-pp-activity"><span class="p79-pp-spinner" aria-hidden="true"></span><span>正在處理，請勿關閉視窗</span></div><p id="mrPreplanProgressStatus" role="status" aria-live="polite"></p><p data-detail></p><div style="display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;margin-top:16px"><button type="button" data-dismiss disabled>確定</button><button type="button" data-continue hidden disabled>繼續處理</button></div>`;
+ const title=dialog.querySelector('h2'),count=dialog.querySelector('[data-count]'),percent=dialog.querySelector('[data-percent]'),bar=dialog.querySelector('[role=progressbar]'),fill=dialog.querySelector('.p79-pp-fill'),icon=dialog.querySelector('[data-icon]'),status=dialog.querySelector('[role=status]'),detail=dialog.querySelector('[data-detail]'),button=dialog.querySelector('[data-dismiss]'),continueButton=dialog.querySelector('[data-continue]');
  let finished=false;bar.setAttribute('aria-valuemax',String(total));
  const update=(message,confirmed=0)=>{
   const pct=total>0?Math.round(Math.max(0,Math.min(total,confirmed))/total*100):0;
   count.textContent='雲端已確認 '+confirmed+'／'+total+' 筆';percent.textContent=pct+'%';bar.setAttribute('aria-valuenow',String(confirmed));bar.setAttribute('aria-valuetext',count.textContent+'（'+pct+'%）');fill.style.width=pct+'%';status.textContent=message;
  };
- const finish=(confirmed,failure,notes='')=>{
+ const finish=(confirmed,failure,notes='',onContinue=null)=>{
   finished=true;const remaining=total-confirmed,success=remaining===0&&!failure&&!notes;
   dialog.dataset.state=success?'success':confirmed?'warning':'error';icon.textContent=success?'✓':confirmed?'!':'×';
   title.textContent=success?'預排儲存完成':confirmed?'預排處理結果':'預排尚未確認完成';
   update('本次雲端已確認 '+confirmed+' 筆預排。'+(remaining?'另有 '+remaining+' 筆尚未確認，請核對後再試。':'')+' 預排不等於正式加班申報。',confirmed);
-  detail.textContent=[failure,notes].filter(Boolean).join('\n');button.disabled=false;button.focus();
+  detail.textContent=[failure,notes].filter(Boolean).join('\n');button.disabled=false;
+  const canContinue=remaining>0&&typeof onContinue==='function';
+  continueButton.hidden=!canContinue;continueButton.disabled=!canContinue;
+  button.textContent=canContinue?'稍後處理':'確定';
+  if(canContinue){continueButton.textContent='繼續處理剩餘 '+remaining+' 筆';continueButton.onclick=()=>{if(!finished||continueButton.disabled)return;continueButton.disabled=true;button.disabled=true;dialog.close();onContinue();};continueButton.focus();}
+  else button.focus();
  };
  dialog.addEventListener('cancel',event=>{if(!finished)event.preventDefault();});
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
@@ -1985,35 +1992,40 @@ async function open(settings={}){
   if(row&&!row.saved){row.checked=e.target.checked;paint();}
  };
  q('#mrPlanAll').onchange=()=>{if(busy||!autoPlan)return;visiblePlannedRows().forEach(r=>{r.checked=q('#mrPlanAll').checked;});paint();};
- q('#mrSavePlans').onclick=async(batchSummary='')=>{if(isReadOnlySource()){setStatus('既有申報目前僅供查閱，不能儲存加班預排。');return;}
+ q('#mrSavePlans').onclick=async(batchSummary='',resume=null)=>{if(isReadOnlySource()){setStatus('既有申報目前僅供查閱，不能儲存加班預排。');return;}
   if(busy||!model||!autoPlan)return;
-  const selected=visiblePlannedRows().filter(r=>r.checked&&!r.saved);if(!selected.length)return;
-  const hoursWarning=selectedHoursWarning(selected);if(hoursWarning){setStatus(hoursWarning);g.alert?.(hoursWarning);return;}
-  if(!confirm('將勾選的 '+selected.length+' 筆建議儲存為預排？尚未確認出勤，不會列為正式加班；例休週期待核項目仍需核對。'+(typeof batchSummary==='string'?batchSummary:'')))return;
+  // Resume the exact original selection, never re-match it to new dates or IDs.
+  if(resume&&(!el.open||resume.month!==loadedMonth||!resume.rows.every(r=>r.saved||model.plannedRows.includes(r)))){g.alert?.('原預排清單已變更，請重新讀取核對。');return;}
+  const selected=resume?resume.rows:visiblePlannedRows().filter(r=>r.checked&&!r.saved),pending=selected.filter(r=>!r.saved);if(!pending.length)return;
+  const hoursWarning=selectedHoursWarning(pending);if(hoursWarning){setStatus(hoursWarning);g.alert?.(hoursWarning);return;}
+  if(!resume&&!confirm('將勾選的 '+selected.length+' 筆建議儲存為預排？尚未確認出勤，不會列為正式加班；例休週期待核項目仍需核對。'+(typeof batchSummary==='string'?batchSummary:'')))return;
   busy=true;stop=false;el.dataset.preplanLocked='true';controls(true);let failure='',latest=null,verified=null,activeRow=null;
   let progressWindow=null;
   const updatePreplanStatus=message=>{setStatus(message);progressWindow?.update(message,selected.filter(r=>r.saved).length);};
   const readPreplan=(rosterOnly,label)=>retryPreplanRead(()=>a.snapshot(loadedMonth,rosterOnly,false,true),
    (attempt,max,delay)=>updatePreplanStatus(label+'｜雲端讀取鎖忙碌，自動重試 '+attempt+'／'+max+'（'+delay/1000+' 秒後）'));
-  let notifyBatch=false;
+  let notifyBatch=false;const blocked=new Set(),blockedReasons=[];
   try{
    progressWindow=showPreplanProgress(el,selected.length);
-   updatePreplanStatus('正在一次核對 '+selected.length+' 筆預排的雲端版本與額度…');
+   updatePreplanStatus((resume?'繼續核對剩餘 ':'正在一次核對 ')+pending.length+' 筆預排的雲端版本與額度…');
    latest=await readPreplan(false,'核對雲端版本與額度');
    if(latest?.provisional===true||latest?.readOnlyDueAttendance===true||latest?.attendanceEvidence?.complete!==true)throw Error('正式考勤未完整核對，不能儲存預排');
    const batch=latest.saveContext;
    const suggested=plan(latest,loadedPeople,loadedMonth,rules,{manualOnly:false,cutoff:q('#mrCutoff').value}).plannedRows;
    const key=r=>id(r.empId)+'|'+r.date+'|'+r.category+'|'+g.P79Overtime.report(r.rule).code;
    const valid=new Set(suggested.map(key));
-   for(const r of selected){
+   for(const r of pending){
+    const meta=latest.schedules?.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date];
+    const saved=meta?.overtimeReport;
+    const exact=saved?.id===r.id&&saved.planned===true&&saved.category===r.category&&saved.code===g.P79Overtime.report(r.rule).code;
+    if(exact&&confirmedReport(meta,saved)){r.attempted=true;r.acknowledged=true;r.saved=true;r.checked=false;r.status='預排已儲存（未正式申報）';verified=latest;continue;}
+    let issue=monthlyRestElectionDay(r.date)?'為選舉日，不得建立一般未休假加班預排':r.date<today()?'預排日期已過':exact||r.acknowledged?'原申報尚未完整讀回，保留原編號':saved||!valid.has(key(r))?'班表、出勤或額度已變更，須重新核對建議':'';
+    if(issue){const message=r.name+' '+r.date+'：'+issue;if(!resume)throw Error(message);blocked.add(r);blockedReasons.push(message);r.status='預排待核：'+issue;continue;}
     r.acknowledged=false;
-    if(monthlyRestElectionDay(r.date))throw Error(r.name+' '+r.date+' 為選舉日，不得建立一般未休假加班預排');
-    const saved=latest.schedules?.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date]?.overtimeReport;
-    if(saved?.id===r.id&&saved.planned===true&&saved.category===r.category&&saved.code===g.P79Overtime.report(r.rule).code){r.attempted=true;r.acknowledged=true;continue;}
-    if(saved||!valid.has(key(r)))throw Error(r.name+' '+r.date+' 的班表、出勤或額度已變更，請重新讀取建議');
    }
-   for(const r of selected){
+   for(const r of pending){
     if(stop)break;
+    if(r.saved||blocked.has(r))continue;
     activeRow=r;
     if(monthlyRestElectionDay(r.date))throw Error('選舉日不得建立一般未休假加班預排');
     if(r.date<today())throw Error('預排日期已過，請重新讀取');
@@ -2045,6 +2057,7 @@ async function open(settings={}){
    failure=(activeRow?activeRow.name+' '+activeRow.date+'：':'')+String(error.message||error);
    if(activeRow&&!activeRow.saved){activeRow.checked=true;activeRow.status='預排未確認：'+String(error.message||error);}
   }finally{
+   if(blockedReasons.length)failure=[failure,...blockedReasons].filter(Boolean).join('；');
    const saved=selected.filter(r=>r.saved).length;
    // Refresh saved roster on partial success as well; retain original
    // candidate IDs and retry state until uncertain writes are reconciled.
@@ -2064,7 +2077,7 @@ async function open(settings={}){
    busy=false;delete el.dataset.preplanLocked;
    try{paint();}catch(error){failure+=(failure?'；':'')+'畫面更新未完成：'+String(error.message||error);}finally{
     controls(false);
-    if(progressWindow)progressWindow.finish(saved,failure,typeof batchSummary==='string'?batchSummary.trim():'');
+    if(progressWindow)progressWindow.finish(saved,failure,typeof batchSummary==='string'?batchSummary.trim():'',saved<selected.length&&!stop?()=>{void q('#mrSavePlans').onclick(batchSummary,{month:resume?.month||loadedMonth,rows:selected});}:null);
     else g.alert?.('本次已確認 '+saved+'／'+selected.length+' 筆預排。'+(failure?'\n'+failure:''));
    }
    // Notify other tabs once per batch, including uncertain writes that need a fresh read.
