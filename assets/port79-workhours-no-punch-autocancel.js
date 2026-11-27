@@ -38,6 +38,30 @@ function candidates(rows,{token='',today='',stateFor=()=>null,isVerified=()=>fal
   signature:r.date+'|'+[...r.reportIds].map(([e,r])=>e+':'+r).sort().join(',')
  }));
 }
+// Discover saved no-show plans directly from an authenticated month, not just
+// the ledger, which can omit plans with no punch-derived row.
+function savedPlanRows(months,{stateFor,isVerified,token,rows=[]}){
+ const out=[],observed=new Set();
+ for(const row of rows||[]){
+  if(row?.clockIn||row?.clockOut)observed.add(id(row.empId)+'|'+day(row.rosterDate||row.dateKey));
+ }
+ for(const month of new Set(months||[])){
+  const state=stateFor(month);
+  if(!isVerified(month)||state?.token!==token||state.pending||state.restEvidencePending||
+     state.restEvidenceError||state.attendanceEvidence?.complete!==true)continue;
+  for(const row of state.rows||[]){
+   const emp=id(row.empId),schedule=row.schedule||{};
+   for(const [date,meta] of Object.entries(schedule.__meta||{})){
+    if(!date.startsWith(month+'-')||observed.has(emp+'|'+date))continue;
+    const r=meta?.overtimeReport,proof=state.attendanceEvidence.days?.[emp+'|'+date];
+    if(r?.planned!==true||proof?.state!=='rest'||!Number.isFinite(proof.shiftEnd))continue;
+    if(Number(state.attendanceEvidence.checkedAt)<proof.shiftEnd||!Number.isFinite(Number(state.attendanceEvidence.checkedAt)))continue;
+    out.push({empId:emp,rosterDate:date,reportVerified:true,overtimeReport:{...r,attendanceState:'rest'}});
+   }
+  }
+ }
+ return out;
+}
 function create(options){
  const fetcher=options.fetch,now=options.now||(()=>new Date()),attempted=new Set(),queue=new Map();
  let running=false,drainTask=null,lastError='',lastMessage='',account='';
@@ -47,7 +71,8 @@ function create(options){
   const token=options.token();
   if(token!==account){account=token;attempted.clear();queue.clear();lastError='';}
   if(!token||!options.canManage()||options.isEditing())return 0;
-  const list=candidates(rows,{token,today:today(),stateFor:options.stateFor,
+  const officialRows=savedPlanRows(options.months?.()||[],{stateFor:options.stateFor,isVerified:options.isVerified,token,rows});
+  const list=candidates(options.months?officialRows:rows,{token,today:today(),stateFor:options.stateFor,
     isVerified:options.isVerified,canManage:true,reconcile:options.reconcile});
   for(const candidate of list.slice(0,31)){
    const key=token+'|'+candidate.signature;
@@ -135,5 +160,5 @@ function create(options){
  }
  return {offer,flush,status:snapshot};
 }
-return{candidates,create};
+return{candidates,savedPlanRows,create};
 });
