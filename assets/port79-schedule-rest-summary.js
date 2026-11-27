@@ -21,7 +21,7 @@ function acceptRows(rows,month=null){
 }
 // A cloud-accepted report ID is authoritative for the monthly category count.
 // A local draft or bare historical overtime flag must never inflate it.
-function confirmedDates(emp,month,category){
+function confirmedDates(emp,month,category,snapshot=null,roster={}){
  if(!ready.has(month)||!['例','休','國'].includes(category))return [];
  const employee=id(emp?.id||emp?.empId||emp),dates=[];
  for(const [key,report] of reports){
@@ -29,6 +29,8 @@ function confirmedDates(emp,month,category){
   const flags=reportFlags.get(key);
   if(owner!==employee||!date.startsWith(month+'-')||report?.category!==category||
      flags?.excluded||flags?.revoked)continue;
+  const meta={...(roster.__meta?.[date]||{}),overtimeReport:report};
+  if(g.P79MonthlyRest?.leaveOverlapQuotaState?.(snapshot,employee,date,roster,meta,report)==='excluded')continue;
   dates.push(date);
  }
  return [...new Set(dates)].sort();
@@ -36,7 +38,12 @@ function confirmedDates(emp,month,category){
 function summary(emp,schedule,allocated,month,snapshot,start=''){
  const roster={...schedule,__meta:JSON.parse(JSON.stringify(allocated||{}))};
  for(const meta of Object.values(roster.__meta))if(meta)delete meta.overtimeReport;
- for(const [key,report] of reports){const [employee,date]=key.split('|');if(employee!==id(emp.id)||!date.startsWith(month+'-'))continue;roster.__meta[date]={...(roster.__meta[date]||{}),overtimeReport:report};}
+ for(const [key,report] of reports){
+  const [employee,date]=key.split('|');if(employee!==id(emp.id||emp.empId)||!date.startsWith(month+'-'))continue;
+  const flags=reportFlags.get(key);
+  if(flags?.excluded||flags?.revoked)continue;
+  roster.__meta[date]={...(roster.__meta[date]||{}),overtimeReport:report};
+ }
  try{
   const result=g.P79MonthlyRest.balance({...emp,empId:emp.id},roster,month,snapshot,start);
   return ready.has(month)?result:{...result,remaining:null,error:'尚未完成雲端申報核對'};
