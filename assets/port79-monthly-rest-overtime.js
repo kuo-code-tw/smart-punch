@@ -1427,7 +1427,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1&cutoffCloud=20261127-v137&residualAndShift=20261127-v138';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1&cutoffCloud=20261127-v137&residualAndShift=20261127-v138&leaveQuota=20261127-v139';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
