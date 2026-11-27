@@ -1570,7 +1570,7 @@ async function open(settings={}){
   const service=g.p79OvertimeStatusContext;
   if(busy||!model||!loadedMonth)return;
   if(!service?.canRevoke?.()||typeof service.revoke!=='function'){setStatus('沒有班表及加班撤銷管理權限，未修改資料。');return;}
-  const month=loadedMonth;let candidates=[],review=[],completed=0,failure='',reload=false,remaining=null,processed=0;
+  const month=loadedMonth;let candidates=[],review=[],completed=0,failure='',reload=false,remaining=null,processed=0,verifiedRoster=null;
   const failed=[];
   const cloudBusy=error=>/雲端目前正在處理其他資料|雲端正處理其他操作|排班讀取等[待候]|未取得鎖|班表正由其他人編輯/.test(String(error?.message||error||''));
   const waitRepair=attempt=>new Promise(resolve=>g.setTimeout(resolve,Math.min(7500,2500*(attempt+1))));
@@ -1591,9 +1591,13 @@ async function open(settings={}){
   try{
    setStatus('正在掃描 '+month+' 全部授權人員的異常預排（不受部門、職稱篩選限制）…');
    let fresh=await readRepairSnapshot();
+   verifiedRoster=fresh;
    ({repair:candidates,review}=abnormalMonthlyRestPlans(fresh,a.employees(),month));
    const list=rows=>rows.map(r=>r.name+'｜'+r.date+'｜'+r.reason+(r.issue?'｜'+r.issue:'')).join('\n');
-   if(!candidates.length){setStatus('查無可安全取消的異常預排。'+(review.length?'另有 '+review.length+' 筆需人工核對：'+list(review):''));return;}
+   if(!candidates.length){
+    await a.syncRepairRoster?.(month,fresh);
+    setStatus('查無可安全取消的異常預排，已通知排班頁重新讀取。'+(review.length?'另有 '+review.length+' 筆需人工核對：'+list(review):''));return;
+   }
    if(!confirm('本月全部授權人員共 '+candidates.length+' 筆異常預排可取消；正常預排、已申報、原始打卡不會刪除。\n\n'+list(candidates)+(review.length?'\n\n另有 '+review.length+' 筆僅供人工核對，不會修改：\n'+list(review):'')+'\n\n確認逐筆取消並重新計算額度？')){setStatus('已取消操作，未修改任何資料。');return;}
    reload=true;
    for(const candidate of candidates){
@@ -1636,12 +1640,14 @@ async function open(settings={}){
      continue;
     }
     completed++;
+    verifiedRoster=fresh;
     snapshot=fresh;model=plan(fresh,loadedPeople,month,rules,{manualOnly:!autoPlan,cutoff:q('#mrCutoff').value});
     paint();controls(true);
     setStatus('異常預排已確認取消 '+completed+'／'+candidates.length+' 筆，已重新計算額度');
     await new Promise(resolve=>g.setTimeout(resolve,0));
    }
    fresh=await readRepairSnapshot();
+   verifiedRoster=fresh;
    const audit=abnormalMonthlyRestPlans(fresh,a.employees(),month);
    remaining=audit.repair.length;review=audit.review;
    if(remaining||failed.length||review.length)failure='全範圍尚未全部還原，請核對剩餘及未確認項目';
@@ -1651,7 +1657,11 @@ async function open(settings={}){
    try{
     if(reload){
      await q('#mrLoad').onclick();const refreshed=!!model&&!isReadOnlySource();
-     if(completed)try{await a.refresh?.();}catch(error){failure+=(failure?'；':'')+'排班／統計更新未確認：'+String(error.message||error);}
+     if(verifiedRoster)try{
+      // Synchronize once after the batch, not between writes, to avoid lock contention.
+      if(a.syncRepairRoster)await a.syncRepairRoster(month,refreshed&&snapshot?.saveContext?.ready?snapshot:verifiedRoster);
+      else if(completed)await a.refresh?.();
+     }catch(error){failure+=(failure?'；':'')+'排班／統計更新未確認：'+String(error.message||error);}
      const summary='異常預排修正：已確認 '+completed+'／'+candidates.length+' 筆。'+(failure?'核對未完整：'+failure+'。':refreshed?'已重新計算未休額度及建議日期，尚未儲存新預排。':'最新資料尚未完整讀取，請重新讀取以核對額度。')+(remaining!==null?' 全範圍剩餘可修正 '+remaining+' 筆。':' 全範圍剩餘筆數尚未確認。')+(failed.length?' '+failed.length+' 筆處理未確認：'+failed.join('；'):'')+(review.length?' 另 '+review.length+' 筆需人工核對：'+review.map(r=>r.name+' '+r.date+' '+r.issue).join('；'):'')+(processed<candidates.length?' 尚有 '+(candidates.length-processed)+' 筆未處理。':'');
      setStatus(summary);
      if(typeof g.alert==='function')g.alert(summary);
