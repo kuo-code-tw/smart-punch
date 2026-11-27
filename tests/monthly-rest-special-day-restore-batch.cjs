@@ -24,6 +24,28 @@ async function main(){
  await sync('2026-11',{saveContext:{token:'test',month:'2026-11',ready:true},schedules:[]});
  assert.equal(cache.has('2026-11'),false);assert.equal(calls.join(','),'port79_cache_mutated_at,invalidate,notify,recheck:2026-11');
  let rejected=false;try{await sync('2026-11',{saveContext:{token:'wrong',month:'2026-11',ready:true},schedules:[]})}catch(e){rejected=true}assert(rejected);assert.equal(calls.length,4);
+ const window={P79SpecialOvertime:{kindsForDate:d=>d==='2026-11-28'?[{kind:'election'}]:[]}};
+ new Function('window',src)(window);
+ const staff='ABCDEFGHI'.split('').map(empId=>({empId,name:empId}));
+ const date='2026-11-28',earlier='2026-11-12';
+ const roster=(shift,meta,extra={})=>({...Object.fromEntries(Array.from({length:30},(_,n)=>['2026-11-'+String(n+1).padStart(2,'0'),'中'])),[date]:shift,...extra,__meta:meta});
+ const report=(id,note='每月未休假加班',code='休16-24')=>({id,planned:true,category:'休',note,code});
+ const schedules=[
+ ['A',roster('休16-24',{[date]:{overtimeReport:report('a'),reportOriginalShift:'中'}})],
+ ['B',roster('休16-24',{})],
+ ['C',roster('休16-24',{[date]:{overtimeReports:[report('c')]}})],
+ ['D',roster('休16-24',{[date]:{overtimeReport:report('d','其他')}})],
+ ['E',roster('選16-24',{[date]:{overtimeReport:report('e','選舉日','選16-24')}})],
+ ['F',roster('中',{[earlier]:{overtimeRevocations:[{confirmed:true,reportId:'f'}],reportOriginalShift:'中'}},{[earlier]:'休16-24'})],
+ ['G',roster('休16-24',{[date]:{overtimeReport:report('g')}})],
+ ['I',roster('中',{[earlier]:{overtimeReport:report('i')}},{[earlier]:'休16-24','2026-11-03':''})]
+ ].map(([empId,schedule])=>({empId,schedule}));
+ const audit=window.P79MonthlyRest.abnormalMonthlyRestPlans({schedules},staff,'2026-11');
+ assert.equal(audit.repair.map(x=>x.empId).join(','),'A');
+ assert.equal(audit.review.map(x=>x.empId).sort().join(','),'B,C,D,F,G,H,I');
+ assert.equal(audit.review.find(x=>x.empId==='F').date,earlier);
+ assert.equal(audit.coverage.people,9);assert.equal(audit.coverage.rosters,8);assert.equal(audit.coverage.days,240);
+ console.log('PASS whole-month audit includes orphaned shift, additional report, missing source and earlier revoked date; legitimate reports preserved');
  console.log('PASS 9 restoration flow cases and authenticated schedule sync/cache invalidation');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
