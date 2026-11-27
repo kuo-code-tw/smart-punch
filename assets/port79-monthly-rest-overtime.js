@@ -72,6 +72,10 @@ function restQuotaExemptDates(emp,roster,dates,snapshot=null){
 // Election-day work follows the special-overtime workflow, not monthly
 // unused-rest allocation. Use the same calendar as the schedule view.
 function monthlyRestElectionDay(date){
+ // The confirmed election date is not a local preference. Even a stale
+ // customized calendar or a temporarily missing calendar module cannot make
+ // this date eligible for ordinary monthly-rest overtime.
+ if(String(date||'').trim().replace(/\//g,'-')==='2026-11-28')return true;
  const special=g.P79SpecialOvertime;
  return special?.kindsForDate?.(date)?.some(x=>x.kind==='election')===true||
   special?.electionDates?.().includes(date)===true||
@@ -79,6 +83,18 @@ function monthlyRestElectionDay(date){
 }
 // Only unequivocal, standalone monthly-rest preplans on special dates can
 // be batch revoked. Never infer invalidity from attendance or quota alone.
+function isMonthlyRestDeclaration(report,meta={}){
+ return /每月未休假加班|每月未休假預排|未休假加班預排/.test(String(report?.note||'')+' '+String(meta.note||''))||
+   (meta.restQuotaOvertime===true&&cats.includes(report?.category)&&(!meta.restCategory||meta.restCategory===report.category));
+}
+function electionMonthlyRestWriteIssue(draft,meta={}){
+ const rule=draft?.rule||{},date=String(draft?.date||''),accounting=String(draft?.overtimeDate||date);
+ if(!monthlyRestElectionDay(date)&&!monthlyRestElectionDay(accounting))return '';
+ if(!cats.includes(rule.category)||/^[選颱]/.test(String(rule.code||'')))return '';
+ const monthly=isMonthlyRestDeclaration({...rule,note:draft.note},meta)||!!draft.monthlyRestPlanMonth||
+   (meta.overtimeReport?.id===draft.id&&isMonthlyRestDeclaration(meta.overtimeReport,meta));
+ return monthly?(monthlyRestElectionDay(date)?date:accounting)+' 選舉日不得申報一般每月未休假加班，請使用選舉日特殊加班申報':'';
+}
 function abnormalMonthlyRestPlans(snapshot,staff,month){
  const people=new Map((staff||[]).map(e=>[id(e.empId||e.id),e])),repair=[],review=[],seen=new Set();
  const days=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate();
@@ -99,7 +115,7 @@ function abnormalMonthlyRestPlans(snapshot,staff,month){
    const reports=[report,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])].filter(r=>confirmedReport(meta,r));
    const active=confirmedReport(meta,report);
    const reason=monthlyRestElectionDay(date)?'選舉日':g.P79SpecialOvertime?.kindsForDate?.(date)?.some(x=>x.kind==='typhoon')||shift==='颱'?'颱風日':'';
-   const monthly=r=>/每月未休假加班/.test(String(r?.note||'')+' '+String(meta.note||''));
+   const monthly=r=>monthlyRestElectionDay(date)?isMonthlyRestDeclaration(r,meta):/每月未休假加班/.test(String(r?.note||'')+' '+String(meta.note||''));
    const general=r=>cats.includes(r?.category)&&!/^[選颱]/.test(String(r?.code||''));
    const generalReports=reports.filter(general);
    const assigned=!!meta.overtimeAssignedShift&&shift===String(meta.overtimeAssignedShift).trim();
@@ -126,7 +142,10 @@ function abnormalMonthlyRestPlans(snapshot,staff,month){
    if(!reason)continue;
    if(active&&general(report)&&monthly(report)){
     const extra=reports.some(r=>r.id!==report.id);
-    if(report.planned!==true||linked||extra||!original||original==='待排班'||timedRest(original))review.push({...item,issue:report.planned!==true?'已正式申報':linked||extra?'有其他加班或代班連結':'原班別無法確認'});
+    const approved=['approvedBy','approvedAt','reviewedBy','reviewedAt'].some(k=>report[k]!=null&&report[k]!=='')||/已核准|已核定|已審核|已結算/.test(String(report.status||'')+' '+String(report.approvalStatus||''));
+    const leave=(snapshot.approvedLeaves||[]).some(l=>id(l.empId)===empId&&date>=l.start&&date<=l.end)||
+      (snapshot.leaveRecords||[]).some(l=>id(l.empId)===empId&&['已核准','已核準'].includes(l.status)&&date>=String(l.startDate||l.startTime||'').slice(0,10).replace(/\//g,'-')&&date<=String(l.endDate||l.endTime||l.startDate||l.startTime||'').slice(0,10).replace(/\//g,'-'));
+    if(report.planned!==true||approved||linked||extra||leave||!original||original==='待排班'||timedRest(original))review.push({...item,issue:report.planned!==true||approved?'已正式申報或核准':linked||extra||leave?'有其他加班或請假代班連結':'原班別無法確認'});
     else repair.push(item);
    }else if(generalReports.length){
     review.push({...item,issue:'特殊日仍有一般例休國申報（來源或主要申報欄位不符），需核對'});
@@ -2043,6 +2062,6 @@ async function open(settings={}){
  // 開啟時只讀核對，優先重用同帳號已核對的本機月份資料；沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').onclick({preferLocal:true});
 }
-g.P79MonthlyRest={open,plan,balance,abnormalMonthlyRestPlans,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,monthlyRestElectionDay,electionMonthlyRestWriteIssue,abnormalMonthlyRestPlans,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
 
 })(window);
