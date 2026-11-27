@@ -1,10 +1,11 @@
 const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const {webcrypto}=require('node:crypto');
 const source=fs.readFileSync(require('path').join(__dirname,'../assets/port79-data-cache.js'),'utf8');
-function setup(override){
+function setup(override, delta){
  const calls=[],snapshots=[],applied=[];const values=new Map([['port79_user_token','private-test-token'],['port79_user_session',JSON.stringify({empId:'QA',adminRole:'admin'})]]);
  const storage={getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,String(v))};
  const fixture=(action,month)=>action==='getAttendanceMonths'?{ok:true,months:['2026-09','2026-10']}:action==='getAttendanceEmployeeMaster'?{ok:true,employees:[{empId:'QA'}]}:{ok:true,records:[{id:month+'-base'},...(action==='getAttendanceMainDirect'?[{id:month+'-direct'}]:[])]};
- const ctx={URL,URLSearchParams,Request,Response,Blob,AbortController,Date,JSON,Map,Set,Promise,console,setTimeout,clearTimeout,document:{},sessionStorage:storage,localStorage:storage,location:{pathname:'/smart-punch/hr/',href:'https://example.invalid/smart-punch/hr/'},snapshots,applied,cachedFullRow:null,window:{GAS_URL:'https://script.google.com/macros/s/TEST/exec',fetch:async input=>{const u=new URL(input),a=u.searchParams.get('action'),m=u.searchParams.get('month');calls.push(u);const d=u.searchParams.get('token')!=='private-test-token'?{ok:false,error:'未登入'}:override?.(a,m)??fixture(a,m);return new Response(JSON.stringify(d),{status:200})}}};
+ const ctx={URL,URLSearchParams,Request,Response,Blob,AbortController,Date,JSON,Map,Set,Promise,console,setTimeout,clearTimeout,document:{},sessionStorage:storage,localStorage:storage,location:{pathname:'/smart-punch/hr/',href:'https://example.invalid/smart-punch/hr/'},snapshots,applied,cachedFullRow:null,window:{GAS_URL:'https://script.google.com/macros/s/TEST/exec',fetch:async(input,init)=>{if(init?.method==='POST'&&delta)return new Response(JSON.stringify(delta(JSON.parse(init.body))));const u=new URL(input),a=u.searchParams.get('action'),m=u.searchParams.get('month');calls.push(u);const d=u.searchParams.get('token')!=='private-test-token'?{ok:false,error:'未登入'}:override?.(a,m)??fixture(a,m);return new Response(JSON.stringify(d),{status:200})}}};
  vm.createContext(ctx);vm.runInContext(source.replace('window.Port79DataCache={','storeApi=async()=>{};getDisplaySnapshot=async()=>cachedFullRow;saveSystemSnapshot=async(sys,data)=>{snapshots.push({sys,data});if(sys==="attendance")cachedFullRow={data,cacheEndpoint:gasUrl(),displayScope:displayScope()};return data};applyAttendanceSnapshotToPage=async(data)=>applied.push(data);window.Port79DataCache={testBuildUrl:buildUrl,'),ctx);
  return {api:ctx.window.Port79DataCache,calls,snapshots,applied,ctx};
 }
@@ -29,6 +30,34 @@ let passed=0;async function test(name,f){await f();passed++;console.log('PASS '+
   const d=await x.api.downloadSystem('attendance');assert(!d.reusedCache);assert.equal(x.calls.filter(u=>u.searchParams.get('action')==='getAttendanceMonthData').length,4);
   x.ctx.sessionStorage.setItem('port79_user_session',JSON.stringify({empId:'QA',adminRole:'admin',dataScope:{attendance:['D']}}));
   assert(!(await x.api.downloadSystem('attendance')).reusedCache);
+ });
+ await test('automatic startup applies row deltas to its saved database without GET month downloads',async()=>{
+  let revision='R1';
+  const deltaCalls=[];
+  const x=setup((action,month)=>{
+   if(action==='getSyncMeta')return {ok:true,revision};
+   if(action==='getAttendanceMonthData')return {ok:true,records:[{id:month,timeStr:month+'-10 08:00'}]};
+   if(action==='getAttendanceMainDirect')return {ok:true,records:[]};
+  },data=>{
+   deltaCalls.push(data);
+   assert.equal(data.token,'private-test-token');
+   assert(data.manifest.records.length>0);
+   const records=data.read==='getAttendanceMainDirect'?[]:
+    data.month==='2026-09'?[{id:'updated',timeStr:'2026-09-10 08:00'}]:[-2];
+   return {ok:true,month:data.month,rowDelta:{version:1,changes:{records}}};
+  });
+  await x.api.downloadSystem('attendance');
+  const fullReads=x.calls.filter(u=>['getAttendanceMonthData','getAttendanceMainDirect'].includes(u.searchParams.get('action'))).length;
+  revision='R2';
+  Object.assign(x.ctx,{TextEncoder,btoa});x.ctx.window.crypto=webcrypto;
+  const result=await x.api.downloadAll(null,{automaticStartup:true,systems:['attendance']});
+  assert.equal(result[0].ok,true);
+  assert.equal(result[0].deferred,undefined);
+  assert.equal(deltaCalls.length,4);
+  const current=x.snapshots.filter(row=>row.sys==='attendance').at(-1).data;
+  assert.equal(current.sourceRevision,'R2');
+  assert.equal(current.records.map(row=>row.id).join(','),'updated,2026-10');
+  assert.equal(x.calls.filter(u=>['getAttendanceMonthData','getAttendanceMainDirect'].includes(u.searchParams.get('action'))).length,fullReads);
  });
  await test('missing or changing metadata never validates the complete cache',async()=>{
   const x=setup();await x.api.downloadSystem('attendance');assert.equal(x.snapshots[0].data.sourceRevision,'');assert(!(await x.api.downloadSystem('attendance')).reusedCache);

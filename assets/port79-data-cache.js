@@ -912,7 +912,7 @@ function monthRowCanonical(value){
  return JSON.stringify(value);
 }
 const monthDeltaUnsupported=new Set();
-async function readMonthDelta(action,month,prior,{url,credential,signal}={}){
+async function readMonthDelta(action,month,prior,{url,credential,signal,allowMissing=false}={}){
  const fields=monthDeltaFields[action];
  url=url||gasUrl();credential=credential||token();
  if(!fields||!prior||!credential||!validDownloadGasUrl(url)||!window.crypto?.subtle||monthDeltaUnsupported.has(url))return null;
@@ -935,7 +935,7 @@ async function readMonthDelta(action,month,prior,{url,credential,signal}={}){
   }
   manifest[field]=hashes;
  }
- if(!Object.keys(manifest).length)return null;
+ if(!Object.keys(manifest).length&&!(allowMissing&&prior.records?.length===0))return null;
  assertContext();
  if(signal?.aborted)throw signal.reason;
  const controller=new AbortController(),interrupt=()=>controller.abort();
@@ -1015,14 +1015,14 @@ function verifyAttendanceDownloadContext(expected){
  if(typeof expected.guard==='function'&&!expected.guard())throw Object.assign(new Error('背景下載已停止'),{code:'P79_SCOPE'});
  if(expected.token!==token()||expected.viewer!==viewerKey())
   throw Object.assign(new Error('登入帳號或憑證確實已變更；未保存舊帳號的考勤資料，請重新登入'),{code:'P79_AUTH'});
- if(expected.scope!==displayScope())
+ if(expected.scope!==displayScope()||expected.endpoint!==gasUrl())
   throw Object.assign(new Error('管理權限範圍在下載期間已更新；為避免不同範圍資料混用，請重新核對後再下載'),{code:'P79_SCOPE'});
  if(expected.stamp!==mutationStamp())
   throw Object.assign(new Error('考勤下載期間偵測到其他資料修改，已保留原快取並停止儲存舊版本；請重新下載考勤'),{code:'P79_MUTATION'});
 }
 async function readAttendanceDatabase(targetSys='attendance',onProgress,readOptions={}){
  const t=token(),viewer=viewerKey(),scope=displayScope(),stamp=mutationStamp();
- const expected={token:t,viewer,scope,stamp,guard:readOptions.startupGuard};
+ const expected={token:t,viewer,scope,stamp,endpoint:gasUrl(),guard:readOptions.startupGuard};
  if(!t)throw new Error('找不到登入 Token，請重新由首頁登入');
  // A full 22-month snapshot can take several seconds to restore from disk.
  let previous=await getDisplaySnapshot('attendance',{timeoutMs:10000}).catch(()=>null);
@@ -1100,7 +1100,9 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
    }
  }
 
- if(readOptions.checkOnly===true)return {deferred:true};
+ const incrementalOnly=readOptions.checkOnly===true;
+ if(incrementalOnly&&(!cloudRevision||!window.crypto?.subtle||
+    previous?.cacheEndpoint!==gasUrl()||previous?.displayScope!==scope))return {deferred:true};
 
  // Native Windows: two bounded read-only workers; browser: existing sequential behavior.
  // Each worker makes at most one GAS request at a time and stores no full snapshot
@@ -1132,12 +1134,16 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
       `沿用已完成的 ${month} 快取｜${completedMonths}/${months.length} 月`);
      continue;
     }
-    onProgress?.('attendance',completedMonths,months.length,'month',`正在讀取 ${month}｜已完成 ${completedMonths}/${months.length} 月`);
+    onProgress?.('attendance',completedMonths,months.length,'month',`${incrementalOnly?'核對異動':'讀取'} ${month}｜已完成 ${completedMonths}/${months.length} 月`);
     const date=new Date(month+'-01T00:00:00Z');
     const adjacent=offset=>new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+offset,1)).toISOString().slice(0,7);
     const base=oldRecordsByMonth.has(month)?{records:[-1,0,1].flatMap(offset=>oldRecordsByMonth.get(adjacent(offset))||[])}:null;
-    const read=async action=>await readMonthDelta(action,month,base)||
-     fetchJson(action,{month,token:t},'',readOptions);
+    const read=async action=>{
+     const updated=await readMonthDelta(action,month,base||(incrementalOnly?{records:[]}:null),{allowMissing:incrementalOnly});
+     if(updated)return updated;
+     if(incrementalOnly)throw Object.assign(Error('此環境的逐筆同步尚未就緒'),{code:'P79_DELTA_UNAVAILABLE'});
+     return fetchJson(action,{month,token:t},'',readOptions);
+    };
     const d=await read('getAttendanceMonthData');
     if(!Array.isArray(d?.records))throw new Error('考勤月份資料格式不正確');
     const direct=await read('getAttendanceMainDirect');
@@ -1147,7 +1153,7 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
     monthResults[i]={month,rows,ok:true};
     await storeMonthCheckpoint(month,rows);
    }catch(e){
-    if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT','P79_MUTATION'].includes(e?.code)){
+    if(['P79_AUTH','P79_SCOPE','P79_TRANSPORT','P79_MUTATION','P79_DELTA_UNAVAILABLE'].includes(e?.code)){
      fatal=fatal||e;return;
     }
     monthResults[i]={month,rows:[],ok:false,error:String(e?.message||e)};
@@ -1157,6 +1163,7 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
   }
  }
  await Promise.all(Array.from({length:Math.min(workerCount,months.length)},()=>worker()));
+ if(fatal?.code==='P79_DELTA_UNAVAILABLE')return {deferred:true};
  if(fatal)throw fatal;
  verifyAttendanceDownloadContext(expected);
  const monthStats=monthResults.map(x=>({month:x.month,count:x.rows.length,ok:x.ok,...(x.ok?{}:{error:x.error})}));
@@ -1169,6 +1176,8 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  // A revision may change while a full download is running. Preserve the
  // original completed-data behavior, but mark sourceRevision='' below so it
  // can NEVER be reused as an unchanged cloud revision on the next visit.
+ if(incrementalOnly&&String(after?.revision||'')!==cloudRevision)
+  throw Error('雲端考勤在同步期間再次變更，已保留原有快取');
  if(cloudRevision&&String(after?.revision||'')!==cloudRevision)
   console.warn('雲端考勤版本於讀取期間變更，完整快取將在下次重新核對');
  const snapshot={
@@ -1368,12 +1377,15 @@ async function downloadAll(onProgress,options={}){
    continue;
   }
   if(automaticStartup&&!connectionError&&sys==='attendance'){
-   onProgress?.(sys,i,systems.length,'loading',null,'只核對既有考勤版本，不自動下載完整歷史');
+   onProgress?.(sys,i,systems.length,'loading',null,'核對本機考勤版本，有異動時逐筆同步');
    try{
     const checked=await readAttendanceDatabase('attendance',(name,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,label),{...readOptions,checkOnly:true});
-    if(checked?.reusedCache===true){
-     attendanceSnapshot=checked;result.push({system:sys,ok:true,reused:true});
-     onProgress?.(sys,i,systems.length,'reused',null,'雲端版本未變，沿用完整本機考勤');
+    if(checked?.ok===true&&checked.fullDatabase===true){
+     attendanceSnapshot=checked;
+     const reused=checked.reusedCache===true;
+     result.push({system:sys,ok:true,reused});
+     onProgress?.(sys,i,systems.length,reused?'reused':'done',null,
+      reused?'雲端版本未變，沿用完整本機考勤':'考勤異動已逐筆同步並保存本機');
     }else{
      result.push({system:sys,ok:true,deferred:true});
      onProgress?.(sys,i,systems.length,'deferred',null,'完整歷史尚需核對，保留本機；當月資料由考勤頁更新，不重抓全部月份');
