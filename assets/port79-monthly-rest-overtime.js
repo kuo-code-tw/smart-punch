@@ -1202,7 +1202,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1217,6 +1217,27 @@ async function open(settings={}){
  let autoPlan=settings.autoPlan!==false,explicitPlanningMode=settings.autoPlan!==undefined;
  const manualPeople=new Map(); // preserve picks across local filters; no implicit cloud writes
  const q=s=>el.querySelector(s),setStatus=x=>{q('#mrStatus').textContent=x;if(q('#mrResult'))q('#mrResult').textContent=x;};let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[],lastFailure='',lastCheckedDay=today();
+ // Operator preferences are local, per authenticated account/server/month.
+ const cutoffMemory=new Map();
+ function cutoffStorageKey(month){
+  try{
+   const context=g.p79OvertimeContext,identity=context?.uploadIdentity?.();
+   const owner=id(identity?.owner),server=String(context?.gasUrl?.()||'').trim();
+   return owner&&server?'p79-monthly-rest-cutoff-v1:'+JSON.stringify([server,owner,month]):'';
+  }catch(_){return '';}
+ }
+ function restoreCutoff(month){
+  if(cutoffMemory.has(month))return validReportCutoff(month,cutoffMemory.get(month));
+  const key=cutoffStorageKey(month);
+  try{return key?validReportCutoff(month,g.localStorage?.getItem(key)):'';}catch(_){return '';}
+ }
+ function rememberCutoff(month,value){
+  const cutoff=validReportCutoff(month,value);cutoffMemory.set(month,cutoff);
+  const key=cutoffStorageKey(month);
+  try{if(key){if(cutoff)g.localStorage?.setItem(key,cutoff);else g.localStorage?.removeItem(key);}}catch(_){}
+  return cutoff;
+ }
+ q('#mrCutoff').value=restoreCutoff(q('#mrMonth').value);
  let people=monthlyPlanPeople(a.employees(),null,q('#mrMonth').value);
  function options(values,all){return '<option value="">'+all+'</option>'+values.map(v=>'<option>'+esc(v)+'</option>').join('');}
  const job=e=>e.jobTitle||e.deptDetail||'未設定';q('#mrDept').innerHTML=options([...new Set(people.map(e=>e.dept||'一般'))],'全部部門');
@@ -1252,8 +1273,8 @@ async function open(settings={}){
  }
  function invalidate(){lastFailure='';model=null;snapshot=null;q('#mrRows').innerHTML='';q('#mrExistingRows').innerHTML='';q('#mrExistingStatus').textContent='讀取班表後顯示既有申報。';q('#mrAutoSupplementRows').innerHTML='';q('#mrAutoSupplementSummary').textContent='正在核對全員來源…';q('#mrBackfill').textContent='';q('#mrAuditSummary').textContent='';q('#mrAuditDetails').textContent='';q('#mrResult').textContent='尚未送出申報';q('#mrSave').disabled=true;q('#mrAll').checked=false;}
  q('#mrDept').onchange=jobs;q('#mrJob').onchange=names;q('#mrEmp').onchange=()=>{if(model&&!busy)paint();};
- q('#mrMonth').onchange=()=>{if(!busy){q('#mrCutoff').value='';q('#mrLoad').click();}};
- q('#mrCutoff').onchange=()=>{if(busy)return;const input=q('#mrCutoff');input.value=validReportCutoff(q('#mrMonth').value,input.value);manualPeople.clear();q('#mrLoad').click();};jobs();
+ q('#mrMonth').onchange=()=>{if(!busy){q('#mrCutoff').value=restoreCutoff(q('#mrMonth').value);manualPeople.clear();q('#mrLoad').click();}};
+ q('#mrCutoff').onchange=()=>{if(busy)return;const input=q('#mrCutoff'),month=q('#mrMonth').value,raw=input.value,valid=validReportCutoff(month,raw);if(raw&&!valid){input.value=restoreCutoff(month);setStatus('截止日必須為選定月份內且不晚於今天的日期，已保留原設定。');return;}input.value=rememberCutoff(month,valid);manualPeople.clear();q('#mrLoad').click();};jobs();
  function controls(disabled,allowFilters=false){
   el.querySelectorAll('.filters input,.filters select,.filters button,#mrAll,#mrRows input,#mrRows select,#mrPlanAll,#mrPlannedRows input,#mrSavePlans,#mrNeedRows input,#mrManualRows button,#mrManualMode,#mrAutoMode,#mrNewPlan').forEach(e=>e.disabled=disabled);
   if(allowFilters){q('#mrDept').disabled=false;q('#mrJob').disabled=false;q('#mrEmp').disabled=false;}
@@ -1634,7 +1655,7 @@ async function open(settings={}){
   }
  };
  choosePlanningMode(autoPlan);
- q('#mrPrior').onclick=()=>{if(busy)return;q('#mrMonth').value=previousMonth(today().slice(0,7));q('#mrCutoff').value='';q('#mrLoad').click();};
+ q('#mrPrior').onclick=()=>{if(busy)return;q('#mrMonth').value=previousMonth(today().slice(0,7));q('#mrCutoff').value=restoreCutoff(q('#mrMonth').value);q('#mrLoad').click();};
  q('#mrNeedRows').onchange=e=>{
   if(busy||!e.target.classList.contains('need-plan'))return;
   const employeeId=id(e.target.dataset.emp);
