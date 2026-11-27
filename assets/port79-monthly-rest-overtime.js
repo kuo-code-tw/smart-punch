@@ -1764,15 +1764,45 @@ async function open(settings={}){
   const selected=visiblePlannedRows().filter(r=>r.checked&&!r.saved);if(!selected.length)return;
   if(!confirm('將勾選的 '+selected.length+' 筆建議儲存為預排？尚未確認出勤，不會列為正式加班；例休週期待核項目仍需核對。'+(typeof batchSummary==='string'?batchSummary:'')))return;
   busy=true;stop=false;el.dataset.preplanLocked='true';controls(true);let failure='',latest=null,verified=null,activeRow=null;
+  // Only retry read operations on lock contention. A write with an uncertain
+  // result must be reconciled by its original report ID, never blindly retried.
+  const readPreplanSnapshot=async(readback,progress)=>{
+   for(let attempt=0;;attempt++){
+    try{return await a.snapshot(loadedMonth,readback,false,true);}
+    catch(error){
+     if(attempt>=2||!/雲端正處理其他操作|排班讀取等待|未取得鎖/.test(String(error.message||error)))throw error;
+     setStatus(progress+'｜雲端忙碌，重新讀取 '+(attempt+1)+'/2');
+     await new Promise(resolve=>g.setTimeout(resolve,500*(attempt+1)));
+    }
+   }
+  };
+  const exactConfirmed=(source,r)=>{
+   if(!source||source.provisional===true||!Array.isArray(source.schedules))return false;
+   const meta=source.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date];
+   const report=meta?.overtimeReport;
+   return report?.id===r.id&&report.planned===true&&report.category===r.category&&report.code===g.P79Overtime.report(r.rule).code&&confirmedReport(meta,report);
+  };
+  const markConfirmed=r=>{r.saved=true;r.checked=false;r.status='預排已儲存（未正式申報）';};
   setStatus('正在一次核對 '+selected.length+' 筆預排的雲端版本與額度…');
   try{
-   latest=await a.snapshot(loadedMonth,false,false,true);
+   latest=await readPreplanSnapshot(false,'核對雲端版本與額度');
    if(latest?.provisional===true||latest?.readOnlyDueAttendance===true||latest?.attendanceEvidence?.complete!==true)throw Error('正式考勤未完整核對，不能儲存預排');
    const batch=latest.saveContext;
    const suggested=plan(latest,loadedPeople,loadedMonth,rules,{manualOnly:false,cutoff:q('#mrCutoff').value}).plannedRows;
    const key=r=>id(r.empId)+'|'+r.date+'|'+r.category+'|'+g.P79Overtime.report(r.rule).code;
    const valid=new Set(suggested.map(key));
+   // Reconcile already-confirmed candidates before any later candidate can
+   // fail validation; this also removes stale rows left by an earlier timeout.
    for(const r of selected){
+    if(exactConfirmed(latest,r)){r.attempted=true;r.acknowledged=true;markConfirmed(r);}
+   }
+   if(selected.some(r=>r.saved)){
+    verified=latest;
+    snapshot={...latest,saveContext:null};
+    paint();controls(true);
+   }
+   for(const r of selected){
+    if(r.saved)continue;
     r.acknowledged=false;
     if(monthlyRestElectionDay(r.date))throw Error(r.name+' '+r.date+' 為選舉日，不得建立一般未休假加班預排');
     const saved=latest.schedules?.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date]?.overtimeReport;
@@ -1781,25 +1811,26 @@ async function open(settings={}){
    }
    for(const r of selected){
     if(stop)break;
+    if(r.saved)continue;
     activeRow=r;
     if(monthlyRestElectionDay(r.date))throw Error('選舉日不得建立一般未休假加班預排');
     if(r.date<today())throw Error('預排日期已過，請重新讀取');
     const progress='預排 '+(selected.indexOf(r)+1)+'／'+selected.length+'：'+r.name+' '+r.date;
+    let writeError=null;
     if(!r.acknowledged){
      const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),manualPlan:true,preventReplace:false,note:'每月未休假加班預排（正式配休）',createdAt:Date.now(),directRow:true,onProgress:stage=>setStatus(progress+'｜'+stage)};
      r.attempted=true;r.status='儲存預排中／待雲端讀回';setStatus(progress+'｜上傳雲端');paint();controls(true);
-     const result=await a.saveReport(draft,batch);
-     if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==r.id||result.report?.planned!==true)throw Error('雲端未確認儲存為預排');
-     r.acknowledged=true;
+     try{
+      const result=await a.saveReport(draft,batch);
+      if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==r.id||result.report?.planned!==true)throw Error('雲端未確認儲存為預排');
+      r.acknowledged=true;
+     }catch(error){writeError=error;}
     }
-    r.status='雲端已接收／待雲端讀回';setStatus(progress+'｜核對原申報編號');paint();controls(true);
-    const fresh=await a.snapshot(loadedMonth,true,false,true);
-    if(fresh?.provisional===true||!Array.isArray(fresh?.schedules))throw Error('正式班表讀回未確認');
-    const meta=fresh.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date];
-    const report=meta?.overtimeReport;
-    if(report?.id!==r.id||report.planned!==true||report.category!==r.category||report.code!==g.P79Overtime.report(r.rule).code||!confirmedReport(meta,report))throw Error('雲端讀回未確認，保留原編號供核對');
+    r.status=writeError?'寫入結果未確認／待雲端讀回':'雲端已接收／待雲端讀回';setStatus(progress+'｜核對原申報編號');paint();controls(true);
+    const fresh=await readPreplanSnapshot(true,progress);
+    if(!exactConfirmed(fresh,r))throw writeError||Error('雲端讀回未確認，保留原編號供核對');
     verified=fresh;
-    r.saved=true;r.checked=false;r.status='預排已儲存（未正式申報）';
+    markConfirmed(r);
     snapshot={...latest,schedules:fresh.schedules,leaveDates:fresh.leaveDates,leaveCoverAssignments:fresh.leaveCoverAssignments,approvedLeaves:fresh.approvedLeaves,saveContext:null};
     setStatus('已確認 '+selected.filter(x=>x.saved).length+'／'+selected.length+' 筆｜'+r.name+' '+r.date+' 預排成功');
     paint();controls(true);
