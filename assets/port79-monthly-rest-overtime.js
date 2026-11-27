@@ -1312,6 +1312,20 @@ function showSubmissionResult(parent,selected,failure){
  parent.appendChild(result);
  result.showModal();
 }
+function preplanReadLockBusy(error){
+ return /雲端(?:目前)?正在處理其他(?:資料|操作)|雲端正處理其他操作|排班讀取等[待候]|未取得(?:讀取)?鎖|雲端.*忙碌/.test(String(error?.message||error||''));
+}
+async function retryPreplanRead(read,onRetry,wait=ms=>new Promise(resolve=>g.setTimeout(resolve,ms))){
+ for(let attempt=0;;attempt++){
+  try{return await read();}
+  catch(error){
+   if(attempt>=3||!preplanReadLockBusy(error))throw error;
+   const delay=2500*(attempt+1);
+   onRetry?.(attempt+1,3,delay);
+   await wait(delay);
+  }
+ }
+}
 function showPreplanProgress(parent,total){
  const dialog=document.createElement('dialog');
  dialog.id='p79MonthlyRestPreplanProgress';
@@ -1979,10 +1993,13 @@ async function open(settings={}){
   busy=true;stop=false;el.dataset.preplanLocked='true';controls(true);let failure='',latest=null,verified=null,activeRow=null;
   let progressWindow=null;
   const updatePreplanStatus=message=>{setStatus(message);progressWindow?.update(message,selected.filter(r=>r.saved).length);};
+  const readPreplan=(rosterOnly,label)=>retryPreplanRead(()=>a.snapshot(loadedMonth,rosterOnly,false,true),
+   (attempt,max,delay)=>updatePreplanStatus(label+'｜雲端讀取鎖忙碌，自動重試 '+attempt+'／'+max+'（'+delay/1000+' 秒後）'));
+  let notifyBatch=false;
   try{
    progressWindow=showPreplanProgress(el,selected.length);
    updatePreplanStatus('正在一次核對 '+selected.length+' 筆預排的雲端版本與額度…');
-   latest=await a.snapshot(loadedMonth,false,false,true);
+   latest=await readPreplan(false,'核對雲端版本與額度');
    if(latest?.provisional===true||latest?.readOnlyDueAttendance===true||latest?.attendanceEvidence?.complete!==true)throw Error('正式考勤未完整核對，不能儲存預排');
    const batch=latest.saveContext;
    const suggested=plan(latest,loadedPeople,loadedMonth,rules,{manualOnly:false,cutoff:q('#mrCutoff').value}).plannedRows;
@@ -2002,14 +2019,15 @@ async function open(settings={}){
     if(r.date<today())throw Error('預排日期已過，請重新讀取');
     const progress='預排 '+(selected.indexOf(r)+1)+'／'+selected.length+'：'+r.name+' '+r.date;
     if(!r.acknowledged){
-     const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),monthlyRestEightHour:true,manualPlan:true,preventReplace:false,note:'每月未休假加班預排（正式配休）',createdAt:Date.now(),directRow:true,onProgress:stage=>updatePreplanStatus(progress+'｜'+stage)};
+     const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),monthlyRestEightHour:true,manualPlan:true,preventReplace:false,note:'每月未休假加班預排（正式配休）',createdAt:Date.now(),directRow:true,deferPreplanNotice:true,onProgress:stage=>updatePreplanStatus(progress+'｜'+stage)};
      r.attempted=true;r.status='儲存預排中／待雲端讀回';updatePreplanStatus(progress+'｜上傳雲端');paint();controls(true);
+     notifyBatch=true;
      const result=await a.saveReport(draft,batch);
      if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==r.id||result.report?.planned!==true)throw Error('雲端未確認儲存為預排');
      r.acknowledged=true;
     }
     r.status='雲端已接收／待雲端讀回';updatePreplanStatus(progress+'｜核對原申報編號');paint();controls(true);
-    const fresh=await a.snapshot(loadedMonth,true,false,true);
+    const fresh=await readPreplan(true,progress+'｜核對原申報編號');
     if(fresh?.provisional===true||!Array.isArray(fresh?.schedules))throw Error('正式班表讀回未確認');
     const meta=fresh.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date];
     const report=meta?.overtimeReport;
@@ -2049,6 +2067,8 @@ async function open(settings={}){
     if(progressWindow)progressWindow.finish(saved,failure,typeof batchSummary==='string'?batchSummary.trim():'');
     else g.alert?.('本次已確認 '+saved+'／'+selected.length+' 筆預排。'+(failure?'\n'+failure:''));
    }
+   // Notify other tabs once per batch, including uncertain writes that need a fresh read.
+   if(notifyBatch)try{g.localStorage?.setItem('p79_schedule_overtime_changed_v1',JSON.stringify({month:loadedMonth,at:Date.now(),source:'monthly-rest-preplan-batch'}));}catch(_){}
    g.setTimeout?.(()=>{try{a.refresh?.();}catch(error){console.warn('預排已核對，統計更新失敗',error);}},0);
   }
  };
