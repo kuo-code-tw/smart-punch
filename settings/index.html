@@ -107,6 +107,10 @@ html[data-theme="dark"] .harbor-image{opacity:.35;background-image:linear-gradie
 <div class="field idle-field"><label for="idleMinutes">網頁版閒置自動登出</label><div><input id="idleMinutes" type="number" min="1" max="120" step="1" inputmode="numeric" value="5" aria-describedby="idleHint"> 分鐘</div></div>
 <div class="idle-presets" aria-label="常用閒置時間"><button type="button" data-idle-minutes="5" aria-pressed="false">5 分</button><button type="button" data-idle-minutes="10" aria-pressed="false">10 分</button><button type="button" data-idle-minutes="15" aria-pressed="false">15 分</button><button type="button" data-idle-minutes="20" aria-pressed="false">20 分</button><button type="button" data-idle-minutes="30" aria-pressed="false">30 分</button><button type="button" data-idle-minutes="60" aria-pressed="false">60 分</button><button type="button" data-idle-minutes="120" aria-pressed="false">120 分</button></div>
 <div class="note" id="idleHint">適用全部公司、單位、組別及人員的網頁版。Windows 電腦版不受閒置時間限制。</div></section>
+<section class="panel" id="punchReview"><h3>🕒 考勤打卡時間設定 <small>全系統</small></h3>
+<div class="field idle-field"><label for="punchInMinute">上班簽到（核對截止分鐘）</label><div><input id="punchInMinute" type="number" min="0" max="59" step="1" inputmode="numeric" value="30"> 分鐘</div></div>
+<div class="field idle-field"><label for="punchOutMinute">下班簽退（正常起始分鐘）</label><div><input id="punchOutMinute" type="number" min="0" max="59" step="1" inputmode="numeric" value="45"> 分鐘</div></div>
+<div class="note">每小時 00 分為正常。上班 01 分至設定值、下班 01 分至設定值前一分鐘標記待核對；0 為不啟用該側分鐘提醒。僅供考勤核對，不阻擋打卡或修改原始時間。</div></section>
 <section class="panel" id="notice"><h3>♧ 通知與公告 <small>全系統</small></h3>
 <label class="checkrow"><input type="checkbox" id="noticeEnabled"><span><strong>顯示首頁公告</strong><small>所有管理員重新進入首頁時顯示</small></span></label>
 <div class="field col"><label for="noticeText">公告內容</label><textarea id="noticeText" maxlength="180" placeholder="最多 180 字"></textarea></div></section>
@@ -122,7 +126,8 @@ html[data-theme="dark"] .harbor-image{opacity:.35;background-image:linear-gradie
 var DEFAULT_GAS='https://script.google.com/macros/s/AKfycbzPD0v8QQol_7cMuMUFGnjHxo-9jFnRLEwoWQhW-n3g5GlbbHnaL7EhRAtcymUcdYOEzg/exec';
 var KEY='p79SystemSettingsV1',D=document,q=function(id){return D.getElementById(id)},busy=false,auth=null,cloud=null,previous=null,token='',verifiedSuperadmin=false;
 var IDLE_FIELD='p79_hr_idle_logout_minutes_v1',IDLE_CACHE='port79_idle_logout_config_v1',DEFAULT_IDLE=5;
-var defaults={notice:{enabled:false,text:''},windowsDownload:{enabled:false}};
+var defaults={notice:{enabled:false,text:''},windowsDownload:{enabled:false},punchReview:{inMinute:30,outMinute:45}};
+function punchMinute(v){if(v===null||v===undefined||String(v).trim()==='')return null;var n=Number(v);return Number.isInteger(n)&&n>=0&&n<=59?n:null;}
 function idleNumber(value){if(value===null||value===undefined||String(value).trim()==='')return null;var n=Number(value&&typeof value==='object'?value.minutes:value);return Number.isInteger(n)&&n>=1&&n<=120?n:null;}
 function idleFromConfig(config){var raw=config[IDLE_FIELD];if(raw===undefined)return DEFAULT_IDLE;var n=idleNumber(raw);if(n===null)throw Error('雲端自動登出設定格式不正確，未覆寫');return n;}
 function paintIdle(){D.querySelectorAll('[data-idle-minutes]').forEach(function(b){b.setAttribute('aria-pressed',String(Number(b.dataset.idleMinutes)===idleNumber(q('idleMinutes').value)));});}
@@ -135,9 +140,9 @@ function timeoutFetch(target,options,ms){var controller=new AbortController(),ti
 function cloudGet(action){return timeoutFetch(url()+'?action='+encodeURIComponent(action)+'&token='+encodeURIComponent(token)+'&t='+Date.now(),null,16000);}
 function cloudPost(payload){return timeoutFetch(url(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({token:token,userToken:token,gcToken:token},payload))},35000);}
 function safeSettings(config){var saved=config&&config[KEY];return saved&&typeof saved==='object'&&!Array.isArray(saved)?saved:defaults;}
-function normalized(value){var src=value&&value.notice||{},download=value&&value.windowsDownload||{};return {notice:{enabled:src.enabled===true,text:String(src.text||'').slice(0,180)},windowsDownload:{enabled:download.enabled===true}};}
-function apply(v){var x=normalized(v);q('noticeEnabled').checked=x.notice.enabled;q('noticeText').value=x.notice.text;q('desktopDownloadEnabled').checked=x.windowsDownload.enabled;previous=x;}
-function readDraft(){return normalized({notice:{enabled:q('noticeEnabled').checked,text:q('noticeText').value.trim()},windowsDownload:{enabled:q('desktopDownloadEnabled').checked}});}
+function normalized(value){var src=value&&value.notice||{},download=value&&value.windowsDownload||{};return {notice:{enabled:src.enabled===true,text:String(src.text||'').slice(0,180)},windowsDownload:{enabled:download.enabled===true},punchReview:{inMinute:punchMinute(value&&value.punchReview&&value.punchReview.inMinute)??30,outMinute:punchMinute(value&&value.punchReview&&value.punchReview.outMinute)??45}};}
+function apply(v){var x=normalized(v);q('noticeEnabled').checked=x.notice.enabled;q('noticeText').value=x.notice.text;q('desktopDownloadEnabled').checked=x.windowsDownload.enabled;q('punchInMinute').value=String(x.punchReview.inMinute);q('punchOutMinute').value=String(x.punchReview.outMinute);previous=x;}
+function readDraft(){return normalized({notice:{enabled:q('noticeEnabled').checked,text:q('noticeText').value.trim()},windowsDownload:{enabled:q('desktopDownloadEnabled').checked},punchReview:{inMinute:q('punchInMinute').value,outMinute:q('punchOutMinute').value}});}
 function saveLocal(key,value){localStorage.setItem(key,value);window.dispatchEvent(new Event('storage'));}
 function setLocalAppearance(){
  q('yearMode').checked=localStorage.getItem('port79_year_mode')==='roc';
@@ -148,7 +153,7 @@ async function reload(){if(busy||!verifiedSuperadmin)return;busy=true;q('reloadC
  var d=await cloudGet('hrGetOrgOptions');if(!d.config||typeof d.config!=='object')throw Error('雲端設定資料不完整');
  var idle=idleFromConfig(d.config);cloud=d.config;apply(safeSettings(cloud));q('idleMinutes').value=String(idle);paintIdle();rememberIdle(idle);status('✅ 已從雲端讀取正式設定','ok');
 }catch(e){setError(e);}finally{busy=false;q('reloadCloud').disabled=false;}}
-async function save(){if(!verifiedSuperadmin){status('沒有通過超級管理員雲端驗證，禁止寫入','error');return false;}if(busy)return false;if(!cloud){status('請先重新讀取正式雲端設定','error');return false;}var idle=idleNumber(q('idleMinutes').value);if(idle===null){status('自動登出時間必須為 1～120 分鐘整數','error');q('idleMinutes').focus();return false;}var draft=readDraft();if(draft.notice.enabled&&!draft.notice.text){status('請先輸入要公告的內容','error');q('noticeText').focus();return false;}
+async function save(){if(!verifiedSuperadmin){status('沒有通過超級管理員雲端驗證，禁止寫入','error');return false;}if(busy)return false;if(!cloud){status('請先重新讀取正式雲端設定','error');return false;}var idle=idleNumber(q('idleMinutes').value);if(idle===null){status('自動登出時間必須為 1～120 分鐘整數','error');q('idleMinutes').focus();return false;}if(punchMinute(q('punchInMinute').value)===null||punchMinute(q('punchOutMinute').value)===null){status('上下班打卡核對分鐘必須為 0～59 的整數','error');return false;}var draft=readDraft();if(draft.notice.enabled&&!draft.notice.text){status('請先輸入要公告的內容','error');q('noticeText').focus();return false;}
 busy=true;q('save').disabled=true;q('restore').disabled=true;status('正在讀取最新雲端設定並保存…');
 try{
  // Revalidate current cloud identity before every write, including restoring defaults.
@@ -180,9 +185,9 @@ async function init(){
  q('themeMode').addEventListener('change',function(){var mode=this.checked?'dark':'light';saveLocal('port79_theme',mode);D.documentElement.setAttribute('data-theme',mode);status('✅ 主題已套用到本瀏覽器','ok');});
  q('idleMinutes').addEventListener('input',paintIdle);D.querySelectorAll('[data-idle-minutes]').forEach(function(b){b.addEventListener('click',function(){q('idleMinutes').value=b.dataset.idleMinutes;paintIdle();});});
  q('cloudPing').addEventListener('click',ping);q('reloadCloud').addEventListener('click',function(){if((JSON.stringify(readDraft())!==JSON.stringify(previous)||cloud&&idleNumber(q('idleMinutes').value)!==idleFromConfig(cloud))&&!confirm('重新讀取會捨棄尚未儲存的全系統設定。確定繼續？'))return;reload();});
- q('save').addEventListener('click',save);q('restore').addEventListener('click',async function(){if(!verifiedSuperadmin||busy)return;if(!confirm('恢復年份、主題、船舶作業時區、首頁公告、電腦版下載（關閉）及閒置登出（5 分鐘）的預設？將先確認雲端儲存成功。'))return;
- var prior=readDraft(),priorIdle=q('idleMinutes').value;q('noticeEnabled').checked=false;q('noticeText').value='';q('desktopDownloadEnabled').checked=false;q('idleMinutes').value=String(DEFAULT_IDLE);paintIdle();
- var confirmed=await save();if(!confirmed){q('noticeEnabled').checked=prior.notice.enabled;q('noticeText').value=prior.notice.text;q('desktopDownloadEnabled').checked=prior.windowsDownload.enabled;q('idleMinutes').value=priorIdle;paintIdle();return;}
+ q('save').addEventListener('click',save);q('restore').addEventListener('click',async function(){if(!verifiedSuperadmin||busy)return;if(!confirm('恢復年份、主題、船舶作業時區、首頁公告、電腦版下載（關閉）、考勤打卡核對分鐘（30／45）及閒置登出（5 分鐘）的預設？將先確認雲端儲存成功。'))return;
+ var prior=readDraft(),priorIdle=q('idleMinutes').value,priorIn=q('punchInMinute').value,priorOut=q('punchOutMinute').value;q('punchInMinute').value='30';q('punchOutMinute').value='45';q('noticeEnabled').checked=false;q('noticeText').value='';q('desktopDownloadEnabled').checked=false;q('idleMinutes').value=String(DEFAULT_IDLE);paintIdle();
+ var confirmed=await save();if(!confirmed){q('noticeEnabled').checked=prior.notice.enabled;q('noticeText').value=prior.notice.text;q('desktopDownloadEnabled').checked=prior.windowsDownload.enabled;q('idleMinutes').value=priorIdle;q('punchInMinute').value=priorIn;q('punchOutMinute').value=priorOut;paintIdle();return;}
  q('workingClockMode').value='taipei';saveLocal('p79_working_report_clock_preview_v1','taipei');q('yearMode').checked=false;q('themeMode').checked=false;saveLocal('port79_year_mode','gregorian');saveLocal('port79_theme','light');D.documentElement.setAttribute('data-theme','light');
  status('✅ 全系統設定已讀回確認恢復預設，並更新本機主題與年份。','ok');});
  token=getToken();if(!token){q('gateText').textContent='沒有正式登入憑證，請返回首頁以超級管理員身分登入。';return;}
