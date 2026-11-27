@@ -95,15 +95,16 @@ function electionMonthlyRestWriteIssue(draft,meta={}){
    (meta.overtimeReport?.id===draft.id&&isMonthlyRestDeclaration(meta.overtimeReport,meta));
  return monthly?(monthlyRestElectionDay(date)?date:accounting)+' 選舉日不得申報一般每月未休假加班，請使用選舉日特殊加班申報':'';
 }
-function abnormalMonthlyRestPlans(snapshot,staff,month){
+function abnormalMonthlyRestPlans(snapshot,staff,month,target=null){
  const people=new Map((staff||[]).map(e=>[id(e.empId||e.id),e])),repair=[],review=[],seen=new Set();
  const days=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate();
- const dates=Array.from({length:days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
+ const allDates=Array.from({length:days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
+ const dates=target?allDates.filter(d=>d===target.date):allDates;
  const timedRest=value=>/^[例休國]\s*\d/.test(String(value||'').trim());
  let scannedDays=0;
  for(const row of snapshot?.schedules||[]){
   const empId=id(row.empId),emp=people.get(empId);
-  if(!emp||!row.schedule||row.month&&String(row.month)!==month)continue;
+  if(!emp||!row.schedule||row.month&&String(row.month)!==month||target&&empId!==id(target.empId))continue;
   seen.add(empId);
   const name=emp.name||row.name||empId;
   const missing=[];
@@ -155,7 +156,7 @@ function abnormalMonthlyRestPlans(snapshot,staff,month){
   }
   if(missing.length)review.push({empId,name,date:month,reason:'整月班表核對',issue:'班表缺漏 '+missing.length+' 日：'+missing.map(d=>d.slice(-2)).join('、')});
  }
- for(const [empId,emp] of people)if(!seen.has(empId))review.push({empId,name:emp.name||empId,date:month,reason:'整月班表核對',issue:'未取得本月正式班表，不能確認已還原'});
+ if(!target)for(const [empId,emp] of people)if(!seen.has(empId))review.push({empId,name:emp.name||empId,date:month,reason:'整月班表核對',issue:'未取得本月正式班表，不能確認已還原'});
  return {repair:repair.sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,'zh-Hant')),review,coverage:{people:people.size,rosters:seen.size,days:scannedDays}};
 }
 function balance(emp,roster,month,snapshot=null,employmentStart=null){
@@ -1632,11 +1633,14 @@ async function open(settings={}){
   const failed=[];
   const cloudBusy=error=>/雲端目前正在處理其他資料|雲端正處理其他操作|排班讀取等[待候]|未取得鎖|班表正由其他人編輯|班表或請假資料已更新/.test(String(error?.message||error||''));
   const waitRepair=attempt=>new Promise(resolve=>g.setTimeout(resolve,Math.min(7500,2500*(attempt+1))));
-  const readRepairSnapshot=async()=>{
+  const readRepairSnapshot=async(full=true)=>{
    for(let attempt=0;;attempt++){
     try{
-     const source=await a.snapshot(month,false,false,true);
-     if(source?.provisional||source?.readOnlyDueAttendance||source?.attendanceEvidence?.complete!==true||!source?.saveContext?.ready)throw Error('正式資料尚未完整核對，未修改');
+     // Full attendance and adjacent-month data are needed before and after the batch.
+     // Between writes the authenticated current roster, leave links and revision suffice;
+     // each revoke still acquires the edit lock and checks the latest server revision.
+     const source=await a.snapshot(month,!full,false,true,false,!full);
+     if(source?.provisional||source?.readOnlyDueAttendance||!source?.saveContext?.ready||(full?source?.attendanceEvidence?.complete!==true:source?.repairRosterOnly!==true))throw Error('正式資料尚未完整核對，未修改');
      return source;
     }catch(error){
      if(attempt>=3||!cloudBusy(error))throw error;
@@ -1662,7 +1666,7 @@ async function open(settings={}){
    reload=true;
    for(const candidate of candidates){
     if(!el.isConnected||loadedMonth!==month||!service.canRevoke())throw Error('視窗、月份或權限已變更');
-    const findCurrent=source=>abnormalMonthlyRestPlans(source,a.employees(),month).repair.find(r=>r.empId===candidate.empId&&r.date===candidate.date&&r.id===candidate.id&&r.original===candidate.original&&r.restoreRevoked===candidate.restoreRevoked&&r.currentShift===candidate.currentShift&&JSON.stringify(r.archive)===JSON.stringify(candidate.archive)&&JSON.stringify(r.report)===JSON.stringify(candidate.report));
+    const findCurrent=source=>abnormalMonthlyRestPlans(source,a.employees(),month,candidate).repair.find(r=>r.empId===candidate.empId&&r.date===candidate.date&&r.id===candidate.id&&r.original===candidate.original&&r.restoreRevoked===candidate.restoreRevoked&&r.currentShift===candidate.currentShift&&JSON.stringify(r.archive)===JSON.stringify(candidate.archive)&&JSON.stringify(r.report)===JSON.stringify(candidate.report));
     let current=findCurrent(fresh);
     processed++;
     if(!current){
@@ -1680,13 +1684,13 @@ async function open(settings={}){
      // A lost response may follow a successful write. Read back before
      // considering another attempt; only explicit pre-write contention
      // with the identical active report still present permits a retry.
-     fresh=await readRepairSnapshot();
+     fresh=await readRepairSnapshot(false);
      const unchanged=findCurrent(fresh);
      if(attempt>=3||!revokeError||!cloudBusy(revokeError)||!unchanged)break;
      if(!el.isConnected||loadedMonth!==month||!service.canRevoke())throw Error('視窗、月份或權限已變更');
      setStatus('異常預排修正 '+processed+'／'+candidates.length+'｜'+current.name+'｜雲端忙碌，重新核對 '+(attempt+1)+'/3');
      await waitRepair(attempt);
-     fresh=await readRepairSnapshot();
+     fresh=await readRepairSnapshot(false);
      const rechecked=findCurrent(fresh);
      if(!rechecked)break;
      current=rechecked;
@@ -1694,14 +1698,14 @@ async function open(settings={}){
     // A successful revocation can leave the old shift behind. If the fresh
     // archive proves the exact original, repair it in this same operation.
     if(!current.restoreRevoked){
-     const leftover=abnormalMonthlyRestPlans(fresh,a.employees(),month).repair.find(r=>r.restoreRevoked===true&&r.empId===current.empId&&r.date===current.date&&r.id===current.id&&r.original===current.original&&JSON.stringify(r.report)===JSON.stringify(current.report));
+     const leftover=abnormalMonthlyRestPlans(fresh,a.employees(),month,current).repair.find(r=>r.restoreRevoked===true&&r.empId===current.empId&&r.date===current.date&&r.id===current.id&&r.original===current.original&&JSON.stringify(r.report)===JSON.stringify(current.report));
      if(leftover){
       if(!el.isConnected||loadedMonth!==month||!service.canRevoke())throw Error('視窗、月份或權限已變更');
       current=leftover;revokeError=null;
       setStatus('異常預排修正 '+processed+'／'+candidates.length+'｜'+current.name+'｜補還原已撤銷班別');
       try{const result=await service.revoke({...current,repairPreplan:true},fresh);if(result?.ok!==true||result.revocationVerified!==true)throw Error('補還原回應未確認');}
       catch(error){revokeError=error;}
-      fresh=await readRepairSnapshot();
+      fresh=await readRepairSnapshot(false);
      }
     }
     const roster=fresh.schedules?.find(r=>id(r.empId)===current.empId)?.schedule,meta=roster?.__meta?.[current.date]||{};
@@ -1714,9 +1718,8 @@ async function open(settings={}){
     }
     completed++;
     verifiedRoster=fresh;
-    snapshot=fresh;model=plan(fresh,loadedPeople,month,rules,{manualOnly:!autoPlan,cutoff:q('#mrCutoff').value});
-    paint();controls(true);
-    setStatus('異常預排已確認取消 '+completed+'／'+candidates.length+' 筆，已重新計算額度');
+    // Keep the controls locked; only progress changes until full data is reloaded.
+    setStatus('異常預排已確認取消 '+completed+'／'+candidates.length+' 筆｜待全部完成後統一計算額度');
     await new Promise(resolve=>g.setTimeout(resolve,0));
    }
    fresh=await readRepairSnapshot();
