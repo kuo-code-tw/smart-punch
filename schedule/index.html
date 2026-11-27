@@ -4044,8 +4044,8 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
       const lockedByOther = manage && scheduleEditLockState.locked && !scheduleEditLockState.mine;
       const owner = lockedByOther ? scheduleLockOwnerLabel() : '';
       const disabledTitle = !manage
-        ? '此帳號只有排班查看權限'
-        : (!p79ScheduleHasOfficialData() ? '正在核對雲端最新班表，目前僅供查看' : lockedByOther ? `目前由 ${owner} 正在更改班表，禁止修改` : '請先按「鎖定編輯」取得編輯權');
+        ? '僅供查看'
+        : (!p79ScheduleHasOfficialData() ? '雲端核對中｜唯讀' : lockedByOther ? `${owner} 編輯中｜唯讀` : '請先鎖定編輯');
 
       const mutationPatterns = [
         'resetToDefaultData','saveAllPersonnelChanges','openAddModal','openEditModal',
@@ -4054,7 +4054,7 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
         'openSubstituteAssignment','saveSubstituteAssignment','clearSubstituteAssignment'
       ];
       document.querySelectorAll('[data-schedule-edit="1"]').forEach(el => {
-        if(el.dataset.p79LeaveLocked==='1'){el.disabled=true;el.title='請先在請假管理完成連動刪除，再修改班別';return;}
+        if(el.dataset.p79LeaveLocked==='1'){el.disabled=true;el.title='請假鎖定｜先解除連動';return;}
         el.disabled = !editable;
         el.title = editable ? '' : disabledTitle;
         el.classList.toggle('opacity-40', !editable);
@@ -4082,10 +4082,10 @@ document.documentElement.dataset.p79SchedulePage=new URLSearchParams(location.se
         const code = String(el.getAttribute('onchange') || '');
         const editChange = ['updateDailyShift','updateEmpRoleAndResort','updateEmpGroupAndResort','updateEmpLockType'].some(p => code.includes(p));
         if (editChange) {
-          if(el.dataset.p79LeaveLocked==='1'){el.disabled=true;el.title='請先在請假管理完成連動刪除，再修改班別';return;}
+          if(el.dataset.p79LeaveLocked==='1'){el.disabled=true;el.title='請假鎖定｜先解除連動';return;}
         const personnelChange=!code.includes('updateDailyShift');
         el.disabled = personnelChange?(!manage||lockedByOther||!p79ScheduleHasOfficialData()):!editable;
-          el.title = el.disabled?disabledTitle:personnelChange?'調任時自動取得編輯權，保留既有班表':(el.dataset.p79RosterEditTitle||'');
+          el.title = personnelChange?(el.disabled?disabledTitle:'調任｜保留原班表'):[el.dataset.p79RosterEditTitle,el.disabled?disabledTitle:''].filter(Boolean).join('\n');
           if(!personnelChange)p79ApplyRosterEditorValue(el,editable);
         }
       });
@@ -5896,6 +5896,35 @@ function p79EmployeeDateEligible(emp,date) {
       }).join('');
     }
 
+    // Display-only compact hints shared by every employee and day.
+    function p79ShortScheduleDayTitle(day,{pairedDetails=[],pendingDetails=[],subRec='',coverHours=0}={}){
+      const {visibleCode,rosterShift,actualShift,dayMeta,ownApprovedLeave}=day;
+      const lines=[];
+      const add=x=>{if(x&&!lines.includes(x))lines.push(x);};
+      const code=String(visibleCode||'待排班');
+      add('班別：'+code+(rosterShift&&rosterShift!==code?'｜原排：'+rosterShift:''));
+      if(day.unworkedOvertime)add('未出勤｜加班不計｜待取消申報');
+      else if(day.specialNoPunch)add(day.specialNoPunch==='颱'?'颱風日｜'+(day.attendanceState==='open'?'暫無打卡':'無出勤'):'選舉日｜無出勤');
+      else if(day.manualNoPunch)add('休假班別待同步');
+      else if(day.punchPending)add('打卡待核｜'+(pendingDetails.length?pendingDetails.length+' 筆待核':'缺卡／配對異常'));
+      else if(day.attendanceUnverified)add('考勤同步中｜暫顯原排');
+      else if(day.noPunchRest)add('無出勤｜按休息計');
+      else if(day.attendanceRosterConflict)add('考勤差異｜實際：'+(actualShift||'待核'));
+      else if(day.verifiedRestAttendance)add('休假日有出勤｜'+(actualShift?'實際：'+actualShift:'班別待核'));
+      else if(Array.isArray(pairedDetails)&&pairedDetails.length)add('已配對出勤'+(pairedDetails.length>1?'（'+pairedDetails.length+' 班）':''));
+      if(day.earlyExtensionWithRegularShift)add('早08–16｜延04–08');
+      if(day.nightSplitLabel)add('20–24加班｜00–08休假');
+      if(day.oldNationalLabel)add('國假額度0｜原紀錄待核');
+      if(ownApprovedLeave)add((ownApprovedLeave.leaveType||'請假')+'已核准');
+      if(!day.unworkedOvertime&&dayMeta?.overtimeReport?.code)add((dayMeta.overtimeReport.planned===true?'預排：':'申報：')+p79OvertimePeriodLabel(dayMeta.overtimeReport));
+      else if(!day.unworkedOvertime&&dayMeta?.overtime)add('加班');
+      if(dayMeta?.forName)add('代班：'+dayMeta.forName);
+      else if(coverHours)add('代班 '+coverHours+' 小時');
+      if(dayMeta?.restCategory)add(dayMeta.restCategory+'額度'+(dayMeta.restSourceDate?'：'+dayMeta.restSourceDate:'')+(dayMeta.restQuotaOvertime&&!day.unworkedOvertime?'｜未休加班':''));
+      if(subRec){const candidates=subRec.match(/\([^)]*\) - 當日休假/g)||[];add(candidates.length?'可代班 '+candidates.length+' 人':'需跨單位支援');}
+      return lines.join('\n');
+    }
+
     function scheduleEscapeHtml(value) {
       return String(value == null ? '' : value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
     }
@@ -6919,7 +6948,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         let cellsHtml = '';
         for(const d of visibleDays) {
           const dayStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
-          if(!p79EmployeeDateEligible(emp,dayStr)){cellsHtml+='<td class="p79-before-reporting text-center text-slate-400 border-r" title="尚未報到，不計算">—</td>';continue;}
+          if(!p79EmployeeDateEligible(emp,dayStr)){cellsHtml+='<td class="p79-before-reporting text-center text-slate-400 border-r" title="未報到｜不計">—</td>';continue;}
           const selected=p79ScheduleDisplayDay(emp,dayStr,displayContext);
           const {rosterShift,ownApprovedLeave,attendanceState,actualShift,noPunchRest,manualNoPunch,
             shiftVal,dayMeta,coverageShift,displayShift,substituteLabel,
@@ -6932,7 +6961,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const storedRosterMeta=monthlyScheduleMeta[emp.id]?.[dayStr]||{};
           const editorRosterValue=rosterShift==='休'&&['例','國'].includes(storedRosterMeta.restCategory)?storedRosterMeta.restCategory:rosterShift;
           const showRosterDifference=!ownApprovedLeave&&!p79LeaveCoverOnDay(emp.id,dayStr).length&&['早','中','晚','休','例','國'].includes(editorRosterValue)&&editorRosterValue!==selected.visibleCode;
-          const previewDifference=showRosterDifference?'預排'+editorRosterValue+'｜'+selected.visibleCode:'';
+          const previewDifference=showRosterDifference?'原排：'+editorRosterValue+'｜目前：'+selected.visibleCode:'';
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
@@ -6987,7 +7016,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const coverRecord = p79LeaveCoverOnDay(emp.id,dayStr).find(item=>item.kind==='worker');
           const coverHours = coverRecord ? (coverRecord.data.mode==='two' ? 4 : 8) : 0;
           const assignButton = canManageSchedule() && shiftVal !== '離' && !ownApprovedLeave
-            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${hasAssignment ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${unworkedOvertime?'已核實未出勤，加班不計；正式報單待管理員取消':coverHours ? '已安排代班'+coverHours+'小時；點擊查看代班設定' : '安排代班'}">${unworkedOvertime?'未出勤不計':coverHours ? '選擇加班時段' : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport)) : (hasAssignment ? '編輯代班' : '代班'))}</button>`
+            ? `<button type="button" onclick="openSubstituteAssignment('${emp.id}','${dayStr}')" class="mt-1 w-full rounded-md ${hasAssignment ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-indigo-50 hover:text-indigo-700'} text-[9px] font-black py-0.5 transition" title="${unworkedOvertime?'未出勤｜加班不計｜待取消':coverHours ? '代班 '+coverHours+' 小時' : '安排代班'}">${unworkedOvertime?'未出勤不計':coverHours ? '選擇加班時段' : (dayMeta?.overtimeReport?.code ? scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport)) : (hasAssignment ? '編輯代班' : '代班'))}</button>`
             : '';
           // 複合狀態只做視覺提示：已申報代班加班且本人同日排休／請假。
           const combinedLeave = !!ownApprovedLeave || ['休','例','國','特','年','事','病','公','喪'].includes(String(shiftVal||''));
@@ -6995,28 +7024,17 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const leaveLink = window.P79CombinedLeaveLink?.resolve({empId:emp.id,date:dayStr,meta:dayMeta,assignments:leaveCoverAssignments,leaveRecords,employees}) || {links:[],conflict:false};
           const hasCoverLink = !unworkedOvertime&&leaveLink.links.length>0;
           const combinedMarker = (combinedLeave && combinedOvertime) || hasCoverLink
-            ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="${scheduleEscapeHtml([previewDifference,'同日有加班與休假，點此查看'].filter(Boolean).join('｜'))}" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
+            ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="${scheduleEscapeHtml([previewDifference,'加班／休假明細'].filter(Boolean).join('\n'))}" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
             : '';
           const pairedDetails=attendanceEvidence?.actualShiftDetails?.[String(emp.id).trim().toUpperCase()+'|'+dayStr];
-          const pairedProof=Array.isArray(pairedDetails)?
-            pairedDetails.map(item=>'正式上下班配對：'+item.start+'～'+item.end+
-              '；歸屬工作日：'+item.workday+'；判定：'+item.shift+'班').join('；'):'';
           const pendingDetails=attendanceEvidence?.pendingPunchDetails?.[String(emp.id).trim().toUpperCase()+'|'+dayStr]||[];
-          const pendingProof=selected.punchPending?(pendingDetails.length?
-            pendingDetails.map(item=>item.type+'：'+item.time+'（歸屬工作日 '+item.workday+'）').join('；'):
-            '考勤判為單側／配對異常；請檢查相鄰工作日及正式考勤來源'):'';
-          const cellTitle = [previewDifference,'目前顯示：'+selected.visibleCode+'；來源：'+shiftSource,
-            earlyExtensionWithRegularShift?'本班：08:00–16:00（早）；加班：04:00–08:00（延），兩段均屬 '+dayStr+'；不變更前一日代班申報':'',
-            oldNationalLabel?'本月國定假日額度為0，原紀錄帶有國假標記；一般休假於畫面改顯示休，正式申報與鎖定資料保留待管理員核對':'',
-            nightSplitLabel?'20:00～24:00 加班（依正式申報及考勤核對）；00:00～08:00 是休假班段，均歸屬 '+dayStr+'；例休國依既有額度，不代表已符合完整24小時法定休息':'',
-            pairedProof,pendingProof,
-            attendanceRosterConflict?'考勤與原排班不一致：原排'+rosterShift+'、實際'+actualShift+'（此畫面不會改寫正式排班）':'',verifiedRestAttendance?(actualShift?'正式考勤已辨識'+actualShift+'班時段；原排'+rosterShift+'；加班性質仍須依正式申報核對':'正式考勤已有完整上下班打卡；原排班：'+rosterShift+'；班別無法可靠推定，仍須核對'):'' ,specialNoPunch==='颱'?(attendanceState==='open'?'颱風停班日：考勤已同步但目前尚無打卡，暫顯示「颱」；有打卡會恢復原班別':'颱風停班日：已核對整班無上下班紀錄，顯示「颱」；原班別未更動'):specialNoPunch==='選'?'選舉日：已核對整班無上下班紀錄，顯示「選」；原班別未更動':'',manualNoPunch?'雲端尚未回傳已分配的休假班別；不可把舊畫面視為最新排班':'',noPunchRest?'整班無上下班卡，按休息計算；原排班：'+rosterShift:'',unworkedOvertime?'已核實整班無出勤，此日加班不計；原申報需由管理員正式取消，保留稽核資料':'',subRec, dayMeta?.forName ? `已指定代替：${dayMeta.forName}` : '', dayMeta?.restCategory ? dayMeta.restCategory+'額度來源：'+dayMeta.restSourceDate+(dayMeta.restQuotaOvertime?'｜未休，實際出勤列加班':'') : '', dayMeta?.overtime ? '此日列為加班' : '', ownApprovedLeave ? `${ownApprovedLeave.leaveType || '請假'}已核准` : ''].filter(Boolean).join('｜');
+          const cellTitle=p79ShortScheduleDayTitle(selected,{pairedDetails,pendingDetails,subRec,coverHours});
           cellsHtml += `
             <td data-display-shift="${scheduleEscapeHtml(shownShift)}" data-rest-date="${dayStr}" data-rest-visible="${visibleRestKind}" data-typhoon-count="${typhoonCounted?(typhoonWorked?'work':'off'):''}" data-display-overtime="${visibleSubstituteLabel ? '1' : '0'}" class="p79-day-cell border-r text-center align-top" title="${scheduleEscapeHtml(cellTitle)}">
-              <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請先在請假管理完成連動刪除，再修改班別"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
+              <select onchange="updateDailyShift('${emp.id}', '${dayStr}', this.value)" ${(ownApprovedLeave||p79LeaveCoverOnDay(emp.id,dayStr).length)?'disabled data-p79-leave-locked="1" title="請假鎖定｜先解除連動"':''} ${scheduleCanEditNow() ? '' : 'disabled'}
                 data-p79-roster-value="${scheduleEscapeHtml(editorRosterValue)}"
-                data-p79-roster-edit-title="${scheduleEscapeHtml(selected.visibleCode+'｜來源：'+shiftSource+'｜正式原排：'+rosterShift+(actualDisplayOption?'｜選擇實際班別可修正正式原排；考勤不變':''))}"
-                title="${scheduleEscapeHtml(selected.visibleCode+'｜來源：'+shiftSource+(attendanceRosterConflict?'｜原排'+rosterShift+'，實際'+actualShift:''))}"
+                data-p79-roster-edit-title="${scheduleEscapeHtml(cellTitle)}"
+                title="${scheduleEscapeHtml(cellTitle)}"
                 class="clean-shift-select p79-shift-select ${visibleSubstituteLabel&&!earlyExtensionWithRegularShift ? 'p79-substitute-time'+(visibleSubstituteLabel.length>5?' p79-substitute-time-long':'') : ''} w-full text-xs cursor-pointer rounded-md ${shownShiftStyle} border-0 outline-none hover:ring-1 hover:ring-indigo-300 transition disabled:opacity-70 disabled:cursor-default">
                 ${visibleSubstituteLabel&&!earlyExtensionWithRegularShift ? `<option value="__overtime__" selected>${scheduleEscapeHtml(visibleSubstituteLabel)}</option>` : ''}
                 ${actualDisplayOption?
@@ -7033,14 +7051,14 @@ async function p79SaveScheduleOvertimeDraft(draft){
                 <option value="離" ${!visibleSubstituteLabel && !approvedLeaveCode && (approvedLeaveCode ? approvedLeaveCode==='離' : shiftVal==='離')?'selected':''}>離職</option>
               </select>
               ${earlyExtensionWithRegularShift?
-                '<span class="block text-[9px] font-bold text-indigo-700 leading-tight" title="加班04:00–08:00；本班08:00–16:00；兩者均已核對正式出勤與報單">延04-08</span>':''}
+                '<span class="block text-[9px] font-bold text-indigo-700 leading-tight" title="延04–08｜早08–16｜已核對">延04-08</span>':''}
               ${combinedMarker}
               ${showRosterDifference&&!combinedMarker?`<span class="p79-combined-dot no-print" tabindex="0" role="img" aria-label="${scheduleEscapeHtml(cellTitle)}" title="${scheduleEscapeHtml(cellTitle)}">●</span>`:''}
               ${'' /* 班別差異僅保留在日期格 title 與全員考勤對帳明細，避免誤把「原排中」當成目前班別。 */}
               ${'' /* 完整出勤已核實：不以無法推定早／中／晚班誤標「班別待核」；保留原始排班與真實缺卡提示。 */}
-              ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="全員颱風日標記；原排班、例休和加班紀錄不改動">颱日</span>':''}
-              ${electionDays.has(dayStr)&&shownShift!=='選'&&!['離','離職'].includes(rosterShift)?'<span class="block text-[9px] leading-tight text-indigo-700 font-bold" title="選舉投票日，原排班保留；依法核對是否休假及當日出勤">選日</span>':''}
-              ${selected.punchPending?'<span class="text-[9px] text-amber-700" title="僅有單邊打卡或配對不明，保留原始資料待核對">打卡待核</span>':''}
+              ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="颱風日｜保留原排">颱日</span>':''}
+              ${electionDays.has(dayStr)&&shownShift!=='選'&&!['離','離職'].includes(rosterShift)?'<span class="block text-[9px] leading-tight text-indigo-700 font-bold" title="選舉日｜保留原排">選日</span>':''}
+              ${selected.punchPending?'<span class="text-[9px] text-amber-700" title="缺卡／配對待核">打卡待核</span>':''}
               ${'' /* 考勤讀取中／失敗於排班表頂部統一提示，勿每人每日反覆顯示考勤未核；唯真正單邊卡保留打卡待核。 */}
               ${metaBadge || leaveCoverBadge ? `<div class="mt-1 flex flex-wrap items-center justify-center gap-0.5">${metaBadge}${leaveCoverBadge}</div>` : ''}
               ${substituteLabel || coverHours ? '' : assignButton}
