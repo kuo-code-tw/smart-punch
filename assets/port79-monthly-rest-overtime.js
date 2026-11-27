@@ -1293,16 +1293,43 @@ function showSubmissionResult(parent,selected,failure){
 function showPreplanProgress(parent,total){
  const dialog=document.createElement('dialog');
  dialog.id='p79MonthlyRestPreplanProgress';
+ dialog.dataset.state='working';
  dialog.setAttribute('aria-labelledby','mrPreplanProgressTitle');
  dialog.setAttribute('aria-describedby','mrPreplanProgressStatus');
- dialog.style.cssText='width:min(470px,calc(100% - 32px));max-height:85vh;overflow:auto;box-sizing:border-box;padding:24px;border:1px solid #cbd5e1;border-radius:14px;color:#123451;background:#fff;box-shadow:0 18px 55px #23395055';
- dialog.innerHTML='<h2 id="mrPreplanProgressTitle" style="margin:0 0 12px;font-size:20px">正在儲存預排</h2><p data-count style="font-weight:bold"></p><progress style="width:100%;height:16px" aria-label="雲端已確認筆數"></progress><p id="mrPreplanProgressStatus" role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere"></p><p data-detail style="white-space:pre-wrap;overflow-wrap:anywhere;color:#475569"></p><div style="display:flex;justify-content:flex-end"><button type="button" disabled style="padding:8px 18px;border:0;border-radius:8px;background:#0864c8;color:#fff">確定</button></div>';
- const title=dialog.querySelector('h2'),count=dialog.querySelector('[data-count]'),bar=dialog.querySelector('progress'),status=dialog.querySelector('[role=status]'),detail=dialog.querySelector('[data-detail]'),button=dialog.querySelector('button');
- let finished=false;bar.max=total;bar.value=0;
- const update=(message,confirmed=0)=>{count.textContent='雲端已確認 '+confirmed+'／'+total+' 筆（'+Math.round(confirmed/total*100)+'%）';bar.value=confirmed;status.textContent=message;};
+ dialog.style.cssText='width:min(470px,calc(100% - 32px));max-height:85vh;overflow:auto;box-sizing:border-box;padding:24px;border:1px solid #bfdbfe;border-radius:16px;color:#123451;background:#fff;box-shadow:0 18px 55px #23395055';
+ dialog.innerHTML=`<style>
+ #p79MonthlyRestPreplanProgress{--progress-accent:#2563eb;--progress-soft:#eff6ff;--progress-fill:linear-gradient(90deg,#38bdf8,#2563eb)}
+ #p79MonthlyRestPreplanProgress[data-state="success"]{--progress-accent:#047857;--progress-soft:#ecfdf5;--progress-fill:linear-gradient(90deg,#34d399,#059669);border-color:#a7f3d0!important}
+ #p79MonthlyRestPreplanProgress[data-state="warning"]{--progress-accent:#b45309;--progress-soft:#fffbeb;--progress-fill:linear-gradient(90deg,#fbbf24,#d97706);border-color:#fde68a!important}
+ #p79MonthlyRestPreplanProgress[data-state="error"]{--progress-accent:#b91c1c;--progress-soft:#fef2f2;--progress-fill:linear-gradient(90deg,#fb7185,#dc2626);border-color:#fecaca!important}
+ #p79MonthlyRestPreplanProgress .p79-pp-head{display:flex;align-items:center;gap:12px;margin:0 0 18px}
+ #p79MonthlyRestPreplanProgress .p79-pp-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--progress-soft);color:var(--progress-accent);font-size:23px;font-weight:800;flex:none}
+ #p79MonthlyRestPreplanProgress h2{margin:0!important;color:var(--progress-accent)!important;font-size:20px!important;font-weight:800!important}
+ #p79MonthlyRestPreplanProgress .p79-pp-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:700;font-size:14px;color:#334155;margin-bottom:9px}
+ #p79MonthlyRestPreplanProgress [data-percent]{color:var(--progress-accent);font-size:26px;font-weight:800;font-variant-numeric:tabular-nums}
+ #p79MonthlyRestPreplanProgress .p79-pp-track{position:relative;width:100%;height:14px;background:#e0eaf5;border-radius:999px;overflow:hidden;box-shadow:inset 0 1px 2px #1e3a5f15}
+ #p79MonthlyRestPreplanProgress .p79-pp-fill{height:100%;width:0%;background:var(--progress-fill);border-radius:999px;transition:width .3s ease}
+ #p79MonthlyRestPreplanProgress .p79-pp-activity{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--progress-accent);margin:10px 0 0}
+ #p79MonthlyRestPreplanProgress .p79-pp-spinner{width:14px;height:14px;border:2px solid #bfdbfe;border-top-color:#2563eb;border-radius:50%;animation:p79-pp-spin .85s linear infinite;flex:none}
+ #p79MonthlyRestPreplanProgress:not([data-state="working"]) .p79-pp-activity{display:none!important}
+ #p79MonthlyRestPreplanProgress #mrPreplanProgressStatus{padding:11px 12px;margin:12px 0 0;border-radius:9px;background:var(--progress-soft);color:#334155;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.55}
+ #p79MonthlyRestPreplanProgress [data-detail]{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--progress-accent);font-size:13px;margin:8px 0}
+ #p79MonthlyRestPreplanProgress [data-detail]:empty{display:none}
+ #p79MonthlyRestPreplanProgress button{padding:9px 20px!important;border:0!important;border-radius:9px!important;background:var(--progress-accent)!important;color:#fff!important;font-weight:700!important;cursor:pointer}
+ #p79MonthlyRestPreplanProgress button:disabled{background:#cbd5e1!important;color:#475569!important;cursor:default;opacity:1!important}
+ @keyframes p79-pp-spin{to{transform:rotate(360deg)}}
+ @media(prefers-reduced-motion:reduce){#p79MonthlyRestPreplanProgress .p79-pp-spinner{animation:none}#p79MonthlyRestPreplanProgress .p79-pp-fill{transition:none}}
+ </style><div class="p79-pp-head"><span class="p79-pp-icon" data-icon aria-hidden="true">↻</span><h2 id="mrPreplanProgressTitle">正在儲存預排</h2></div><div class="p79-pp-summary"><span data-count></span><span data-percent></span></div><div class="p79-pp-track" role="progressbar" aria-label="雲端已確認筆數" aria-valuemin="0" aria-valuenow="0"><div class="p79-pp-fill"></div></div><div class="p79-pp-activity"><span class="p79-pp-spinner" aria-hidden="true"></span><span>正在處理，請勿關閉視窗</span></div><p id="mrPreplanProgressStatus" role="status" aria-live="polite"></p><p data-detail></p><div style="display:flex;justify-content:flex-end;margin-top:16px"><button type="button" disabled>確定</button></div>`;
+ const title=dialog.querySelector('h2'),count=dialog.querySelector('[data-count]'),percent=dialog.querySelector('[data-percent]'),bar=dialog.querySelector('[role=progressbar]'),fill=dialog.querySelector('.p79-pp-fill'),icon=dialog.querySelector('[data-icon]'),status=dialog.querySelector('[role=status]'),detail=dialog.querySelector('[data-detail]'),button=dialog.querySelector('button');
+ let finished=false;bar.setAttribute('aria-valuemax',String(total));
+ const update=(message,confirmed=0)=>{
+  const pct=total>0?Math.round(Math.max(0,Math.min(total,confirmed))/total*100):0;
+  count.textContent='雲端已確認 '+confirmed+'／'+total+' 筆';percent.textContent=pct+'%';bar.setAttribute('aria-valuenow',String(confirmed));bar.setAttribute('aria-valuetext',count.textContent+'（'+pct+'%）');fill.style.width=pct+'%';status.textContent=message;
+ };
  const finish=(confirmed,failure,notes='')=>{
-  finished=true;const remaining=total-confirmed;
-  title.textContent=remaining===0&&!failure&&!notes?'預排儲存完成':confirmed?'預排處理結果':'預排尚未確認完成';
+  finished=true;const remaining=total-confirmed,success=remaining===0&&!failure&&!notes;
+  dialog.dataset.state=success?'success':confirmed?'warning':'error';icon.textContent=success?'✓':confirmed?'!':'×';
+  title.textContent=success?'預排儲存完成':confirmed?'預排處理結果':'預排尚未確認完成';
   update('本次雲端已確認 '+confirmed+' 筆預排。'+(remaining?'另有 '+remaining+' 筆尚未確認，請核對後再試。':'')+' 預排不等於正式加班申報。',confirmed);
   detail.textContent=[failure,notes].filter(Boolean).join('\n');button.disabled=false;button.focus();
  };
