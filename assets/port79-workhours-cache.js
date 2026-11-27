@@ -42,9 +42,17 @@ function valid(b,month,s){
  const months=monthsFor(month);
  return (!s.scope||b?.localScope===s.scope)&&b?.schema===1&&b.month===month&&b.viewer===s.viewer&&b.url===s.url&&typeof b.version==='string'&&b.version&&b.config?.ok===true&&b.config.config&&typeof b.config.config==='object'&&b.roster?.ok===true&&b.roster.month===month&&b.meta?.version===b.version&&Array.isArray(b.roster.employees)&&Array.isArray(b.roster.schedules)&&b.roster.schedules.every(r=>r&&String(r.month)===month&&r.schedule&&typeof r.schedule==='object'&&!Array.isArray(r.schedule))&&months.every(m=>b.raw?.[m]?.ok===true&&b.raw[m].month===m&&Array.isArray(b.raw[m].records));
 }
-async function saved(s,month){
- const k=key(s,month),stamp=Number(s.stamp)||0;if(valid(memory.get(k),month,s)&&Number(memory.get(k).savedAt||0)>=stamp)return memory.get(k);
- let timer;try{const row=await Promise.race([g.Port79DataCache?.get?.(k),new Promise(r=>{timer=setTimeout(()=>r(null),10000);})]);assert(s);if(row?.data&&s.scope&&row.displayScope===s.scope&&!row.data.localScope)row.data.localScope=s.scope;if(valid(row?.data,month,s)&&(!s.scope||!row.displayScope||row.displayScope===s.scope)&&row.savedAt>0&&row.savedAt>=stamp&&row.savedAt<=Date.now()+60000){row.data.savedAt=row.savedAt;remember(k,row.data);return row.data;}}catch(_){}finally{clearTimeout(timer);}return null;
+async function saved(s,month,versionCheckOnly=false){
+ const k=key(s,month),stamp=Number(s.stamp)||0;if(valid(memory.get(k),month,s)&&Number(memory.get(k).savedAt||0)>0&&(versionCheckOnly||Number(memory.get(k).savedAt||0)>=stamp))return memory.get(k);
+ let timer;try{const row=await Promise.race([g.Port79DataCache?.get?.(k),new Promise(r=>{timer=setTimeout(()=>r(null),10000);})]);assert(s);if(row?.data&&s.scope&&row.displayScope===s.scope&&!row.data.localScope)row.data.localScope=s.scope;if(valid(row?.data,month,s)&&(!s.scope||!row.displayScope||row.displayScope===s.scope)&&row.savedAt>0&&(versionCheckOnly||row.savedAt>=stamp)&&row.savedAt<=Date.now()+60000){row.data.savedAt=row.savedAt;if(!versionCheckOnly||row.savedAt>=stamp)remember(k,row.data);return row.data;}}catch(_){}finally{clearTimeout(timer);}return null;
+}
+// Reuse only components with matching authenticated revisions, not timestamps.
+function reusableParts(b,m,s,month){
+ if(!valid(b,month,s))return {roster:false,raw:false};
+ const old=b.meta?.revisions,now=m?.revisions;
+ const same=keys=>!!old&&!!now&&keys.every(k=>old[k]!=null&&now[k]!=null&&String(old[k])!==''&&String(old[k])===String(now[k]));
+ const base=same(['schema','dualDate','apiVersion','month','viewer','scope','employees']);
+ return {roster:base&&same(['schedule','leave'])&&b.roster.revision===[now.schedule,now.leave,now.employees,month].join(':'),raw:base&&same(['attendance','attendanceDelta'])&&Object.values(b.raw).every(d=>String(d.revision)===String(now.attendance)&&String(d.deltaSeq)===String(now.attendanceDelta))};
 }
 function compatible(b,m){
  const r=m.revisions,revision=[r.schedule,r.leave,r.employees,b.month].join(':');
@@ -64,46 +72,56 @@ function load(month,options={}){
  const p=(async()=>{
   const metaRead=meta(s,month,options.force===true);metaRead.catch(()=>{});
   const prior=await saved(s,month);assert(s);
+  // A local edit invalidates display previews, not necessarily every server component.
+  // Older data may be used only after the live version/scope is checked.
+  const candidate=prior||await saved(s,month,true);assert(s);
   // Preview is explicitly marked unverified; no accounting/save operation gets
   // this result. UI still filters people through the current authenticated scope.
   if(prior&&!observers.get(k)?.preview)publish(k,'onPreview',{...copy(prior),preview:true,source:'本機快取，背景核對中'});
   let before=await metaRead;assert(s);
-  if(prior&&prior.version===before.version){const hit={...prior,source:'本機有效快取',preview:false,meta:before};remember(key(s,month),hit);verifiedMemo.set(key(s,month),{version:hit.version,token:s.token,stamp:s.stamp});return hit;}
+  if(candidate&&candidate.version===before.version){
+   const hit={...candidate,source:'本機有效快取',preview:false,meta:before,savedAt:Math.max(Date.now(),Number(s.stamp)||0)};
+   const row={key:key(s,month),kind:'system',system:'workhours',month,savedAt:hit.savedAt,size:JSON.stringify(hit).length,data:copy(hit),...(s.scope?{displayScope:s.scope,cacheEndpoint:s.url}:{})};
+   const persistence=Promise.resolve(g.Port79DataCache?.put?.(row));
+   if(options.persist===true&&await persistence!==true)throw Error('加班月份本機保存尚未確認');
+   if(options.persist!==true)void persistence.catch(()=>{});
+   assert(s);remember(key(s,month),hit);verifiedMemo.set(key(s,month),{version:hit.version,token:s.token,stamp:s.stamp});return hit;
+  }
   verifiedMemo.delete(key(s,month));
   // A scope/HR revision change must immediately stop showing old scoped data.
-  if(prior&&prior.meta?.revisions?.scope!==before.revisions.scope)publish(k,'onInvalidate',month);
+  if(candidate&&candidate.meta?.revisions?.scope!==before.revisions.scope)publish(k,'onInvalidate',month);
   for(let attempt=0;attempt<2;attempt++){
    // GAS can hold a shared document lock for schedule reads. Fetching the roster,
    // multiple raw months and config together can exhaust its 8-second lock wait.
    // Start with the roster and then read at most two other resources concurrently.
-   const months=monthsFor(month);
+   const months=monthsFor(month),reuse=reusableParts(candidate,before,s,month);
    // Reuse a just-finished authenticated roster request already made by the
    // visible overtime page. This removes a duplicate GAS sheet read, not its
    // version, identity or per-scope verification.
    let sharedRoster=null;
-   try{sharedRoster=await context()?.recentRoster?.(month,s.token,s.stamp);}catch(_){}
+   if(!reuse.roster)try{sharedRoster=await context()?.recentRoster?.(month,s.token,s.stamp);}catch(_){}
    assert(s);
-   const roster=sharedRoster?.ok===true&&sharedRoster.month===month&&Array.isArray(sharedRoster.employees)&&Array.isArray(sharedRoster.schedules)
+   const roster=reuse.roster?copy(candidate.roster):sharedRoster?.ok===true&&sharedRoster.month===month&&Array.isArray(sharedRoster.employees)&&Array.isArray(sharedRoster.schedules)
     ? sharedRoster : await request(s,'getScheduleDataSecure',month);
    assert(s);
    // Authenticated roster rows can be displayed before the cross-month raw
    // punches finish. They remain a preview until the final version check.
-   publish(k,'onRoster',{month,roster,preview:true,source:'雲端班表已讀取，考勤核對中'});
+   publish(k,'onRoster',{month,roster,preview:true,source:reuse.roster?'班表版本未變，沿用本機':'雲端班表已讀取，考勤核對中'});
    const batches=[];
-   for(let offset=0;offset<months.length;offset+=2){
+   if(!reuse.raw)for(let offset=0;offset<months.length;offset+=2){
     const group=await Promise.all(months.slice(offset,offset+2).map(m=>request(s,'getAttendanceMonthRaw',m)));
     batches.push(...group);assert(s);
    }
-   const raw=Object.fromEntries(months.map((m,i)=>[m,batches[i]]));
+   const raw=reuse.raw?copy(candidate.raw):Object.fromEntries(months.map((m,i)=>[m,batches[i]]));
    if(Array.isArray(roster.employees))Object.values(raw).forEach(d=>{if(Array.isArray(d.records)&&context().scopeRecords){d.records=context().scopeRecords(d.records,roster.employees);d.recordCount=d.records.length;delete d.missingNameSamples;}});
    if(!months.every(m=>raw[m]?.ok===true&&raw[m].month===m&&Array.isArray(raw[m].records)))throw Error('跨月考勤尚未讀齊');
-   publish(k,'onAttendance',{month,roster,raw,preview:true,source:'雲端考勤已讀取，背景核對版本中'});
+   publish(k,'onAttendance',{month,roster,raw,preview:true,source:reuse.raw?'考勤版本未變，沿用本機，背景核對版本中':'雲端考勤已讀取，背景核對版本中'});
    const config=await request(s,'getOvertimeConfig',month);assert(s);
    const b={schema:1,month,viewer:s.viewer,url:s.url,localScope:s.scope,version:before.version,roster,raw,config,meta:before};
    if(!valid(b,month,s))throw Error('完整班表或跨月考勤尚未讀齊，未覆蓋原快取');
    const after=await meta(s,month,true);assert(s);
    if(before.version!==after.version||!compatible(b,after)){before=after;continue;}
-   b.meta=after;b.savedAt=Date.now();b.source='雲端已核對，已保存本機';b.preview=false;remember(key(s,month),b);verifiedMemo.set(key(s,month),{version:b.version,token:s.token,stamp:s.stamp});
+   b.meta=after;b.savedAt=Date.now();b.source=reuse.roster||reuse.raw?'雲端異動已同步，未變更資料沿用本機':'雲端已核對，已保存本機';b.preview=false;remember(key(s,month),b);verifiedMemo.set(key(s,month),{version:b.version,token:s.token,stamp:s.stamp});
    const row={key:key(s,month),kind:'system',system:'workhours',month,savedAt:b.savedAt,size:JSON.stringify(b).length,data:copy(b),...(s.scope?{displayScope:s.scope,cacheEndpoint:s.url}:{})};
    // Cache/disk failures cannot hold the rendered result hostage. Account/scope
    // remain in the row key; a late write cannot validate a later version.
