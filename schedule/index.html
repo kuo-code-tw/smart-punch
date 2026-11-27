@@ -7034,7 +7034,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
               ${earlyExtensionWithRegularShift?
                 '<span class="block text-[9px] font-bold text-indigo-700 leading-tight" title="加班04:00–08:00；本班08:00–16:00；兩者均已核對正式出勤與報單">延04-08</span>':''}
               ${combinedMarker}
-              ${showRosterDifference?`<span class="block text-[9px] text-slate-600 leading-tight" title="正式原排與考勤／加班顯示分開，編輯時選擇正式原排">原排${scheduleEscapeHtml(editorRosterValue)}｜${scheduleEscapeHtml(selected.visibleCode)}</span>`:''}
+              ${showRosterDifference?(noPunchRest?(combinedMarker?'':`<span class="p79-combined-dot no-print" tabindex="0" role="img" aria-label="${scheduleEscapeHtml(cellTitle)}" title="${scheduleEscapeHtml(cellTitle)}">●</span>`):`<span class="block text-[9px] text-slate-600 leading-tight" title="正式原排與考勤／加班顯示分開，編輯時選擇正式原排">原排${scheduleEscapeHtml(editorRosterValue)}｜${scheduleEscapeHtml(selected.visibleCode)}</span>`):''}
               ${'' /* 班別差異僅保留在日期格 title 與全員考勤對帳明細，避免誤把「原排中」當成目前班別。 */}
               ${'' /* 完整出勤已核實：不以無法推定早／中／晚班誤標「班別待核」；保留原始排班與真實缺卡提示。 */}
               ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="全員颱風日標記；原排班、例休和加班紀錄不改動">颱日</span>':''}
