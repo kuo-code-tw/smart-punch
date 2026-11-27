@@ -1570,7 +1570,8 @@ async function open(settings={}){
   const service=g.p79OvertimeStatusContext;
   if(busy||!model||!loadedMonth)return;
   if(!service?.canRevoke?.()||typeof service.revoke!=='function'){setStatus('沒有班表及加班撤銷管理權限，未修改資料。');return;}
-  const month=loadedMonth;let candidates=[],review=[],completed=0,failure='',reload=false,remaining=null;
+  const month=loadedMonth;let candidates=[],review=[],completed=0,failure='',reload=false,remaining=null,processed=0;
+  const failed=[];
   const readRepairSnapshot=async()=>{
    for(let attempt=0;;attempt++){
     try{
@@ -1596,8 +1597,12 @@ async function open(settings={}){
    for(const candidate of candidates){
     if(!el.isConnected||loadedMonth!==month||!service.canRevoke())throw Error('視窗、月份或權限已變更');
     const current=abnormalMonthlyRestPlans(fresh,a.employees(),month).repair.find(r=>r.empId===candidate.empId&&r.date===candidate.date&&r.id===candidate.id&&JSON.stringify(r.report)===JSON.stringify(candidate.report));
-    if(!current)throw Error(candidate.name+' '+candidate.date+' 原預排已變更，未撤銷');
-    setStatus('異常預排修正 '+(completed+1)+'／'+candidates.length+'｜'+current.name+' '+current.date);
+    processed++;
+    if(!current){
+     failed.push(candidate.name+' '+candidate.date+'：原預排已變更，未撤銷');
+     continue;
+    }
+    setStatus('異常預排修正 '+processed+'／'+candidates.length+'｜'+current.name+' '+current.date);
     let revokeError=null;
     try{
      const result=await service.revoke({...current,repairPreplan:true},fresh);
@@ -1607,13 +1612,20 @@ async function open(settings={}){
     // revocation record and restored roster against a fresh cloud read.
     fresh=await readRepairSnapshot();
     const roster=fresh.schedules?.find(r=>id(r.empId)===current.empId)?.schedule,meta=roster?.__meta?.[current.date]||{};
-    if(!roster||meta.overtimeReport?.id===current.id||meta.overtimeReports?.some?.(r=>r?.id===current.id&&confirmedReport(meta,r))||!meta.overtimeRevocations?.some(r=>r.confirmed===true&&String(r.reportId)===String(current.id))||String(roster[current.date]||'').trim()!==current.original)throw Error(current.name+' '+current.date+' 撤銷或原班別讀回未確認，停止後續修正'+(revokeError?'：'+String(revokeError.message||revokeError):''));
+    if(!roster||meta.overtimeReport?.id===current.id||meta.overtimeReports?.some?.(r=>r?.id===current.id&&confirmedReport(meta,r))||!meta.overtimeRevocations?.some(r=>r.confirmed===true&&String(r.reportId)===String(current.id))||String(roster[current.date]||'').trim()!==current.original){
+     failed.push(current.name+' '+current.date+'：撤銷或原班別未確認'+(revokeError?'：'+String(revokeError.message||revokeError):''));
+     // A fresh authoritative snapshot is available. Isolate this employee/date
+     // and proceed with other candidates; never repeat this uncertain write.
+     setStatus('已處理 '+processed+'／'+candidates.length+' 筆｜已確認 '+completed+' 筆｜待核對 '+failed.length+' 筆');
+     continue;
+    }
     completed++;
     snapshot=fresh;model=plan(fresh,loadedPeople,month,rules,{manualOnly:!autoPlan,cutoff:q('#mrCutoff').value});
     paint();controls(true);
     setStatus('異常預排已確認取消 '+completed+'／'+candidates.length+' 筆，已重新計算額度');
     await new Promise(resolve=>g.setTimeout(resolve,0));
    }
+   fresh=await readRepairSnapshot();
    const audit=abnormalMonthlyRestPlans(fresh,a.employees(),month);
    remaining=audit.repair.length;review=audit.review;
    if(remaining)failure='全範圍仍有 '+remaining+' 筆異常預排，請重新核對';
@@ -1624,7 +1636,9 @@ async function open(settings={}){
     if(reload){
      await q('#mrLoad').onclick();const refreshed=!!model&&!isReadOnlySource();
      if(completed)try{await a.refresh?.();}catch(error){failure+=(failure?'；':'')+'排班／統計更新未確認：'+String(error.message||error);}
-     setStatus('異常預排修正：已確認 '+completed+'／'+candidates.length+' 筆。'+(failure?'停止：'+failure+'；請重新核對。':refreshed?'已重新計算未休額度及建議日期，尚未儲存新預排。':'最新資料尚未完整讀取，請重新讀取以核對額度。')+(remaining!==null?' 全範圍剩餘可修正 '+remaining+' 筆。':' 全範圍剩餘筆數尚未確認。')+(review.length?' 另 '+review.length+' 筆需人工核對。':''));
+     const summary='異常預排修正：已確認 '+completed+'／'+candidates.length+' 筆。'+(failure?'核對未完整：'+failure+'。':refreshed?'已重新計算未休額度及建議日期，尚未儲存新預排。':'最新資料尚未完整讀取，請重新讀取以核對額度。')+(remaining!==null?' 全範圍剩餘可修正 '+remaining+' 筆。':' 全範圍剩餘筆數尚未確認。')+(failed.length?' '+failed.length+' 筆處理未確認：'+failed.join('；'):'')+(review.length?' 另 '+review.length+' 筆需人工核對：'+review.map(r=>r.name+' '+r.date+' '+r.issue).join('；'):'')+(processed<candidates.length?' 尚有 '+(candidates.length-processed)+' 筆未處理。':'');
+     setStatus(summary);
+     if(typeof g.alert==='function')g.alert(summary);
     }
     else if(failure)setStatus('異常預排掃描未完成：'+failure);
    }finally{delete el.dataset.preplanLocked;controls(false);}
