@@ -428,8 +428,8 @@ function mount(el){
    const selectedPending=(state.tab==='done'?[]:state.tab==='audit'?audit:pending).filter(isPicked);
    const selectedReview=selectedPending.filter(r=>selectionMode(r)==='review');
    const selectedQuota=selectedQuotaByPerson([...pending,...audit],state.reviewSelected);
-   const formalCount=data.ready.filter(r=>r.checked&&!r.disabled).length;
-   const planCount=data.planned.filter(r=>r.checked&&!r.disabled).length;
+   const formalCount=pending.filter(r=>r.kind==='ready'&&r.checked&&!r.disabled).length;
+   const planCount=pending.filter(r=>r.kind==='plan'&&r.checked&&!r.disabled).length;
    const needs=deficits.length;
    const ready=pending.filter(r=>kind(r)==='ready').length;
    const sourceLoaded=!!text(el,'#mrAuditSummary');
@@ -479,7 +479,7 @@ function mount(el){
    q('#mrUxSubmit').textContent=canBatchFormal?'➤ 批次申報核對（'+(formalCount+datedFormal.length)+' 筆）':'➤ 正式申報（'+formalCount+' 筆）';
    if(state.tab!=='pending')q('#mrUxSubmit').disabled=true;
    if(state.tab==='done')q('#mrUxSavePlan').disabled=true;
-   q('#mrUxHint').textContent=state.submitting?(originalMonth.disabled?(info||'正在核對雲端資料…'):/未寫入資料|無符合|查無/.test(info)?'未寫入；詳細原因請看各筆狀態及上方核對結果。':'核對結果請看上方訊息。'):canBatchFormal||canBatchPlan?'優先原日期；不符時自動搜尋同人員同假別的合格日期及時段':canOpenPlan&&!hasNativePlans?'無日期項目可手動設定預排':state.tab==='audit'?'異常核對不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':data.planned.some(r=>r.checked)?'預排不等於正式申報':'正式申報需核實完整出勤';
+   q('#mrUxHint').textContent=state.submitting?(originalMonth.disabled?(info||'正在核對雲端資料…'):/未寫入資料|無符合|查無/.test(info)?'未寫入；詳細原因請看各筆狀態及上方核對結果。':'核對結果請看上方訊息。'):canBatchFormal||canBatchPlan?'優先原日期；不符時自動搜尋同人員同假別的合格日期及時段':canOpenPlan&&!hasNativePlans?'無日期項目可手動設定預排':state.tab==='audit'?'異常核對不代表尚有休假缺額':state.tab==='done'?'已完成項目唯讀，不會重複申報':planCount?'預排不等於正式申報':'正式申報需核實完整出勤';
    const latestDates=latestConfirmedDates(data.prior);
    q('#mrUxRows').innerHTML=shown.map(r=>{
     const quota=state.tab==='done'?r.quotaProgress:quotaSelectionPreview(r.quotaProgress,selectedQuota.get(norm(r.empId||r.id)));
@@ -598,16 +598,16 @@ function mount(el){
  q('#mrUxSavePlan').onclick=async()=>{
   if(state.tab==='done'||originalMonth.disabled)return;
   const button=$(el,'#mrSavePlans'),view=currentView();
-  const dated=state.tab==='pending'?[...selectedDatedReferences(view.pending,state.reviewSelected,'plan'),...view.data.planned.filter(r=>r.checked&&!r.disabled)]:[];
+  const dated=state.tab==='pending'?[...selectedDatedReferences(view.pending,state.reviewSelected,'plan'),...view.pending.filter(r=>r.kind==='plan'&&r.checked&&!r.disabled)]:[];
   if(dated.length&&typeof el.p79ProcessMonthlyRestSelection==='function'){state.hint='';state.submitting=true;try{const task=el.p79ProcessMonthlyRestSelection(dated,'plan');render();await task;}finally{state.submitting=false;render();}return;}
-  if(state.tab==='pending'&&button&&!button.disabled&&view.data.planned.some(r=>r.checked&&!r.disabled)){state.hint='';state.submitting=true;try{const task=button.onclick();render();await task;}finally{state.submitting=false;render();}return;}
+  if(state.tab==='pending'&&button&&!button.disabled&&view.pending.some(r=>r.kind==='plan'&&r.checked&&!r.disabled)){state.hint='';state.submitting=true;try{const task=button.onclick();render();await task;}finally{state.submitting=false;render();}return;}
   const people=selectedPlanPeople((state.tab==='audit'?view.audit:view.pending).filter(r=>r.kind==='roster'&&!r.date),state.reviewSelected);
   if(people.length)el.p79OpenMonthlyRestPlan?.(people);
  };
  q('#mrUxSubmit').onclick=()=>{
   if(state.tab!=='pending'||originalMonth.disabled)return;
   const view=currentView();
-  const dated=[...selectedDatedReferences(view.pending,state.reviewSelected,'formal'),...view.data.ready.filter(r=>r.checked&&!r.disabled)];
+  const dated=[...selectedDatedReferences(view.pending,state.reviewSelected,'formal'),...view.pending.filter(r=>r.kind==='ready'&&r.checked&&!r.disabled)];
   if(dated.length&&typeof el.p79ProcessMonthlyRestSelection==='function'){state.hint='';state.submitting=true;el.p79ProcessMonthlyRestSelection(dated,'formal');render();return;}
   const submit=$(el,'#mrSave');
   if(!submit||!sourceRows(el).ready.some(r=>r.checked&&!r.disabled))return;
