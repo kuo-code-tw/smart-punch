@@ -17,7 +17,7 @@
 <script src="../assets/port79-planned-rest-reconciliation.js?v=20261106-workhours-no-punch-v1"></script>
 <script src="../assets/port79-workhours-no-punch-autocancel.js?v=20261106-workhours-no-punch-v1"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261123-true-simple-official-v2&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1&dashboard=20261123-review-checkbox-v3&fullRoster=20261124-v21&result=20261125-confirmed-popup-v1&quotaPreview=20261125-v26&autoRematch=20261125-v27&weeklyDefault=20261125-mon-sun-v28&restPlanGuard=20261125-v29&crossMonthWeekly=20261125-v30&weeklyQuotaLayout=20261125-v31&saved-rest=20261125-v32&eligibilityLayout=20261125-v33&sharedShiftPeriod=20261125-v34&roster-rest-first=20261125-v37&cloudPreplan=20261125-v44&localPreplan=20261125-v1&compactReason=20261126-v1&loadFix=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1&restore20261127=v8&repairSpeed=20261127-v1&preplanProgress=20261127-v2&eightHourAlert=20261127-v1&preplanLockRetry=20261127-v1&preplanContinue=20261127-v1"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261123-true-simple-official-v2&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1&dashboard=20261123-review-checkbox-v3&fullRoster=20261124-v21&result=20261125-confirmed-popup-v1&quotaPreview=20261125-v26&autoRematch=20261125-v27&weeklyDefault=20261125-mon-sun-v28&restPlanGuard=20261125-v29&crossMonthWeekly=20261125-v30&weeklyQuotaLayout=20261125-v31&saved-rest=20261125-v32&eligibilityLayout=20261125-v33&sharedShiftPeriod=20261125-v34&roster-rest-first=20261125-v37&cloudPreplan=20261125-v44&localPreplan=20261125-v1&compactReason=20261126-v1&loadFix=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1&restore20261127=v8&repairSpeed=20261127-v1&preplanProgress=20261127-v2&eightHourAlert=20261127-v1&preplanLockRetry=20261127-v1&preplanContinue=20261127-v1&directReportProgress=20261127-v1"></script>
 <script src="../assets/port79-overtime-status.js?v=20261027-dept-job-name-onefield-v3"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -13750,14 +13750,19 @@ async function p79ExportOvertimeComparison(printMode){
                 return;
             }
             if(button&&button.dataset.planKey!==item.key)return;
+            const show=window.P79MonthlyRest?.showPreplanProgress;
+            if(typeof show!=='function'){showToast('進度視窗尚未載入，請重新整理','warning');return;}
+            let modal;try{modal=show(document.body,1,'report');}catch(error){showToast('無法開啟申報進度視窗：'+String(error?.message||error),'warning');return;}
             p79PlannedBulkBusy=true;p79OvertimeWritePriority++;
             p79MainPlannedSubmittingKey=item.key;
             const started=Date.now(),operation={stopped:false,writeStarted:false,controller:new AbortController()};
-            let ticker,verified=false;
+            let ticker,verified=false,failure='';
+            const identity=(row.name||row.empId)+'｜'+item.date+'｜'+item.rule[1];
             const progress=stage=>{
                 if(operation.stopped)return;
                 p79MainPlannedStage=stage;
                 const label=stage+' '+Math.floor((Date.now()-started)/1000)+'秒';
+                modal.update(identity+'\n'+label,0);
                 const current=Array.from(document.querySelectorAll('button[data-plan-key]')).find(b=>b.dataset.planKey===item.key);
                 for(const target of new Set([button,current].filter(Boolean))){target.disabled=true;target.textContent=label;}
             };
@@ -13770,13 +13775,16 @@ async function p79ExportOvertimeComparison(printMode){
                 p79PlannedBulkSelected.delete(item.key);
                 showToast((row.name||row.empId)+' '+item.date+' '+item.rule[1]+' 已申報','success');
             }catch(error){
-                showToast((row.name||row.empId)+'：'+String(error?.message||error),'warning');
+                failure=identity+'：'+String(error?.message||error);
+                showToast(failure,'warning');
             }finally{
                 clearInterval(ticker);
                 p79MainPlannedSubmittingKey='';p79MainPlannedStage='';
                 p79PlannedBulkBusy=false;p79OvertimeWritePriority=Math.max(0,p79OvertimeWritePriority-1);
                 if(button){button.disabled=verified;button.textContent=verified?'已申報':operation.writeStarted?'重新核對':'直接申報';}
                 p79OvertimeCalculationCache=null;
+                modal.finish(verified?1:0,failure);
+                if(verified)modal.update(identity+'\n雲端已確認正式申報 1 筆。',1);
                 setTimeout(()=>{try{renderOvertimeStats();}catch(error){console.warn('統計畫面更新失敗',error);}finally{try{p79RefreshPlannedBulkControls();}catch(error){console.warn(error);}}},0);
             }
         }
@@ -14890,30 +14898,36 @@ function p79OvertimePeriodLabel(report){
             if(!window.confirm('確定依完整實際打卡，核對以下 '+selected.length+
                 ' 筆原預排並逐筆儲存為正式申報？\n'+details+
                 '\n這不等於主管核准或薪資結算，若某筆雲端資料改變會停止該筆。'))return;
+            const show=window.P79MonthlyRest?.showPreplanProgress;
+            if(typeof show!=='function'){p79PlannedPunchNotice('進度視窗尚未載入，請重新整理','warning');return;}
+            const parent=document.getElementById('p79OvertimePlannedDialog');
+            let modal;try{modal=show(parent?.open?parent:document.body,selected.length,'report');}catch(error){p79PlannedPunchNotice('無法開啟申報進度視窗：'+String(error?.message||error),'warning');return;}
             p79PlannedBulkBusy=true;p79OvertimeWritePriority++;
             let completed=0,failed=[];
             try{
                 p79RefreshPlannedBulkControls();
                 for(let i=0;i<selected.length;i++){
                     const item=selected[i];
-                    p79PlannedPunchNotice('批次核對進行中 '+(i+1)+' / '+selected.length+
-                        '：'+(item.row.name||item.row.empId)+' '+item.date);
+                    const label='第 '+(i+1)+'／'+selected.length+' 筆：'+(item.row.name||item.row.empId)+'｜'+item.date+'｜'+item.rule[1];
+                    const progress=stage=>{p79PlannedPunchNotice(label+'｜'+stage);modal.update(label+'\n'+stage,completed);};
+                    progress('核對最新出勤與申報規則');
                     try{
-                        await p79ConfirmPlannedOvertimeCandidate(item,stage=>p79PlannedPunchNotice('批次核對 '+(i+1)+' / '+selected.length+'：'+(item.row.name||item.row.empId)+' '+item.date+'｜'+stage));
+                        await p79ConfirmPlannedOvertimeCandidate(item,progress);
                         p79PlannedBulkSelected.delete(item.key);
-                        completed++;
+                        completed++;progress('雲端已確認正式申報');
                     }catch(error){
                         failed.push((item.row.name||item.row.empId)+' '+item.date+
                             '：'+String(error?.message||error));
                     }
                 }
-            }finally{
+            }catch(error){failed.push(String(error?.message||error));}
+            finally{
                 p79PlannedBulkBusy=false;p79OvertimeWritePriority=Math.max(0,p79OvertimeWritePriority-1);
                 p79OvertimeCalculationCache=null;
-                renderOvertimeStats();
-                p79RefreshPlannedBulkControls();
+                try{renderOvertimeStats();p79RefreshPlannedBulkControls();}catch(error){failed.push('統計畫面更新未完成：'+String(error?.message||error));}
                 const message='批次核對完成：成功 '+completed+' 筆、需單筆核對 '+
                     failed.length+' 筆。'+(failed.length?'\n'+failed.join('\n'):'');
+                modal.finish(completed,failed.join('\n'));
                 p79PlannedPunchNotice(message,failed.length?'warning':'success');
             }
         }
