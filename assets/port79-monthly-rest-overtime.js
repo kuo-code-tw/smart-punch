@@ -80,25 +80,55 @@ function monthlyRestElectionDay(date){
 // Only unequivocal, standalone monthly-rest preplans on special dates can
 // be batch revoked. Never infer invalidity from attendance or quota alone.
 function abnormalMonthlyRestPlans(snapshot,staff,month){
- const people=new Map((staff||[]).map(e=>[id(e.empId||e.id),e])),repair=[],review=[];
+ const people=new Map((staff||[]).map(e=>[id(e.empId||e.id),e])),repair=[],review=[],seen=new Set();
+ const days=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).getDate();
+ const dates=Array.from({length:days},(_,i)=>month+'-'+String(i+1).padStart(2,'0'));
+ const timedRest=value=>/^[例休國]\s*\d/.test(String(value||'').trim());
+ let scannedDays=0;
  for(const row of snapshot?.schedules||[]){
-  const empId=id(row.empId),emp=people.get(empId);if(!emp||!row.schedule)continue;
-  for(const [date,meta] of Object.entries(row.schedule.__meta||{})){
-   const report=meta?.overtimeReport;
-   if(!date.startsWith(month+'-')||!confirmedReport(meta,report)||!cats.includes(report?.category))continue;
-   const reason=monthlyRestElectionDay(date)?'選舉日':g.P79SpecialOvertime?.kindsForDate?.(date)?.some(x=>x.kind==='typhoon')||String(row.schedule[date]||'').trim()==='颱'?'颱風日':'';
-   if(!reason||! /每月未休假加班/.test(String(report.note||'')+' '+String(meta.note||''))||/^[選颱]/.test(String(report.code||'')))continue;
-   const assigned=meta.overtimeAssignedShift&&row.schedule[date]===meta.overtimeAssignedShift;
-   const original=String(meta.reportOriginalShift??meta.overtimeOriginalShift??(assigned?'':row.schedule[date])??'').trim();
-   const linked=!!(meta.forEmpId||meta.coverAssignmentId||meta.type==='substitute'||report.forEmpId||report.leaveId||
+  const empId=id(row.empId),emp=people.get(empId);
+  if(!emp||!row.schedule||row.month&&String(row.month)!==month)continue;
+  seen.add(empId);
+  const name=emp.name||row.name||empId;
+  const missing=[];
+  for(const date of dates){
+   scannedDays++;
+   const shift=String(row.schedule[date]||'').trim();
+   if(!shift)missing.push(date);
+   const meta=row.schedule.__meta?.[date]||{},report=meta.overtimeReport;
+   const reports=[report,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])].filter(r=>confirmedReport(meta,r));
+   const active=confirmedReport(meta,report);
+   const reason=monthlyRestElectionDay(date)?'選舉日':g.P79SpecialOvertime?.kindsForDate?.(date)?.some(x=>x.kind==='typhoon')||shift==='颱'?'颱風日':'';
+   const monthly=r=>/每月未休假加班/.test(String(r?.note||'')+' '+String(meta.note||''));
+   const general=r=>cats.includes(r?.category)&&!/^[選颱]/.test(String(r?.code||''));
+   const generalReports=reports.filter(general);
+   const assigned=!!meta.overtimeAssignedShift&&shift===String(meta.overtimeAssignedShift).trim();
+   const recordedOriginal=String(meta.reportOriginalShift??meta.overtimeOriginalShift??'').trim();
+   const original=recordedOriginal||(!assigned&&!timedRest(shift)?shift:'');
+   const revoked=(meta.overtimeRevocations||[]).some(r=>r?.confirmed===true);
+   const linked=!!(meta.forEmpId||meta.coverAssignmentId||meta.type==='substitute'||report?.forEmpId||report?.leaveId||
      (snapshot.leaveCoverAssignments||[]).some(c=>date>=c.startDate&&date<=c.endDate&&(id(c.leaveEmpId)===empId||(c.workerIds||[]).some(w=>id(w)===empId))));
-   const extra=Array.isArray(meta.overtimeReports)&&meta.overtimeReports.some(r=>r?.id!==report.id&&confirmedReport(meta,r));
-   const item={empId,name:emp.name||row.name||empId,date,id:report.id,report,reason,original};
-   if(report.planned!==true||linked||extra||!original||original==='待排班')review.push({...item,issue:report.planned!==true?'已正式申報':linked||extra?'有其他加班或代班連結':'原班別無法確認'});
-   else repair.push(item);
+   const item={empId,name,date,id:report?.id,report,reason:reason||'整月班表核對',original};
+   // All dates: a revoked declaration must not silently leave an assigned
+   // overtime shift behind. Review only, never guess or write a replacement.
+   if(revoked&&!reports.length&&!linked&&(timedRest(shift)||assigned)&&(!recordedOriginal||shift!==recordedOriginal)){
+    review.push({...item,issue:'已有撤銷紀錄但班別仍為 '+shift+'，需核對原班別'});continue;
+   }
+   if(!reason)continue;
+   if(active&&general(report)&&monthly(report)){
+    const extra=reports.some(r=>r.id!==report.id);
+    if(report.planned!==true||linked||extra||!original||original==='待排班'||timedRest(original))review.push({...item,issue:report.planned!==true?'已正式申報':linked||extra?'有其他加班或代班連結':'原班別無法確認'});
+    else repair.push(item);
+   }else if(generalReports.length){
+    review.push({...item,issue:'特殊日仍有一般例休國申報（來源或主要申報欄位不符），需核對'});
+   }else if(timedRest(shift)&&!reports.length&&!linked){
+    review.push({...item,issue:'特殊日班別仍為 '+shift+'，但無有效申報，需核對原班別'});
+   }
   }
+  if(missing.length)review.push({empId,name,date:month,reason:'整月班表核對',issue:'班表缺漏 '+missing.length+' 日：'+missing.map(d=>d.slice(-2)).join('、')});
  }
- return {repair:repair.sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,'zh-Hant')),review};
+ for(const [empId,emp] of people)if(!seen.has(empId))review.push({empId,name:emp.name||empId,date:month,reason:'整月班表核對',issue:'未取得本月正式班表，不能確認已還原'});
+ return {repair:repair.sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,'zh-Hant')),review,coverage:{people:people.size,rosters:seen.size,days:scannedDays}};
 }
 function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const quota=g.p79RestQuota(month),start=employmentStart??g.p79MonthlyRestContext.employmentStart(emp),end=Object.keys(roster).filter(d=>/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d)&&['離','離職'].includes(roster[d])).sort()[0]||'',dates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>(!start||d>=start)&&(!end||d<end));
@@ -1570,7 +1600,7 @@ async function open(settings={}){
   const service=g.p79OvertimeStatusContext;
   if(busy||!model||!loadedMonth)return;
   if(!service?.canRevoke?.()||typeof service.revoke!=='function'){setStatus('沒有班表及加班撤銷管理權限，未修改資料。');return;}
-  const month=loadedMonth;let candidates=[],review=[],completed=0,failure='',reload=false,remaining=null,processed=0;
+  const month=loadedMonth;let candidates=[],review=[],completed=0,failure='',reload=false,remaining=null,processed=0,verifiedRoster=null,coverage=null;
   const failed=[];
   const cloudBusy=error=>/雲端目前正在處理其他資料|雲端正處理其他操作|排班讀取等[待候]|未取得鎖|班表正由其他人編輯/.test(String(error?.message||error||''));
   const waitRepair=attempt=>new Promise(resolve=>g.setTimeout(resolve,Math.min(7500,2500*(attempt+1))));
@@ -1591,10 +1621,16 @@ async function open(settings={}){
   try{
    setStatus('正在掃描 '+month+' 全部授權人員的異常預排（不受部門、職稱篩選限制）…');
    let fresh=await readRepairSnapshot();
-   ({repair:candidates,review}=abnormalMonthlyRestPlans(fresh,a.employees(),month));
+   verifiedRoster=fresh;
+   ({repair:candidates,review,coverage}=abnormalMonthlyRestPlans(fresh,a.employees(),month));
    const list=rows=>rows.map(r=>r.name+'｜'+r.date+'｜'+r.reason+(r.issue?'｜'+r.issue:'')).join('\n');
-   if(!candidates.length){setStatus('查無可安全取消的異常預排。'+(review.length?'另有 '+review.length+' 筆需人工核對：'+list(review):''));return;}
-   if(!confirm('本月全部授權人員共 '+candidates.length+' 筆異常預排可取消；正常預排、已申報、原始打卡不會刪除。\n\n'+list(candidates)+(review.length?'\n\n另有 '+review.length+' 筆僅供人工核對，不會修改：\n'+list(review):'')+'\n\n確認逐筆取消並重新計算額度？')){setStatus('已取消操作，未修改任何資料。');return;}
+   const coverageText=()=>coverage?'整月核對：授權 '+coverage.people+' 人，已取得 '+coverage.rosters+' 人班表，逐日檢查 '+coverage.days+' 格。':'整月核對範圍尚未確認。';
+   if(!candidates.length){
+    await a.syncRepairRoster?.(month,fresh);
+    const summary=coverageText()+'\n'+(review.length?'尚未全部還原：無可安全自動撤銷的預排，但有 '+review.length+' 項需核對：\n'+list(review):'查無此類異常預排或殘留班別。')+'\n已通知排班頁重新讀取。';
+    setStatus(summary);if(typeof g.alert==='function')g.alert(summary);return;
+   }
+   if(!confirm(coverageText()+'\n本月全部授權人員共 '+candidates.length+' 筆異常預排可取消；正常預排、已申報、原始打卡不會刪除。\n\n'+list(candidates)+(review.length?'\n\n另有 '+review.length+' 筆僅供人工核對，不會修改：\n'+list(review):'')+'\n\n確認逐筆取消並重新計算額度？')){setStatus('已取消操作，未修改任何資料。');return;}
    reload=true;
    for(const candidate of candidates){
     if(!el.isConnected||loadedMonth!==month||!service.canRevoke())throw Error('視窗、月份或權限已變更');
@@ -1636,14 +1672,16 @@ async function open(settings={}){
      continue;
     }
     completed++;
+    verifiedRoster=fresh;
     snapshot=fresh;model=plan(fresh,loadedPeople,month,rules,{manualOnly:!autoPlan,cutoff:q('#mrCutoff').value});
     paint();controls(true);
     setStatus('異常預排已確認取消 '+completed+'／'+candidates.length+' 筆，已重新計算額度');
     await new Promise(resolve=>g.setTimeout(resolve,0));
    }
    fresh=await readRepairSnapshot();
+   verifiedRoster=fresh;
    const audit=abnormalMonthlyRestPlans(fresh,a.employees(),month);
-   remaining=audit.repair.length;review=audit.review;
+   remaining=audit.repair.length;review=audit.review;coverage=audit.coverage;
    if(remaining||failed.length||review.length)failure='全範圍尚未全部還原，請核對剩餘及未確認項目';
   }catch(error){failure=String(error.message||error);}
   finally{
@@ -1651,8 +1689,12 @@ async function open(settings={}){
    try{
     if(reload){
      await q('#mrLoad').onclick();const refreshed=!!model&&!isReadOnlySource();
-     if(completed)try{await a.refresh?.();}catch(error){failure+=(failure?'；':'')+'排班／統計更新未確認：'+String(error.message||error);}
-     const summary='異常預排修正：已確認 '+completed+'／'+candidates.length+' 筆。'+(failure?'核對未完整：'+failure+'。':refreshed?'已重新計算未休額度及建議日期，尚未儲存新預排。':'最新資料尚未完整讀取，請重新讀取以核對額度。')+(remaining!==null?' 全範圍剩餘可修正 '+remaining+' 筆。':' 全範圍剩餘筆數尚未確認。')+(failed.length?' '+failed.length+' 筆處理未確認：'+failed.join('；'):'')+(review.length?' 另 '+review.length+' 筆需人工核對：'+review.map(r=>r.name+' '+r.date+' '+r.issue).join('；'):'')+(processed<candidates.length?' 尚有 '+(candidates.length-processed)+' 筆未處理。':'');
+     if(verifiedRoster)try{
+      // Synchronize once after the batch, not between writes, to avoid lock contention.
+      if(a.syncRepairRoster)await a.syncRepairRoster(month,refreshed&&snapshot?.saveContext?.ready?snapshot:verifiedRoster);
+      else if(completed)await a.refresh?.();
+     }catch(error){failure+=(failure?'；':'')+'排班／統計更新未確認：'+String(error.message||error);}
+     const summary=(coverage?'整月核對：授權 '+coverage.people+' 人，已取得 '+coverage.rosters+' 人班表，逐日檢查 '+coverage.days+' 格。\n':'')+'異常預排修正：已確認 '+completed+'／'+candidates.length+' 筆。'+(failure?'核對未完整：'+failure+'。':refreshed?'已重新計算未休額度及建議日期，尚未儲存新預排。':'最新資料尚未完整讀取，請重新讀取以核對額度。')+(remaining!==null?' 全範圍剩餘可修正 '+remaining+' 筆。':' 全範圍剩餘筆數尚未確認。')+(failed.length?' '+failed.length+' 筆處理未確認：'+failed.join('；'):'')+(review.length?' 另 '+review.length+' 筆需人工核對：'+review.map(r=>r.name+' '+r.date+' '+r.issue).join('；'):'')+(processed<candidates.length?' 尚有 '+(candidates.length-processed)+' 筆未處理。':'');
      setStatus(summary);
      if(typeof g.alert==='function')g.alert(summary);
     }
