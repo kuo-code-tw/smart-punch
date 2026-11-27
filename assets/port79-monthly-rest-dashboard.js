@@ -345,6 +345,7 @@ function mount(el){
  <label>姓名 <input type="search" id="mrUxName" placeholder="搜尋姓名" autocomplete="off"></label>
  <label>狀態 <select id="mrUxState"><option value="">全部狀態</option><option value="ready">可申報</option><option value="review">待核對</option><option value="missing">缺資料</option><option value="plan">預排建議</option></select></label>
  <span class="mr-ux-spacer"></span>
+ <button type="button" id="mrUxRepair" class="mr-ux-outline" style="color:#92400e;border-color:#f59e0b" title="掃描本月份全部授權人員，確認後取消選舉日／颱風日錯誤未休假預排">↻ 異常預排修正</button>
  <button type="button" id="mrUxAuto" class="mr-ux-primary">✦ 自動配對日期</button>
  <button type="button" id="mrUxBatch" class="mr-ux-outline">☑ 批次核對</button>
  <button type="button" id="mrUxExport" class="mr-ux-outline">⇧ 匯出</button>
@@ -511,6 +512,7 @@ function mount(el){
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
    q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+(state.tab==='pending'&&audit.some(r=>r.residualOnly)?'｜尚無日期的缺額請見「已預排／待核對」':'');
    q('#mrUxExport').disabled=!shown.length;
+   q('#mrUxRepair').disabled=originalMonth.disabled||!sourceLoaded||typeof el.p79RepairAbnormalPreplans!=='function'||global.p79OvertimeStatusContext?.canRevoke?.()!==true;
    if(locked){
     for(const root of [shell,actionFooter].filter(Boolean))for(const control of root.querySelectorAll('button,input,select,textarea')){control.dataset.preplanUiDisabled=String(control.disabled);control.disabled=true;}
     q('#mrUxHint').textContent=info||'正在逐筆確認預排，完成後自動解鎖';
@@ -584,6 +586,11 @@ function mount(el){
  q('#mrUxTabAudit').onclick=()=>{state.tab='audit';state.status='';q('#mrUxState').value='';render();};
  q('#mrUxTabDone').onclick=()=>{state.tab='done';render();};
  q('#mrUxReload').onclick=()=>{state.submitting=false;state.hint='';state.reviewSelected.clear();$(el,'#mrLoad')?.click();render();};
+ q('#mrUxRepair').onclick=async()=>{
+  if(originalMonth.disabled||typeof el.p79RepairAbnormalPreplans!=='function')return;
+  state.submitting=false;state.hint='';state.reviewSelected.clear();state.tab='pending';
+  try{await el.p79RepairAbnormalPreplans();}finally{render();}
+ };
  q('#mrUxAuto').onclick=()=>{
   const mode=$(el,'#mrAutoMode');if(!mode||mode.disabled)return;
   mode.checked=true;mode.dispatchEvent(new Event('change',{bubbles:true}));
