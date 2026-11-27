@@ -260,6 +260,9 @@ function mount(el){
  #p79MonthlyRest .mr-ux-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:white;border:1px solid #dce7f6;border-radius:15px;padding:12px;box-shadow:0 3px 12px #174f8510}
  #p79MonthlyRest .mr-ux-tools>label{flex:0 1 auto;display:flex;flex-direction:row;align-items:center;gap:8px;font-weight:700;font-size:13px;white-space:nowrap}
  #p79MonthlyRest .mr-ux-tools input,#p79MonthlyRest .mr-ux-tools select{height:40px;min-width:145px;border:1px solid #d2ddef;border-radius:9px;padding:7px 10px;color:#1f3557;background:#fff;font-size:13px}
+ #p79MonthlyRest #mrUxCutoff{cursor:pointer;position:relative;color-scheme:light}
+ #p79MonthlyRest #mrUxCutoff:disabled{cursor:not-allowed}
+ #p79MonthlyRest #mrUxCutoff::-webkit-calendar-picker-indicator{display:block!important;visibility:visible!important;opacity:1!important;cursor:pointer}
  #p79MonthlyRest .mr-ux-tools #mrUxName{width:150px;min-width:130px}
  #p79MonthlyRest .mr-ux-tools .mr-ux-spacer{flex:1}
  #p79MonthlyRest .mr-ux-primary{background:linear-gradient(#2581ff,#055de5)!important;color:#fff!important;box-shadow:0 4px 8px #125de324;font-weight:800}
@@ -321,7 +324,7 @@ function mount(el){
  </div>
  <div class="mr-ux-tools">
  <label>月份 <input type="month" id="mrUxMonth"></label>
- <label>已申報截止日 <input type="date" id="mrUxCutoff" title="自行設定已處理完畢的日期；留空核對整月"></label>
+ <label>已申報截止日 <input type="date" id="mrUxCutoff" aria-label="選擇已申報截止日" title="點擊日期欄位開啟日曆，留空核對整月"></label>
  <span id="mrUxFrom" style="font-size:12px;color:#245077;font-weight:700"></span>
  <label>部門 <select id="mrUxDept"></select></label>
  <label>職稱 <select id="mrUxJob"><option value="">全部職稱</option></select></label>
@@ -407,7 +410,7 @@ function mount(el){
    cutoff.style.backgroundColor=cutoff.value?'#fef3c7':'';
    cutoff.style.color=cutoff.value?'#92400e':'';
    cutoff.style.borderColor=cutoff.value?'#d97706':'';
-   cutoff.title='自行設定截止日；不代表截止日前每一天均已正式申報';
+   cutoff.title='點擊開啟日曆並選擇截止日；不代表截止日前每一天均已正式申報';
    q('#mrUxFrom').style.color=cutoff.value?'#1d4ed8':'#64748b';
    const sourceOptions=originalDept.innerHTML;
    if(q('#mrUxDept').innerHTML!==sourceOptions)q('#mrUxDept').innerHTML=sourceOptions;
@@ -546,6 +549,8 @@ function mount(el){
   editor.showModal();
  }
  q('#mrUxMonth').onchange=e=>{if(!originalMonth.disabled){state.submitting=false;state.hint='';state.reviewSelected.clear();originalMonth.value=e.target.value;originalMonth.dispatchEvent(new Event('change',{bubbles:true}));}};
+ const cutoffPicker=q('#mrUxCutoff');
+ cutoffPicker.onclick=()=>{if(cutoffPicker.disabled)return;if(typeof cutoffPicker.showPicker==='function'){try{cutoffPicker.showPicker();}catch(_){/* Native calendar icon remains available. */}}};
  q('#mrUxCutoff').onchange=e=>{
   const input=$(el,'#mrCutoff');if(!input||input.disabled)return;
   state.submitting=false;state.reviewSelected.clear();state.hint='';input.value=e.target.value;input.dispatchEvent(new Event('change',{bubbles:true}));render();
