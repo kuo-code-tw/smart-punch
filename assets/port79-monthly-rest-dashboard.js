@@ -200,10 +200,20 @@ function dailyPendingRows(data){
     checked:false,disabled:true,reviewType:'deficit',actualReference:hint.actualReference===true,eligible:hint.eligible===true||!hint.referenceOnly,eligibilityIssue:hint.issue||'',canPreplan:person.canPreplan===true};
    covered.add(hint.date);dated.set(k,item);result.push(item);
   }
-  // Preserve unresolved deficits without inventing dates or grouping dated rows.
-  const remaining=Math.max(0,Number(person.due||0)-covered.size);
-  if(!covered.size||remaining>0)result.push({...person,suggestions:[],period:'尚缺 '+(remaining||person.due)+' 天，未找到其他可用日期',due:remaining||person.due,
-   category:person.category,canPreplan:!covered.size&&person.canPreplan,residualOnly:true});
+  // V138: only usable candidates cover a deficit; count by category.
+  const usable=result.filter(r=>norm(r.empId)===norm(person.id)&&
+   (r.kind==='plan'&&r.saved!==true&&!/失敗|未確認|讀回|儲存預排中/.test(r.status)||
+    r.kind==='ready'&&r.status==='可申報'||
+    r.kind==='reference'&&r.eligible===true));
+  const remainingByCategory=person.quotaProgress?Object.fromEntries(['例','休','國'].map(c=>[
+   c,Math.max(0,Number(person.quotaProgress[c]?.remaining||0)-new Set(usable.filter(r=>r.category===c).map(r=>r.date)).size)
+  ])):null;
+  const remaining=remainingByCategory?Object.values(remainingByCategory).reduce((a,b)=>a+b,0):Math.max(0,Number(person.due||0)-new Set(usable.map(r=>r.date)).size);
+  if(remaining>0){
+   const detail=remainingByCategory?['例','休','國'].filter(c=>remainingByCategory[c]>0).map(c=>c+remainingByCategory[c]+'天').join('／'):'尚缺 '+remaining+' 天';
+   result.push({...person,suggestions:[],period:detail+'，尚無其他可用日期',due:remaining,
+    category:person.category,canPreplan:usable.length===0&&person.canPreplan,residualOnly:true});
+  }
  }
  return result.sort((a,b)=>String(a.date||'9999').localeCompare(String(b.date||'9999'))||
   String(a.name||'').localeCompare(String(b.name||''),'zh-Hant')||String(a.id).localeCompare(String(b.id)));
@@ -392,9 +402,10 @@ function mount(el){
   const deficits=data.roster.filter(r=>r.reviewType==='deficit'&&!quotaFullyAllocated(r.quotaProgress));
   const exceptions=data.roster.filter(r=>r.reviewType!=='deficit');
   const daily=dailyPendingRows(data);
-  const pending=daily.filter(r=>!r.residualOnly);
+  // Show remaining deficits in pending even if no eligible date was found.
+  const pending=daily;
   const savedPlanRows=data.planned.filter(r=>r.saved&&!pendingReports.some(p=>norm(p.empId)===norm(r.empId)&&p.date===r.date)).map(r=>({...r,kind:'existing',status:'預排已儲存（待出勤）'}));
-  const audit=[...pendingReports,...savedPlanRows,...exceptions.filter(r=>!quotaFullyAllocated(r.quotaProgress)),...daily.filter(r=>r.residualOnly)];
+  const audit=[...pendingReports,...savedPlanRows,...exceptions.filter(r=>!quotaFullyAllocated(r.quotaProgress))];
   return {data,pending,audit,verified,deficits,exceptions};
  }
  function kind(row){
@@ -510,9 +521,9 @@ function mount(el){
     return '<tr><td><input type="checkbox" data-action="pick" data-kind="'+kindKey+'" data-id="'+id+'" data-key="'+key+'" '+(isPicked(r)?'checked ':'')+(selectable?'':'disabled ')+
       'aria-label="勾選 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+filingDateMarkup(r,cutoff.value,latestDates.get(norm(r.empId||r.id))||'')+'</td><td>'+esc(r.name)+(r.role?'<small style="display:block;color:#64748b">'+esc(r.role)+(r.kind==='roster'?'｜'+(r.reviewType==='deficit'?'未休缺額':'異常核對'):'')+'</small>':'')+'</td>'+
       '<td><span class="mr-ux-kind">'+esc(r.category)+'</span>'+quotaDisplayMarkup(quota,state.tab!=='done')+'</td><td>'+(r.suggestions?.length?r.suggestions.map(x=>'<div style="margin:3px 0"><b>'+esc((r.suggestions.length>1?x.date.slice(5)+'　':'')+suggestionPeriod(x))+'</b>'+'<small style="margin-left:6px;color:#64748b">'+esc(suggestionStatus(x))+'</small>'+'</div>').join(''):esc(periodLabel(r.period)))+'</td><td>'+esc(r.hours)+'</td>'+
-      '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+(r.kind==='reference'&&!r.eligible?'<small class="mr-ux-eligibility">'+esc(r.eligibilityIssue||r.source||'尚未符合預排資格')+'</small>':'')+''+'</td><td>'+operations+'</td></tr>';
+      '<td><span class="mr-ux-pill '+(type==='plan'?'review':type)+'">'+esc(status)+'</span>'+(r.kind==='reference'&&!r.eligible||r.residualOnly?'<small class="mr-ux-eligibility">'+esc(r.eligibilityIssue||r.source||'尚未符合預排資格')+'</small>':'')+''+'</td><td>'+operations+'</td></tr>';
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
-   q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+(state.tab==='pending'&&audit.some(r=>r.residualOnly)?'｜尚無日期的缺額請見「已預排／待核對」':'');
+   q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+(state.tab==='pending'&&shown.some(r=>r.residualOnly)?'｜尚缺日期者保留在待處理名單，請檢視原因或設定預排':'');
    q('#mrUxExport').disabled=!shown.length;
    q('#mrUxRepair').disabled=originalMonth.disabled||!sourceLoaded||typeof el.p79RepairAbnormalPreplans!=='function'||global.p79OvertimeStatusContext?.canRevoke?.()!==true;
    if(locked){
