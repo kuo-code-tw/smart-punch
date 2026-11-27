@@ -225,10 +225,10 @@
   options(id('prJob'),jobs.map(x=>({value:x,label:x})),'全部職稱');
   const fJob=id('prJob').value;
   const matches=inUnit.filter(e=>fJob==='ALL'||job(e)===fJob);
-  const names=fUnit==='ALL'?[]:matches.slice().sort((a,b)=>stroke.compare(a.name||'',b.name||'')||stroke.compare(empId(a),empId(b)));
+  const names=matches.slice().sort((a,b)=>stroke.compare(a.name||'',b.name||'')||stroke.compare(empId(a),empId(b)));
   options(id('prPerson'),names.map(e=>({value:empId(e),label:String(e.name||'未命名')+'（'+empId(e)+'）'})),
-    fUnit==='ALL'?'請先選擇單位':'全部姓名');
-  id('prPerson').disabled=fUnit==='ALL';
+    '全部姓名');
+  id('prPerson').disabled=false;
   const person=id('prPerson').value;
   const scoped=matches.filter(e=>person==='ALL'||empId(e)===person);
   const allow=new Set(scoped.map(empId)),byId=new Map(scoped.map(e=>[empId(e),e]));
@@ -489,7 +489,7 @@
   const host=id('viewAdmin')?.querySelector('.admin-desktop-content');
   if(!host||id('p79WorkhoursReference'))return;
   let markup;
-  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1&listFilters=20261126-inline-v4',{cache:'default'});
+  try{const resp=await fetch('../assets/port79-workhours-reference-dashboard.html?v=20261117-approved-v1&columns=20261118-no-id-v1&kpis=20261118-ops-v1&listFilters=20261126-inline-v4&personfilter=20261127-v1',{cache:'default'});
    if(!resp.ok)throw Error('HTTP '+resp.status);markup=await resp.text();
    if(!markup.includes('id="p79WorkhoursReference"')||!markup.includes('id="prTableBody"'))throw Error('版型檔格式錯誤');
   }catch(e){console.warn('工時版型尚未讀取完成，保留原本功能',e);return}
