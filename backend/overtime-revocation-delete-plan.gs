@@ -13,7 +13,8 @@ function p79OvertimeDeletionPlan_(rows,covers,empId,date){
   nextRows.forEach(function(row){
     if(!affected.has(normalizeEmpId_(row.empId)))return;
     const schedule=row.schedule||{},all=schedule.__meta||{},meta=all[date]||{};
-    if(meta.overtimeAssignedShift&&schedule[date]===meta.overtimeAssignedShift&&meta.overtimeOriginalShift!==undefined)schedule[date]=meta.reportOriginalShift!==undefined?meta.reportOriginalShift:meta.overtimeOriginalShift;
+    const original=meta.reportOriginalShift??meta.overtimeOriginalShift;
+    if(meta.overtimeAssignedShift&&schedule[date]===meta.overtimeAssignedShift&&String(original??'').trim())schedule[date]=original;
     const kept=Object.assign({},meta);
     ['type','forEmpId','forName','note','assignedAt','overtime','overtimeType','overtimeOriginalShift','overtimeAssignedShift','overtimeStart','overtimeEnd','overtimeReport','reportOriginalShift'].forEach(function(key){delete kept[key];});
     kept.overtimeExcluded=true;kept.overtimeDeletedAt=new Date().toISOString();
