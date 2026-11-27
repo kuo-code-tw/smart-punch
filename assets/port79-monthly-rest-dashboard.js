@@ -418,6 +418,7 @@ function mount(el){
    if(q('#mrUxDept').value!==originalDept.value)q('#mrUxDept').value=originalDept.value;
    if(q('#mrUxJob').innerHTML!==originalJob.innerHTML)q('#mrUxJob').innerHTML=originalJob.innerHTML;
    if(q('#mrUxJob').value!==originalJob.value)q('#mrUxJob').value=originalJob.value;
+   q('#mrUxDept').disabled=originalDept.disabled;
    q('#mrUxJob').disabled=originalJob.disabled;
    const view=currentView(),{data,pending,audit,verified,shown,deficits,exceptions}=view;
    // Discard local inspection picks for rows no longer in the live source.
@@ -556,7 +557,7 @@ function mount(el){
   const input=$(el,'#mrCutoff');if(!input||input.disabled)return;
   state.submitting=false;state.reviewSelected.clear();state.hint='';input.value=e.target.value;input.dispatchEvent(new Event('change',{bubbles:true}));render();
  };
- q('#mrUxDept').onchange=e=>{if(!originalDept.disabled){originalDept.value=e.target.value;originalDept.dispatchEvent(new Event('change',{bubbles:true}));}};
+ q('#mrUxDept').onchange=e=>{if(!originalDept.disabled){state.reviewSelected.clear();originalDept.value=e.target.value;originalDept.dispatchEvent(new Event('change',{bubbles:true}));render();}};
  q('#mrUxJob').onchange=e=>{if(!originalJob.disabled){state.reviewSelected.clear();originalJob.value=e.target.value;originalJob.dispatchEvent(new Event('change',{bubbles:true}));render();}};
  q('#mrUxName').oninput=e=>{state.name=e.target.value;render();};
  q('#mrUxState').onchange=e=>{state.status=e.target.value;render();};
@@ -627,6 +628,12 @@ function mount(el){
   global.setTimeout(()=>URL.revokeObjectURL(url),1000);
  };
  const observers=[];
+ // Observe the actual filter controls so the visible mirror unlocks immediately.
+ for(const control of [originalDept,originalJob]){
+  const observer=new MutationObserver(()=>render());
+  observer.observe(control,{attributes:true,attributeFilter:['disabled'],childList:true,subtree:true});
+  observers.push(observer);
+ }
  for(const selector of ['#mrRows','#mrPlannedRows','#mrExistingRows','#mrNeedRows','#mrAutoSupplementRows','#mrAuditSummary','#mrStatus','#mrSave','#mrSavePlans']){
   const node=$(el,selector);if(!node)continue;
   const observer=new MutationObserver(()=>render());
