@@ -17,7 +17,7 @@
 <script src="../assets/port79-planned-rest-reconciliation.js?v=20261106-workhours-no-punch-v1"></script>
 <script src="../assets/port79-workhours-no-punch-autocancel.js?v=20261106-workhours-no-punch-v1"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261123-true-simple-official-v2&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1&dashboard=20261123-review-checkbox-v3&fullRoster=20261124-v21&result=20261125-confirmed-popup-v1&quotaPreview=20261125-v26&autoRematch=20261125-v27&weeklyDefault=20261125-mon-sun-v28&restPlanGuard=20261125-v29&crossMonthWeekly=20261125-v30&weeklyQuotaLayout=20261125-v31&saved-rest=20261125-v32&eligibilityLayout=20261125-v33&sharedShiftPeriod=20261125-v34&roster-rest-first=20261125-v37&cloudPreplan=20261125-v44&localPreplan=20261125-v1&compactReason=20261126-v1&loadFix=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1&restore20261127=v8&repairSpeed=20261127-v1&preplanProgress=20261127-v2&eightHourAlert=20261127-v1"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261123-true-simple-official-v2&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1&dashboard=20261123-review-checkbox-v3&fullRoster=20261124-v21&result=20261125-confirmed-popup-v1&quotaPreview=20261125-v26&autoRematch=20261125-v27&weeklyDefault=20261125-mon-sun-v28&restPlanGuard=20261125-v29&crossMonthWeekly=20261125-v30&weeklyQuotaLayout=20261125-v31&saved-rest=20261125-v32&eligibilityLayout=20261125-v33&sharedShiftPeriod=20261125-v34&roster-rest-first=20261125-v37&cloudPreplan=20261125-v44&localPreplan=20261125-v1&compactReason=20261126-v1&loadFix=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1&restore20261127=v8&repairSpeed=20261127-v1&preplanProgress=20261127-v2&eightHourAlert=20261127-v1&preplanLockRetry=20261127-v1"></script>
 <script src="../assets/port79-overtime-status.js?v=20261027-dept-job-name-onefield-v3"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -17747,7 +17747,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const token=currentPort79SsoToken();if(!token||!p79CanReportOvertime())throw Error('沒有申報權限');
  const month=draft.date.slice(0,7),url=getActiveGasUrl();
  const read=async (action,label)=>{
-  const maxAttempts=draft.directRow?2:4;
+  const maxAttempts=draft.deferPreplanNotice===true?4:draft.directRow?2:4;
   for(let attempt=1;attempt<=maxAttempts;attempt++){
    const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),draft.directRow?12000:45000);
    try{
@@ -17755,7 +17755,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
     const data=await response.json();
     if(!response.ok||data.ok!==true){
      const failure=new Error(label+'：'+(data.error||'雲端回應失敗'));
-     failure.retryable=data?.retryable===true&&/正在處理其他資料|目前正在更新|雲端.*忙碌/.test(String(data.error||''));
+     failure.retryable=(data?.retryable===true&&/正在處理其他資料|目前正在更新|雲端.*忙碌/.test(String(data.error||'')))||(draft.deferPreplanNotice===true&&/雲端(?:目前)?正在處理其他(?:資料|操作)|雲端正處理其他操作|排班讀取等[待候]|未取得(?:讀取)?鎖/.test(String(data.error||'')));
      throw failure;
     }
     return data;
@@ -17763,7 +17763,9 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
     const transport=error?.name==='AbortError'||error?.name==='TimeoutError'||error instanceof TypeError||/Failed to fetch|NetworkError|signal is aborted|operation was aborted/i.test(error?.message||'');
     if(!transport&&!error?.retryable)throw error;
     if(attempt===maxAttempts)throw Error(error?.retryable?'雲端仍在處理其他資料，本次修改尚未送出；請重新開啟原申報核對。':label+'連線失敗或逾時，已保留內容，請重試核對。');
-    await new Promise(resolve=>setTimeout(resolve,600*attempt));
+    const delay=draft.deferPreplanNotice===true&&error?.retryable?2500*attempt:600*attempt;
+    if(draft.deferPreplanNotice===true&&error?.retryable)draft.onProgress?.('雲端讀取鎖忙碌，自動重試 '+attempt+'/'+(maxAttempts-1)+'（'+delay/1000+' 秒後）');
+    await new Promise(resolve=>setTimeout(resolve,delay));
    }finally{clearTimeout(timer)}
   }
  };
@@ -17918,7 +17920,7 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
   const savedRow=p79WorkOvertimeMonths.get(month).rows.find(row=>String(row.empId).trim().toUpperCase()===employeeId);
   if(savedRow){savedRow.schedule.__meta=savedRow.schedule.__meta||{};savedRow.schedule.__meta[draft.date]={...(savedRow.schedule.__meta[draft.date]||{}),overtimeReport:result.report,forEmpId:draft.forEmpId||''};}
   if(batch){batch.ready=result.revision!=null;batch.cloud={...cloud,revision:result.revision,schedules:p79WorkOvertimeMonths.get(month).rows};}
-  try{localStorage.setItem('p79_schedule_overtime_changed_v1',JSON.stringify({month,empId:draft.empId,date:draft.date,at:Date.now()}));}catch(_){ }
+  if(draft.deferPreplanNotice!==true)try{localStorage.setItem('p79_schedule_overtime_changed_v1',JSON.stringify({month,empId:draft.empId,date:draft.date,at:Date.now()}));}catch(_){ }
   // The cloud write is verified; rebuilding all statistics must not delay the save confirmation.
   p79OvertimeCalculationCache=null;
   if(!batch&&!draft.directRow)setTimeout(()=>{try{renderOvertimeStats();}catch(error){console.warn('加班已儲存，統計畫面更新失敗',error);}},0);
