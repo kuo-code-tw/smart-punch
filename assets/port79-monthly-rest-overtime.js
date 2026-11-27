@@ -88,7 +88,8 @@ function abnormalMonthlyRestPlans(snapshot,staff,month){
    if(!date.startsWith(month+'-')||!confirmedReport(meta,report)||!cats.includes(report?.category))continue;
    const reason=monthlyRestElectionDay(date)?'選舉日':g.P79SpecialOvertime?.kindsForDate?.(date)?.some(x=>x.kind==='typhoon')||String(row.schedule[date]||'').trim()==='颱'?'颱風日':'';
    if(!reason||! /每月未休假加班/.test(String(report.note||'')+' '+String(meta.note||''))||/^[選颱]/.test(String(report.code||'')))continue;
-   const original=String(meta.reportOriginalShift??meta.overtimeOriginalShift??row.schedule[date]??'').trim();
+   const assigned=meta.overtimeAssignedShift&&row.schedule[date]===meta.overtimeAssignedShift;
+   const original=String(meta.reportOriginalShift??meta.overtimeOriginalShift??(assigned?'':row.schedule[date])??'').trim();
    const linked=!!(meta.forEmpId||meta.coverAssignmentId||meta.type==='substitute'||report.forEmpId||report.leaveId||
      (snapshot.leaveCoverAssignments||[]).some(c=>date>=c.startDate&&date<=c.endDate&&(id(c.leaveEmpId)===empId||(c.workerIds||[]).some(w=>id(w)===empId))));
    const extra=Array.isArray(meta.overtimeReports)&&meta.overtimeReports.some(r=>r?.id!==report.id&&confirmedReport(meta,r));
@@ -1600,7 +1601,7 @@ async function open(settings={}){
   finally{
    busy=false;
    try{
-    if(reload){await q('#mrLoad').onclick();setStatus('異常預排修正：已確認 '+completed+'／'+candidates.length+' 筆。'+(failure?'停止：'+failure+'；其餘未處理，請重新核對。':'已重新計算未休額度及建議日期，尚未儲存新預排。')+(review.length?' 另 '+review.length+' 筆需人工核對。':''));}
+    if(reload){await q('#mrLoad').onclick();const refreshed=!!model&&!isReadOnlySource();setStatus('異常預排修正：已確認 '+completed+'／'+candidates.length+' 筆。'+(failure?'停止：'+failure+'；其餘未處理，請重新核對。':refreshed?'已重新計算未休額度及建議日期，尚未儲存新預排。':'最新資料尚未完整讀取，請重新讀取以核對額度。')+(review.length?' 另 '+review.length+' 筆需人工核對。':''));}
     else if(failure)setStatus('異常預排掃描未完成：'+failure);
    }finally{delete el.dataset.preplanLocked;controls(false);}
   }
