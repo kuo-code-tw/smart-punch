@@ -129,6 +129,7 @@ function auditChanged(report,meta){
  const created=String(report?.reportedAt||report?.createdAt||'').trim();
  return verified||!!(String(report?.replacesReportId||'').trim()&&String(report.replacesReportId).trim()!==String(report?.id||'').trim())||!!(modified&&created&&modified!==created);
 }
+function isPendingPlan(report){return report?.planned===true||report?.planned==='true'||report?.status==='預排待出勤';}
 function overtimeDayIndicator(date,monthState){
  if(monthState?.ready!==true)return null;
  const people=new Map((monthState.people||[]).map(p=>[id(p.empId),p.name||p.empId]));
@@ -141,25 +142,28 @@ function overtimeDayIndicator(date,monthState){
   for(const report of reports){
    if(!report?.id||meta.overtimeExcluded===true||
       (meta.overtimeRevocations||[]).some(a=>a?.confirmed===true&&String(a.reportId)===String(report.id)))continue;
-   const kind=auditChanged(report,meta)?'amended':'reported';
-   const key=empId+'|'+date+'|'+report.id+'|'+kind;
+   const kind=isPendingPlan(report)?'planned':auditChanged(report,meta)?'amended':'reported';
+   const key=empId+'|'+date+'|'+report.id;
    if(seen.has(key))continue;seen.add(key);
-   entries.push({kind,name,code:String(report.code||''),hours:report.declaredHours||'',
-     detail:kind==='amended'?'申報已修改，請重新核對':'加班申報已登錄'});
+   const period=[report.overtimeStart,report.overtimeEnd].filter(v=>v!=null&&String(v)!=='').join('-');
+   const code=String(report.code||'');
+   const actualPeriod=period&&!code.endsWith(period)?'（加班 '+period+'）':'';
+   entries.push({kind,name,code:code+actualPeriod,hours:report.declaredHours||'',
+     detail:kind==='planned'?'尚未正式申報，不列入加班費':kind==='amended'?'正式申報已修改，請重新核對':'正式加班申報已登錄'});
   }
  }
  if(!entries.length)return null;
- const counts={reported:0,amended:0};
+ const counts={reported:0,amended:0,planned:0};
  for(const row of entries)counts[row.kind]++;
  // 僅顯示目前有效申報；取消歷史保留在正式資料，不顯示於日期列。
  const activeCount=counts.reported+counts.amended;
- const kind=counts.amended?'amended':'reported';
- const summary=['已申報 '+counts.reported,'已修改 '+counts.amended].join('｜');
- const names={amended:'已修改',reported:'已申報'};
+ const kind=counts.planned?'pending':counts.amended?'amended':'reported';
+ const summary=['正式申報 '+activeCount+'（已修改 '+counts.amended+'）','預排待核對 '+counts.planned].join('｜');
+ const names={amended:'正式申報・已修改',reported:'正式申報',planned:'預排待核對'};
  const lines=entries.slice(0,24).map(row=>row.name+'：'+names[row.kind]+
   (row.code?'｜'+row.code:'')+(row.hours?'｜'+row.hours+'小時':'')+'｜'+row.detail);
  if(entries.length>24)lines.push('其餘 '+(entries.length-24)+' 筆請開啟申報明細核對');
- return {kind,count:entries.length,activeCount,amendedCount:counts.amended,revokedCount:0,title:date+'\n'+summary+'\n'+lines.join('\n')};
+ return {kind,count:entries.length,activeCount,amendedCount:counts.amended,plannedCount:counts.planned,revokedCount:0,title:date+'\n'+summary+'\n'+lines.join('\n')};
 }
 // 查核只確認「當下讀到的正式申報版本」，不會修改 GAS 申報或歷史稽核。
 // 只存 hash，避免舊日期一旦查核就永遠把後續新修改誤標為綠色。
@@ -469,7 +473,7 @@ async function recheckAndMarkReviewed(date,checked=true){
    if(!signature)throw Error('正式申報指紋未完成');
    await p79ReviewCloudWrite(date,signature,true,token);
    markReviewed(date,true);
-   return {ok:true,kind:'reported',message:date+' 雲端已確認 '+info.activeCount+' 筆有效申報，查核已跨裝置保存並顯示綠色；修改／取消歷史仍保留'+(attendanceConfirmation?'；取消無出勤預排 '+attendanceConfirmation.cancelled+' 筆、打卡待核 '+attendanceConfirmation.punchReview+' 筆、已審核待管理員確認 '+attendanceConfirmation.approvedReview+' 筆':'；預排自動取消尚未啟用，原預排保留')};
+   return {ok:true,kind:'reported',message:date+' 雲端已確認 '+info.activeCount+' 筆有效正式申報，查核已跨裝置保存'+(info.plannedCount?'；另有 '+info.plannedCount+' 筆預排待核對，維持黃色':'並顯示綠色')+'；修改／取消歷史仍保留'+(attendanceConfirmation?'；取消無出勤預排 '+attendanceConfirmation.cancelled+' 筆、打卡待核 '+attendanceConfirmation.punchReview+' 筆、已審核待管理員確認 '+attendanceConfirmation.approvedReview+' 筆':'；預排自動取消尚未啟用，原預排保留')};
   }catch(error){
    const reason=error?.name==='AbortError'?'雲端讀取逾時':String(error?.message||error||'未知錯誤');
    return {ok:false,message:date+' 查核失敗：'+reason+'。不會修改正式申報或強制變綠。'};
@@ -561,7 +565,7 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   const effectiveKind=info?.kind==='amended'&&reviewed?'reported':info?.kind;
   const palette=!ready?['#f1f5f9','#64748b','#94a3b8']:
    !info?['#ffffff','#334155','#cbd5e1']:
-   effectiveKind==='amended'?['#fef3c7','#92400e','#f59e0b']:
+   ['amended','pending'].includes(effectiveKind)?['#fef3c7','#92400e','#f59e0b']:
    ['#dcfce7','#166534','#4ade80'];
   button.style.setProperty('background-color',palette[0],'important');
   button.style.setProperty('color',palette[1],'important');
@@ -579,7 +583,7 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   const legend=g.document.createElement('span');
   legend.id='p79OvertimeDateLegend';
   legend.style.cssText='flex-shrink:0;white-space:nowrap;margin-left:6px;font-size:11px;color:#64748b';
-  legend.textContent='白：未見申報｜綠：有效申報｜黃：修改待核｜灰：尚未確認；10月備援非最終核薪';
+  legend.textContent='白：未見申報｜綠：有效正式申報｜黃：預排／修改待核｜灰：尚未確認；10月備援非最終核薪';
   host.appendChild(legend);
  }
 }
