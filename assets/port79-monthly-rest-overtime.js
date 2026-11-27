@@ -112,7 +112,14 @@ function abnormalMonthlyRestPlans(snapshot,staff,month){
    // All dates: a revoked declaration must not silently leave an assigned
    // overtime shift behind. Review only, never guess or write a replacement.
    if(revoked&&!reports.length&&!linked&&(timedRest(shift)||assigned)&&(!recordedOriginal||shift!==recordedOriginal)){
-    review.push({...item,issue:'已有撤銷紀錄但班別仍為 '+shift+'，需核對原班別'});continue;
+    const archives=meta.overtimeRevocations||[],archive=archives[archives.length-1],prior=archive?.report,priorOriginal=String(archive?.originalShift||'').trim();
+    const rawReports=[report,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])].filter(r=>r?.id);
+    const rawActive=rawReports.some(r=>!archives.some(a=>a?.confirmed===true&&String(a.reportId)===String(r.id)));
+    const safe=archive?.confirmed===true&&archive.reason==='休假超額'&&id(archive.empId)===empId&&archive.date===date&&String(archive.reportId)===String(prior?.id)&&prior?.planned===true&&general(prior)&&/每月未休假加班/.test(String(prior.note||'')+' '+String(archive.note||''))&&!prior.forEmpId&&!prior.leaveId&&!rawActive&&priorOriginal&&priorOriginal!=='待排班'&&!timedRest(priorOriginal)&&timedRest(shift)&&shift!==priorOriginal&&shift===String(archive.assignedShift||prior.code||'').trim()&&(!recordedOriginal||recordedOriginal===priorOriginal);
+    if(safe&&(snapshot?.saveContext?.cloud?.overtimeRevokedRestoreVersion===1||snapshot?.overtimeRevokedRestoreVersion===1))
+     repair.push({...item,id:archive.reportId,report:prior,original:priorOriginal,currentShift:shift,restoreRevoked:true});
+    else review.push({...item,issue:safe?'已撤銷且原班別可確認，需部署雲端補還原功能':'已有撤銷紀錄但班別仍為 '+shift+'，需核對原班別'});
+    continue;
    }
    if(!reason)continue;
    if(active&&general(report)&&monthly(report)){
@@ -1630,11 +1637,11 @@ async function open(settings={}){
     const summary=coverageText()+'\n'+(review.length?'尚未全部還原：無可安全自動撤銷的預排，但有 '+review.length+' 項需核對：\n'+list(review):'查無此類異常預排或殘留班別。')+'\n已通知排班頁重新讀取。';
     setStatus(summary);if(typeof g.alert==='function')g.alert(summary);return;
    }
-   if(!confirm(coverageText()+'\n本月全部授權人員共 '+candidates.length+' 筆異常預排可取消；正常預排、已申報、原始打卡不會刪除。\n\n'+list(candidates)+(review.length?'\n\n另有 '+review.length+' 筆僅供人工核對，不會修改：\n'+list(review):'')+'\n\n確認逐筆取消並重新計算額度？')){setStatus('已取消操作，未修改任何資料。');return;}
+   if(!confirm(coverageText()+'\n本月全部授權人員共 '+candidates.length+' 筆異常預排可取消或還原；正常預排、已申報、原始打卡不會刪除。\n\n'+list(candidates)+(review.length?'\n\n另有 '+review.length+' 筆僅供人工核對，不會修改：\n'+list(review):'')+'\n\n確認逐筆撤銷或補還原班別並重新計算額度？')){setStatus('已取消操作，未修改任何資料。');return;}
    reload=true;
    for(const candidate of candidates){
     if(!el.isConnected||loadedMonth!==month||!service.canRevoke())throw Error('視窗、月份或權限已變更');
-    const findCurrent=source=>abnormalMonthlyRestPlans(source,a.employees(),month).repair.find(r=>r.empId===candidate.empId&&r.date===candidate.date&&r.id===candidate.id&&r.original===candidate.original&&JSON.stringify(r.report)===JSON.stringify(candidate.report));
+    const findCurrent=source=>abnormalMonthlyRestPlans(source,a.employees(),month).repair.find(r=>r.empId===candidate.empId&&r.date===candidate.date&&r.id===candidate.id&&r.original===candidate.original&&r.restoreRevoked===candidate.restoreRevoked&&r.currentShift===candidate.currentShift&&JSON.stringify(r.report)===JSON.stringify(candidate.report));
     let current=findCurrent(fresh);
     processed++;
     if(!current){
@@ -1664,7 +1671,7 @@ async function open(settings={}){
      current=rechecked;
     }
     const roster=fresh.schedules?.find(r=>id(r.empId)===current.empId)?.schedule,meta=roster?.__meta?.[current.date]||{};
-    if(!roster||meta.overtimeReport?.id===current.id||meta.overtimeReports?.some?.(r=>r?.id===current.id&&confirmedReport(meta,r))||!meta.overtimeRevocations?.some(r=>r.confirmed===true&&String(r.reportId)===String(current.id))||String(roster[current.date]||'').trim()!==current.original){
+    if(!roster||(meta.overtimeReport?.id===current.id&&(!current.restoreRevoked||confirmedReport(meta,meta.overtimeReport)))||meta.overtimeReports?.some?.(r=>r?.id===current.id&&confirmedReport(meta,r))||!meta.overtimeRevocations?.some(r=>r.confirmed===true&&String(r.reportId)===String(current.id))||String(roster[current.date]||'').trim()!==current.original){
      failed.push(current.name+' '+current.date+'：撤銷或原班別未確認'+(revokeError?'：'+String(revokeError.message||revokeError):''));
      // A fresh authoritative snapshot is available. Isolate this employee/date
      // and proceed with other candidates; never repeat this uncertain write.
