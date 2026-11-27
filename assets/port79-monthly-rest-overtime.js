@@ -524,6 +524,19 @@ function canDesignateFutureRest(roster,date,month,category){
  return category==='休'&&['早','中','晚'].includes(String(roster?.[date]||'').trim())&&!automaticRestCategory(roster,date,month)&&!originalRestDesignation(roster,date);
 }
 // Weekly roster audit is separate from eligibility to reserve a future plan.
+// V138: an unstarted working shift is a future preplan opportunity even on
+// today's accounting date (晚 24-08 starts at the following midnight).
+// Do not use this exception when attendance is incomplete, a punch exists,
+// the shift has started, or the day is not an explicit working shift.
+function unstartedSameDayRestShift(roster,date,snapshot,emp,asOf=today(),now=Date.now()){
+ if(date!==asOf||!['早','中','晚'].includes(String(roster?.[date]||'').trim())||
+    snapshot?.provisional===true||snapshot?.readOnlyDueAttendance===true||snapshot?.attendanceEvidence?.complete!==true||
+    g.P79RestAttendance?.state(snapshot,emp.empId,date)!=='open'||
+    g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster)||
+    (snapshot?.pairs||[]).some(p=>id(p.empId)===id(emp.empId)&&p.date===date))return false;
+ const period=g.P79RestAttendance?.period?.(date,roster);
+ return period?.known===true&&Number.isFinite(period.start)&&Number.isFinite(now)&&now<period.start;
+}
 function futureRestEligibilityIssue(roster,date,month,emp,category,snapshot){
  if(monthlyRestElectionDay(date))return '選舉日須走特殊加班流程，不得預排一般未休假加班';
  const m=roster?.__meta?.[date]||{};
@@ -679,7 +692,7 @@ function plan(snapshot,people,month,rules,options={}){
    if(monthlyRestElectionDay(date))continue; // Special election-day overtime is not a monthly rest candidate.
    if((b.typhoonDates||[]).includes(date)||!(['早','中','晚','國','休','例'].includes(roster[date])||/^[休國例]\s*\d/.test(String(roster[date]||'')))||m.overtimeReport||hasActiveExtraReport(m)||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
    const originalCategory=automaticRestCategory(roster,date,month)||
-    (!historical&&date>currentDate&&canDesignateFutureRest(roster,date,month,'休')?'休':'');
+    (!historical&&(date>currentDate||unstartedSameDayRestShift(roster,date,snapshot,emp,currentDate))&&canDesignateFutureRest(roster,date,month,'休')?'休':'');
    if(!originalCategory){
     if(date>=currentDate&&['早','中','晚'].includes(roster[date]))for(const category of ['休','國'])blocked(date,category,'原排'+roster[date]+'班，沒有已確認的'+category+'假別');
     continue;
@@ -885,7 +898,8 @@ function manualRestPlanIssue(snapshot,emp,month,date,rule,asOf=today(),cutoff=''
  if(!roster)return '缺少正式班表';
  const category=rule[0],meta=roster.__meta?.[date]||{};
  if(date<forwardReportStart(month,cutoff,asOf))return '早於你設定的本次申報起日';
- if(!canDesignateFutureRest(roster,date,month,category)||date===asOf&&!documentedFutureRestCategory(roster,date,month,category))return '既有假別不符或不是可配休的未來班別';
+ if(!canDesignateFutureRest(roster,date,month,category))return '既有假別不符或不是可配休的未來班別';
+ if(date===asOf&&!documentedFutureRestCategory(roster,date,month,category)&&!unstartedSameDayRestShift(roster,date,snapshot,emp,asOf))return '當日原工作班已開始或出勤尚待核對，不得新增配休預排';
  if(meta.overtimeReport||hasActiveExtraReport(meta)||meta.overtime||meta.forEmpId||meta.coverAssignmentId||meta.overtimeExcluded)return '已有加班、代班或排除紀錄，不得重複預排';
  if((snapshot.leaveDates||[]).includes(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))return '該日已有請假，不得重複預排';
  if((snapshot.pairs||[]).some(p=>id(p.empId)===id(emp.empId)&&p.date===date))return '該日已有打卡，請由實際出勤核對流程處理';
@@ -920,13 +934,14 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
  const explicitRange=from>month+'-01';
  const permitted=day=>{const m=roster.__meta?.[day]||{},pairs=pairsByDate.get(day)||[];
   const actual=day<=asOf&&explicitRange&&pairs.length===1&&fullDayEvidence(snapshot,emp.empId,day,pairs[0]);
-  return day>=from&&(actual||day>asOf&&!pairs.length)&&day.startsWith(month+'-')&&
+  const beforeStart=unstartedSameDayRestShift(roster,day,snapshot,emp,asOf);
+  return day>=from&&(actual||(day>asOf||beforeStart)&&!pairs.length)&&day.startsWith(month+'-')&&
   !monthlyRestElectionDay(day)&&!(b.typhoonDates||[]).includes(day)&&!m.overtimeReport&&!hasActiveExtraReport(m)&&!m.overtime&&!m.forEmpId&&!m.coverAssignmentId&&!m.overtimeExcluded&&
   !blocked.has(employee+'|'+day)&&!g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,day,roster);};
  for(const date of days.filter(permitted)){
   const original=String(roster[date]||'').trim(),m=roster.__meta?.[date]||{};
   const originalCategory=automaticRestCategory(roster,date,month);
-  if(date<=asOf){
+  if(date<=asOf&&!unstartedSameDayRestShift(roster,date,snapshot,emp,asOf)){
    const pair=pairsByDate.get(date)[0];
    // Reference only: a complete ordinary workday is not proof of rest-day
    // overtime. The formal model still requires original category and quota.
@@ -1391,7 +1406,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1&cutoffCloud=20261127-v137';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1&cutoffCloud=20261127-v137&residualAndShift=20261127-v138';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -2083,6 +2098,11 @@ async function open(settings={}){
     activeRow=r;
     if(monthlyRestElectionDay(r.date))throw Error('選舉日不得建立一般未休假加班預排');
     if(r.date<today())throw Error('預排日期已過，請重新讀取');
+    if(r.date===today()&&!r.acknowledged){
+     const roster=latest.schedules?.find(x=>id(x.empId)===id(r.empId))?.schedule;
+     const emp=loadedPeople.find(x=>id(x.empId)===id(r.empId));
+     if(!roster||!emp||!documentedFutureRestCategory(roster,r.date,loadedMonth,r.category)&&!unstartedSameDayRestShift(roster,r.date,latest,emp))throw Error(r.name+'：班次已開始或考勤待核，不再建立當日配休預排');
+    }
     const progress='預排 '+(selected.indexOf(r)+1)+'／'+selected.length+'：'+r.name+' '+r.date;
     if(!r.acknowledged){
      const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),monthlyRestEightHour:true,manualPlan:true,preventReplace:false,note:'每月未休假加班預排（正式配休）',createdAt:Date.now(),directRow:true,deferPreplanNotice:true,onProgress:stage=>updatePreplanStatus(progress+'｜'+stage)};
@@ -2233,6 +2253,6 @@ async function open(settings={}){
  // 開啟時只讀核對，優先重用同帳號已核對的本機月份資料；沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').onclick({preferLocal:true});
 }
-g.P79MonthlyRest={open,plan,balance,showPreplanProgress,monthlyRestHoursIssue,monthlyRestReportApplies,monthlyRestDraftHoursIssue,monthlyRestElectionDay,electionMonthlyRestWriteIssue,abnormalMonthlyRestPlans,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,showPreplanProgress,monthlyRestHoursIssue,monthlyRestReportApplies,monthlyRestDraftHoursIssue,monthlyRestElectionDay,electionMonthlyRestWriteIssue,abnormalMonthlyRestPlans,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture,unstartedSameDayRestShift};
 
 })(window);
