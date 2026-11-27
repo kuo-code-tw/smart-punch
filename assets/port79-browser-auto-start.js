@@ -30,7 +30,7 @@
   if(!job)return;
   const row={phase,detail:String(detail||'').replace(/(?:userToken|adminToken|token)=[^&\s]+/gi,'憑證=已隱藏').slice(0,180),
    viewer:job.viewer,startedAt:job.startedAt,updatedAt:Date.now(),system:job.system,
-   completed:Object.values(job.states).filter(x=>x==='done'||x==='reused').length,total:job.total,
+   completed:Object.values(job.states).filter(x=>x==='done'||x==='reused'||x==='deferred').length,total:job.total,
    monthCompleted:job.monthCompleted,monthTotal:job.monthTotal,states:{...job.states},historyOnDemand:job.historyOnDemand};
   job.last=row;
   try{localStorage.setItem(KEY,JSON.stringify(row))}catch(_){}
@@ -57,9 +57,9 @@
     job.system=sys;
     if(state!=='detail')job.states[sys]=state;
     if(month){job.monthCompleted=Number(month.monthCompleted)||0;job.monthTotal=Number(month.monthTotal)||0;}
-    const status={loading:'下載中',done:'下載完成',reused:'沿用本機資料',error:'未完成',skipped:'尚未下載',detail:'處理月份'};
+    const status={loading:'下載中',done:'下載完成',reused:'沿用本機資料',deferred:'按需讀取',error:'未完成',skipped:'尚未下載',detail:'處理月份'};
     publish('downloading',(names[sys]||sys)+'｜'+(detail||status[state]||state)+(error?'｜'+String(error.message||error):''));
-   },{quickFirst:true,resumeExisting:true,historyOnDemand:true,prepareWorkhours:true,systems:ctx.systems,startupGuard:()=>same(ctx)});
+   },{quickFirst:true,resumeExisting:true,historyOnDemand:true,prepareWorkhours:true,automaticStartup:true,systems:ctx.systems,startupGuard:()=>same(ctx)});
    if(!same(ctx))return;
    await api.flushFolder?.();
    if(!same(ctx))return;
@@ -71,7 +71,7 @@
    publish(failures.length||storageWarning?'partial':'complete',failures.length?
     '未完成：'+failures.map(x=>names[x.system]+' '+x.error).join('；')+'。原快取保留。':
     storageWarning?'瀏覽器快取已保存，電腦資料夾尚未確認，請重新授權。':
-    '有權限的基本資料已下載或沿用本機。'+(ctx.historyOnDemand?'歷史資料不列入啟動下載，請在歷史中心選月份讀取。':''));
+    '啟動資料已處理。'+(rows.some(x=>x.deferred)?'完整歷史考勤按需下載，未重抓。':'已下載或沿用本機。')+(ctx.historyOnDemand?'歷史資料不列入啟動下載，請在歷史中心選月份讀取。':''));
   }catch(error){
    if(same(ctx))publish('failed','背景下載未完成，保留已完成快取：'+String(error?.message||error));
   }finally{
