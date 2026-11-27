@@ -69,6 +69,14 @@ function restQuotaExemptDates(emp,roster,dates,snapshot=null){
   return reason?.exempt===true&&(reason.kind==='typhoon'||!ownRestCoverReport(meta,roster,date));
  });
 }
+// Election-day work follows the special-overtime workflow, not monthly
+// unused-rest allocation. Use the same calendar as the schedule view.
+function monthlyRestElectionDay(date){
+ const special=g.P79SpecialOvertime;
+ return special?.kindsForDate?.(date)?.some(x=>x.kind==='election')===true||
+  special?.electionDates?.().includes(date)===true||
+  /選舉|投票/.test(String(g.P79OfficialCalendar?.get?.(date)?.name||''));
+}
 function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const quota=g.p79RestQuota(month),start=employmentStart??g.p79MonthlyRestContext.employmentStart(emp),end=Object.keys(roster).filter(d=>/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d)&&['離','離職'].includes(roster[d])).sort()[0]||'',dates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>(!start||d>=start)&&(!end||d<end));
  const counts={'例':0,'休':0,'國':0},off={...counts},reported={...counts},reserved={...counts},conflicts=[];
@@ -157,6 +165,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
   // Cloud-confirmed preplans reserve one official quota day without treating
   // future or incomplete attendance as earned overtime.
   if(verified&&r.planned===true){
+   if(monthlyRestElectionDay(d)&&/每月未休假加班/.test(String(r.note||'')+' '+String(m.note||''))&&!/^選/.test(String(r.code||'')))conflicts.push({date:d,reportId:r.id,reason:'選舉日已有一般未休假加班預排，請核對並改由選舉日加班流程處理；保留原紀錄待確認'});
    reserved[r.category]++;
    ledger.push({date:d,kind:'reportedPendingAttendance',category:r.category,actual,reportId:r.id,
      statusNote:actual==='worked'?'預排已有出勤，待正式申報':'正式預排已占額度，待考勤核對'});
@@ -406,11 +415,13 @@ function weeklyPlanIssue(roster,date,anchor,snapshot,empId){
 // A future ordinary shift can be explicitly designated as a rest-day plan
 // on cloud save, without requiring the designation to exist beforehand.
 function canDesignateFutureRest(roster,date,month,category){
+ if(monthlyRestElectionDay(date))return false;
  if(documentedFutureRestCategory(roster,date,month,category))return true;
  return category==='休'&&['早','中','晚'].includes(String(roster?.[date]||'').trim())&&!automaticRestCategory(roster,date,month)&&!originalRestDesignation(roster,date);
 }
 // Weekly roster audit is separate from eligibility to reserve a future plan.
 function futureRestEligibilityIssue(roster,date,month,emp,category,snapshot){
+ if(monthlyRestElectionDay(date))return '選舉日須走特殊加班流程，不得預排一般未休假加班';
  const m=roster?.__meta?.[date]||{};
  if(!['休','國'].includes(category))return '例假不得自動預排加班';
  if(!canDesignateFutureRest(roster,date,month,category))return '既有假別不符或無可配對班別，不能覆蓋原假別';
@@ -561,6 +572,7 @@ function plan(snapshot,people,month,rules,options={}){
   for(const date of b.dates){
    const m=roster.__meta?.[date]||{};
    if(date<nextReportDate)continue; // Earlier unresolved attendance stays in the audit ledger.
+   if(monthlyRestElectionDay(date))continue; // Special election-day overtime is not a monthly rest candidate.
    if((b.typhoonDates||[]).includes(date)||!(['早','中','晚','國','休','例'].includes(roster[date])||/^[休國例]\s*\d/.test(String(roster[date]||'')))||m.overtimeReport||hasActiveExtraReport(m)||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
    const originalCategory=automaticRestCategory(roster,date,month)||
     (!historical&&date>currentDate&&canDesignateFutureRest(roster,date,month,'休')?'休':'');
@@ -759,6 +771,7 @@ function automaticSupplementReviewRows(snapshot,staff,month,model){
  // 不因當天沒有8小時打卡或已過月末候選窗口就把 F/L 等職稱隱藏。
 // Explicit operator-selected future rest overtime, with fresh source guards.
 function manualRestPlanIssue(snapshot,emp,month,date,rule,asOf=today(),cutoff=''){
+ if(monthlyRestElectionDay(date))return '選舉日請使用特殊加班申報，不得建立每月未休假加班預排';
  if(!emp||snapshot?.provisional===true||snapshot?.readOnlyDueAttendance===true||snapshot?.attendanceEvidence?.complete!==true)return '正式班表或考勤尚未完整核對，不能儲存預排';
  if(month!==asOf.slice(0,7)||!/^\d{4}-\d{2}-\d{2}$/.test(date)||!date.startsWith(month+'-')||date<asOf)return '預排限本月今天至月底，不得補造過去出勤';
  if(!['休','國'].includes(rule?.[0])||!fullDayRule(rule))return '預排僅接受有缺額的休息日／國定假日正式8小時規則；例假須另循例外程序';
@@ -804,7 +817,7 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
  const permitted=day=>{const m=roster.__meta?.[day]||{},pairs=pairsByDate.get(day)||[];
   const actual=day<=asOf&&explicitRange&&pairs.length===1&&fullDayEvidence(snapshot,emp.empId,day,pairs[0]);
   return day>=from&&(actual||day>asOf&&!pairs.length)&&day.startsWith(month+'-')&&
-  !(b.typhoonDates||[]).includes(day)&&!m.overtimeReport&&!hasActiveExtraReport(m)&&!m.overtime&&!m.forEmpId&&!m.coverAssignmentId&&!m.overtimeExcluded&&
+  !monthlyRestElectionDay(day)&&!(b.typhoonDates||[]).includes(day)&&!m.overtimeReport&&!hasActiveExtraReport(m)&&!m.overtime&&!m.forEmpId&&!m.coverAssignmentId&&!m.overtimeExcluded&&
   !blocked.has(employee+'|'+day)&&!g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,day,roster);};
  for(const date of days.filter(permitted)){
   const original=String(roster[date]||'').trim(),m=roster.__meta?.[date]||{};
@@ -1202,7 +1215,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1697,6 +1710,7 @@ async function open(settings={}){
    const valid=new Set(suggested.map(key));
    for(const r of selected){
     r.acknowledged=false;
+    if(monthlyRestElectionDay(r.date))throw Error(r.name+' '+r.date+' 為選舉日，不得建立一般未休假加班預排');
     const saved=latest.schedules?.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date]?.overtimeReport;
     if(saved?.id===r.id&&saved.planned===true&&saved.category===r.category&&saved.code===g.P79Overtime.report(r.rule).code){r.attempted=true;r.acknowledged=true;continue;}
     if(saved||!valid.has(key(r)))throw Error(r.name+' '+r.date+' 的班表、出勤或額度已變更，請重新讀取建議');
@@ -1704,6 +1718,7 @@ async function open(settings={}){
    for(const r of selected){
     if(stop)break;
     activeRow=r;
+    if(monthlyRestElectionDay(r.date))throw Error('選舉日不得建立一般未休假加班預排');
     if(r.date<today())throw Error('預排日期已過，請重新讀取');
     const progress='預排 '+(selected.indexOf(r)+1)+'／'+selected.length+'：'+r.name+' '+r.date;
     if(!r.acknowledged){
@@ -1774,6 +1789,7 @@ async function open(settings={}){
    for(const emp of loadedPeople.filter(emp=>selected.some(r=>id(r.empId)===id(emp.empId)))){const roster=fresh.schedules.find(x=>id(x.empId)===id(emp.empId))?.schedule;if(!roster)throw Error(emp.name+' 班表已變更，請重新讀取');available.set(id(emp.empId),balance(emp,roster,loadedMonth,fresh).remaining);}
    for(const r of selected){activeRow=r;const roster=fresh.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule,meta=roster?.__meta?.[r.date]||{};
     if(meta.overtimeReport?.id===r.id&&meta.overtimeReport.planned!==true&&meta.overtimeReport.category===r.category&&meta.overtimeReport.code===g.P79Overtime.report(r.rule).code){r.saved=true;r.checked=false;r.status='已核對儲存成功';continue;}
+    if(monthlyRestElectionDay(r.date))throw Error(r.name+' '+r.date+' 為選舉日，請改用特殊加班申報');
     if(r.date<forwardReportStart(loadedMonth,q('#mrCutoff').value))throw Error(r.name+' 早於你設定的本次申報起日，請重新讀取');
     // Genuine completed attendance remains on its ORIGINAL day even if reported later.
     // The existing-date/report, leave, verified-hours and single-rule checks below stay mandatory.
