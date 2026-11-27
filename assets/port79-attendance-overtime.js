@@ -137,16 +137,6 @@ function overtimeDayIndicator(date,monthState){
   const empId=id(item.empId),name=people.get(empId)||String(item.name||empId);
   const meta=item.schedule?.__meta?.[date];
   if(!meta)continue;
-  for(const audit of meta.overtimeRevocations||[]){
-   const report=audit?.report;
-   if(audit?.confirmed!==true||!String(audit.reportId||'').trim()||
-      String(audit.reportId)!==String(report?.id)||id(audit.empId)!==empId||
-      audit.date!==date||!audit.at||!audit.actor)continue;
-   const key=empId+'|'+date+'|'+report.id+'|revoked';
-   if(seen.has(key))continue;seen.add(key);
-   entries.push({kind:'revoked',name,code:String(report.code||''),hours:report.declaredHours||'',
-     detail:'已取消；原因：'+(audit.reason||'未填')+'；時間：'+audit.at});
-  }
   const reports=[meta.overtimeReport,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])].filter(Boolean);
   for(const report of reports){
    if(!report?.id||meta.overtimeExcluded===true||
@@ -159,18 +149,17 @@ function overtimeDayIndicator(date,monthState){
   }
  }
  if(!entries.length)return null;
- const counts={reported:0,amended:0,revoked:0};
+ const counts={reported:0,amended:0};
  for(const row of entries)counts[row.kind]++;
- // 日期顏色以「目前有效」申報為主：歷史撤銷不能蓋掉同日重新申報。
- // 有效申報仍有待核的修改才呈黃；只有不存在有效申報時，歷史取消才呈紅。
+ // 僅顯示目前有效申報；取消歷史保留在正式資料，不顯示於日期列。
  const activeCount=counts.reported+counts.amended;
- const kind=activeCount>0?(counts.amended?'amended':'reported'):'revoked';
- const summary=['已申報 '+counts.reported,'已修改 '+counts.amended,'已取消 '+counts.revoked].join('｜');
- const names={revoked:'已取消',amended:'已修改',reported:'已申報'};
+ const kind=counts.amended?'amended':'reported';
+ const summary=['已申報 '+counts.reported,'已修改 '+counts.amended].join('｜');
+ const names={amended:'已修改',reported:'已申報'};
  const lines=entries.slice(0,24).map(row=>row.name+'：'+names[row.kind]+
   (row.code?'｜'+row.code:'')+(row.hours?'｜'+row.hours+'小時':'')+'｜'+row.detail);
  if(entries.length>24)lines.push('其餘 '+(entries.length-24)+' 筆請開啟申報明細核對');
- return {kind,count:entries.length,activeCount,amendedCount:counts.amended,revokedCount:counts.revoked,title:date+'\n'+summary+'\n'+lines.join('\n')};
+ return {kind,count:entries.length,activeCount,amendedCount:counts.amended,revokedCount:0,title:date+'\n'+summary+'\n'+lines.join('\n')};
 }
 // 查核只確認「當下讀到的正式申報版本」，不會修改 GAS 申報或歷史稽核。
 // 只存 hash，避免舊日期一旦查核就永遠把後續新修改誤標為綠色。
@@ -472,19 +461,9 @@ async function recheckAndMarkReviewed(date,checked=true){
    if(!info?.activeCount){
     if(attendanceConfirmation)return {ok:true,attendanceConfirmed:attendanceConfirmation.attendanceConfirmed,kind:info?.kind||'none',message:date+' 雲端考勤核對完成；取消預排 '+attendanceConfirmation.cancelled+' 筆、打卡待核 '+attendanceConfirmation.punchReview+' 筆、已審核交管理員確認 '+attendanceConfirmation.approvedReview+' 筆；原休假類別與異動紀錄保留，無有效申報不強制顯示綠色'};
     const evidence=attendanceReviewEvidence(date,state);
-    const details=[
-     '本次班表回傳 '+evidence.candidate+' 筆申報候選資料',
-     evidence.revoked+' 筆已確認取消歷史',
-     ...(evidence.matchedCancelId?['其中 '+evidence.matchedCancelId+' 筆申報編號與取消紀錄相同']:[]),
-     ...(evidence.excluded?['有 '+evidence.excluded+' 筆標記為排除']:[]),
-     ...(evidence.missingId?['有 '+evidence.missingId+' 筆缺少申報編號']:[])
-    ].join('、');
-    // A schedule snapshot is only one source. It cannot prove that a filing
-    // wasn't saved elsewhere or that cloud schedule replication has completed.
+    // No active candidate in this snapshot does not prove that the authoritative filing is absent.
     return {ok:false,kind:'unverified',evidence,
-     message:date+' 目前無法從考勤班表快照確認有效申報（'+details+'）。'
-      +'這不代表你沒有正式申報，也不能只因取消歷史就否定後續申報。'
-      +'如果加班管理已顯示「正常已申報」，代表兩邊資料需要核對；目前不會自行改動正式申報或強制標綠。'};
+     message:date+' 目前考勤班表尚未確認有效申報；如加班管理已有正常申報，請核對兩邊資料。'};
    }
    const signature=reviewFingerprint(date,state);
    if(!signature)throw Error('正式申報指紋未完成');
@@ -574,7 +553,7 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   button.style.removeProperty('border-color');
   button.style.removeProperty('box-shadow');
   button.removeAttribute('title');
-  // 白色只代表「正式雲端月份已讀取、當日沒有申報或撤銷紀錄」。
+  // 白色只代表「正式雲端月份已讀取、當日沒有有效申報」。
   // 尚未讀到完整月份時不可誤當作無申報；查核標記不參與顏色判斷。
   const ready=state?.ready===true;
   // 修改經人工核對且申報版本未再變動，恢復綠色；新的修改仍須重新核對。
@@ -582,7 +561,6 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   const effectiveKind=info?.kind==='amended'&&reviewed?'reported':info?.kind;
   const palette=!ready?['#f1f5f9','#64748b','#94a3b8']:
    !info?['#ffffff','#334155','#cbd5e1']:
-   effectiveKind==='revoked'?['#fee2e2','#991b1b','#f87171']:
    effectiveKind==='amended'?['#fef3c7','#92400e','#f59e0b']:
    ['#dcfce7','#166534','#4ade80'];
   button.style.setProperty('background-color',palette[0],'important');
@@ -592,7 +570,7 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   button.dataset.p79OvertimeAudit=effectiveKind||(ready?'none':'unknown');
   button.dataset.p79OvertimeReview=reviewed?'reviewed':'not-reviewed';
   button.dataset.p79OvertimeContentVersion=ready?reviewFingerprint(date,cloudMonth(date)):'';
-  button.title=(info?.title||(date+(ready?'｜沒有正式加班申報':'｜正式申報資料尚未確認')))
+  button.title=(info?.title||(date+(ready?'｜沒有有效加班申報':'｜正式申報資料尚未確認')))
    +(state?.source==='2026-10-provisional'?'\n⚠️ 10/28歷史備援，非月底核薪定稿':'')
    +(reviewed&&info?.activeCount?'\n此版本已人工查核；修改歷史保留':'');
   button.setAttribute('aria-label',date+'｜'+button.title.replaceAll('\n','；'));
@@ -601,7 +579,7 @@ function decorateOvertimeDateStrip(keys,selectedDate=''){
   const legend=g.document.createElement('span');
   legend.id='p79OvertimeDateLegend';
   legend.style.cssText='flex-shrink:0;white-space:nowrap;margin-left:6px;font-size:11px;color:#64748b';
-  legend.textContent='白：未見申報｜綠：備援有申報｜黃：修改待核｜紅：取消｜灰：尚未確認；10月備援非最終核薪';
+  legend.textContent='白：未見申報｜綠：有效申報｜黃：修改待核｜灰：尚未確認；10月備援非最終核薪';
   host.appendChild(legend);
  }
 }
