@@ -1909,8 +1909,8 @@ async function open(settings={}){
    setStatus('這位人員沒有可用未休額度或可預排日期，請重新核對');return;
   }
   const prefill=chosen?
-   {manualPlan:true,monthlyRestEightHour:true,empId:chosen.empId,allowedEmpIds:[chosen.empId],requirePeriodSelection:true,pickDateExplicitly:true}:
-   {manualPlan:true,monthlyRestEightHour:true};
+   {manualPlan:true,monthlyRestEightHour:true,note:'每月未休假加班預排（正式配休）',empId:chosen.empId,allowedEmpIds:[chosen.empId],requirePeriodSelection:true,pickDateExplicitly:true}:
+   {manualPlan:true,monthlyRestEightHour:true,note:'每月未休假加班預排（正式配休）'};
   if(fromRoster){
    if(!chosen||!detail||!manualPlanSelectable(detail,loadedMonth)||
       !(Number(detail.remaining.休)>0||Number(detail.remaining.國)>0))return setStatus('目前沒有可預排的休／國缺額');
