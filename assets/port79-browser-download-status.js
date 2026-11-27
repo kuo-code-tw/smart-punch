@@ -11,12 +11,29 @@
  function readNotice(record){try{return JSON.parse(localStorage.getItem(noticeKey(record))||'null')||{}}catch(_){return {}}}
  function saveNotice(record,patch){try{localStorage.setItem(noticeKey(record),JSON.stringify({...readNotice(record),...patch}))}catch(_){}}
  function read(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(_){return null}}
+ // The shared header is created after login. Reparent the same widget, never
+ // leave a floating overlay on the content or duplicate a notification button.
+ function mount(){
+  if(!panel)return false;
+  const tools=document.querySelector('#p79WorkspaceTopbar .p79-toolbar-tools');
+  if(!tools||!document.body?.classList.contains('p79-workspace'))return false;
+  const bell=tools.querySelector('button[data-p79-notification-bell],button[aria-label="通知"],button[aria-label="通知中心"],button[title="通知"],button[title="通知中心"]');
+  if(panel.parentElement!==tools){
+   if(bell)bell.after(panel);
+   else tools.insertBefore(panel,tools.querySelector('.p79-toolbar-user')||null);
+   panel.p79Collapse?.();
+  }
+  panel.dataset.p79BesideBell=bell?'1':'0';
+  return true;
+ }
  function build(){
   if(panel||!document.body)return;
   const style=document.createElement('style');
-  style.textContent='#p79BrowserBgProgress{position:fixed;right:15px;bottom:15px;z-index:15000;width:max-content;max-width:calc(100vw - 30px);color:#153956;font:700 12px/1.6 system-ui,"Microsoft JhengHei",sans-serif}'+
-   '#p79BrowserBgProgress [data-p79-compact]{display:flex;align-items:center;gap:6px;border:1px solid #9abfda;border-radius:999px;padding:6px 10px;background:#f5faff;color:#153956;box-shadow:0 3px 12px #123b662b;white-space:nowrap}'+
-   '#p79BrowserBgProgress [data-p79-popover]{position:absolute;right:0;bottom:100%;width:min(335px,calc(100vw - 30px));max-height:calc(100dvh - 70px);overflow:auto;box-sizing:border-box;border:1px solid #9abfda;border-radius:13px;padding:11px 13px;background:#f5faff;color:#153956;box-shadow:0 8px 28px #123b662b}'+
+  style.textContent='#p79BrowserBgProgress{position:relative;flex:0 0 auto;align-self:center;z-index:15000;width:max-content;max-width:100%;color:#153956;font:700 12px/1.6 system-ui,"Microsoft JhengHei",sans-serif}'+
+   '#p79BrowserBgProgress [data-p79-compact]{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:32px;border:1px solid #9abfda;border-radius:8px;padding:4px 8px;background:#f5faff;color:#153956;box-shadow:none;white-space:nowrap}'+
+   '#p79BrowserBgProgress [data-p79-bell]{width:17px;height:17px;flex:none}'+
+   '#p79BrowserBgProgress[data-p79-beside-bell="1"] [data-p79-bell]{display:none}'+
+   '#p79BrowserBgProgress [data-p79-popover]{position:absolute;right:0;top:100%;width:min(335px,calc(100vw - 30px));max-height:calc(100dvh - 70px);overflow:auto;box-sizing:border-box;border:1px solid #9abfda;border-radius:13px;padding:11px 13px;background:#f5faff;color:#153956;box-shadow:0 8px 28px #123b662b}'+
    '#p79BrowserBgProgress[hidden],#p79BrowserBgProgress [hidden]{display:none!important}'+
    '#p79BrowserBgProgress .p79-head{font-size:13px;font-weight:900}'+
    '#p79BrowserBgProgress progress{width:100%;height:9px;vertical-align:middle}'+
@@ -26,8 +43,9 @@
   (document.head||document.body).appendChild(style);
   panel=document.createElement('aside');panel.id='p79BrowserBgProgress';panel.hidden=true;
   panel.setAttribute('aria-label','背景資料下載進度');
-  panel.innerHTML='<button type="button" data-p79-compact aria-expanded="false" aria-controls="p79BrowserBgPopover" aria-label="背景資料下載進度">☁ <span data-p79-compact-text>下載中</span></button><div id="p79BrowserBgPopover" data-p79-popover hidden><div class="p79-head" data-p79-title>☁ 背景資料下載</div><div><span data-p79-count>0/6</span> <progress data-p79-bar max="1" value="0"></progress></div><div data-p79-systems></div><div data-p79-month hidden><span data-p79-month-count></span><progress data-p79-month-bar max="1" value="0"></progress></div><div data-p79-summary></div><button type="button" data-p79-toggle aria-expanded="false">查看下載明細</button><div class="p79-detail" data-p79-detail hidden></div><button type="button" data-p79-retry hidden>補抓未完成資料</button><button type="button" data-p79-dismiss hidden>關閉完成通知</button></div>';
-  document.body.appendChild(panel);
+  panel.innerHTML='<button type="button" data-p79-compact aria-expanded="false" aria-controls="p79BrowserBgPopover" aria-label="背景資料下載通知"><svg data-p79-bell viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span data-p79-compact-text>下載中</span></button><div id="p79BrowserBgPopover" data-p79-popover hidden><div class="p79-head" data-p79-title>☁ 背景資料下載</div><div><span data-p79-count>0/6</span> <progress data-p79-bar max="1" value="0"></progress></div><div data-p79-systems></div><div data-p79-month hidden><span data-p79-month-count></span><progress data-p79-month-bar max="1" value="0"></progress></div><div data-p79-summary></div><button type="button" data-p79-toggle aria-expanded="false">查看下載明細</button><div class="p79-detail" data-p79-detail hidden></div><button type="button" data-p79-retry hidden>補抓未完成資料</button><button type="button" data-p79-dismiss hidden>關閉完成通知</button></div>';
+  // Keep detached until the authenticated shared toolbar is ready.
+  mount();
   const compact=panel.querySelector('[data-p79-compact]');
   const popover=panel.querySelector('[data-p79-popover]');
   const sync=()=>{const open=!panel.hidden&&(hovered||pinned||focusOpen);popover.hidden=!open;compact.setAttribute('aria-expanded',String(open));};
@@ -46,6 +64,7 @@
  }
  function update(record){
   build();if(!panel)return;
+  if(!mount()){panel.hidden=true;panel.p79Collapse();return;}
   record=record||read();
   const user=window.Port79DataCache?.viewerKey?.();
   if(!record||!user||record.viewer!==user||!record.startedAt||
@@ -90,6 +109,7 @@
  }
  function start(){
   build();update();
+  window.addEventListener('p79-home-status-ready',()=>update());
   window.addEventListener('storage',e=>{if(e.key===KEY||e.key?.startsWith(NOTICE_KEY))update()});
   try{if(typeof BroadcastChannel==='function'){const channel=new BroadcastChannel('p79-browser-cache-progress');channel.onmessage=e=>update(e.data)}}catch(_){}
   window.setInterval?.(()=>update(),5000);
