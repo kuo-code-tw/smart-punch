@@ -1344,8 +1344,8 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
     <div class="flex flex-nowrap gap-1 text-[9px] leading-tight text-slate-600 dark:text-slate-300" >
                             <div class="flex flex-nowrap items-center gap-x-1">
                                 <span class="font-bold whitespace-nowrap">💡 異常顏色：</span>
-                                <span class="inline-flex rounded border border-amber-300 bg-amber-100 dark:bg-amber-950 px-1 py-0.5 font-bold text-amber-800 dark:text-amber-300" title="上班時間需核對｜01–30 分">上班核對</span>
-                                <span class="inline-flex rounded border border-violet-300 bg-violet-100 dark:bg-violet-950 px-1 py-0.5 font-bold text-violet-800 dark:text-violet-300" title="下班時間需核對｜非 45–60 分">下班核對</span>
+                                <span class="inline-flex rounded border border-amber-300 bg-amber-100 dark:bg-amber-950 px-1 py-0.5 font-bold text-amber-800 dark:text-amber-300" title="上班時間需核對｜依系統設置的簽到分鐘">上班核對</span>
+                                <span class="inline-flex rounded border border-violet-300 bg-violet-100 dark:bg-violet-950 px-1 py-0.5 font-bold text-violet-800 dark:text-violet-300" title="下班時間需核對｜依系統設置的簽退分鐘">下班核對</span>
                                 <span class="inline-flex rounded border border-cyan-300 bg-cyan-100 dark:bg-cyan-950 dark:border-cyan-800 px-1 py-0.5 font-bold text-cyan-800 dark:text-cyan-300" title="已整合｜同班次重複刷卡">重複已整合</span>
                                 <span class="inline-flex rounded border border-rose-300 bg-rose-100 dark:bg-rose-950 dark:border-rose-800 px-1 py-0.5 font-bold text-rose-800 dark:text-rose-300" title="缺卡｜缺少簽到">缺上班卡</span>
                                 <span class="inline-flex rounded border border-orange-300 bg-orange-100 dark:bg-orange-950 dark:border-orange-800 px-1 py-0.5 font-bold text-orange-800 dark:text-orange-300" title="缺卡｜缺少簽退">缺下班卡</span>
@@ -1578,7 +1578,7 @@ body[data-p79-system="attendance"] #attendanceRecordsToolbar #attendanceExcelLoa
 
                 <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 px-3 py-2 text-[11px]">
                     <span class="font-bold text-slate-600 dark:text-slate-300">💡 時間提醒：</span>
-                    <span class="inline-flex items-center rounded-lg border border-violet-300 dark:border-violet-800 bg-violet-100 dark:bg-violet-950 px-2 py-1 font-bold text-violet-800 dark:text-violet-300">下班分鐘不在 45–60</span>
+                    <span class="inline-flex items-center rounded-lg border border-violet-300 dark:border-violet-800 bg-violet-100 dark:bg-violet-950 px-2 py-1 font-bold text-violet-800 dark:text-violet-300">下班分鐘不符合系統設置</span>
                 </div>
 
                 <div class="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-2xl p-3">
@@ -14714,6 +14714,12 @@ function getManualPairRecordAnchor(record) {
             return match ? Number(match[2]) : null;
         }
 
+        // Shared cloud settings; existing 30/45 rules remain the fallback.
+        function p79PunchReviewThreshold(type) {
+            const fallback=type==='IN'?30:45;
+            const raw=sysConfig?.p79SystemSettingsV1?.punchReview?.[type==='IN'?'inMinute':'outMinute'];
+            return Number.isInteger(raw)&&raw>=0&&raw<=59?raw:fallback;
+        }
         function formatAttendanceTimeCell(record, type) {
             if (!record) return '--';
             if (!normalizeImportedAttendanceTime(record.timeStr)) return `<span class="text-rose-700 dark:text-rose-300 font-semibold">${escapeHtml(String(record.timeStr || '--'))}（時間不完整）</span>`;
@@ -14723,12 +14729,14 @@ function getManualPairRecordAnchor(record) {
                 return `<span class="text-slate-700 dark:text-white font-semibold">${text}</span>`;
             }
             const minute = getAttendanceMinute(record);
-            if(type==='IN'&&minute!==null&&minute>=1&&minute<=30){
-                return `<span class="inline-flex px-2 py-1 rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold" title="上班時間需核對：分鐘為 01 至 30">${text}</span>`;
+            const inLimit=typeof p79PunchReviewThreshold==='function'?p79PunchReviewThreshold('IN'):30;
+            const outLimit=typeof p79PunchReviewThreshold==='function'?p79PunchReviewThreshold('OUT'):45;
+            if(type==='IN'&&minute!==null&&minute>=1&&minute<=inLimit){
+                return `<span class="inline-flex px-2 py-1 rounded-lg bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold" title="上班時間需核對：分鐘為 01 至 ${inLimit}">${text}</span>`;
             }
             // 分鐘 45–59，以及下一小時的 00 分，均視為 45–60 的正常範圍。
-            if (type === 'OUT' && minute !== null && minute !== 0 && minute < 45) {
-                return `<span class="inline-flex px-2 py-1 rounded-lg bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 font-bold" title="下班簽退分鐘未介於 45–60">${text}</span>`;
+            if (type === 'OUT' && minute !== null && minute !== 0 && minute < outLimit) {
+                return `<span class="inline-flex px-2 py-1 rounded-lg bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300 font-bold" title="下班簽退分鐘未介於 ${String(outLimit).padStart(2,'0')}–60">${text}</span>`;
             }
             return text;
         }
@@ -15184,9 +15192,11 @@ function getManualPairRecordAnchor(record) {
                 const minute=r=>{const m=String(r?.timeStr||'').match(/(?:\s|T)\d{1,2}:(\d{2})(?::\d{2})?$/);return m?Number(m[1]):null;};
                 const inMinute=minute(row.clockIn);
                 const timeChecks=[];
-                if(!edited(row.clockIn)&&inMinute!==null&&inMinute>=1&&inMinute<=30)timeChecks.push('上班時間需核對：分鐘為01至30');
+                const inLimit=typeof p79PunchReviewThreshold==='function'?p79PunchReviewThreshold('IN'):30;
+                const outLimit=typeof p79PunchReviewThreshold==='function'?p79PunchReviewThreshold('OUT'):45;
+                if(!edited(row.clockIn)&&inMinute!==null&&inMinute>=1&&inMinute<=inLimit)timeChecks.push('上班時間需核對：分鐘為01至'+inLimit);
                 const outMinute=minute(row.clockOut);
-                if(!edited(row.clockOut)&&outMinute!==null&&outMinute>0&&outMinute<45)timeChecks.push('下班分鐘未在45–60');
+                if(!edited(row.clockOut)&&outMinute!==null&&outMinute>0&&outMinute<outLimit)timeChecks.push('下班分鐘未在'+String(outLimit).padStart(2,'0')+'–60');
                 if(timeChecks.length)return {kind:'ABNORMAL',status:'時間需核對',reasons:timeChecks};
                 return {kind:'NORMAL',status:'正常'};
             }
@@ -16653,7 +16663,7 @@ function getManualPairRecordAnchor(record) {
                     : '<span class="text-[11px] '+(rosterRest.missingDates?'text-slate-500':'text-amber-700')+'" title="'+escapeHtml(rosterRestTitle)+'">'+
                       escapeHtml(rosterRest.label)+(rosterRest.missingDates?'<span class="block text-[10px]">缺 '+escapeHtml(rosterRest.missingDates.slice(0,4).map(d=>d.slice(5).replace('-','/')).join('、'))+(rosterRest.missingDates.length>4?'…':'')+'</span>':'')+'</span>';
 
-                const visibleAssessmentReasons=(row.attendanceAssessmentReasons||[]).filter(reason=>!String(reason).startsWith('上班時間與班表不符')&&!String(reason).startsWith('上班時間需核對：')&&String(reason)!=='下班分鐘未在45–60');
+                const visibleAssessmentReasons=(row.attendanceAssessmentReasons||[]).filter(reason=>!String(reason).startsWith('上班時間與班表不符')&&!String(reason).startsWith('上班時間需核對：')&&!String(reason).startsWith('下班分鐘未在'));
                 const hiddenTimeOnly=row.attendanceStatus==='時間需核對'&&(row.attendanceAssessmentReasons||[]).length>0&&!visibleAssessmentReasons.length;
                 const statusText=hiddenTimeOnly?'':row.attendanceStatus;
                 const assessmentDetails = visibleAssessmentReasons.map(reason => `<span class="inline-flex ml-1 text-[10px] text-rose-700 dark:text-rose-300">${escapeHtml(reason)}</span>`).join('');
