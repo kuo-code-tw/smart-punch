@@ -1202,7 +1202,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1354,7 +1354,7 @@ async function open(settings={}){
     (provisional?' ⚠️ 此份歷史備援非月底核薪定稿。':'')+
     (attendanceUnavailable?' ⚠️ 考勤讀取未完成，僅展示既有申報，不判定實際出勤。':'');
    q('#mrExistingRows').innerHTML=existing.map(r=>
-    '<tr data-emp="'+esc(r.empId)+'"'+quotaAttr(r.empId)+'><td>'+esc(r.date)+'</td><td>'+esc(r.role)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.category)+'</td><td>'+esc(r.code||'時段待核')+
+    '<tr data-emp="'+esc(r.empId)+'" data-work-date="'+esc(r.date)+'"'+quotaAttr(r.empId)+'><td>'+esc(r.date)+'</td><td>'+esc(r.role)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.category)+'</td><td>'+esc(r.code||'時段待核')+
     '</td><td>'+esc(r.status)+'</td><td>'+esc(r.typhoon?'颱風加班（另核額度）':r.monthlyRest?'每月未休假加班':r.source||'一般例休國申報')+
     '</td><td><small>'+esc(r.reportId)+'</small></td></tr>').join('')||
     '<tr><td colspan="8">'+(scheduleCount?'這個篩選沒有已保存的例／休／國申報編號，其他加班仍需另查。':'本月來源尚未讀到，不能當作零申報。')+'</td></tr>';
@@ -1404,7 +1404,7 @@ async function open(settings={}){
       ' 筆（尚未建立）｜未能安排 '+unfilled+' 天'+(weeklyReview?'｜例休週期待核 '+weeklyReview+' 筆':'')+'；尚未發生或尚未核實，不計入正式申報';
     q('#mrPlannedRows').innerHTML=upcoming.map(r=>{
       const emp=loadedPeople.find(e=>id(e.empId)===id(r.empId))||{};
-      return '<tr data-emp="'+esc(r.empId)+'" data-saved="'+String(r.saved===true)+'"'+quotaAttr(r.empId)+' data-hours="'+esc(r.rule?.[2]||'')+' 小時"><td><input type="checkbox" class="plan-pick" data-plan-index="'+model.plannedRows.indexOf(r)+'" '+(r.checked?'checked':'')+' '+(r.saved?'disabled':'')+' aria-label="預排 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date)+'</td><td>'+esc(job(emp))+'</td><td>'+esc(r.name)+'</td><td class="'+esc(r.category)+'">'+
+      return '<tr data-emp="'+esc(r.empId)+'" data-work-date="'+esc(r.date)+'" data-saved="'+String(r.saved===true)+'"'+quotaAttr(r.empId)+' data-hours="'+esc(r.rule?.[2]||'')+' 小時"><td><input type="checkbox" class="plan-pick" data-plan-index="'+model.plannedRows.indexOf(r)+'" '+(r.checked?'checked':'')+' '+(r.saved?'disabled':'')+' aria-label="預排 '+esc(r.name)+' '+esc(r.date)+'"></td><td>'+esc(r.date)+'</td><td>'+esc(job(emp))+'</td><td>'+esc(r.name)+'</td><td class="'+esc(r.category)+'">'+
         esc(r.category)+'</td><td>'+esc(r.rule?.[1])+'</td><td>'+esc(r.status)+'</td></tr>';
     }).join('')||'<tr><td colspan="7">目前沒有可產生的月底預排建議；請查看各單位缺額和班表限制</td></tr>';
     const review=rosterReviewRows(model,chosenPeople());
@@ -1710,7 +1710,7 @@ async function open(settings={}){
     r.attempted=true;r.status='儲存預排中／待雲端讀回';setStatus(progress+'｜上傳雲端');paint();controls(true);
     const result=await a.saveReport(draft,batch);
     if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==r.id||result.report?.planned!==true)throw Error('雲端未確認儲存為預排');
-    r.acknowledged=true;
+    r.acknowledged=true;r.checked=false;r.status='雲端已接收／待雲端讀回';paint();controls(true);
    }
   }catch(error){failure=String(error.message||error);}
   finally{

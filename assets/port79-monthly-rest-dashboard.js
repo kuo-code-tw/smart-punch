@@ -9,6 +9,16 @@ const $$=(root,sel)=>Array.from(root.querySelectorAll(sel));
 const esc=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;' ,'"':'&quot;',"'":'&#39;'}[ch]));
 const text=(root,sel)=>$(root,sel)?.textContent?.trim()||'';
 const norm=value=>String(value||'').trim().toLowerCase();
+// Display localization may rewrite a cell to ROC dates; never use that
+// localized text as a different work-date identity.
+function workDateKey(value){
+ const m=String(value||'').trim().match(/^(\d{3,4})[-/](\d{1,2})[-/](\d{1,2})$/);
+ if(!m)return '';
+ const year=Number(m[1])+(m[1].length===3?1911:0);
+ const date=year+'-'+m[2].padStart(2,'0')+'-'+m[3].padStart(2,'0');
+ const ms=Date.parse(date+'T00:00:00Z');
+ return Number.isFinite(ms)&&new Date(ms).toISOString().slice(0,10)===date?date:'';
+}
 const hasDataRow=tr=>tr&&tr.hasAttribute('data-row');
 function periodLabel(value){
  const raw=String(value||'').trim();
@@ -118,13 +128,13 @@ function sourceRows(el){
  }).filter(r=>r.date);
  const planned=$$(el,'#mrPlannedRows tr').filter(tr=>$(tr,'.plan-pick')).map(tr=>{
   const td=tr.cells,pick=$(tr,'.plan-pick');
-  return {kind:'plan',id:pick.dataset.planIndex,empId:tr.dataset?.emp||'',date:td[1]?.textContent?.trim()||'',name:td[3]?.textContent?.trim()||'',
+  return {kind:'plan',id:pick.dataset.planIndex,empId:tr.dataset?.emp||'',date:workDateKey(tr.dataset?.workDate||td[1]?.textContent),name:td[3]?.textContent?.trim()||'',
     category:td[4]?.textContent?.trim()||'',period:td[5]?.textContent?.trim()||'',hours:tr.dataset?.hours||'—',
     quotaProgress:rowQuotaProgress(tr),status:td[6]?.textContent?.trim()||'預排待核',saved:tr.dataset?.saved==='true',checked:!!pick.checked,disabled:!!pick.disabled};
  });
  const prior=$$(el,'#mrExistingRows tr').filter(tr=>tr.cells.length===8).map(tr=>{
   const td=tr.cells;
-  return {kind:'existing',id:td[7]?.textContent?.trim()||'',empId:tr.dataset?.emp||'',quotaProgress:rowQuotaProgress(tr),date:td[0]?.textContent?.trim()||'',name:td[2]?.textContent?.trim()||'',
+  return {kind:'existing',id:td[7]?.textContent?.trim()||'',empId:tr.dataset?.emp||'',quotaProgress:rowQuotaProgress(tr),date:workDateKey(tr.dataset?.workDate||td[0]?.textContent),name:td[2]?.textContent?.trim()||'',
     category:td[3]?.textContent?.trim()||'',period:td[4]?.textContent?.trim()||'',hours:'—',
     status:td[5]?.textContent?.trim()||'',source:td[6]?.textContent?.trim()||''};
  });
@@ -160,12 +170,14 @@ function quotaFullyAllocated(progress){
 }
 function dailyPendingRows(data){
  const people=new Map(data.roster.map(r=>[String(r.id).trim().toUpperCase(),r]));
- const key=(emp,date)=>String(emp||'').trim().toUpperCase()+'|'+date;
+ const key=(emp,date)=>String(emp||'').trim().toUpperCase()+'|'+workDateKey(date);
  const dated=new Map(),result=[];
  // Every saved active declaration (including a preplan awaiting attendance)
  // occupies its employee/work-date; cancelled/history-only rows do not.
  const occupiedDates=new Set([...(data.prior||[]).filter(r=>r.id&&r.empId&&r.date&&!/已取消|歷史版本/.test(r.status)),...(data.planned||[]).filter(r=>r.saved===true&&r.empId&&r.date)].map(r=>key(r.empId,r.date)));
- for(const row of [...data.ready,...data.planned]){
+ for(const raw of [...data.ready,...data.planned]){
+  const row={...raw,date:workDateKey(raw.date)};
+  if(!row.empId||!row.date)continue;
   const person=people.get(String(row.empId||'').trim().toUpperCase());
   // Completed quotas leave the actionable list, not the official record archive.
   if(quotaFullyAllocated(row.quotaProgress||person?.quotaProgress)||row.kind==='plan'&&row.saved===true)continue;
@@ -177,7 +189,8 @@ function dailyPendingRows(data){
  }
  for(const person of data.roster.filter(r=>r.reviewType==='deficit'&&!quotaFullyAllocated(r.quotaProgress))){
   const covered=new Set(result.filter(r=>String(r.empId||'').trim().toUpperCase()===String(person.id).trim().toUpperCase()).map(r=>r.date));
-  for(const hint of person.suggestions||[]){
+  for(const rawHint of person.suggestions||[]){
+   const hint={...rawHint,date:workDateKey(rawHint.date)};
    if(!hint.date||covered.has(hint.date))continue;
    const k=key(person.id,hint.date);
    if(dated.has(k)||occupiedDates.has(k))continue;
@@ -214,7 +227,7 @@ function selectionMode(row){
  if(!row)return 'none';
  if(row.kind==='roster'||row.kind==='reference')return 'review';
  if(row.kind==='existing')return row.status==='已核對出勤'?'none':'review';
- if(row.kind==='plan')return row.disabled?'review':'native';
+ if(row.kind==='plan')return /儲存預排中|待雲端讀回|雲端已接收/.test(row.status)?'none':row.disabled?'review':'native';
  if(row.kind==='ready')return !row.disabled&&/可申報/.test(row.status)&&
    !/缺|不足|無法|失敗|錯誤/.test(row.status)?'native':'review';
  return 'none';
@@ -391,7 +404,7 @@ function mount(el){
   if(!row.disabled&&/可申報/.test(row.status))return 'ready';
   return 'review';
  }
- function label(row){if(row.kind==='roster')return compactRosterStatus(row);if(row.kind==='existing'&&/^預排/.test(row.status))return row.status;const type=kind(row);return {ready:'可申報',review:'待核對',missing:'缺資料',plan:'預排建議',done:'已完成'}[type];}
+ function label(row){if(row.kind==='plan'&&/儲存預排中|待雲端讀回|雲端已接收|讀回未確認|失敗/.test(row.status))return row.status;if(row.kind==='roster')return compactRosterStatus(row);if(row.kind==='existing'&&/^預排/.test(row.status))return row.status;const type=kind(row);return {ready:'可申報',review:'待核對',missing:'缺資料',plan:'預排建議',done:'已完成'}[type];}
  function currentView(){const data=rows();let shown=state.tab==='done'?data.verified:state.tab==='audit'?data.audit:data.pending;
   if(state.name)shown=shown.filter(r=>norm(r.name).includes(norm(state.name)));
   if(state.status&&state.tab!=='done')shown=shown.filter(r=>kind(r)===state.status);
