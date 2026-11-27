@@ -8,6 +8,7 @@ const confirmedReport=(meta,report)=>{
  return !(meta?.overtimeRevocations||[]).some(x=>
    x?.confirmed===true&&String(x.reportId)===String(report.id));
 };
+const hasActiveExtraReport=meta=>(Array.isArray(meta?.overtimeReports)?meta.overtimeReports:[]).some(r=>confirmedReport(meta,r));
 const id=x=>String(x||'').trim().toUpperCase(),today=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei'}).format(new Date());
 // V2026-11-17: Current-month overtime preplanning uses employment status,
 // rather than just permission scope. Never delete saved historical reports.
@@ -560,7 +561,7 @@ function plan(snapshot,people,month,rules,options={}){
   for(const date of b.dates){
    const m=roster.__meta?.[date]||{};
    if(date<nextReportDate)continue; // Earlier unresolved attendance stays in the audit ledger.
-   if((b.typhoonDates||[]).includes(date)||!(['早','中','晚','國','休','例'].includes(roster[date])||/^[休國例]\s*\d/.test(String(roster[date]||'')))||m.overtimeReport||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
+   if((b.typhoonDates||[]).includes(date)||!(['早','中','晚','國','休','例'].includes(roster[date])||/^[休國例]\s*\d/.test(String(roster[date]||'')))||m.overtimeReport||hasActiveExtraReport(m)||m.overtime||m.forEmpId||m.coverAssignmentId||m.overtimeExcluded||leaveDates.has(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))continue;
    const originalCategory=automaticRestCategory(roster,date,month)||
     (!historical&&date>currentDate&&canDesignateFutureRest(roster,date,month,'休')?'休':'');
    if(!originalCategory){
@@ -768,7 +769,7 @@ function manualRestPlanIssue(snapshot,emp,month,date,rule,asOf=today(),cutoff=''
  const category=rule[0],meta=roster.__meta?.[date]||{};
  if(date<forwardReportStart(month,cutoff,asOf))return '早於你設定的本次申報起日';
  if(!canDesignateFutureRest(roster,date,month,category)||date===asOf&&!documentedFutureRestCategory(roster,date,month,category))return '既有假別不符或不是可配休的未來班別';
- if(meta.overtimeReport||meta.overtime||meta.forEmpId||meta.coverAssignmentId||meta.overtimeExcluded)return '已有加班、代班或排除紀錄，不得重複預排';
+ if(meta.overtimeReport||hasActiveExtraReport(meta)||meta.overtime||meta.forEmpId||meta.coverAssignmentId||meta.overtimeExcluded)return '已有加班、代班或排除紀錄，不得重複預排';
  if((snapshot.leaveDates||[]).includes(id(emp.empId)+'|'+date)||g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,date,roster))return '該日已有請假，不得重複預排';
  if((snapshot.pairs||[]).some(p=>id(p.empId)===id(emp.empId)&&p.date===date))return '該日已有打卡，請由實際出勤核對流程處理';
  if(date===asOf&&!['open','missing'].includes(g.P79RestAttendance?.state(snapshot,emp.empId,date)))return '當日出勤狀態不適合新增預排';
@@ -803,7 +804,7 @@ function rosterPeriodReferences(snapshot,emp,b,month,rules,asOf=today()){
  const permitted=day=>{const m=roster.__meta?.[day]||{},pairs=pairsByDate.get(day)||[];
   const actual=day<=asOf&&explicitRange&&pairs.length===1&&fullDayEvidence(snapshot,emp.empId,day,pairs[0]);
   return day>=from&&(actual||day>asOf&&!pairs.length)&&day.startsWith(month+'-')&&
-  !(b.typhoonDates||[]).includes(day)&&!m.overtimeReport&&!m.overtime&&!m.forEmpId&&!m.coverAssignmentId&&!m.overtimeExcluded&&
+  !(b.typhoonDates||[]).includes(day)&&!m.overtimeReport&&!hasActiveExtraReport(m)&&!m.overtime&&!m.forEmpId&&!m.coverAssignmentId&&!m.overtimeExcluded&&
   !blocked.has(employee+'|'+day)&&!g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,day,roster);};
  for(const date of days.filter(permitted)){
   const original=String(roster[date]||'').trim(),m=roster.__meta?.[date]||{};
@@ -1201,7 +1202,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
