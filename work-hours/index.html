@@ -18229,7 +18229,7 @@ window.p79OvertimeStatusContext={
     // overtime-specific flags, not personnel, attendance or leave data.
     ['overtime','overtimeType','overtimeAssignedShift','overtimeOriginalShift','reportOriginalShift','restQuotaOvertime','restCategory','restAllocationSource','overtimeStart','overtimeEnd'].forEach(k=>delete meta[k]);
     meta.overtimeExcluded=true;
-    const requestId='SCHEDULE-'+crypto.randomUUID();
+    const requestId='SCHSAVE-'+crypto.randomUUID();
     const savedResult=await rpc('syncSchedules',{month,schedules:rows,expectedEmployeeCount:rows.length,saveRequestId:requestId,expectedScheduleDigest:digest});
     // Controller independently reads back the exact archive and shift even if
     // the write response is lost. Never retry an ambiguous full-month write.
