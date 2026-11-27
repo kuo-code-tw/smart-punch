@@ -878,7 +878,7 @@ html.dark #todayScheduleLeaveSummary .today-leave-title{color:#fdba74}
 }
 </style>
 
-<script src="/smart-punch/assets/port79-data-cache.js?v=20261123-quick-preload-shared-v1&bg=20261123-progress-v1"></script>
+<script src="/smart-punch/assets/port79-data-cache.js?v=20261123-quick-preload-shared-v1&bg=20261123-progress-v1&rowDelta=20261127-v1"></script>
 <script src="../assets/port79-ui-trim.js?v=20261025-zh-import-export"></script>
 <link rel="stylesheet" href="../assets/port79-seven-top.css?v=20261024-unified-status-icons&menuhover=20261026a&menu=20261112-clean-v1">
 
@@ -4660,12 +4660,17 @@ function p79EmployeeDateEligible(emp,date) {
         const timer = controller ? setTimeout(() => controller.abort(), 25000) : null;
         let data;
         try {
-          const res = await fetch(
-            GAS_URL + '?action=getScheduleDataSecure&gcToken=' + encodeURIComponent(token) + '&month=' + encodeURIComponent(requestMonth) + '&_=' + Date.now(),
-            { redirect:'follow', cache:'no-store', signal:controller?.signal }
-          );
-          if(!res.ok)throw new Error('排班讀取失敗：HTTP '+res.status);
-          data=await res.json();
+          data=await window.Port79DataCache?.readScheduleMonthDelta?.(requestMonth,{
+            url:GAS_URL,credential:token,signal:controller?.signal
+          });
+          if(!data){
+            const res = await fetch(
+              GAS_URL + '?action=getScheduleDataSecure&gcToken=' + encodeURIComponent(token) + '&month=' + encodeURIComponent(requestMonth) + '&_=' + Date.now(),
+              { redirect:'follow', cache:'no-store', signal:controller?.signal }
+            );
+            if(!res.ok)throw new Error('排班讀取失敗：HTTP '+res.status);
+            data=await res.json();
+          }
         } finally {
           if (timer) clearTimeout(timer);
           if(p79ScheduleCloudReadController===controller)p79ScheduleCloudReadController=null;

@@ -601,7 +601,7 @@ async function getSchedulePreview(month,options={}){
  const candidates=rows.map(row=>{
   if(!row||!currentViewerRow(row)||row.kind!=='system'||row.system!=='schedule'||row.savedAt<=0||row.savedAt>Date.now()+60000)return null;
   // AQC statistics may only reuse same-scope, same-endpoint, unmutated recent previews.
-  if(options.strict&&(row.displayScope!==scope||row.cacheEndpoint!==endpoint||row.savedAt<mutationStamp()||Date.now()-row.savedAt>86400000))return null;
+  if(options.strict&&(row.displayScope!==scope||row.cacheEndpoint!==endpoint||(!options.versionCheckOnly&&(row.savedAt<mutationStamp()||Date.now()-row.savedAt>86400000))))return null;
   const scoped=row.key===base+'|'+month&&row.month===month;
   const data=schedulePreviewData(row.data,month,scoped);
   return data?{data,savedAt:row.savedAt}:null;
@@ -899,6 +899,91 @@ async function fetchJson(action,params={},sys='',readOptions={}){
  }
  throw lastError;
 }
+const monthDeltaFields={
+ getAttendanceMonthRaw:['records'],
+ getAttendanceMonthData:['records'],
+ getAttendanceMainDirect:['records'],
+ getScheduleDataSecure:['employees','schedules','scheduleGroups','leaveRecords','leaveCoverAssignments','leaveCoverCancellations']
+};
+function monthRowCanonical(value){
+ if(Array.isArray(value))return '['+value.map(monthRowCanonical).join(',')+']';
+ if(value!==null&&typeof value==='object')
+  return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+monthRowCanonical(value[key])).join(',')+'}';
+ return JSON.stringify(value);
+}
+const monthDeltaUnsupported=new Set();
+async function readMonthDelta(action,month,prior,{url,credential,signal}={}){
+ const fields=monthDeltaFields[action];
+ url=url||gasUrl();credential=credential||token();
+ if(!fields||!prior||!credential||!validDownloadGasUrl(url)||!window.crypto?.subtle||monthDeltaUnsupported.has(url))return null;
+ const viewer=viewerKey(),scope=displayScope(),stamp=mutationStamp(),sessionToken=token();
+ const assertContext=()=>{
+  if(viewerKey()!==viewer||displayScope()!==scope||mutationStamp()!==stamp||token()!==sessionToken)
+   throw Object.assign(Error('帳號、權限或資料已變更，已保留原有快取'),{code:'P79_SCOPE'});
+ };
+ const manifest={},encoder=new TextEncoder();
+ for(const field of fields){
+  const rows=prior[field];
+  if(!Array.isArray(rows)||!rows.length||rows.length>25000)continue;
+  const hashes=[];
+  for(let start=0;start<rows.length;start+=256){
+   const batch=await Promise.all(rows.slice(start,start+256).map(async row=>{
+    const bytes=new Uint8Array(await window.crypto.subtle.digest('SHA-256',encoder.encode(monthRowCanonical(row))));
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+   }));
+   hashes.push(...batch);
+  }
+  manifest[field]=hashes;
+ }
+ if(!Object.keys(manifest).length)return null;
+ assertContext();
+ if(signal?.aborted)throw signal.reason;
+ const controller=new AbortController(),interrupt=()=>controller.abort();
+ signal?.addEventListener('abort',interrupt,{once:true});
+ const timeout=setTimeout(interrupt,45000);
+ try{
+  const response=await rawFetch(url,{method:'POST',cache:'no-store',redirect:'follow',signal:controller.signal,
+   headers:{'Content-Type':'text/plain;charset=UTF-8'},
+   body:JSON.stringify({action:'getMonthRowDelta',read:action,month,token:credential,manifest})});
+  if(!response.ok)throw Error('雲端增量同步 HTTP '+response.status);
+  const data=await response.json();
+  assertContext();
+  if(data?.ok===false&&/未知操作:\s*\[getMonthRowDelta\]/i.test(String(data.error||''))){
+   monthDeltaUnsupported.add(url);return null;
+  }
+  if(data?.ok!==true||data.retryable||data.month!==month||data.rowDelta?.version!==1)
+   throw Error(data?.error||'增量同步回應不完整，已保留原有快取');
+  const changes=data.rowDelta.changes;
+  if(!changes||typeof changes!=='object'||Array.isArray(changes))throw Error('增量同步格式不正確');
+  for(const [field,entries] of Object.entries(changes)){
+   if(!fields.includes(field)||!Array.isArray(entries)||!manifest[field])throw Error('增量同步欄位不正確');
+   data[field]=entries.map(entry=>{
+    if(typeof entry!=='number'||entry>=0)return entry;
+    const index=-entry-1;
+    if(!Number.isInteger(index)||index>=prior[field].length)throw Error('本機快取索引不完整');
+    return prior[field][index];
+   });
+  }
+  delete data.rowDelta;
+  return data;
+ }catch(error){
+  if(error?.name==='AbortError'||error instanceof TypeError)
+   throw Object.assign(Error('雲端增量同步連線未完成，已保留原有快取'),{code:'P79_TRANSPORT'});
+  throw error;
+ }finally{
+  clearTimeout(timeout);
+  signal?.removeEventListener('abort',interrupt);
+ }
+}
+async function readScheduleMonthDelta(month,options={}){
+ if(options.url&&options.url!==gasUrl())return null;
+ let timer;
+ try{
+  const row=await Promise.race([getSchedulePreview(month,{strict:true,versionCheckOnly:true}),
+   new Promise(resolve=>{timer=setTimeout(()=>resolve(null),1200);})]);
+  return readMonthDelta('getScheduleDataSecure',month,row?.data,options);
+ }finally{clearTimeout(timer);}
+}
 async function saveSystemSnapshot(sys,data){
  await put({key:systemKey(sys),kind:'system',system:sys,savedAt:Date.now(),size:safeSize(data),data});
  return data;
@@ -1020,6 +1105,16 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  // Native Windows: two bounded read-only workers; browser: existing sequential behavior.
  // Each worker makes at most one GAS request at a time and stores no full snapshot
  // until all months and the final account/version checks succeed.
+ const oldRecordsByMonth=new Map();
+ if(previous?.cacheEndpoint===gasUrl()&&previous?.displayScope===scope&&Array.isArray(old?.records)){
+  for(const row of old.records){
+   const part=String(row.timeStr||row.date||'').match(/^(\d{4})[-/](\d{1,2})/);
+   if(!part)continue;
+   const key=part[1]+'-'+part[2].padStart(2,'0');
+   if(!oldRecordsByMonth.has(key))oldRecordsByMonth.set(key,[]);
+   oldRecordsByMonth.get(key).push(row);
+  }
+ }
  const workerCount=window.chrome?.webview?.postMessage?2:1;
  const monthResults=new Array(months.length);
  let nextMonth=0,completedMonths=0,fatal=null;
@@ -1038,9 +1133,14 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
      continue;
     }
     onProgress?.('attendance',completedMonths,months.length,'month',`正在讀取 ${month}｜已完成 ${completedMonths}/${months.length} 月`);
-    const d=await fetchJson('getAttendanceMonthData',{month,token:t},'',readOptions);
+    const date=new Date(month+'-01T00:00:00Z');
+    const adjacent=offset=>new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+offset,1)).toISOString().slice(0,7);
+    const base=oldRecordsByMonth.has(month)?{records:[-1,0,1].flatMap(offset=>oldRecordsByMonth.get(adjacent(offset))||[])}:null;
+    const read=async action=>await readMonthDelta(action,month,base)||
+     fetchJson(action,{month,token:t},'',readOptions);
+    const d=await read('getAttendanceMonthData');
     if(!Array.isArray(d?.records))throw new Error('考勤月份資料格式不正確');
-    const direct=await fetchJson('getAttendanceMainDirect',{month,token:t},'',readOptions);
+    const direct=await read('getAttendanceMainDirect');
     if(!Array.isArray(direct?.records))throw new Error('考勤主表資料格式不正確');
     verifyAttendanceDownloadContext(expected);
     const rows=direct.records.length?mergeAttendanceRows(d.records.concat(direct.records)):d.records;
@@ -1153,7 +1253,13 @@ async function downloadSystem(sys,onProgress,readOptions={}){
  const t=token(),m=ymNow();
  if(sys==='attendance'||sys==='workhours')return downloadAttendanceDatabase(sys,onProgress,readOptions);
  if(sys==='leave')return fetchJson('getLeaveData',{token:t},sys,readOptions);
- if(sys==='schedule')return fetchJson('getScheduleDataSecure',{token:t},sys,readOptions);
+ if(sys==='schedule'){
+  const started=Date.now();
+  const data=await readScheduleMonthDelta(m);
+  if(!data)return fetchJson('getScheduleDataSecure',{token:t,month:m},sys,readOptions);
+  await storeSchedulePreview(m,data,viewerKey(),t,started);
+  return saveSystemSnapshot(sys,data);
+ }
  if(sys==='efficiency')return fetchJson('gcGetData',{token:t,month:m,scope:'month'},sys,readOptions);
  if(sys==='hr')return fetchJson('hrGetEmployees',{token:t},sys,readOptions);
  if(sys==='history'){
@@ -1572,7 +1678,7 @@ if(typeof window.addEventListener==='function'){
  window.__port79NativeCloudSyncReady=true;
 }
 
-window.Port79DataCache={preloadCurrent,startBackgroundDownload,getDisplaySnapshot,getAttendanceStartupPreview,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
+window.Port79DataCache={readMonthDelta,readScheduleMonthDelta,preloadCurrent,startBackgroundDownload,getDisplaySnapshot,getAttendanceStartupPreview,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 if(!window.__p79BrowserBackgroundWorker&&!window.chrome?.webview?.postMessage&&typeof document!=='undefined'&&document?.head?.appendChild&&document?.createElement){
  // Shared by every management page without changing its own navigation flow.
  const src=document.querySelector?.('script[src*="port79-data-cache.js"]')?.src;

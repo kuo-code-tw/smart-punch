@@ -27,7 +27,13 @@ function identity(){const c=context(),token=c?.token?.(),viewer=g.Port79DataCach
 function assert(s){const n=identity();if(n.token!==s.token||n.viewer!==s.viewer||n.url!==s.url||n.generation!==s.generation||n.stamp!==s.stamp||n.scope!==s.scope)throw Error('登入或資料版本已變更，請重新讀取');}
 function key(s,month){return s.viewer+'|system|workhours|verified-v1|'+encodeURIComponent(s.url)+'|'+month;}
 function monthsFor(month){if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw Error('月份格式不正確');const d=new Date(month+'-01T00:00:00Z'),current=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit'}).format(new Date()),offset=n=>new Date(Date.UTC(d.getUTCFullYear(),d.getUTCMonth()+n,1)).toISOString().slice(0,7);return [offset(-1),month,...(offset(1)<=current?[offset(1)]:[])];}
-async function request(s,action,month){
+async function request(s,action,month,prior){
+ assert(s);
+ if(prior&&g.Port79DataCache?.readMonthDelta){
+  const delta=await g.Port79DataCache.readMonthDelta(action,month,prior,{url:s.url,credential:s.token});
+  assert(s);
+  if(delta)return delta;
+ }
  assert(s);const u=new URL(s.url);u.searchParams.set('action',action);u.searchParams.set('month',month);u.searchParams.set('token',s.token);u.searchParams.set('gcToken',s.token);
  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),45000);
  try{const r=await g.fetch(u.toString(),{cache:'no-store',signal:ctl.signal}),d=await r.json();assert(s);if(r.ok===false||d?.ok!==true||d.retryable)throw Error(d?.error||'雲端讀取未完成');return d;}catch(e){if(e?.name==='AbortError')throw Error('雲端版本或月份讀取逾時，已保留本機資料，請重新核對');throw e;}finally{clearTimeout(timer);}
@@ -103,14 +109,14 @@ function load(month,options={}){
    if(!reuse.roster)try{sharedRoster=await context()?.recentRoster?.(month,s.token,s.stamp);}catch(_){}
    assert(s);
    const roster=reuse.roster?copy(candidate.roster):sharedRoster?.ok===true&&sharedRoster.month===month&&Array.isArray(sharedRoster.employees)&&Array.isArray(sharedRoster.schedules)
-    ? sharedRoster : await request(s,'getScheduleDataSecure',month);
+    ? sharedRoster : await request(s,'getScheduleDataSecure',month,candidate?.roster);
    assert(s);
    // Authenticated roster rows can be displayed before the cross-month raw
    // punches finish. They remain a preview until the final version check.
    publish(k,'onRoster',{month,roster,preview:true,source:reuse.roster?'班表版本未變，沿用本機':'雲端班表已讀取，考勤核對中'});
    const batches=[];
    if(!reuse.raw)for(let offset=0;offset<months.length;offset+=2){
-    const group=await Promise.all(months.slice(offset,offset+2).map(m=>request(s,'getAttendanceMonthRaw',m)));
+    const group=await Promise.all(months.slice(offset,offset+2).map(m=>request(s,'getAttendanceMonthRaw',m,candidate?.raw?.[m])));
     batches.push(...group);assert(s);
    }
    const raw=reuse.raw?copy(candidate.raw):Object.fromEntries(months.map((m,i)=>[m,batches[i]]));

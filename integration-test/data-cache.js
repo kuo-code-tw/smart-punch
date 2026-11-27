@@ -601,7 +601,7 @@ async function getSchedulePreview(month,options={}){
  const candidates=rows.map(row=>{
   if(!row||!currentViewerRow(row)||row.kind!=='system'||row.system!=='schedule'||row.savedAt<=0||row.savedAt>Date.now()+60000)return null;
   // AQC statistics may only reuse same-scope, same-endpoint, unmutated recent previews.
-  if(options.strict&&(row.displayScope!==scope||row.cacheEndpoint!==endpoint||row.savedAt<mutationStamp()||Date.now()-row.savedAt>86400000))return null;
+  if(options.strict&&(row.displayScope!==scope||row.cacheEndpoint!==endpoint||(!options.versionCheckOnly&&(row.savedAt<mutationStamp()||Date.now()-row.savedAt>86400000))))return null;
   const scoped=row.key===base+'|'+month&&row.month===month;
   const data=schedulePreviewData(row.data,month,scoped);
   return data?{data,savedAt:row.savedAt}:null;
@@ -892,11 +892,97 @@ async function fetchJson(action,params={},sys='',readOptions={}){
   }finally{clearTimeout(to)}
   readVersions.set(action,(readVersions.get(action)||0)+1);
   // Storage failures must not trigger another cloud request.
+  if(typeof readOptions.startupGuard==='function'&&!readOptions.startupGuard())throw Object.assign(new Error('登入狀態已變更，拒絕保存'),{code:'P79_SCOPE'});
   await storeApi(url,data,sys);
   if(new URL(url).pathname!==primary.pathname)recoveredGasUrl=CANONICAL_GAS_URL;
   return data;
  }
  throw lastError;
+}
+const monthDeltaFields={
+ getAttendanceMonthRaw:['records'],
+ getAttendanceMonthData:['records'],
+ getAttendanceMainDirect:['records'],
+ getScheduleDataSecure:['employees','schedules','scheduleGroups','leaveRecords','leaveCoverAssignments','leaveCoverCancellations']
+};
+function monthRowCanonical(value){
+ if(Array.isArray(value))return '['+value.map(monthRowCanonical).join(',')+']';
+ if(value!==null&&typeof value==='object')
+  return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+monthRowCanonical(value[key])).join(',')+'}';
+ return JSON.stringify(value);
+}
+const monthDeltaUnsupported=new Set();
+async function readMonthDelta(action,month,prior,{url,credential,signal}={}){
+ const fields=monthDeltaFields[action];
+ url=url||gasUrl();credential=credential||token();
+ if(!fields||!prior||!credential||!validDownloadGasUrl(url)||!window.crypto?.subtle||monthDeltaUnsupported.has(url))return null;
+ const viewer=viewerKey(),scope=displayScope(),stamp=mutationStamp(),sessionToken=token();
+ const assertContext=()=>{
+  if(viewerKey()!==viewer||displayScope()!==scope||mutationStamp()!==stamp||token()!==sessionToken)
+   throw Object.assign(Error('帳號、權限或資料已變更，已保留原有快取'),{code:'P79_SCOPE'});
+ };
+ const manifest={},encoder=new TextEncoder();
+ for(const field of fields){
+  const rows=prior[field];
+  if(!Array.isArray(rows)||!rows.length||rows.length>25000)continue;
+  const hashes=[];
+  for(let start=0;start<rows.length;start+=256){
+   const batch=await Promise.all(rows.slice(start,start+256).map(async row=>{
+    const bytes=new Uint8Array(await window.crypto.subtle.digest('SHA-256',encoder.encode(monthRowCanonical(row))));
+    return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+   }));
+   hashes.push(...batch);
+  }
+  manifest[field]=hashes;
+ }
+ if(!Object.keys(manifest).length)return null;
+ assertContext();
+ if(signal?.aborted)throw signal.reason;
+ const controller=new AbortController(),interrupt=()=>controller.abort();
+ signal?.addEventListener('abort',interrupt,{once:true});
+ const timeout=setTimeout(interrupt,45000);
+ try{
+  const response=await rawFetch(url,{method:'POST',cache:'no-store',redirect:'follow',signal:controller.signal,
+   headers:{'Content-Type':'text/plain;charset=UTF-8'},
+   body:JSON.stringify({action:'getMonthRowDelta',read:action,month,token:credential,manifest})});
+  if(!response.ok)throw Error('雲端增量同步 HTTP '+response.status);
+  const data=await response.json();
+  assertContext();
+  if(data?.ok===false&&/未知操作:\s*\[getMonthRowDelta\]/i.test(String(data.error||''))){
+   monthDeltaUnsupported.add(url);return null;
+  }
+  if(data?.ok!==true||data.retryable||data.month!==month||data.rowDelta?.version!==1)
+   throw Error(data?.error||'增量同步回應不完整，已保留原有快取');
+  const changes=data.rowDelta.changes;
+  if(!changes||typeof changes!=='object'||Array.isArray(changes))throw Error('增量同步格式不正確');
+  for(const [field,entries] of Object.entries(changes)){
+   if(!fields.includes(field)||!Array.isArray(entries)||!manifest[field])throw Error('增量同步欄位不正確');
+   data[field]=entries.map(entry=>{
+    if(typeof entry!=='number'||entry>=0)return entry;
+    const index=-entry-1;
+    if(!Number.isInteger(index)||index>=prior[field].length)throw Error('本機快取索引不完整');
+    return prior[field][index];
+   });
+  }
+  delete data.rowDelta;
+  return data;
+ }catch(error){
+  if(error?.name==='AbortError'||error instanceof TypeError)
+   throw Object.assign(Error('雲端增量同步連線未完成，已保留原有快取'),{code:'P79_TRANSPORT'});
+  throw error;
+ }finally{
+  clearTimeout(timeout);
+  signal?.removeEventListener('abort',interrupt);
+ }
+}
+async function readScheduleMonthDelta(month,options={}){
+ if(options.url&&options.url!==gasUrl())return null;
+ let timer;
+ try{
+  const row=await Promise.race([getSchedulePreview(month,{strict:true,versionCheckOnly:true}),
+   new Promise(resolve=>{timer=setTimeout(()=>resolve(null),1200);})]);
+  return readMonthDelta('getScheduleDataSecure',month,row?.data,options);
+ }finally{clearTimeout(timer);}
 }
 async function saveSystemSnapshot(sys,data){
  await put({key:systemKey(sys),kind:'system',system:sys,savedAt:Date.now(),size:safeSize(data),data});
@@ -926,6 +1012,7 @@ function downloadAttendanceDatabase(targetSys='attendance',onProgress,readOption
  attendanceDownloads.set(key,pending);return pending;
 }
 function verifyAttendanceDownloadContext(expected){
+ if(typeof expected.guard==='function'&&!expected.guard())throw Object.assign(new Error('背景下載已停止'),{code:'P79_SCOPE'});
  if(expected.token!==token()||expected.viewer!==viewerKey())
   throw Object.assign(new Error('登入帳號或憑證確實已變更；未保存舊帳號的考勤資料，請重新登入'),{code:'P79_AUTH'});
  if(expected.scope!==displayScope())
@@ -935,17 +1022,27 @@ function verifyAttendanceDownloadContext(expected){
 }
 async function readAttendanceDatabase(targetSys='attendance',onProgress,readOptions={}){
  const t=token(),viewer=viewerKey(),scope=displayScope(),stamp=mutationStamp();
- const expected={token:t,viewer,scope,stamp};
+ const expected={token:t,viewer,scope,stamp,guard:readOptions.startupGuard};
  if(!t)throw new Error('找不到登入 Token，請重新由首頁登入');
- const previous=await getDisplaySnapshot('attendance').catch(()=>null);
+ // A full 22-month snapshot can take several seconds to restore from disk.
+ let previous=await getDisplaySnapshot('attendance',{timeoutMs:10000}).catch(()=>null);
+ // A local mutation invalidates display data, but an older exact-scope snapshot
+ // can still be a candidate for a live revision check. Never display it as fresh.
+ if(!previous){
+  const candidate=await getSystemSnapshot('attendance').catch(()=>null);
+  verifyAttendanceDownloadContext(expected);
+  if(candidate?.data?.ok===true&&candidate.data.fullDatabase===true&&candidate.displayScope===scope&&
+     candidate.cacheEndpoint===gasUrl()&&candidate.savedAt>0&&candidate.savedAt<=Date.now()+60000)previous=candidate;
+ }
+ if(readOptions.checkOnly===true&&!previous?.data?.fullDatabase)return {deferred:true};
  const before=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
- onProgress?.('attendance',0,1,'catalog','讀取月份清單');
+ onProgress?.('attendance',0,0,'catalog','核對雲端月份清單（尚未下載月份）');
  const catalog=await fetchJson('getAttendanceMonths',{token:t},'',readOptions);
  if(!Array.isArray(catalog?.months))throw new Error('考勤月份清單格式不正確，請重新下載');
  const months=[...new Set((Array.isArray(catalog?.months)?catalog.months:[]).filter(m=>/^\d{4}-\d{2}$/.test(String(m))))].sort();
  if(!months.length)months.push(ymNow());
 
- onProgress?.('attendance',0,months.length+1,'master','讀取員工主檔');
+ onProgress?.('attendance',0,0,'master','核對員工主檔及已下載版本（尚未下載月份）');
  const master=await fetchJson('getAttendanceEmployeeMaster',{token:t},'',readOptions);
  if(!Array.isArray(master?.employees))throw new Error('員工主檔格式不正確，已保留原有快取');
  const employees=master.employees;
@@ -956,14 +1053,14 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  const monthCheckpointSignature=cloudRevision?JSON.stringify([
   cloudRevision,String(catalog.revision||''),String(master.revision||''),months,employees
  ]):'';
- const checkpointMaxAgeMs=24*60*60*1000;
+ // Exact server revision, scoped master and mutation checks are the checkpoint validity criteria.
+ // Do not expire a completed chunk solely because another day has passed.
  async function checkpointMonth(month){
   if(!monthCheckpointSignature)return null;
   const row=await get(systemKey('attendance')+'|checkpoint|'+month).catch(()=>null);
   if(!row||!currentViewerRow(row)||row.kind!=='system'||row.system!=='attendance'||
      row.displayScope!==scope||row.cacheEndpoint!==gasUrl()||
      row.savedAt<stamp||row.savedAt>Date.now()+60000||
-     Date.now()-row.savedAt>checkpointMaxAgeMs||
      row.data?.signature!==monthCheckpointSignature||
      !Array.isArray(row.data?.rows)||row.data?.month!==month)return null;
   return row.data.rows;
@@ -993,15 +1090,31 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
    const confirmed=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
   verifyAttendanceDownloadContext(expected);
    if(String(confirmed?.revision||'')===String(before.revision)){
-   onProgress?.('attendance',months.length,months.length,'reused','雲端版本未變，重用電腦完整快取');
+   // The revision was checked twice; renew the persisted verification timestamp,
+   // otherwise every later startup re-enters the expired-cache download path.
+   if(!Array.isArray(readOptions.authorizedSystems)||readOptions.authorizedSystems.includes('attendance'))await saveSystemSnapshot('attendance',old);
+   if(!Array.isArray(readOptions.authorizedSystems)||readOptions.authorizedSystems.includes('workhours'))await saveSystemSnapshot('workhours',old);
+   onProgress?.('attendance',months.length,months.length,'reused','雲端版本未變，重用電腦完整快取（未下載月份）');
    if(targetSys==='attendance'||targetSys==='workhours')await applyAttendanceSnapshotToPage(old,true);
    return {...old,reusedCache:true};
    }
  }
 
+ if(readOptions.checkOnly===true)return {deferred:true};
+
  // Native Windows: two bounded read-only workers; browser: existing sequential behavior.
  // Each worker makes at most one GAS request at a time and stores no full snapshot
  // until all months and the final account/version checks succeed.
+ const oldRecordsByMonth=new Map();
+ if(previous?.cacheEndpoint===gasUrl()&&previous?.displayScope===scope&&Array.isArray(old?.records)){
+  for(const row of old.records){
+   const part=String(row.timeStr||row.date||'').match(/^(\d{4})[-/](\d{1,2})/);
+   if(!part)continue;
+   const key=part[1]+'-'+part[2].padStart(2,'0');
+   if(!oldRecordsByMonth.has(key))oldRecordsByMonth.set(key,[]);
+   oldRecordsByMonth.get(key).push(row);
+  }
+ }
  const workerCount=window.chrome?.webview?.postMessage?2:1;
  const monthResults=new Array(months.length);
  let nextMonth=0,completedMonths=0,fatal=null;
@@ -1020,9 +1133,14 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
      continue;
     }
     onProgress?.('attendance',completedMonths,months.length,'month',`正在讀取 ${month}｜已完成 ${completedMonths}/${months.length} 月`);
-    const d=await fetchJson('getAttendanceMonthData',{month,token:t},'',readOptions);
+    const date=new Date(month+'-01T00:00:00Z');
+    const adjacent=offset=>new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+offset,1)).toISOString().slice(0,7);
+    const base=oldRecordsByMonth.has(month)?{records:[-1,0,1].flatMap(offset=>oldRecordsByMonth.get(adjacent(offset))||[])}:null;
+    const read=async action=>await readMonthDelta(action,month,base)||
+     fetchJson(action,{month,token:t},'',readOptions);
+    const d=await read('getAttendanceMonthData');
     if(!Array.isArray(d?.records))throw new Error('考勤月份資料格式不正確');
-    const direct=await fetchJson('getAttendanceMainDirect',{month,token:t},'',readOptions);
+    const direct=await read('getAttendanceMainDirect');
     if(!Array.isArray(direct?.records))throw new Error('考勤主表資料格式不正確');
     verifyAttendanceDownloadContext(expected);
     const rows=direct.records.length?mergeAttendanceRows(d.records.concat(direct.records)):d.records;
@@ -1060,8 +1178,8 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
   recordCount:allRecords.length,employeeCount:employees.length,
   revision:String(master?.revision||catalog?.revision||'')
  };
- await saveSystemSnapshot('attendance',snapshot);
- await saveSystemSnapshot('workhours',snapshot);
+ if(!Array.isArray(readOptions.authorizedSystems)||readOptions.authorizedSystems.includes('attendance'))await saveSystemSnapshot('attendance',snapshot);
+ if(!Array.isArray(readOptions.authorizedSystems)||readOptions.authorizedSystems.includes('workhours'))await saveSystemSnapshot('workhours',snapshot);
  if(targetSys==='attendance'||targetSys==='workhours')await applyAttendanceSnapshotToPage(snapshot,true);
  return snapshot;
 }
@@ -1135,7 +1253,13 @@ async function downloadSystem(sys,onProgress,readOptions={}){
  const t=token(),m=ymNow();
  if(sys==='attendance'||sys==='workhours')return downloadAttendanceDatabase(sys,onProgress,readOptions);
  if(sys==='leave')return fetchJson('getLeaveData',{token:t},sys,readOptions);
- if(sys==='schedule')return fetchJson('getScheduleDataSecure',{token:t},sys,readOptions);
+ if(sys==='schedule'){
+  const started=Date.now();
+  const data=await readScheduleMonthDelta(m);
+  if(!data)return fetchJson('getScheduleDataSecure',{token:t,month:m},sys,readOptions);
+  await storeSchedulePreview(m,data,viewerKey(),t,started);
+  return saveSystemSnapshot(sys,data);
+ }
  if(sys==='efficiency')return fetchJson('gcGetData',{token:t,month:m,scope:'month'},sys,readOptions);
  if(sys==='hr')return fetchJson('hrGetEmployees',{token:t},sys,readOptions);
  if(sys==='history'){
@@ -1167,11 +1291,11 @@ const SYSTEM_REUSE_MAX_AGE_MS=30*60*1000;
 const SYSTEM_AUTO_RESUME_MAX_AGE_MS=24*60*60*1000;
 async function startupCachedSystem(sys,scopeAtStart){
  if(!['attendance','workhours','leave','schedule','efficiency','hr','history'].includes(sys))return null;
- const snapshot=await getDisplaySnapshot(sys,{timeoutMs:3500}).catch(()=>null);
+ const snapshot=await getDisplaySnapshot(sys,{timeoutMs:['attendance','workhours'].includes(sys)?10000:3500}).catch(()=>null);
  if(!snapshot||snapshot.data?.ok!==true||snapshot.kind!=='system'||snapshot.system!==sys||
     snapshot.displayScope!==scopeAtStart||!Number.isFinite(Number(snapshot.savedAt)))return null;
  if(Date.now()-Number(snapshot.savedAt)>SYSTEM_AUTO_RESUME_MAX_AGE_MS)return null;
- if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
+ if(sys==='efficiency'&&(snapshot.scope?.month||snapshot.month||snapshot.data?.month)!==ymNow())return null;
  if(sys==='schedule'&&snapshot.scope?.month&&snapshot.scope.month!==ymNow())return null;
  if(sys==='attendance'||sys==='workhours'){
   const data=snapshot.data;
@@ -1188,7 +1312,7 @@ async function reusableSystemDownload(sys,scopeAtStart){
  if(Date.now()-Number(snapshot.savedAt)>SYSTEM_REUSE_MAX_AGE_MS)return null;
  if(snapshot.system!==sys||snapshot.kind!=='system')return null;
  // The current month is part of scoped, mutable efficiency results.
- if(sys==='efficiency'&&snapshot.month!==ymNow())return null;
+ if(sys==='efficiency'&&(snapshot.scope?.month||snapshot.month||snapshot.data?.month)!==ymNow())return null;
  return snapshot;
 }
 let lastAllDownload=null;
@@ -1197,6 +1321,9 @@ async function downloadAll(onProgress,options={}){
  // long multi-month attendance scan. The legacy API retains its original order.
  const fastFirst=options?.quickFirst===true;
  const resumeExisting=fastFirst&&options?.resumeExisting===true;
+ // Homepage startup is not a request to download all historical attendance.
+ // Manual cloud-centre downloads keep the existing complete, verified path.
+ const automaticStartup=options?.automaticStartup===true;
  // Windows does not require a historical catalog to open the management
  // dashboard. History is read on demand for the selected month by the
  // dedicated history-data page, preserving every existing historical cache.
@@ -1204,9 +1331,9 @@ async function downloadAll(onProgress,options={}){
  const historyOnDemand=options?.historyOnDemand===true;
  const systems=(fastFirst?['leave','schedule','efficiency','hr','history','attendance','workhours']:
   ['attendance','workhours','leave','schedule','efficiency','hr','history'])
-  .filter(sys=>!historyOnDemand||sys!=='history');
+  .filter(sys=>(!historyOnDemand||sys!=='history')&&(!Array.isArray(options.systems)||options.systems.includes(sys)));
  const result=[];
- const readOptions=fastFirst?{interactive:true,...(resumeExisting?{resumeExisting:true}:{})}:{};
+ const readOptions=fastFirst?{interactive:true,...(resumeExisting?{resumeExisting:true}:{}),...(typeof options.startupGuard==='function'?{startupGuard:options.startupGuard}:{}),...(Array.isArray(options.systems)?{authorizedSystems:systems}:{})}:{};
  const batchViewer=viewerKey(),batchToken=token(),batchScope=displayScope(),batchGas=gasUrl(),batchStamp=mutationStamp();
  // Within a short same-login retry, keep the six successful snapshots and fetch
  // only modules that actually failed. A new session/scope or later refresh starts fresh.
@@ -1214,22 +1341,56 @@ async function downloadAll(onProgress,options={}){
  const prior=lastAllDownload?.key===batchKey&&Date.now()-lastAllDownload.at<180000&&
              lastAllDownload.result.some(row=>!row.ok)?lastAllDownload.result:null;
  let attendanceSnapshot=null,attendanceError=null,connectionError=null,consecutiveTransportFailures=0;
+ const deferredReadRetries=new Map();
  for(let i=0;i<systems.length;i++){
   const sys=systems[i];
+  if(typeof options.startupGuard==='function'&&!options.startupGuard())throw Object.assign(new Error('登入狀態已變更，停止背景下載'),{code:'P79_SCOPE'});
+  // The generic workhours snapshot is only attendance. Prepare the actual
+  // versioned overtime month separately, using the same loader as the page.
+  if(!connectionError&&sys==='workhours'&&options.prepareWorkhours===true&&typeof window!=='undefined'&&window.P79WorkhoursCache?.prepareForStartup){
+   let session=null;try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')}catch(_){}
+   const role=String(session?.adminRole||session?.role||'').toLowerCase();
+   const allowed=role==='superadmin'||role==='admin'&&['workhours','attendance','schedule'].every(k=>['view','manage'].includes(String(session?.systemPermissions?.[k]||'')));
+   if(allowed&&!session?.punchOnly){
+    const guard=()=>batchViewer===viewerKey()&&batchToken===token()&&batchScope===displayScope()&&batchGas===gasUrl()&&batchStamp===mutationStamp()&&(typeof options.startupGuard!=='function'||options.startupGuard());
+    onProgress?.(sys,i,systems.length,'loading',null,'準備本月加班申報、班表與考勤');
+    try{const bundle=await window.P79WorkhoursCache.prepareForStartup({month:ymNow(),token:batchToken,url:batchGas,guard});
+     if(!guard()||!bundle||bundle.preview!==false)throw Error('加班月份資料尚未確認');
+     const reused=bundle.source==='本機有效快取';result.push({system:sys,ok:true,reused});onProgress?.(sys,i,systems.length,reused?'reused':'done',null,reused?'本月完整加班快取版本未變':'本月完整加班資料已保存本機');
+    }catch(e){result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e);}
+    continue;
+   }
+  }
   if(prior?.some(row=>row.system===sys&&row.ok)){
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true,reused:true});
    onProgress?.(sys,i,systems.length,'reused',null,'此系統先前已完成，沿用快取');
    continue;
   }
+  if(automaticStartup&&!connectionError&&sys==='attendance'){
+   onProgress?.(sys,i,systems.length,'loading',null,'只核對既有考勤版本，不自動下載完整歷史');
+   try{
+    const checked=await readAttendanceDatabase('attendance',(name,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,label),{...readOptions,checkOnly:true});
+    if(checked?.reusedCache===true){
+     attendanceSnapshot=checked;result.push({system:sys,ok:true,reused:true});
+     onProgress?.(sys,i,systems.length,'reused',null,'雲端版本未變，沿用完整本機考勤');
+    }else{
+     result.push({system:sys,ok:true,deferred:true});
+     onProgress?.(sys,i,systems.length,'deferred',null,'完整歷史尚需核對，保留本機；當月資料由考勤頁更新，不重抓全部月份');
+    }
+   }catch(e){result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e);}
+   continue;
+  }
   // Startup resumes exact-viewer, exact-scope stored snapshots within 24 h.
   // Manual refresh deliberately does NOT use this long reuse window.
   // In both modes a snapshot failing permission, endpoint or edit checks is
   // reloaded, never silently presented as a verified latest cloud response.
-  if(fastFirst&&await (resumeExisting?startupCachedSystem(sys,batchScope):reusableSystemDownload(sys,batchScope))){
+  const reusable=fastFirst&&await (resumeExisting?startupCachedSystem(sys,batchScope):reusableSystemDownload(sys,batchScope));
+  if(reusable){
    if(batchViewer!==viewerKey()||batchToken!==token()||
       batchScope!==displayScope()||batchGas!==gasUrl()||batchStamp!==mutationStamp())
     throw Object.assign(new Error('登入或管理權限已變更，停止沿用快取'),{code:'P79_SCOPE'});
+   if(sys==='attendance'&&reusable.data?.fullDatabase===true)attendanceSnapshot=reusable.data;
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true,reused:true});
    onProgress?.(sys,i,systems.length,'reused',null,resumeExisting?
@@ -1238,6 +1399,14 @@ async function downloadAll(onProgress,options={}){
    continue;
   }
   // Treat remaining untouched modules as skipped after an identity/scope/transport failure.
+  if(automaticStartup&&!connectionError&&['attendance','workhours'].includes(sys)){
+   // A missing/invalid full-history snapshot must not launch a 22-month scan
+   // on every homepage return. No stale snapshot is promoted to verified.
+   // The attendance/workhours pages still perform their own live month reads.
+   result.push({system:sys,ok:true,deferred:true});
+   onProgress?.(sys,i,systems.length,'deferred',null,'完整歷史考勤按需下載；當月資料由各系統即時核對');
+   continue;
+  }
   if(connectionError){
    result.push({system:sys,ok:false,skipped:true,error:'前一項雲端讀取中斷，尚未下載；原因：'+String(connectionError.message||connectionError)});
    onProgress?.(sys,i,systems.length,'skipped',connectionError);
@@ -1245,11 +1414,12 @@ async function downloadAll(onProgress,options={}){
   }
   onProgress?.(sys,i,systems.length,'loading');
   try{
-   if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state} ${mi}/${mt}`,{monthCompleted:mi,monthTotal:mt}),readOptions);
+   if(sys==='attendance')attendanceSnapshot=await downloadAttendanceDatabase('attendance',(s,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,`${label||state}${mt>0?' '+mi+'/'+mt:''}`,{monthCompleted:mi,monthTotal:mt}),readOptions);
    else if(sys==='workhours'&&attendanceError)throw attendanceError;
    else if(sys==='workhours'&&attendanceSnapshot){await saveSystemSnapshot('workhours',attendanceSnapshot);if(currentSystem()==='workhours')await applyAttendanceSnapshotToPage(attendanceSnapshot,true)}
    else{
     const payload=await downloadSystem(sys,null,readOptions);
+    if(typeof options.startupGuard==='function'&&!options.startupGuard())throw Object.assign(new Error('登入狀態已變更，停止保存'),{code:'P79_SCOPE'});
     if(fastFirst&&['leave','schedule','efficiency','hr','history'].includes(sys)&&payload?.ok===true){
      if(batchViewer!==viewerKey()||batchToken!==token()||batchScope!==displayScope()||
         batchGas!==gasUrl()||batchStamp!==mutationStamp())
@@ -1271,8 +1441,31 @@ async function downloadAll(onProgress,options={}){
    if(['P79_AUTH','P79_SCOPE'].includes(e?.code)||
       (e?.code==='P79_TRANSPORT'&&(!fastFirst||++consecutiveTransportFailures>=2)))connectionError=e;
    if(sys==='attendance')attendanceError=e;
+   if(fastFirst&&['leave','schedule'].includes(sys)&&e?.retryable===true&&['P79_CLOUD','P79_TRANSPORT'].includes(e?.code))deferredReadRetries.set(sys,e);
    result.push({system:sys,ok:false,error:String(e?.message||e)});
    onProgress?.(sys,i,systems.length,'error',e);
+  }
+ }
+ // Only retry transient, read-only leave/schedule failures once after other modules.
+ // Do not re-download completed modules or retry permission/auth/storage failures.
+ const sameBatch=()=>batchViewer===viewerKey()&&batchToken===token()&&batchScope===displayScope()&&batchGas===gasUrl()&&batchStamp===mutationStamp()&&(typeof options.startupGuard!=='function'||options.startupGuard());
+ if(fastFirst&&result.some(row=>row.ok)&&!['P79_AUTH','P79_SCOPE'].includes(connectionError?.code)){
+  for(const [sys] of deferredReadRetries){
+   if(!sameBatch())break;
+   const index=result.findIndex(row=>row.system===sys&&!row.ok&&!row.skipped);
+   if(index<0)continue;
+   onProgress?.(sys,systems.indexOf(sys),systems.length,'loading',null,'其他系統已處理，正在補抓此項雲端資料');
+   try{
+    const payload=await downloadSystem(sys,null,{...readOptions,interactive:false,startupGuard:sameBatch});
+    if(!sameBatch())throw Object.assign(new Error('登入或管理權限已變更，停止補抓'),{code:'P79_SCOPE'});
+    if(payload?.ok!==true)throw Error('雲端資料尚未完整確認');
+    await saveSystemSnapshot(sys,payload);
+    if(!sameBatch())throw Object.assign(new Error('登入或管理權限已變更，停止補抓'),{code:'P79_SCOPE'});
+    result[index]={system:sys,ok:true};onProgress?.(sys,systems.indexOf(sys),systems.length,'done',null,'補抓完成，已保存本機');
+   }catch(error){
+    result[index]={system:sys,ok:false,error:String(error?.message||error)};onProgress?.(sys,systems.indexOf(sys),systems.length,'error',error);
+    if(['P79_AUTH','P79_SCOPE'].includes(error?.code))break;
+   }
   }
  }
  if(currentSystem()==='attendance'&&attendanceSnapshot)await applyAttendanceSnapshotToPage(attendanceSnapshot,true);
@@ -1298,12 +1491,14 @@ function startBrowserBackgroundDownload(action,system){
  if(prior?.viewer===viewerKey()&&['downloading','starting'].includes(prior.phase)&&
    Date.now()-Number(prior.updatedAt||0)<90000){
   setProgress('背景下載仍在進行：'+String(prior.detail||'').slice(0,110)+'。請查看右下角進度並保留背景下載分頁。');
+  if(action==='resume')window.alert?.('背景資料下載已在進行中，不會重複啟動。');
   return true;
  }
  const loader=document.querySelector('script[src*="port79-data-cache.js"]');
  if(!loader?.src)return false;
  const url=new URL('port79-browser-background.html',loader.src);
- url.searchParams.set('mode',action);
+ url.searchParams.set('mode',action==='resume'?'all':action);
+ if(action==='resume')url.searchParams.set('resume','1');
  if(action==='current')url.searchParams.set('system',system);
  // The direct user click must synchronously open the tab or popup blockers win.
  // Each run uses a new browsing context so it cannot reuse another login's
@@ -1311,16 +1506,25 @@ function startBrowserBackgroundDownload(action,system){
  const tab=window.open(url.href,'_blank');
  if(!tab){
   setProgress('瀏覽器封鎖了背景下載分頁。請允許此網站開啟彈出式視窗後再按一次下載。');
+  if(action==='resume')window.alert?.('瀏覽器封鎖背景下載分頁，請允許彈出式視窗後再試。');
   return true;
  }
  try{tab.opener=null}catch(_){}
  try{const now=Date.now();localStorage.setItem(key,JSON.stringify({
   phase:'starting',viewer:viewerKey(),startedAt:now,updatedAt:now,
-  completed:0,total:action==='all'?6:action==='current'?1:0,
+  completed:0,total:['all','resume'].includes(action)?6:action==='current'?1:0,
   detail:'已開啟獨立下載分頁，正在確認權限。'
  }))}catch(_){}
  setProgress('下載已交給背景分頁；可關閉此視窗、切換排班或考勤。請保持背景下載分頁開啟，右下角會顯示目前進度。');
  return true;
+}
+function startBackgroundDownload(){
+ let session=null;try{session=JSON.parse(sessionStorage.getItem('port79_user_session')||'null')}catch(_){}
+ const role=String(session?.adminRole||session?.role||'').toLowerCase();
+ if(!session||session.punchOnly===true||!['admin','superadmin'].includes(role)||!token()||window.__port79CachedSessionRefreshPending===true){window.alert?.('請完成管理登入及權限核對後再下載。');return false;}
+ if(window.navigator?.onLine===false){window.alert?.('目前離線，已下載的本機資料保持不變。');return false;}
+ if(window.chrome?.webview?.postMessage){window.chrome.webview.postMessage(JSON.stringify({kind:'port79-cache-command-v1',action:'download-resume'}));return true;}
+ return startBrowserBackgroundDownload('resume',currentSystem());
 }
 function ensureModal(){
  ensureStyle();let b=document.getElementById('p79CacheBackdrop');if(b)return b;
@@ -1454,7 +1658,7 @@ async function nativeCloudSyncFromDesktop(){
     state==='error'||state==='skipped'?label+' 未完成：'+String(error?.message||error||'雲端讀取未完成'):
     '正在下載 '+label;
    status('downloading',message,done.size,month);
-  },{quickFirst:true,resumeExisting:window.__port79WorkerResumeOnly===true,historyOnDemand});
+  },{quickFirst:true,resumeExisting:window.__port79WorkerResumeOnly===true,historyOnDemand,prepareWorkhours:true});
   const success=result.filter(x=>x.ok).length,failures=result.filter(x=>!x.ok);
   fullyCompleted=success===total&&!failures.length;
   status(failures.length?(success?'partial':'failed'):'complete',
@@ -1474,13 +1678,13 @@ if(typeof window.addEventListener==='function'){
  window.__port79NativeCloudSyncReady=true;
 }
 
-window.Port79DataCache={preloadCurrent,getDisplaySnapshot,getAttendanceStartupPreview,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
+window.Port79DataCache={readMonthDelta,readScheduleMonthDelta,preloadCurrent,startBackgroundDownload,getDisplaySnapshot,getAttendanceStartupPreview,restoreFolderSystems,getFolderSyncStatus,getExportSnapshot,storeExportSnapshot,getHistoryPreview,getSchedulePreview,storeSchedulePreview,connectFolder,reconnectFolder,disconnectFolder,retainDeviceData,deviceStatus,flushFolder,openCenter,downloadSystem,downloadAll,clear,all,get,put,currentSystem,viewerKey,getSystemSnapshot,restoreSystemSnapshot};
 if(!window.__p79BrowserBackgroundWorker&&!window.chrome?.webview?.postMessage&&typeof document!=='undefined'&&document?.head?.appendChild&&document?.createElement){
  // Shared by every management page without changing its own navigation flow.
  const src=document.querySelector?.('script[src*="port79-data-cache.js"]')?.src;
  if(src){
   const tag=document.createElement('script');
-  tag.src=new URL('port79-browser-download-status.js?v=20261123-bg-status-v1',src).href;
+  tag.src=new URL('port79-browser-download-status.js?v=20261127-compact-hover-v1&deferred=20261127-v1',src).href;
   tag.defer=true;
   document.head.appendChild(tag);
  }
