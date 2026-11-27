@@ -5,7 +5,7 @@
 <script src="../assets/port79-messages.js?v=20261018-chinese"></script>
 <!-- Official HR hidden job-title policy: selectors only; data and calculations unchanged. -->
 <script defer src="../assets/port79-hidden-job-titles.js?v=20261117-hr-hidden-v1&refresh=20261118-stable-v1"></script>
-<script defer src="../assets/port79-workhours-hidden-job-ui.js?v=20261117-hr-filter-v1&refresh=20261118-stable-v1"></script>
+<script defer src="../assets/port79-workhours-hidden-job-ui.js?v=20261117-hr-filter-v1&refresh=20261118-stable-v1&compactNotice=20261127-v1"></script>
 <script defer src="../assets/port79-overtime-upload-queue.js?v=20261125-local-outbox-v1"></script>
 <script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v7-write-priority&outbox=20261125-v1&bulkReview=20261125-v2&pendingEdit=20261125-v1&punchTime=20261126-v1"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261124-planned-review-v3"></script>
@@ -1160,7 +1160,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 /* Two aligned rows: top heading + actions; below: five equal-height filters. */
 #adminContentOvertime .p79-overtime-compact-first{
   display:grid!important;grid-template-columns:minmax(190px,1fr) auto!important;
-  grid-template-areas:"title actions" "filters filters";align-items:center!important;
+  grid-template-areas:"actions actions" "filters filters";align-items:center!important;
   column-gap:14px!important;row-gap:11px!important;padding-bottom:11px!important
 }
 #adminContentOvertime .p79-overtime-compact-title{
@@ -1213,7 +1213,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 }
 @media(max-width:1179px){
  #adminContentOvertime .p79-overtime-compact-first{
-  grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"title" "actions" "filters"
+  grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"actions" "filters"
  }
  #adminContentOvertime .p79-overtime-compact-actions{justify-self:start}
  #adminContentOvertime .p79-overtime-action-group{justify-content:flex-start}
@@ -1310,6 +1310,11 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
 <link rel="stylesheet" href="../assets/port79-org-context.css?v=20261112-unified-v1">
 <script src="../assets/port79-org-context.js?v=20261112-unified-v1"></script>
 <script defer src="../assets/port79-hover-notes.js?v=20261125-hover-v1"></script>
+<style id="p79-overtime-remove-redundant-labels-20261127">
+#adminContentOvertime .p79-overtime-compact-first{grid-template-areas:"actions actions" "filters filters"!important}
+#adminContentOvertime #p79HiddenTitleReadStatus[hidden]{display:none!important;margin:0!important;padding:0!important}
+@media(max-width:1179px){#adminContentOvertime .p79-overtime-compact-first{grid-template-areas:"actions" "filters"!important}}
+</style>
 </head>
 <!-- v2026.09.28.8.0：五大系統統一介面／重新整理／編輯模式同步／篩選樣式一致化；保留原系統資料與核心邏輯。 -->
 <body class="p79-work-hours-page bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-200" data-p79-system="workhours">
@@ -1723,11 +1728,6 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
             <div id="adminContentOvertime" class="hidden space-y-3">
                 <div class="p79-overtime-unified rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 sm:p-4 shadow-sm">
                 <div class="p79-overtime-compact-first">
-                  <div class="p79-overtime-compact-title" title="班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過8小時且延長超過30分鐘才列為估算加班。正常出勤依實際上班日；已核實的跨日代班加班依加班歸屬日統計。預排未核對不得計入正式加班。上班分鐘01–30，下班分鐘不在45–60須核對。">
-                    <strong>每日加班人員統計</strong>
-                    <span aria-label="加班計算與時間提醒" title="班表「例／休／國加班」依完整簽到簽退的實際時數計入；一般工作日超過8小時且延長超過30分鐘才列為估算加班。正常出勤依實際上班日；已核實的跨日代班加班依加班歸屬日統計。預排未核對不得計入正式加班。上班分鐘01–30，下班分鐘不在45–60須核對。">💡</span>
-                    <span id="overtimeFilterResultCount" class="text-[10px] text-slate-500"></span>
-                  </div>
                   <div class="p79-overtime-compact-filters">
                     <div class="flex flex-nowrap gap-2 overflow-x-auto">
                         <div style="flex:1;min-width:120px"><label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">紀錄來源</label><select id="overtimeSourceFilter" onchange="overtimeCurrentPage=1;renderOvertimeStats()" class="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"><option value="ALL">全部加班出勤／申報</option><option value="arranged">已申報</option><option value="pending">出勤待申報</option><option value="review">🔴 疑似多報（整班無卡）</option></select></div>
@@ -1747,6 +1747,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                       <button id="p79OvertimePlannedToggle" type="button" onclick="p79ToggleOvertimePlanned()" class="p79-ot-btn-planned" aria-controls="p79OvertimePlannedDialog" aria-haspopup="dialog" aria-expanded="false" title="開啟預排／待核對視窗">預排／待核對</button>
                       <button type="button" onclick="resetOvertimeFilters()" class="p79-ot-btn-reset">↺ 清除篩選</button>
                     </div>
+                    <span id="overtimeFilterResultCount" class="text-[10px] text-slate-500"></span>
                   </div>
                 </div>
 
@@ -1758,7 +1759,6 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     <div class="rounded-2xl border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/30 p-3"><div class="text-xs font-semibold text-orange-700 dark:text-orange-400">加班出勤時數</div><div id="overtimePendingEstimateHours" class="mt-1 text-xl font-bold text-orange-800 dark:text-orange-300">0 小時</div></div>
                     <div class="rounded-2xl border border-rose-100 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-3"><div class="text-xs font-semibold text-rose-600 dark:text-rose-400">超過每日 12 小時</div><div id="overtimeOver12Count" class="mt-1 text-xl font-bold text-rose-700 dark:text-rose-300">0</div></div>
                 </div>
-                <p id="p79OvertimeMainListExplanation" class="text-xs text-slate-600 dark:text-slate-300 mt-2" role="note">未出勤預排在「預排／待核對」視窗查看；已有完整打卡的預排列為出勤待核，未確認前不計正式申報時數。</p>
                 <div id="p79OvertimeMissingConversionPanel" class="hidden mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100" role="region" aria-label="待換算加班申報清單"></div>
                 </div>
 

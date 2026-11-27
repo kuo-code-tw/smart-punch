@@ -86,9 +86,11 @@
   if(status){
    const p=policy();
    if(ready()){
-    status.textContent='已套用人資管理的隱藏職稱設定';
+    status.textContent='';
+    status.hidden=true;
     status.dataset.state='ready';
    }else{
+    status.hidden=false;
     status.textContent=p?.status?.()==='error'
      ?'無法核對人資隱藏職稱（雲端／權限），職稱選單暫停。請確認人資查看權限或重新整理。'
      :'正在核對人資隱藏職稱設定，職稱與姓名選單暫停。';
@@ -116,7 +118,7 @@
   const overtime=document.getElementById('adminContentOvertime');
   if(!overtime||document.getElementById('p79HiddenTitleReadStatus'))return;
   const note=document.createElement('p');
-  note.id='p79HiddenTitleReadStatus';note.setAttribute('role','status');
+  note.id='p79HiddenTitleReadStatus';note.hidden=true;note.setAttribute('role','status');
   note.style.cssText='font-size:11px;color:#526d91;margin:2px 0 6px;padding:3px 8px;';
   const host=overtime.querySelector('.p79-overtime-compact-filters')||overtime;
   host.insertAdjacentElement('afterend',note);
