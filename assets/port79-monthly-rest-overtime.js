@@ -1391,7 +1391,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1&cutoffCloud=20261127-v137';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1406,7 +1406,7 @@ async function open(settings={}){
  let autoPlan=settings.autoPlan!==false,explicitPlanningMode=settings.autoPlan!==undefined;
  const manualPeople=new Map(); // preserve picks across local filters; no implicit cloud writes
  const q=s=>el.querySelector(s),setStatus=x=>{q('#mrStatus').textContent=x;if(q('#mrResult'))q('#mrResult').textContent=x;};let busy=false,model=null,snapshot=null,rules=[],stop=false,loadedMonth='',loadedPeople=[],lastFailure='',lastCheckedDay=today();
- // Operator preferences are local, per authenticated account/server/month.
+ // V137: cloud is authoritative per authenticated account/month; localStorage is only migration/cache.
  const cutoffMemory=new Map();
  function cutoffStorageKey(month){
   try{
@@ -1425,6 +1425,52 @@ async function open(settings={}){
   const key=cutoffStorageKey(month);
   try{if(key){if(cutoff)g.localStorage?.setItem(key,cutoff);else g.localStorage?.removeItem(key);}}catch(_){}
   return cutoff;
+ }
+ const cutoffCloudStates=new Map();
+ function applyCutoffCloud(month,state){
+  if(state?.cutoffCloudVersion!==1||state.month!==month||!Number.isSafeInteger(state.revision)||state.revision<0||typeof state.cutoff!=='string'||(state.cutoff&&validReportCutoff(month,state.cutoff)!==state.cutoff))throw Error('雲端截止日格式異常');
+  cutoffCloudStates.set(month,state);
+  const value=rememberCutoff(month,state.cutoff);
+  if(q('#mrMonth').value===month){q('#mrCutoff').value=value;q('#mrCutoff').dataset.cloudSync='cloud';}
+  return value;
+ }
+ async function cutoffCloudRequest(month,write){
+  const ctx=g.p79OvertimeContext,url=String(ctx?.gasUrl?.()||''),token=String(ctx?.token?.()||'');
+  if(!url||!token)throw Error('請先重新登入加班管理');
+  const action=write?'saveMonthlyRestCutoff':'getMonthlyRestCutoff',endpoint=new URL(url);
+  if(!write){endpoint.searchParams.set('action',action);endpoint.searchParams.set('month',month);endpoint.searchParams.set('token',token);endpoint.searchParams.set('_',String(Date.now()));}
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),15000);
+  try{
+   const options=write?{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,month,token,gcToken:token,cutoff:write.cutoff,expectedRevision:write.expectedRevision}),signal:controller.signal}:{cache:'no-store',signal:controller.signal};
+   const response=await fetch(endpoint.toString(),options),result=await response.json();
+   if(!response.ok)throw Error('截止日雲端 HTTP '+response.status);
+   if(result?.ok===false&&result.code==='CUTOFF_CONFLICT')return result;
+   if(result?.ok===false&&/未知操作/.test(String(result.error||'')))return null;
+   if(result?.ok!==true||result.cutoffCloudVersion!==1)throw Error(result?.error||'截止日雲端未確認成功');
+   return result;
+  }finally{clearTimeout(timer);}
+ }
+ async function syncCutoffCloud(month){
+  const local=restoreCutoff(month),state=await cutoffCloudRequest(month);
+  if(state===null){cutoffCloudStates.set(month,null);q('#mrCutoff').dataset.cloudSync='local';return local;}
+  if(state.revision===0&&local){
+   // Only migrate a previously saved local date if the cloud has never been set.
+   // An explicit cloud clear has a positive revision and must never be revived.
+   const migrated=await cutoffCloudRequest(month,{cutoff:local,expectedRevision:0});
+   if(migrated===null)throw Error('雲端截止日服務版本不一致');
+   return applyCutoffCloud(month,migrated.code==='CUTOFF_CONFLICT'?migrated.state:migrated);
+  }
+  return applyCutoffCloud(month,state);
+ }
+ async function saveCutoffCloud(month,value){
+  if(!cutoffCloudStates.has(month))throw Error('尚未完成截止日雲端核對，請重新讀取');
+  const current=cutoffCloudStates.get(month);
+  if(current===null){rememberCutoff(month,value);q('#mrCutoff').dataset.cloudSync='local';alert('GAS 尚未部署截止日雲端同步版本；本次只儲存在這台電腦。');return;}
+  const saved=await cutoffCloudRequest(month,{cutoff:value,expectedRevision:current.revision});
+  if(saved===null)throw Error('截止日雲端服務尚未啟用，未修改設定');
+  if(saved.code==='CUTOFF_CONFLICT'){applyCutoffCloud(month,saved.state);throw Error(saved.error);}
+  if(saved.cutoff!==value)throw Error('雲端截止日讀回不一致，請重新核對');
+  applyCutoffCloud(month,saved);
  }
  q('#mrCutoff').value=restoreCutoff(q('#mrMonth').value);
  let people=monthlyPlanPeople(a.employees(),null,q('#mrMonth').value);
@@ -1463,7 +1509,12 @@ async function open(settings={}){
  function invalidate(){lastFailure='';model=null;snapshot=null;q('#mrRows').innerHTML='';q('#mrExistingRows').innerHTML='';q('#mrExistingStatus').textContent='讀取班表後顯示既有申報。';q('#mrAutoSupplementRows').innerHTML='';q('#mrAutoSupplementSummary').textContent='正在核對全員來源…';q('#mrBackfill').textContent='';q('#mrAuditSummary').textContent='';q('#mrAuditDetails').textContent='';q('#mrResult').textContent='尚未送出申報';q('#mrSave').disabled=true;q('#mrAll').checked=false;}
  q('#mrDept').onchange=jobs;q('#mrJob').onchange=names;q('#mrEmp').onchange=()=>{if(model&&!busy)paint();};
  q('#mrMonth').onchange=()=>{if(!busy){q('#mrCutoff').value=restoreCutoff(q('#mrMonth').value);manualPeople.clear();q('#mrLoad').click();}};
- q('#mrCutoff').onchange=()=>{if(busy)return;const input=q('#mrCutoff'),month=q('#mrMonth').value,raw=input.value,valid=validReportCutoff(month,raw);if(raw&&!valid){input.value=restoreCutoff(month);setStatus('截止日必須為選定月份內且不晚於今天的日期，已保留原設定。');return;}input.value=rememberCutoff(month,valid);manualPeople.clear();q('#mrLoad').click();};jobs();
+ q('#mrCutoff').onchange=async()=>{if(busy)return;const input=q('#mrCutoff'),month=q('#mrMonth').value,raw=input.value,valid=validReportCutoff(month,raw);if(raw&&!valid){input.value=restoreCutoff(month);setStatus('截止日必須為選定月份內且不晚於今天的日期，已保留原設定。');return;}
+  busy=true;controls(true);setStatus('正在儲存雲端截止日…');
+  try{await saveCutoffCloud(month,valid);manualPeople.clear();}
+  catch(error){input.value=restoreCutoff(month);alert('截止日尚未確認儲存：'+String(error?.message||error)+'。系統將重新核對雲端。');}
+  finally{busy=false;controls(false);if(el.open)q('#mrLoad').click();}
+ };jobs();
  function controls(disabled,allowFilters=false){
   el.querySelectorAll('.filters input,.filters select,.filters button,#mrAll,#mrRows input,#mrRows select,#mrPlanAll,#mrPlannedRows input,#mrSavePlans,#mrNeedRows input,#mrManualRows button,#mrManualMode,#mrAutoMode,#mrNewPlan').forEach(e=>e.disabled=disabled);
   if(allowFilters){q('#mrDept').disabled=false;q('#mrJob').disabled=false;q('#mrEmp').disabled=false;}
@@ -1670,7 +1721,8 @@ async function open(settings={}){
    if(loadedMonth&&loadedMonth!==requestedMonth)manualPeople.clear();
    loadedMonth=requestedMonth;
     const cutoff=q('#mrCutoff');cutoff.min=loadedMonth+'-01';cutoff.max=loadedMonth===today().slice(0,7)?today():loadedMonth+'-'+String(g.p79RestQuota(loadedMonth).days).padStart(2,'0');
-    cutoff.value=validReportCutoff(loadedMonth,cutoff.value);
+    cutoff.dataset.cloudSync='loading';
+    cutoff.value=await syncCutoffCloud(loadedMonth);
     if(loadedMonth>today().slice(0,7))throw Error('不能對未來月份先建立跨月補報');
     if(!people.length){
      setStatus('正在載入人資名冊與操作權限，完成後繼續核對…');
