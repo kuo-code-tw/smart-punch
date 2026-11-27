@@ -44,7 +44,8 @@ const fresh={...snapshot,schedules:[{empId:'TEST',schedule:monthly}],
  attendanceEvidence:{complete:true,days:{}},pairs:[]};
 const rule=['休','休08-16',8,8,'','','08','16','full'];
 const planned=api.plan(fresh,[emp],'2026-11',[rule]);
-assert.deepEqual(Array.from(planned.plannedRows,r=>r.date),['2026-11-26','2026-11-27','2026-11-28','2026-11-30']);
+assert.deepEqual(Array.from(planned.plannedRows,r=>r.date),['2026-11-26','2026-11-27','2026-11-30']);
+assert.match(api.manualRestPlanIssue(fresh,emp,'2026-11','2026-11-28',rule,'2026-11-25'),/選舉日/,'election day cannot be a monthly rest preplan even without the calendar module');
 const withoutProtectedRest={...monthly,'2026-11-29':'早',__meta:{...monthly.__meta}};
 delete withoutProtectedRest.__meta['2026-11-29'];
 const warningSnapshot={...fresh,schedules:[{empId:'TEST',schedule:withoutProtectedRest}]};
