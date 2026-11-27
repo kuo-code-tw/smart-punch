@@ -940,7 +940,16 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
  const expected={token:t,viewer,scope,stamp,guard:readOptions.startupGuard};
  if(!t)throw new Error('找不到登入 Token，請重新由首頁登入');
  // A full 22-month snapshot can take several seconds to restore from disk.
- const previous=await getDisplaySnapshot('attendance',{timeoutMs:10000}).catch(()=>null);
+ let previous=await getDisplaySnapshot('attendance',{timeoutMs:10000}).catch(()=>null);
+ // A local mutation invalidates display data, but an older exact-scope snapshot
+ // can still be a candidate for a live revision check. Never display it as fresh.
+ if(!previous){
+  const candidate=await getSystemSnapshot('attendance').catch(()=>null);
+  verifyAttendanceDownloadContext(expected);
+  if(candidate?.data?.ok===true&&candidate.data.fullDatabase===true&&candidate.displayScope===scope&&
+     candidate.cacheEndpoint===gasUrl()&&candidate.savedAt>0&&candidate.savedAt<=Date.now()+60000)previous=candidate;
+ }
+ if(readOptions.checkOnly===true&&!previous?.data?.fullDatabase)return {deferred:true};
  const before=await fetchJson('getSyncMeta',{token:t},'',readOptions).catch(error=>{if(['P79_AUTH','P79_TRANSPORT'].includes(error?.code))throw error;return null;});
  onProgress?.('attendance',0,0,'catalog','核對雲端月份清單（尚未下載月份）');
  const catalog=await fetchJson('getAttendanceMonths',{token:t},'',readOptions);
@@ -1005,6 +1014,8 @@ async function readAttendanceDatabase(targetSys='attendance',onProgress,readOpti
    return {...old,reusedCache:true};
    }
  }
+
+ if(readOptions.checkOnly===true)return {deferred:true};
 
  // Native Windows: two bounded read-only workers; browser: existing sequential behavior.
  // Each worker makes at most one GAS request at a time and stores no full snapshot
@@ -1248,6 +1259,20 @@ async function downloadAll(onProgress,options={}){
    consecutiveTransportFailures=0;
    result.push({system:sys,ok:true,reused:true});
    onProgress?.(sys,i,systems.length,'reused',null,'此系統先前已完成，沿用快取');
+   continue;
+  }
+  if(automaticStartup&&!connectionError&&sys==='attendance'){
+   onProgress?.(sys,i,systems.length,'loading',null,'只核對既有考勤版本，不自動下載完整歷史');
+   try{
+    const checked=await readAttendanceDatabase('attendance',(name,mi,mt,state,label)=>onProgress?.(sys,i,systems.length,'detail',null,label),{...readOptions,checkOnly:true});
+    if(checked?.reusedCache===true){
+     attendanceSnapshot=checked;result.push({system:sys,ok:true,reused:true});
+     onProgress?.(sys,i,systems.length,'reused',null,'雲端版本未變，沿用完整本機考勤');
+    }else{
+     result.push({system:sys,ok:true,deferred:true});
+     onProgress?.(sys,i,systems.length,'deferred',null,'完整歷史尚需核對，保留本機；當月資料由考勤頁更新，不重抓全部月份');
+    }
+   }catch(e){result.push({system:sys,ok:false,error:String(e?.message||e)});onProgress?.(sys,i,systems.length,'error',e);}
    continue;
   }
   // Startup resumes exact-viewer, exact-scope stored snapshots within 24 h.
