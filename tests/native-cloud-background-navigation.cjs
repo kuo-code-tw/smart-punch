@@ -47,6 +47,8 @@ function monthHarness({storageFailure=false}={}){
   ymNow:()=> '2026-11',currentSystem:()=> 'home',
   systemKey:sys=>'USER@admin|system|'+sys,
   getDisplaySnapshot:async()=>null,
+  getSystemSnapshot:async()=>null,
+  readMonthDelta:async()=>null,
   currentViewerRow:row=>row.key.startsWith('USER@admin|'),
   get:async key=>shared.get(key)||null,
   put:async row=>{if(storageFailure)throw Error('indexedDB is not defined');
