@@ -162,8 +162,9 @@ function dailyPendingRows(data){
  const people=new Map(data.roster.map(r=>[String(r.id).trim().toUpperCase(),r]));
  const key=(emp,date)=>String(emp||'').trim().toUpperCase()+'|'+date;
  const dated=new Map(),result=[];
- // A confirmed cloud report must not reappear as a read-only roster suggestion.
- const confirmedDates=new Set((data.prior||[]).filter(r=>r.status==='已核對出勤'&&r.empId&&r.date).map(r=>key(r.empId,r.date)));
+ // Every saved active declaration (including a preplan awaiting attendance)
+ // occupies its employee/work-date; cancelled/history-only rows do not.
+ const occupiedDates=new Set([...(data.prior||[]).filter(r=>r.id&&r.empId&&r.date&&!/已取消|歷史版本/.test(r.status)),...(data.planned||[]).filter(r=>r.saved===true&&r.empId&&r.date)].map(r=>key(r.empId,r.date)));
  for(const row of [...data.ready,...data.planned]){
   const person=people.get(String(row.empId||'').trim().toUpperCase());
   // Completed quotas leave the actionable list, not the official record archive.
@@ -171,7 +172,7 @@ function dailyPendingRows(data){
   const item={...row,role:person?.role||row.role||'',quota:person?.category||'',quotaProgress:row.quotaProgress||person?.quotaProgress||null,lastReported:person?.lastReported||''};
   // The real dated row takes precedence over the person's preview of it.
   const k=key(row.empId||row.audit||row.name,row.date);
-  if(dated.has(k))continue;
+  if(dated.has(k)||occupiedDates.has(k))continue;
   dated.set(k,item);result.push(item);
  }
  for(const person of data.roster.filter(r=>r.reviewType==='deficit'&&!quotaFullyAllocated(r.quotaProgress))){
@@ -179,7 +180,7 @@ function dailyPendingRows(data){
   for(const hint of person.suggestions||[]){
    if(!hint.date||covered.has(hint.date))continue;
    const k=key(person.id,hint.date);
-   if(dated.has(k)||confirmedDates.has(k))continue;
+   if(dated.has(k)||occupiedDates.has(k))continue;
    const item={kind:'reference',id:person.id,empId:person.id,date:hint.date,name:person.name,role:person.role,
     category:hint.category||String(hint.period||'').match(/^[休例國]/)?.[0]||'',period:suggestionPeriod(hint),
     quota:person.category,quotaProgress:person.quotaProgress||null,lastReported:person.lastReported,hours:'—',status:'待核對',source:hint.note||person.source,
