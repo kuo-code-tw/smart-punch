@@ -6932,6 +6932,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const storedRosterMeta=monthlyScheduleMeta[emp.id]?.[dayStr]||{};
           const editorRosterValue=rosterShift==='休'&&['例','國'].includes(storedRosterMeta.restCategory)?storedRosterMeta.restCategory:rosterShift;
           const showRosterDifference=!ownApprovedLeave&&!p79LeaveCoverOnDay(emp.id,dayStr).length&&['早','中','晚','休','例','國'].includes(editorRosterValue)&&editorRosterValue!==selected.visibleCode;
+          const previewDifference=showRosterDifference?'預排'+editorRosterValue+'｜'+selected.visibleCode:'';
           const hasAssignment=!!(dayMeta?.forEmpId||dayMeta?.overtime||dayMeta?.overtimeReport||dayMeta?.note);
 
 
@@ -6994,7 +6995,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const leaveLink = window.P79CombinedLeaveLink?.resolve({empId:emp.id,date:dayStr,meta:dayMeta,assignments:leaveCoverAssignments,leaveRecords,employees}) || {links:[],conflict:false};
           const hasCoverLink = !unworkedOvertime&&leaveLink.links.length>0;
           const combinedMarker = (combinedLeave && combinedOvertime) || hasCoverLink
-            ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="同日有加班與休假，點此查看" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
+            ? `<button type="button" class="p79-combined-dot no-print" aria-label="查看加班與休假複合狀態" title="${scheduleEscapeHtml([previewDifference,'同日有加班與休假，點此查看'].filter(Boolean).join('｜'))}" data-combined-emp="${scheduleEscapeHtml(emp.id)}" data-combined-name="${scheduleEscapeHtml(emp.name)}" data-combined-date="${scheduleEscapeHtml(dayStr)}" data-combined-leave="${scheduleEscapeHtml(ownApprovedLeave?scheduleLeaveTypeText(ownApprovedLeave):shiftVal)}" data-combined-overtime="${scheduleEscapeHtml(p79OvertimePeriodLabel(dayMeta.overtimeReport))}" onclick="p79ShowCombinedShiftInfo(this)">●</button>`
             : '';
           const pairedDetails=attendanceEvidence?.actualShiftDetails?.[String(emp.id).trim().toUpperCase()+'|'+dayStr];
           const pairedProof=Array.isArray(pairedDetails)?
@@ -7004,7 +7005,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
           const pendingProof=selected.punchPending?(pendingDetails.length?
             pendingDetails.map(item=>item.type+'：'+item.time+'（歸屬工作日 '+item.workday+'）').join('；'):
             '考勤判為單側／配對異常；請檢查相鄰工作日及正式考勤來源'):'';
-          const cellTitle = ['目前顯示：'+selected.visibleCode+'；來源：'+shiftSource,
+          const cellTitle = [previewDifference,'目前顯示：'+selected.visibleCode+'；來源：'+shiftSource,
             earlyExtensionWithRegularShift?'本班：08:00–16:00（早）；加班：04:00–08:00（延），兩段均屬 '+dayStr+'；不變更前一日代班申報':'',
             oldNationalLabel?'本月國定假日額度為0，原紀錄帶有國假標記；一般休假於畫面改顯示休，正式申報與鎖定資料保留待管理員核對':'',
             nightSplitLabel?'20:00～24:00 加班（依正式申報及考勤核對）；00:00～08:00 是休假班段，均歸屬 '+dayStr+'；例休國依既有額度，不代表已符合完整24小時法定休息':'',
@@ -7034,7 +7035,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
               ${earlyExtensionWithRegularShift?
                 '<span class="block text-[9px] font-bold text-indigo-700 leading-tight" title="加班04:00–08:00；本班08:00–16:00；兩者均已核對正式出勤與報單">延04-08</span>':''}
               ${combinedMarker}
-              ${showRosterDifference?(noPunchRest?(combinedMarker?'':`<span class="p79-combined-dot no-print" tabindex="0" role="img" aria-label="${scheduleEscapeHtml(cellTitle)}" title="${scheduleEscapeHtml(cellTitle)}">●</span>`):`<span class="block text-[9px] text-slate-600 leading-tight" title="正式原排與考勤／加班顯示分開，編輯時選擇正式原排">原排${scheduleEscapeHtml(editorRosterValue)}｜${scheduleEscapeHtml(selected.visibleCode)}</span>`):''}
+              ${showRosterDifference&&!combinedMarker?`<span class="p79-combined-dot no-print" tabindex="0" role="img" aria-label="${scheduleEscapeHtml(cellTitle)}" title="${scheduleEscapeHtml(cellTitle)}">●</span>`:''}
               ${'' /* 班別差異僅保留在日期格 title 與全員考勤對帳明細，避免誤把「原排中」當成目前班別。 */}
               ${'' /* 完整出勤已核實：不以無法推定早／中／晚班誤標「班別待核」；保留原始排班與真實缺卡提示。 */}
               ${typhoonCounted&&shownShift!=='颱'?'<span class="block text-[9px] leading-tight text-cyan-800 font-bold" title="全員颱風日標記；原排班、例休和加班紀錄不改動">颱日</span>':''}
