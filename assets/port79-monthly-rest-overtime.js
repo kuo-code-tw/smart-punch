@@ -59,6 +59,19 @@ function ownRestCoverReport(meta,roster,date){
 }
 // Shared by the schedule allocator and monthly ledger. A historical report's
 // stored category does not override its verified typhoon/cover classification.
+// V139: a leave-overlapping preplan without attendance is an audit record,
+// not earned overtime or a reservation. Single punches and actual work
+// remain protected for reconciliation. No source record is deleted here.
+function leaveOverlapQuotaState(snapshot,empId,date,roster,meta=roster?.__meta?.[date]||{},report=meta.overtimeReport){
+ if(!confirmedReport(meta,report)||!cats.includes(report?.category)||
+    !g.P79RestAttendance?.isLeaveDay(snapshot,empId,date,roster))return '';
+ if(g.P79RestAttendance?.verifiedNoWork?.(snapshot,empId,date)===true)return 'excluded';
+ if(report.planned===true){
+  const actual=g.P79RestAttendance?.state(snapshot,empId,date);
+  return actual==='worked'||actual==='missing'?'reserved':'excluded';
+ }
+ return 'reported';
+}
 function restQuotaExemptDates(emp,roster,dates,snapshot=null){
  const R=g.P79OvertimeReason;
  return dates.filter(date=>{
@@ -178,6 +191,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
    String(roster[d]||'').trim()==='颱'));
  const exemptReportDates=new Set(restQuotaExemptDates(emp,roster,dates,snapshot));
  const nonQuotaDates=new Set([...typhoonProtected,...exemptReportDates]);
+ const leaveBlockedReports=dates.filter(d=>leaveOverlapQuotaState(snapshot,emp.empId,d,roster)==='excluded');
  // Any 休/例/國 roster day with one complete IN/OUT pair is an actual attended day.
  // A short pair counts as attendance without inventing a full shift or approved overtime.
  // 只改統計歸屬，不將打卡直接視為已核准的加班；正式申報仍須人工確認。
@@ -202,7 +216,7 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
  // Only scheduled rest belongs in the holiday ledger; absence is not rest.
  const observedOffDates=partialNightDates;
  const allocated=g.p79AllocateRestMonth(roster,roster.__meta||{},month,excluded,start,end,
-   [...nonQuotaDates],[...nonQuotaDates],observedOffDates,[...exemptReportDates],weeklyCycleAnchor(emp)).meta;
+   [...nonQuotaDates],[...nonQuotaDates],observedOffDates,[...new Set([...exemptReportDates,...leaveBlockedReports])],weeklyCycleAnchor(emp)).meta;
  const ledger=[],extraRestDates=[];
  for(const d of dates){const m=roster.__meta?.[d]||{},r=m.overtimeReport,allocation=allocated[d];
   const actual=g.P79RestAttendance?.state(snapshot,emp.empId,d)||'unknown';
@@ -225,8 +239,13 @@ function balance(emp,roster,month,snapshot=null,employmentStart=null){
   const leave=g.P79RestAttendance?.isLeaveDay(snapshot,emp.empId,d,roster)||false;
   if(leave){
    ledger.push({date:d,kind:'leave',category:'',actual});
-   if(verified&&!confirmedNoWork){reported[r.category]++;ledger.push({date:d,kind:'reported',category:r.category,actual,reportId:r.id});conflicts.push({date:d,reportId:r.id,reason:'請假日期與正式加班申報重疊，保留原申報供核對'});}
-   if(confirmedNoWork)conflicts.push({date:d,reportId:r.id,reason:'已核實請假日沒有實際出勤，不計加班；原申報待管理員正式取消'});
+   if(verified){
+    const overlap=leaveOverlapQuotaState(snapshot,emp.empId,d,roster,m,r);
+    if(overlap==='reported'){reported[r.category]++;ledger.push({date:d,kind:'reported',category:r.category,actual,reportId:r.id});}
+    if(overlap==='reserved'){reserved[r.category]++;ledger.push({date:d,kind:'reportedPendingAttendance',category:r.category,actual,reportId:r.id,statusNote:'請假與預排重疊且有考勤，保留待核，不算已申報'});}
+    if(overlap==='excluded')ledger.push({date:d,kind:'leavePreplanConflict',category:r.category,actual,reportId:r.id,statusNote:'請假重疊，尚無出勤證據，不占例休國額度；保留原紀錄待核'});
+    conflicts.push({date:d,reportId:r.id,reason:overlap==='excluded'?'請假與加班重疊，無已核實出勤／待補卡，不占額度；原紀錄待核對':'請假日期與加班申報重疊，保留原申報供核對'});
+   }
    continue;
   }
   // A confirmed, cross-source absence audit overrides even an old cloud report.
@@ -811,7 +830,9 @@ function existingRestOvertimeRows(snapshot,staff,month){
     const historical=!!current?.id&&String(current.id)!==reportId;
     const source=String(meta.note||report.note||'');
     const typhoon=/^颱/.test(String(report.code||''))||/颱風/.test(source);
-    const status=cancelled?'已取消':historical?'歷史版本（非目前有效申報）':
+    const overlap=leaveOverlapQuotaState(snapshot,empId,date,row.schedule,meta,report);
+   const status=cancelled?'已取消':historical?'歷史版本（非目前有效申報）':
+     overlap==='excluded'?'請假重疊｜不占額度（待核對）':overlap==='reserved'?'請假重疊｜出勤待核（預留額度）':
      report.planned===true?(date<today()?'預排出勤待核':'預排待出勤'):String(report.status||'申報狀態待核對');
     result.push({empId,name,role,date,category:report.category,
      code:String(report.code||''),reportId,status,cancelled,historical,
@@ -1155,7 +1176,7 @@ function personSummary(model,empId){
 }
 function auditText(model,empId){
  const b=model.balances.find(b=>id(b.emp.empId)===id(empId));if(!b)return '';
- const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'未確認安排（不扣額度）',reported:'正式申報',exemptOvertime:'颱風／純代班加班（不計例休國額度）',reportedPendingAttendance:'已申報／出勤待核對（預留額度）',workedRestUnreported:'休息日有出勤但尚未申報（需核對）',unconfirmed:'缺少申報編號（不扣額度）',unconfirmedAssignment:'人工加班時段待核（不扣額度）',typhoon:'颱風日（不計額度）',leave:'請假（不扣例／休／國）',absencePending:'工作日無卡・缺勤／待核（不扣休假）',excessRest:'額度以外無卡休息'};
+ const p=reportProgress(model,empId),label={off:'已休',reserved:'預排休',reservedOvertime:'未確認安排（不扣額度）',reported:'正式申報',exemptOvertime:'颱風／純代班加班（不計例休國額度）',reportedPendingAttendance:'已申報／出勤待核對（預留額度）',workedRestUnreported:'休息日有出勤但尚未申報（需核對）',unconfirmed:'缺少申報編號（不扣額度）',unconfirmedAssignment:'人工加班時段待核（不扣額度）',typhoon:'颱風日（不計額度）',leave:'請假（不扣例／休／國）',leavePreplanConflict:'請假重疊預排（不扣額度，原紀錄待核）',absencePending:'工作日無卡・缺勤／待核（不扣休假）',excessRest:'額度以外無卡休息'};
  const lines=[b.emp.name+'｜逐日額度核對',personSummary(model,empId)];
  for(const c of ['例','休','國'])lines.push(c+'：應休 '+b.quota[c]+'－已休 '+b.off[c]+'－預排休 '+b.reserved[c]+'－既有申報 '+b.reported[c]+'－本次已成功 '+p[c].saved+'＝未報 '+p[c].remaining+'；勾選 '+p[c].selected+'，報後 '+p[c].after);
  lines.push('',...(b.ledger||[]).map(x=>x.date+' '+(x.category||'')+' '+label[x.kind]+
@@ -2253,6 +2274,6 @@ async function open(settings={}){
  // 開啟時只讀核對，優先重用同帳號已核對的本機月份資料；沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').onclick({preferLocal:true});
 }
-g.P79MonthlyRest={open,plan,balance,showPreplanProgress,monthlyRestHoursIssue,monthlyRestReportApplies,monthlyRestDraftHoursIssue,monthlyRestElectionDay,electionMonthlyRestWriteIssue,abnormalMonthlyRestPlans,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture,unstartedSameDayRestShift};
+g.P79MonthlyRest={open,plan,balance,showPreplanProgress,monthlyRestHoursIssue,monthlyRestReportApplies,monthlyRestDraftHoursIssue,monthlyRestElectionDay,electionMonthlyRestWriteIssue,abnormalMonthlyRestPlans,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,leaveOverlapQuotaState,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture,unstartedSameDayRestShift};
 
 })(window);
