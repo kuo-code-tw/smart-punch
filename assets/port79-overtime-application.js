@@ -42,6 +42,7 @@ function resolvedConvertedHours(report){
  const converted=Number(matches[0][3]);
  return Number.isFinite(converted)&&converted>=0?converted:null;
 }
+function isPendingPlan(report){return report?.planned===true||report?.planned==='true'||report?.status==='預排待出勤';}
 function collect(snapshots,employees,dates,company,jobs,mode){
  const selected=new Set(dates),jobSet=new Set(jobs),people=new Map(employees.map(e=>[uid(e.empId),e])),rows=[],issues=[],seen=new Set();
  for(const snapshot of snapshots)for(const entry of snapshot.schedules||[]){const emp=people.get(uid(entry.empId));if(!emp)continue;const job=String(emp.jobTitle||emp.deptDetail||'未設定'),co=companyFor(emp);if(company&&company!==co||jobSet.size&&!jobSet.has(job))continue;
@@ -49,10 +50,10 @@ function collect(snapshots,employees,dates,company,jobs,mode){
     if((meta.overtimeRevocations||[]).some(x=>x?.confirmed===true&&String(x.reportId)===String(report.id)))continue;
    const key=uid(emp.empId)+'|'+String(report.id||date);if(seen.has(key))throw Error(emp.name+' '+date+' 有重複申報資料，請先核對');seen.add(key);
    if(!report.id){issues.push(emp.name+' '+date+' 缺少已儲存申報識別碼，未列入');continue;}
+   const planned=isPendingPlan(report);
+   if(mode==='actual'&&planned){issues.push(emp.name+' '+date+'：預排 '+String(report.code||'')+' '+String(report.declaredHours??'')+' 小時尚未正式申報，不列入加班費');continue;}
+   if(mode==='planned'&&(!planned||workDate<today()))continue;
    const review=g.P79RestAttendance?.reportIssue(snapshot,entry.empId,workDate);if(review){issues.push(emp.name+' '+date+'：'+review);continue;}
-   const planned=report.planned===true&&workDate>=today();
-   if(mode==='actual'&&planned)continue;
-   if(mode==='planned'&&!planned)continue;
    const substitute=report.category==='代'||['休假代班加班','代班加班'].includes(report.typeName);
    const category=substitute?'休':['休','例','國'].includes(report.category)?report.category:'延';
    const spans=['','','',''];spans[{休:0,延:1,例:2,國:3}[category]]=period(report);
