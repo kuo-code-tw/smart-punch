@@ -11,6 +11,7 @@ const dateValid=x=>/^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/.test(Stri
 const token=()=>typeof getAttendanceEmployeeMasterToken==='function'?String(getAttendanceEmployeeMasterToken()||''):'';
 const gas=()=>typeof getActiveGasUrl==='function'?String(getActiveGasUrl()||''):'';
 const notify=(message,type='info')=>{if(typeof showToast==='function')showToast(message,type);else console.info(message);};
+function isPendingPlan(report){return report?.planned===true||report?.planned==='true'||report?.status==='預排待出勤';}
 function sheetRows(json,date){
  const persons=new Map((Array.isArray(json.employees)?json.employees:[]).map(e=>[id(e.empId||e.id),e]));
  const unique=new Set(),out=[];
@@ -18,12 +19,13 @@ function sheetRows(json,date){
   const empId=id(row.empId),meta=row.schedule?.__meta?.[date]||{};
   if(!empId||meta.overtimeExcluded===true)continue;
   const revoked=new Set((meta.overtimeRevocations||[]).filter(x=>x?.confirmed===true).map(x=>String(x.reportId)));
-  const reports=[...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[]),meta.overtimeReport].filter(Boolean);
+  const reports=[meta.overtimeReport,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])].filter(Boolean);
   const person=persons.get(empId)||row;
   for(const report of reports){
     const reportId=String(report?.id||'').trim(),key=empId+'|'+reportId;
     if(!reportId||revoked.has(reportId)||unique.has(key))continue;
     unique.add(key);
+    if(isPendingPlan(report))continue;
     out.push({date,empId,reportId,report,employeeName:String(person.name||row.name||empId),
       department:String(person.dept||row.dept||''),jobTitle:String(person.jobTitle||row.jobTitle||'')});
   }
