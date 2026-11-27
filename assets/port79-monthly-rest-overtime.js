@@ -93,7 +93,7 @@ function electionMonthlyRestWriteIssue(draft,meta={}){
  if(!cats.includes(rule.category)||/^[選颱]/.test(String(rule.code||'')))return '';
  const monthly=isMonthlyRestDeclaration({...rule,note:draft.note},meta)||!!draft.monthlyRestPlanMonth||
    (meta.overtimeReport?.id===draft.id&&isMonthlyRestDeclaration(meta.overtimeReport,meta));
- return monthly?'11月28日選舉日不得申報一般每月未休假加班，請使用選舉日特殊加班申報':'';
+ return monthly?(monthlyRestElectionDay(date)?date:accounting)+' 選舉日不得申報一般每月未休假加班，請使用選舉日特殊加班申報':'';
 }
 function abnormalMonthlyRestPlans(snapshot,staff,month){
  const people=new Map((staff||[]).map(e=>[id(e.empId||e.id),e])),repair=[],review=[],seen=new Set();
@@ -115,7 +115,7 @@ function abnormalMonthlyRestPlans(snapshot,staff,month){
    const reports=[report,...(Array.isArray(meta.overtimeReports)?meta.overtimeReports:[])].filter(r=>confirmedReport(meta,r));
    const active=confirmedReport(meta,report);
    const reason=monthlyRestElectionDay(date)?'選舉日':g.P79SpecialOvertime?.kindsForDate?.(date)?.some(x=>x.kind==='typhoon')||shift==='颱'?'颱風日':'';
-   const monthly=r=>isMonthlyRestDeclaration(r,meta);
+   const monthly=r=>monthlyRestElectionDay(date)?isMonthlyRestDeclaration(r,meta):/每月未休假加班/.test(String(r?.note||'')+' '+String(meta.note||''));
    const general=r=>cats.includes(r?.category)&&!/^[選颱]/.test(String(r?.code||''));
    const generalReports=reports.filter(general);
    const assigned=!!meta.overtimeAssignedShift&&shift===String(meta.overtimeAssignedShift).trim();
