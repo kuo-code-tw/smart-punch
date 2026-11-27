@@ -10,18 +10,16 @@ const selectors={
   history:'.p79-ot-btn-history',
   detail:'.p79-ot-btn-detail',
   report:'.p79-ot-btn-report',
-  rules:'.p79-ot-btn-options',
   planned:'#p79OvertimePlannedToggle',
   reset:'.p79-ot-btn-reset'
 };
 const entries=[
   ['home','工時與加班總覽'],
   ['overview','加班總覽（人員統計）'],
-  ['monthly','每月未休假加班'],
+  ['monthly','未休假加班預排'],
   ['history','申報／異動紀錄'],
   ['detail','加班明細'],
   ['report','申報加班'],
-  ['rules','加班選項管理'],
   ['planned','預排／待核對'],
   ['reset','清除篩選']
 ];
@@ -110,7 +108,7 @@ function decorateMonthlyDialog(){
  tabs.setAttribute('aria-label','加班管理分頁切換');
  const back=d.createElement('button');back.type='button';back.textContent='加班總覽（人員統計）';back.dataset.p79OvertimeIcon='overview';
  back.addEventListener('click',()=>activate('overview'));
- const current=d.createElement('button');current.type='button';current.textContent='每月未休假加班';current.dataset.p79OvertimeIcon='monthly';
+ const current=d.createElement('button');current.type='button';current.textContent='未休假加班預排';current.dataset.p79OvertimeIcon='monthly';
  current.className='is-active';current.disabled=true;current.setAttribute('aria-current','page');
  tabs.append(back,current);
  header.append(tabs);

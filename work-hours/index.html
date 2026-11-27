@@ -1743,7 +1743,6 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                       <button type="button" onclick="P79OvertimeStatus.open({state:'all'})" class="p79-ot-btn-detail" title="查看所有已儲存加班申報，不只異常或修改紀錄">加班明細</button>
                       <button type="button" onclick="P79MonthlyRest.open()" class="p79-ot-btn-monthly">未休假加班預排</button>
                       <button type="button" onclick="P79Overtime.openReport()" class="p79-ot-btn-report">＋ 申報加班</button>
-                      <button type="button" onclick="if(p79CanManageOvertime())P79Overtime.openRules();else alert('沒有管理加班選項的權限')" class="p79-ot-btn-options" title="新增、修改或刪除加班類型與出勤時段">⚙ 加班選項管理</button>
                       <button id="p79OvertimePlannedToggle" type="button" onclick="p79ToggleOvertimePlanned()" class="p79-ot-btn-planned" aria-controls="p79OvertimePlannedDialog" aria-haspopup="dialog" aria-expanded="false" title="開啟預排／待核對視窗">預排／待核對</button>
                       <button type="button" onclick="resetOvertimeFilters()" class="p79-ot-btn-reset">↺ 清除篩選</button>
                     </div>
@@ -18540,7 +18539,7 @@ window.addEventListener('focus',p79RefreshVisibleOvertimeEvidence);
 <script>window.p79WorkhoursRosterForVisibility=()=>typeof employees==='undefined'||!Array.isArray(employees)?[]:employees;</script>
 <!-- PORT79 approved overtime workspace: visual-only tabs; original records and handlers retained. -->
 <link rel="stylesheet" href="../assets/port79-overtime-approved-dashboard.css?v=20261125-color-toolbar-v5&icons=20261126-v1&compactMetrics=20261127-v1">
-<script defer src="../assets/port79-overtime-approved-dashboard.js?v=20261125-no-redundant-heading-v4&icons=20261126-v1"></script>
+<script defer src="../assets/port79-overtime-approved-dashboard.js?v=20261125-no-redundant-heading-v4&icons=20261126-v1&toolbar=20261127-v1"></script>
 </body>
 </html>
 
