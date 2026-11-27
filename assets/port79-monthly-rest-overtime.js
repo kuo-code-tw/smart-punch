@@ -1572,6 +1572,8 @@ async function open(settings={}){
   if(!service?.canRevoke?.()||typeof service.revoke!=='function'){setStatus('沒有班表及加班撤銷管理權限，未修改資料。');return;}
   const month=loadedMonth;let candidates=[],review=[],completed=0,failure='',reload=false,remaining=null,processed=0;
   const failed=[];
+  const cloudBusy=error=>/雲端目前正在處理其他資料|雲端正處理其他操作|排班讀取等[待候]|未取得鎖|班表正由其他人編輯/.test(String(error?.message||error||''));
+  const waitRepair=attempt=>new Promise(resolve=>g.setTimeout(resolve,Math.min(7500,2500*(attempt+1))));
   const readRepairSnapshot=async()=>{
    for(let attempt=0;;attempt++){
     try{
@@ -1579,9 +1581,9 @@ async function open(settings={}){
      if(source?.provisional||source?.readOnlyDueAttendance||source?.attendanceEvidence?.complete!==true||!source?.saveContext?.ready)throw Error('正式資料尚未完整核對，未修改');
      return source;
     }catch(error){
-     if(attempt>=2||!/雲端正處理其他操作|排班讀取等[待候]|未取得鎖/.test(String(error.message||error)))throw error;
-     setStatus('異常預排｜雲端忙碌，重新讀取 '+(attempt+1)+'/2');
-     await new Promise(resolve=>g.setTimeout(resolve,500*(attempt+1)));
+     if(attempt>=3||!cloudBusy(error))throw error;
+     setStatus('異常預排｜雲端忙碌，重新讀取 '+(attempt+1)+'/3');
+     await waitRepair(attempt);
     }
    }
   };
@@ -1596,7 +1598,8 @@ async function open(settings={}){
    reload=true;
    for(const candidate of candidates){
     if(!el.isConnected||loadedMonth!==month||!service.canRevoke())throw Error('視窗、月份或權限已變更');
-    const current=abnormalMonthlyRestPlans(fresh,a.employees(),month).repair.find(r=>r.empId===candidate.empId&&r.date===candidate.date&&r.id===candidate.id&&JSON.stringify(r.report)===JSON.stringify(candidate.report));
+    const findCurrent=source=>abnormalMonthlyRestPlans(source,a.employees(),month).repair.find(r=>r.empId===candidate.empId&&r.date===candidate.date&&r.id===candidate.id&&r.original===candidate.original&&JSON.stringify(r.report)===JSON.stringify(candidate.report));
+    let current=findCurrent(fresh);
     processed++;
     if(!current){
      failed.push(candidate.name+' '+candidate.date+'：原預排已變更，未撤銷');
@@ -1604,13 +1607,26 @@ async function open(settings={}){
     }
     setStatus('異常預排修正 '+processed+'／'+candidates.length+'｜'+current.name+' '+current.date);
     let revokeError=null;
-    try{
-     const result=await service.revoke({...current,repairPreplan:true},fresh);
-     if(result?.ok!==true||result.revocationVerified!==true)throw Error('撤銷回應未確認');
-    }catch(error){revokeError=error;}
-    // Never repeat a possibly successful mutation. Verify both the exact
-    // revocation record and restored roster against a fresh cloud read.
-    fresh=await readRepairSnapshot();
+    for(let attempt=0;;attempt++){
+     revokeError=null;
+     try{
+      const result=await service.revoke({...current,repairPreplan:true},fresh);
+      if(result?.ok!==true||result.revocationVerified!==true)throw Error('撤銷回應未確認');
+     }catch(error){revokeError=error;}
+     // A lost response may follow a successful write. Read back before
+     // considering another attempt; only explicit pre-write contention
+     // with the identical active report still present permits a retry.
+     fresh=await readRepairSnapshot();
+     const unchanged=findCurrent(fresh);
+     if(attempt>=3||!revokeError||!cloudBusy(revokeError)||!unchanged)break;
+     if(!el.isConnected||loadedMonth!==month||!service.canRevoke())throw Error('視窗、月份或權限已變更');
+     setStatus('異常預排修正 '+processed+'／'+candidates.length+'｜'+current.name+'｜雲端忙碌，重新核對 '+(attempt+1)+'/3');
+     await waitRepair(attempt);
+     fresh=await readRepairSnapshot();
+     const rechecked=findCurrent(fresh);
+     if(!rechecked)break;
+     current=rechecked;
+    }
     const roster=fresh.schedules?.find(r=>id(r.empId)===current.empId)?.schedule,meta=roster?.__meta?.[current.date]||{};
     if(!roster||meta.overtimeReport?.id===current.id||meta.overtimeReports?.some?.(r=>r?.id===current.id&&confirmedReport(meta,r))||!meta.overtimeRevocations?.some(r=>r.confirmed===true&&String(r.reportId)===String(current.id))||String(roster[current.date]||'').trim()!==current.original){
      failed.push(current.name+' '+current.date+'：撤銷或原班別未確認'+(revokeError?'：'+String(revokeError.message||revokeError):''));
