@@ -17,5 +17,18 @@ const edited=cell('中','休');apply(edited,true);assert.equal(edited.value,'中
 assert(html.includes('data-p79-roster-value='));
 assert(html.includes('if(!personnelChange)p79ApplyRosterEditorValue(el,editable)'));
 assert(html.includes('原排${scheduleEscapeHtml(editorRosterValue)}｜${scheduleEscapeHtml(selected.visibleCode)}'));
+
+const markerLine=html.split('\n').find(line=>line.includes('${showRosterDifference?(noPunchRest?'));
+assert(markerLine,'verified no-punch rest must use a hover marker');
+const renderMarker=vm.runInNewContext('(showRosterDifference,noPunchRest,combinedMarker,cellTitle,editorRosterValue,selected,scheduleEscapeHtml)=>`'+markerLine.trim()+'`');
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+const marker=(diff,rest,existing='')=>renderMarker(diff,rest,existing,'整班無上下班卡，按休息計算；原排班：中','中',{visibleCode:'休'},esc);
+assert.match(marker(true,true),/p79-combined-dot/);
+assert.match(marker(true,true),/title="整班無上下班卡，按休息計算；原排班：中"/);
+assert.doesNotMatch(marker(true,true),/原排中｜休/);
+assert.match(marker(true,false),/原排中｜休/);
+assert.equal(marker(false,true),'');
+assert.equal(marker(true,true,'existing-marker'),'','Never overlap an existing red marker');
+
 for(const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g))if(!/\bsrc=|application\/json|importmap/.test(m[1]))new vm.Script(m[2]);
 console.log('PASS separate stored roster edit selection, rest/attendance/overtime display, redraw, lock mode, and heartbeat');
