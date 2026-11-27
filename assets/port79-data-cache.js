@@ -1204,6 +1204,9 @@ async function downloadAll(onProgress,options={}){
  // long multi-month attendance scan. The legacy API retains its original order.
  const fastFirst=options?.quickFirst===true;
  const resumeExisting=fastFirst&&options?.resumeExisting===true;
+ // Homepage startup is not a request to download all historical attendance.
+ // Manual cloud-centre downloads keep the existing complete, verified path.
+ const automaticStartup=options?.automaticStartup===true;
  // Windows does not require a historical catalog to open the management
  // dashboard. History is read on demand for the selected month by the
  // dedicated history-data page, preserving every existing historical cache.
@@ -1265,6 +1268,14 @@ async function downloadAll(onProgress,options={}){
    continue;
   }
   // Treat remaining untouched modules as skipped after an identity/scope/transport failure.
+  if(automaticStartup&&!connectionError&&['attendance','workhours'].includes(sys)){
+   // A missing/invalid full-history snapshot must not launch a 22-month scan
+   // on every homepage return. No stale snapshot is promoted to verified.
+   // The attendance/workhours pages still perform their own live month reads.
+   result.push({system:sys,ok:true,deferred:true});
+   onProgress?.(sys,i,systems.length,'deferred',null,'完整歷史考勤按需下載；當月資料由各系統即時核對');
+   continue;
+  }
   if(connectionError){
    result.push({system:sys,ok:false,skipped:true,error:'前一項雲端讀取中斷，尚未下載；原因：'+String(connectionError.message||connectionError)});
    onProgress?.(sys,i,systems.length,'skipped',connectionError);
@@ -1542,7 +1553,7 @@ if(!window.__p79BrowserBackgroundWorker&&!window.chrome?.webview?.postMessage&&t
  const src=document.querySelector?.('script[src*="port79-data-cache.js"]')?.src;
  if(src){
   const tag=document.createElement('script');
-  tag.src=new URL('port79-browser-download-status.js?v=20261127-compact-hover-v1',src).href;
+  tag.src=new URL('port79-browser-download-status.js?v=20261127-compact-hover-v1&deferred=20261127-v1',src).href;
   tag.defer=true;
   document.head.appendChild(tag);
  }
