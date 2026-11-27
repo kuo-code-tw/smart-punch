@@ -30,8 +30,8 @@
 <script src="../assets/port79-rest-allocation.js?v=20261116-manual-example-v4&cycle=20261124-v21&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3"></script>
 <script src="../assets/port79-rest-attendance.js?v=20261101-official-accounting-day-v1&noWork=20261106"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261123-true-simple-official-v2&fullRoster=20261124-v21&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1&noWork=20261106&result=20261125-confirmed-popup-v1&electionGuard=20261127-v1"></script>
-<script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261123-true-simple-official-v2&fullRoster=20261124-v21&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&tdz=20261030-options-v1&noWork=20261106&result=20261125-confirmed-popup-v1&electionGuard=20261127-v1&leaveQuota=20261127-v139"></script>
+<script src="../assets/port79-schedule-rest-summary.js?v=20261030-confirmed-rest-count&leaveQuota=20261127-v139"></script>
 <script src="../assets/port79-schedule-rest-evidence.js?v=20261109-month-to-date-no-card-v1"></script>
 <script src="../assets/port79-schedule-transfer-roles.js?v=20261125-export-overtime-option-v1"></script>
 <script id="p79-default-light-v20261001">
@@ -8058,6 +8058,10 @@ async function p79SaveScheduleOvertimeDraft(draft){
           (/^颱/.test(String(report.code||''))||/颱風|颱日|停班/.test(String(report.typeName||''))))){protectedTyphoonSet.add(date);}
       }
       const dates=kind=>[...new Set(visibleRestDates?(visibleRestDates[kind]||[]):audit.dates[kind].map(d=>month+'-'+d))];
+      const reportRoster={...roster,__meta:metadata};
+      const reportSnapshot={leaveDates:p79ScheduleRestLeaveDates(month,emp.id),attendanceEvidence:p79ScheduleRestClient().status(month).evidence};
+      const leaveBlockedDates=new Set((ledger?.ledger||[]).filter(x=>x.kind==='leavePreplanConflict').map(x=>x.date));
+      const leaveBlocksReport=day=>leaveBlockedDates.has(day)||window.P79MonthlyRest?.leaveOverlapQuotaState?.(reportSnapshot,emp.id,day,reportRoster)==='excluded';
       const nationalDuplicates=dates('國').filter(day=>protectedTyphoonSet.has(day)).length;
       const total=typhoonSet.size;
       const quotaCells=['例','休','國'].map(category=>{
@@ -8065,7 +8069,7 @@ async function p79SaveScheduleOvertimeDraft(draft){
         // category even when the date cell subsequently shows actual shift.
         // Deduplicate it with visible dated labels; do not count local drafts.
         const shownDates=dates(category).filter(day=>!protectedTyphoonSet.has(day));
-        const reportedDates=typeof window!=='undefined' ? window.P79ScheduleRestSummary?.confirmedDates?.(emp,month,category)||[] : [];
+        const reportedDates=typeof window!=='undefined' ? window.P79ScheduleRestSummary?.confirmedDates?.(emp,month,category,reportSnapshot,reportRoster)||[] : [];
         // A cloud report may arrive in the verified quota ledger and monthly
         // roster before the summary receipt cache is rebuilt. Read those
         // same already-confirmed records as well; never infer a report from an
@@ -8084,7 +8088,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
               !(meta?.overtimeRevocations||[]).some(item=>
                 item?.confirmed===true&&String(item.reportId)===String(report.id));
           }).map(([date])=>date):[];
-        const categoryDates=[...new Set([...shownDates,...reportedDates,...ledgerReportDates,...formalMetaDates])]
+        const reportDates=[...reportedDates,...ledgerReportDates,...formalMetaDates].filter(day=>!leaveBlocksReport(day));
+        const categoryDates=[...new Set([...shownDates,...reportDates])]
           .filter(day=>day.startsWith(month+'-')&&!protectedTyphoonSet.has(day)).sort();
         const extraReportedDates=categoryDates.filter(day=>!shownDates.includes(day));
         const displayDates=categoryDates.map(day=>day.slice(-2));
@@ -8101,6 +8106,8 @@ async function p79SaveScheduleOvertimeDraft(draft){
         const color=category==='例'?'p79-rest-example bg-purple-50 text-purple-800':category==='休'?'p79-rest-break bg-blue-50 text-blue-800':'p79-rest-national bg-green-50 text-green-800';
         // Numbers only: actual allocated days / still available days.
         const auditNotes=[];
+        const excludedLeavePlans=[...new Set([...reportedDates,...ledgerReportDates,...formalMetaDates,...leaveBlockedDates])].filter(day=>leaveBlocksReport(day)&&metadata[day]?.overtimeReport?.category===category);
+        if(excludedLeavePlans.length)auditNotes.push('請假重疊預排不占額度：'+excludedLeavePlans.join('、')+'；原紀錄保留待核');
         if(invalidNationalCount)auditNotes.push('本月國定假日額度0；仍有'+invalidNationalCount+'筆歷史國假標記或正式申報須管理員核對。原始報單未修改。');
         if(extraReportedDates.length)auditNotes.push('雲端已確認'+category+'加班：'+extraReportedDates.join('、'));
         if(verified&&officialRemaining!==rest)auditNotes.push('班格與正式帳本差異須核對（畫面剩餘 '+rest+'；帳本剩餘 '+officialRemaining+'）');
@@ -8180,11 +8187,13 @@ async function p79SaveScheduleOvertimeDraft(draft){
       const evidence=p79ScheduleRestClient().status(month).evidence;
       const existing=metadata||monthlyScheduleMeta[emp.id]||{};
       const observedOffDates=Object.keys(evidence?.nightSplitRestConfirmed||{}).filter(key=>key.startsWith(String(emp.id).trim().toUpperCase()+'|')).map(key=>key.split('|')[1]).filter(date=>date.startsWith(month+'-'));
-      const exemptReports=window.P79MonthlyRest?.restQuotaExemptDates?.(
-        {...emp,empId:emp.id},{...schedule,__meta:existing},
-        Object.keys(schedule).filter(date=>date.startsWith(month+'-')),
-        {attendanceEvidence:evidence,leaveCoverAssignments:typeof leaveCoverAssignments==='undefined'?[]:leaveCoverAssignments}
-      )||[];
+      const reportRoster={...schedule,__meta:existing};
+      const reportSnapshot={attendanceEvidence:evidence,leaveDates:p79ScheduleRestLeaveDates(month,emp.id),leaveCoverAssignments:typeof leaveCoverAssignments==='undefined'?[]:leaveCoverAssignments};
+      const reportDates=Object.keys(schedule).filter(date=>date.startsWith(month+'-'));
+      const exemptReports=[...new Set([
+        ...(window.P79MonthlyRest?.restQuotaExemptDates?.({...emp,empId:emp.id},reportRoster,reportDates,reportSnapshot)||[]),
+        ...reportDates.filter(date=>window.P79MonthlyRest?.leaveOverlapQuotaState?.(reportSnapshot,emp.id,date,reportRoster)==='excluded')
+      ])];
       return p79AllocateRestMonth(schedule,existing,month,
         p79RestAutomaticExcludedDates(emp,month),p79EmploymentStartDate(emp),
         /^\d{4}-\d{2}-\d{2}$/.test(end)?end:'',nationalBlocked,typhoonProtected,observedOffDates,exemptReports,window.P79MonthlyRest?.weeklyCycleAnchor?.(emp)||'');
