@@ -80,7 +80,8 @@ function load(month,options={}){
   if(prior&&!observers.get(k)?.preview)publish(k,'onPreview',{...copy(prior),preview:true,source:'本機快取，背景核對中'});
   let before=await metaRead;assert(s);
   if(candidate&&candidate.version===before.version){
-   const hit={...candidate,source:'本機有效快取',preview:false,meta:before,savedAt:Math.max(Date.now(),Number(s.stamp)||0)};
+   const hit={...candidate,source:'本機有效快取',preview:false,meta:before,savedAt:prior?candidate.savedAt:Math.max(Date.now(),Number(s.stamp)||0)};
+   if(prior){remember(key(s,month),hit);verifiedMemo.set(key(s,month),{version:hit.version,token:s.token,stamp:s.stamp});return hit;}
    const row={key:key(s,month),kind:'system',system:'workhours',month,savedAt:hit.savedAt,size:JSON.stringify(hit).length,data:copy(hit),...(s.scope?{displayScope:s.scope,cacheEndpoint:s.url}:{})};
    const persistence=Promise.resolve(g.Port79DataCache?.put?.(row));
    if(options.persist===true&&await persistence!==true)throw Error('加班月份本機保存尚未確認');
