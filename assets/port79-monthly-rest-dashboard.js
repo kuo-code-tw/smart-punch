@@ -416,7 +416,7 @@ function mount(el){
   if(!row.disabled&&/可申報/.test(row.status))return 'ready';
   return 'review';
  }
- function label(row){if(row.kind==='plan'&&/儲存預排中|待雲端讀回|雲端已接收|讀回未確認|預排未確認|失敗/.test(row.status))return row.status;if(row.kind==='roster')return compactRosterStatus(row);if(row.kind==='existing'&&/^預排/.test(row.status))return row.status;const type=kind(row);return {ready:'可申報',review:'待核對',missing:'缺資料',plan:'預排建議',done:'已完成'}[type];}
+ function label(row){if(row.kind==='plan'&&/儲存預排中|待雲端讀回|雲端已接收|讀回未確認|預排未確認|失敗/.test(row.status))return row.status;if(row.kind==='roster')return compactRosterStatus(row);if(row.kind==='existing'&&/^(預排|請假重疊)/.test(row.status))return row.status;const type=kind(row);return {ready:'可申報',review:'待核對',missing:'缺資料',plan:'預排建議',done:'已完成'}[type];}
  function currentView(){const data=rows();let shown=state.tab==='done'?data.verified:state.tab==='audit'?data.audit:data.pending;
   if(state.name)shown=shown.filter(r=>norm(r.name).includes(norm(state.name)));
   if(state.status&&state.tab!=='done')shown=shown.filter(r=>kind(r)===state.status);
