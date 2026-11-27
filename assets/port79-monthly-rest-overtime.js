@@ -77,6 +77,29 @@ function monthlyRestElectionDay(date){
   special?.electionDates?.().includes(date)===true||
   /選舉|投票/.test(String(g.P79OfficialCalendar?.get?.(date)?.name||''));
 }
+// Only unequivocal, standalone monthly-rest preplans on special dates can
+// be batch revoked. Never infer invalidity from attendance or quota alone.
+function abnormalMonthlyRestPlans(snapshot,staff,month){
+ const people=new Map((staff||[]).map(e=>[id(e.empId||e.id),e])),repair=[],review=[];
+ for(const row of snapshot?.schedules||[]){
+  const empId=id(row.empId),emp=people.get(empId);if(!emp||!row.schedule)continue;
+  for(const [date,meta] of Object.entries(row.schedule.__meta||{})){
+   const report=meta?.overtimeReport;
+   if(!date.startsWith(month+'-')||!confirmedReport(meta,report)||!cats.includes(report?.category))continue;
+   const reason=monthlyRestElectionDay(date)?'選舉日':g.P79SpecialOvertime?.kindsForDate?.(date)?.some(x=>x.kind==='typhoon')||String(row.schedule[date]||'').trim()==='颱'?'颱風日':'';
+   if(!reason||! /每月未休假加班/.test(String(report.note||'')+' '+String(meta.note||''))||/^[選颱]/.test(String(report.code||'')))continue;
+   const assigned=meta.overtimeAssignedShift&&row.schedule[date]===meta.overtimeAssignedShift;
+   const original=String(meta.reportOriginalShift??meta.overtimeOriginalShift??(assigned?'':row.schedule[date])??'').trim();
+   const linked=!!(meta.forEmpId||meta.coverAssignmentId||meta.type==='substitute'||report.forEmpId||report.leaveId||
+     (snapshot.leaveCoverAssignments||[]).some(c=>date>=c.startDate&&date<=c.endDate&&(id(c.leaveEmpId)===empId||(c.workerIds||[]).some(w=>id(w)===empId))));
+   const extra=Array.isArray(meta.overtimeReports)&&meta.overtimeReports.some(r=>r?.id!==report.id&&confirmedReport(meta,r));
+   const item={empId,name:emp.name||row.name||empId,date,id:report.id,report,reason,original};
+   if(report.planned!==true||linked||extra||!original||original==='待排班')review.push({...item,issue:report.planned!==true?'已正式申報':linked||extra?'有其他加班或代班連結':'原班別無法確認'});
+   else repair.push(item);
+  }
+ }
+ return {repair:repair.sort((a,b)=>a.date.localeCompare(b.date)||a.name.localeCompare(b.name,'zh-Hant')),review};
+}
 function balance(emp,roster,month,snapshot=null,employmentStart=null){
  const quota=g.p79RestQuota(month),start=employmentStart??g.p79MonthlyRestContext.employmentStart(emp),end=Object.keys(roster).filter(d=>/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d)&&['離','離職'].includes(roster[d])).sort()[0]||'',dates=Array.from({length:quota.days},(_,i)=>month+'-'+String(i+1).padStart(2,'0')).filter(d=>(!start||d>=start)&&(!end||d<end));
  const counts={'例':0,'休':0,'國':0},off={...counts},reported={...counts},reserved={...counts},conflicts=[];
@@ -1215,7 +1238,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1542,6 +1565,47 @@ async function open(settings={}){
 
   }catch(e){console.warn('每月未休假資料讀取失敗',e);setStatus('讀取失敗：'+String(e?.message||e));}finally{busy=false;controls(false);}
  };
+ // Explicit repair operation: whole authorized month, independent of UI filters.
+ el.p79RepairAbnormalPreplans=async()=>{
+  const service=g.p79OvertimeStatusContext;
+  if(busy||!model||!loadedMonth)return;
+  if(!service?.canRevoke?.()||typeof service.revoke!=='function'){setStatus('沒有班表及加班撤銷管理權限，未修改資料。');return;}
+  const month=loadedMonth;let candidates=[],review=[],completed=0,failure='',reload=false;
+  busy=true;el.dataset.preplanLocked='true';controls(true);
+  try{
+   setStatus('正在掃描 '+month+' 全部授權人員的異常預排（不受部門、職稱篩選限制）…');
+   let fresh=await a.snapshot(month,false,false,true);
+   if(fresh?.provisional||fresh?.readOnlyDueAttendance||fresh?.attendanceEvidence?.complete!==true||!fresh?.saveContext?.ready)throw Error('正式資料尚未完整核對，未修改');
+   ({repair:candidates,review}=abnormalMonthlyRestPlans(fresh,a.employees(),month));
+   const list=rows=>rows.map(r=>r.name+'｜'+r.date+'｜'+r.reason+(r.issue?'｜'+r.issue:'')).join('\n');
+   if(!candidates.length){setStatus('查無可安全取消的異常預排。'+(review.length?'另有 '+review.length+' 筆需人工核對：'+list(review):''));return;}
+   if(!confirm('本月全部授權人員共 '+candidates.length+' 筆異常預排可取消；正常預排、已申報、原始打卡不會刪除。\n\n'+list(candidates)+(review.length?'\n\n另有 '+review.length+' 筆僅供人工核對，不會修改：\n'+list(review):'')+'\n\n確認逐筆取消並重新計算額度？')){setStatus('已取消操作，未修改任何資料。');return;}
+   reload=true;
+   for(const candidate of candidates){
+    if(!el.isConnected||loadedMonth!==month||!service.canRevoke())throw Error('視窗、月份或權限已變更');
+    const current=abnormalMonthlyRestPlans(fresh,a.employees(),month).repair.find(r=>r.empId===candidate.empId&&r.date===candidate.date&&r.id===candidate.id&&JSON.stringify(r.report)===JSON.stringify(candidate.report));
+    if(!current)throw Error(candidate.name+' '+candidate.date+' 原預排已變更，未撤銷');
+    setStatus('異常預排修正 '+(completed+1)+'／'+candidates.length+'｜'+current.name+' '+current.date);
+    const result=await service.revoke({...current,repairPreplan:true},fresh);
+    if(result?.ok!==true||result.revocationVerified!==true)throw Error(current.name+' '+current.date+' 撤銷未確認，請重新讀取');
+    fresh=await a.snapshot(month,false,false,true);
+    const roster=fresh.schedules?.find(r=>id(r.empId)===current.empId)?.schedule,meta=roster?.__meta?.[current.date]||{};
+    if(fresh.provisional||!fresh.saveContext?.ready||!roster||meta.overtimeReport?.id===current.id||!meta.overtimeRevocations?.some(r=>r.confirmed===true&&String(r.reportId)===String(current.id))||String(roster[current.date]||'').trim()!==current.original)throw Error(current.name+' '+current.date+' 撤銷或原班別讀回未確認，停止後續修正');
+    completed++;
+    snapshot=fresh;model=plan(fresh,loadedPeople,month,rules,{manualOnly:!autoPlan,cutoff:q('#mrCutoff').value});
+    paint();controls(true);
+    setStatus('異常預排已確認取消 '+completed+'／'+candidates.length+' 筆，已重新計算額度');
+    await new Promise(resolve=>g.setTimeout(resolve,0));
+   }
+  }catch(error){failure=String(error.message||error);}
+  finally{
+   busy=false;
+   try{
+    if(reload){await q('#mrLoad').onclick();const refreshed=!!model&&!isReadOnlySource();setStatus('異常預排修正：已確認 '+completed+'／'+candidates.length+' 筆。'+(failure?'停止：'+failure+'；其餘未處理，請重新核對。':refreshed?'已重新計算未休額度及建議日期，尚未儲存新預排。':'最新資料尚未完整讀取，請重新讀取以核對額度。')+(review.length?' 另 '+review.length+' 筆需人工核對。':''));}
+    else if(failure)setStatus('異常預排掃描未完成：'+failure);
+   }finally{delete el.dataset.preplanLocked;controls(false);}
+  }
+ };
  function choosePlanningMode(automatic){
   if(busy)return;
   autoPlan=automatic;
@@ -1861,6 +1925,6 @@ async function open(settings={}){
  // 開啟時只讀核對，優先重用同帳號已核對的本機月份資料；沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').onclick({preferLocal:true});
 }
-g.P79MonthlyRest={open,plan,balance,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,abnormalMonthlyRestPlans,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
 
 })(window);
