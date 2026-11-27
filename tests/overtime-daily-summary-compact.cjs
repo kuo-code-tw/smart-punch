@@ -1,0 +1,22 @@
+'use strict';
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const css=fs.readFileSync('assets/port79-overtime-approved-dashboard.css','utf8');
+const html=fs.readFileSync('work-hours/index.html','utf8');
+function rule(selector){const i=css.indexOf(selector+'{');assert(i>=0,selector);return css.slice(i+selector.length+1,css.indexOf('}',i));}
+const prefix='html body.p79-work-hours-page #adminContentOvertime ';
+assert.match(rule(prefix+'.p79-overtime-unified'),/padding:8px 11px!important/);
+assert.match(rule(prefix+'.p79-overtime-compact-filters select'),/height:29px!important/);
+assert.match(rule(prefix+'.p79-overtime-metrics'),/repeat\(6,minmax\(0,1fr\)\)/);
+assert.match(rule(prefix+'.p79-overtime-metrics>div'),/padding:7px 9px!important/);
+assert.match(rule(prefix+'.p79-overtime-metrics>div>div[id]'),/clamp\(14px,1.05vw,18px\)/);
+assert.match(rule('#adminContentOvertime #p79OvertimeMainListExplanation'),/padding:4px 7px!important/);
+assert(css.includes('grid-template-areas:"title filters"!important'));
+assert(css.includes('@media(max-width:480px)'));
+assert(css.includes('overflow-wrap:anywhere!important'),'long totals must wrap instead of clipping');
+const start=html.indexOf('<div class="p79-overtime-unified '),end=html.indexOf('id="p79OvertimeMissingConversionPanel"',start);
+assert(start>=0&&end>start);
+const panel=html.slice(start,end);
+for(const id of ['overtimeSourceFilter','overtimeMonthFilter','overtimeDeptFilter','overtimeJobTitleFilter','overtimeEmployeeFilter','overtimeEmployeeCount','overtimeShiftCount','overtimeRawReportedHours','overtimeTotalHours','overtimePendingEstimateHours','overtimeOver12Count','p79OvertimeMainListExplanation'])assert.equal((panel.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
+assert(html.includes('compactStats=20261127-v1'),'new stylesheet cache key');
+assert(panel.includes('未確認前不計正式申報時數'),'complete explanation retained');
+console.log('PASS compact daily overtime: 29px filters, six desktop metrics, mobile wrapping, all live IDs and note preserved');
