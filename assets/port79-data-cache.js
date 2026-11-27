@@ -1696,7 +1696,7 @@ if(!window.__p79BrowserBackgroundWorker&&!window.chrome?.webview?.postMessage&&t
  const src=document.querySelector?.('script[src*="port79-data-cache.js"]')?.src;
  if(src){
   const tag=document.createElement('script');
-  tag.src=new URL('port79-browser-download-status.js?v=20261127-compact-hover-v1&deferred=20261127-v1',src).href;
+  tag.src=new URL('port79-browser-download-status.js?v=20261127-compact-hover-v1&deferred=20261127-v1&toolbarBell=20261127-v1',src).href;
   tag.defer=true;
   document.head.appendChild(tag);
  }
