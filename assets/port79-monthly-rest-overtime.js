@@ -1202,7 +1202,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1310,6 +1310,15 @@ async function open(settings={}){
      if(existing.some(x=>id(x.empId)===id(r.empId)&&x.date===r.date&&x.reportId===r.id))continue;
      const emp=loadedPeople.find(x=>id(x.empId)===id(r.empId))||{};
      existing.push({empId:r.empId,name:r.name,role:job(emp),date:r.date,category:r.category,code:r.rule?.[1],reportId:r.id,status:'已核對出勤',monthlyRest:true});
+    }
+   }
+   // Move each read-back-confirmed plan out of the actionable list.
+   if(!isReadOnlySource()){
+    const scopedIds=new Set(chosenPeople().map(e=>id(e.empId)));
+    for(const r of model.plannedRows.filter(x=>x.saved===true&&scopedIds.has(id(x.empId)))){
+     if(existing.some(x=>id(x.empId)===id(r.empId)&&x.date===r.date&&x.reportId===r.id))continue;
+     const emp=loadedPeople.find(x=>id(x.empId)===id(r.empId))||{};
+     existing.push({empId:r.empId,name:r.name,role:job(emp),date:r.date,category:r.category,code:r.rule?.[1],reportId:r.id,status:'預排已儲存（待出勤）',monthlyRest:true});
     }
    }
    const active=existing.filter(r=>!r.cancelled&&!r.historical);
@@ -1697,6 +1706,12 @@ async function open(settings={}){
     }
    }catch(error){failure+=(failure?'；':'')+'讀回未確認：'+String(error.message||error);pending.forEach(r=>{if(!r.saved){r.checked=true;r.status='雲端讀回未確認，保留原編號供核對';}});}
    const saved=selected.filter(r=>r.saved).length;
+   // Refresh saved roster on partial success as well; retain original
+   // candidate IDs and retry state until uncertain writes are reconciled.
+   const refreshed=verified||latest;
+   if(refreshed&&Array.isArray(refreshed.schedules)&&!refreshed.provisional){
+    snapshot={...(latest||snapshot),schedules:refreshed.schedules,leaveDates:refreshed.leaveDates,leaveCoverAssignments:refreshed.leaveCoverAssignments,approvedLeaves:refreshed.approvedLeaves,saveContext:null};
+   }
    // Reuse confirmed roster and already-read attendance; no redundant full reload.
    if(saved===selected.length&&!failure&&latest&&verified&&!stop){
     try{
@@ -1705,7 +1720,7 @@ async function open(settings={}){
      g.p79UpdateMonthlyRestPlans?.(loadedMonth,model.plannedRows||[],loadedPeople);
     }catch(error){failure='預排已確認，但畫面額度更新未完成：'+String(error.message||error);}
    }
-   setStatus('本次已確認雲端儲存 '+saved+' 筆預排，已占用正式額度（未正式申報加班）。'+(failure?'未完成：'+failure:'')+(selected.some(r=>!r.saved)?'其餘保留選取，請核對後重試。':''));
+   setStatus('本次已確認雲端儲存 '+saved+' 筆預排；成功項目已移至已預排／待核對（未正式申報加班）。'+(failure?'未完成：'+failure:'')+(selected.some(r=>!r.saved)?'其餘保留選取，請核對後重試。':''));
    busy=false;try{paint();}finally{controls(false);}
    g.setTimeout?.(()=>{try{a.refresh?.();}catch(error){console.warn('預排已核對，統計更新失敗',error);}},0);
   }
