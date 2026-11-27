@@ -423,7 +423,9 @@ function mount(el){
    if(nativeCutoff){cutoff.min=nativeCutoff.min;cutoff.max=nativeCutoff.max;cutoff.disabled=nativeCutoff.disabled;
     if(cutoff.value!==nativeCutoff.value)cutoff.value=nativeCutoff.value;}
    const from=global.P79MonthlyRest?.forwardReportStart(month,cutoff.value)||month+'-01';
-   q('#mrUxFrom').textContent=cutoff.value?(from.startsWith(month+'-')?'從 '+from.slice(5)+' 起申報':'本月已無後續日期'):'核對整月（未設定截止日）';
+   const cutoffSync=nativeCutoff?.dataset.cloudSync;
+   const cutoffLabel=cutoff.value?(from.startsWith(month+'-')?'從 '+from.slice(5)+' 起申報':'本月已無後續日期'):'核對整月（未設定截止日）';
+   q('#mrUxFrom').textContent=cutoffLabel+(cutoffSync==='cloud'?'｜已讀取雲端':cutoffSync==='local'?'｜僅本機，GAS 尚未更新':cutoffSync==='loading'?'｜雲端核對中':cutoffSync==='error'?'｜雲端核對失敗':'');
    cutoff.style.backgroundColor=cutoff.value?'#fef3c7':'';
    cutoff.style.color=cutoff.value?'#92400e':'';
    cutoff.style.borderColor=cutoff.value?'#d97706':'';
