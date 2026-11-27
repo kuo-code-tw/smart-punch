@@ -76,7 +76,7 @@
   panel.querySelector('[data-p79-summary]').textContent=(record.system?'目前：'+(names[record.system]||record.system):'')+
     (record.monthTotal?'　月份 '+record.monthCompleted+'/'+record.monthTotal:'')+
     (stalled?'｜請查看下載分頁':'');
-  const systemText={waiting:'等待',loading:'下載中',done:'已下載',reused:'沿用本機',error:'失敗',skipped:'未下載'};
+  const systemText={waiting:'等待',loading:'下載中',done:'已下載',reused:'沿用本機',deferred:'按需讀取',error:'失敗',skipped:'未下載'};
   const statuses=Object.entries(record.states||{}).map(([sys,state])=>(names[sys]||sys)+'：'+(systemText[state]||state));
   if(record.historyOnDemand===true)statuses.push('歷史資料：按月讀取（未預載）');
   panel.querySelector('[data-p79-systems]').textContent=statuses.join('　');
