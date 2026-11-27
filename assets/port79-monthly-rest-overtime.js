@@ -1768,7 +1768,7 @@ async function open(settings={}){
    const pendingIssues=[...new Set(model.issues.filter(issue=>!issue.includes('已休、預排休與已申報合計超出額度')))];
    setStatus(isReadOnlySource()?'已顯示 '+loadedMonth+' 來源中的既有申報；'+(snapshot?.provisional===true?'歷史備援非月底核薪版。':'')+(snapshot?.readOnlyDueAttendance===true?'考勤尚未讀取成功。':'')+'目前僅供查看，不能新增、修改或儲存加班。':'已核對 '+loadedPeople.length+' 位授權人員；'+(autoPlan?'自動建議尚未儲存，':'未自動建立預排，')+'正式可申報 '+(model.rows||[]).length+' 筆；切換部門、職稱或姓名會立即篩選，先前勾選保留。'+(pendingIssues.length?'另有 '+pendingIssues.length+' 項仍待核對，請展開「逐人缺額及待核對原因」查看；已完成的項目不重複提示。':'本次沒有其他未解決的提示。'));
 
-  }catch(e){console.warn('每月未休假資料讀取失敗',e);setStatus('讀取失敗：'+String(e?.message||e));}finally{busy=false;controls(false);}
+  }catch(e){if(q('#mrCutoff').dataset.cloudSync==='loading'){q('#mrCutoff').dataset.cloudSync='error';cutoffCloudStates.delete(loadedMonth);}console.warn('每月未休假資料讀取失敗',e);setStatus('讀取失敗：'+String(e?.message||e));}finally{busy=false;controls(false);}
  };
  // Explicit repair operation: whole authorized month, independent of UI filters.
  el.p79RepairAbnormalPreplans=async()=>{
