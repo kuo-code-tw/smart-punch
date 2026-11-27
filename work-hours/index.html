@@ -7,7 +7,7 @@
 <script defer src="../assets/port79-hidden-job-titles.js?v=20261117-hr-hidden-v1&refresh=20261118-stable-v1"></script>
 <script defer src="../assets/port79-workhours-hidden-job-ui.js?v=20261117-hr-filter-v1&refresh=20261118-stable-v1&compactNotice=20261127-v1"></script>
 <script defer src="../assets/port79-overtime-upload-queue.js?v=20261125-local-outbox-v1"></script>
-<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v7-write-priority&outbox=20261125-v1&bulkReview=20261125-v2&pendingEdit=20261125-v1&punchTime=20261126-v1"></script>
+<script src="../assets/port79-overtime-report.js?v=20261114-fix-date-validation-v3&recovery=20261113-r3&monthlyPlan=20261124-v7-write-priority&outbox=20261125-v1&bulkReview=20261125-v2&pendingEdit=20261125-v1&punchTime=20261126-v1&eightHourAlert=20261127-v1"></script>
 <script src="../assets/port79-overtime-shift-match.js?v=20261124-planned-review-v3"></script>
 <script src="../assets/port79-leave-cover-suggest.js?v=20261108-night-cover-credit-prev-day-v1"></script>
 <!-- 2026-10-27: 班別改變時先暫估，完整打卡與雲端覆核後以原申報 ID 修改；列表、統計、匯出共享正式申報。 -->
@@ -17,7 +17,7 @@
 <script src="../assets/port79-planned-rest-reconciliation.js?v=20261106-workhours-no-punch-v1"></script>
 <script src="../assets/port79-workhours-no-punch-autocancel.js?v=20261106-workhours-no-punch-v1"></script>
 <script src="../assets/port79-overtime-reason.js?v=20261030-readonly-audit-v4"></script>
-<script src="../assets/port79-monthly-rest-overtime.js?v=20261123-true-simple-official-v2&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1&dashboard=20261123-review-checkbox-v3&fullRoster=20261124-v21&result=20261125-confirmed-popup-v1&quotaPreview=20261125-v26&autoRematch=20261125-v27&weeklyDefault=20261125-mon-sun-v28&restPlanGuard=20261125-v29&crossMonthWeekly=20261125-v30&weeklyQuotaLayout=20261125-v31&saved-rest=20261125-v32&eligibilityLayout=20261125-v33&sharedShiftPeriod=20261125-v34&roster-rest-first=20261125-v37&cloudPreplan=20261125-v44&localPreplan=20261125-v1&compactReason=20261126-v1&loadFix=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1&restore20261127=v8&repairSpeed=20261127-v1&preplanProgress=20261127-v2"></script>
+<script src="../assets/port79-monthly-rest-overtime.js?v=20261123-true-simple-official-v2&preview=20261028-month-end-all-roles-v6&manual=20261029-checkbox-in-monthly-v7&fill=20261028-all-quota-v7&reconcile=20261028-shared-v2&exempt=20261028-typhoon-v3&weekly=20261029-weekly-rest-audit-v2-real-dates&tdz=20261030-options-v1&dashboard=20261123-review-checkbox-v3&fullRoster=20261124-v21&result=20261125-confirmed-popup-v1&quotaPreview=20261125-v26&autoRematch=20261125-v27&weeklyDefault=20261125-mon-sun-v28&restPlanGuard=20261125-v29&crossMonthWeekly=20261125-v30&weeklyQuotaLayout=20261125-v31&saved-rest=20261125-v32&eligibilityLayout=20261125-v33&sharedShiftPeriod=20261125-v34&roster-rest-first=20261125-v37&cloudPreplan=20261125-v44&localPreplan=20261125-v1&compactReason=20261126-v1&loadFix=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1&preplanReadback=20261127-v2&cutoffPersist=20261127-v1&singlePending=20261127-v1&sequentialPreplan=20261127-v1&electionGuard=20261127-v1&repairPreplan=20261127-v1&restore20261127=v8&repairSpeed=20261127-v1&preplanProgress=20261127-v2&eightHourAlert=20261127-v1"></script>
 <script src="../assets/port79-overtime-status.js?v=20261027-dept-job-name-onefield-v3"></script>
 <!-- PORT79 2026-10-06 統一單月月曆日期選擇｜work-hours -->
 <!-- PORT79 2026-10-04 PERFORMANCE-SLIM-WORKHOURS：Delta只更新目前畫面、快取寫入去抖、移除1.5秒掃描。 -->
@@ -1759,6 +1759,7 @@ body.p79-work-hours-page #attendanceStatsCompactTable{
                     <div class="rounded-2xl border border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/30 p-3"><div class="text-xs font-semibold text-orange-700 dark:text-orange-400">加班出勤時數</div><div id="overtimePendingEstimateHours" class="mt-1 text-xl font-bold text-orange-800 dark:text-orange-300">0 小時</div></div>
                     <div class="rounded-2xl border border-rose-100 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-3"><div class="text-xs font-semibold text-rose-600 dark:text-rose-400">超過每日 12 小時</div><div id="overtimeOver12Count" class="mt-1 text-xl font-bold text-rose-700 dark:text-rose-300">0</div></div>
                 </div>
+                <div id="p79OvertimeEightHourAlert" class="hidden mt-3 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900 dark:border-red-800 dark:bg-red-950/40 dark:text-red-100" role="region" aria-label="未休假加班申報時段異常"></div>
                 <div id="p79OvertimeMissingConversionPanel" class="hidden mt-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100" role="region" aria-label="待換算加班申報清單"></div>
                 </div>
 
@@ -14079,6 +14080,7 @@ async function p79ExportOvertimeComparison(printMode){
                         specialOvertimeMinutes,specialReportMinutes,
                         specialOvertimeLabels:[...new Set(specialParts.flatMap(part=>part.kinds.map(kind=>kind.code)))],
                         overtimeReport:restMeta?.overtimeReport||null,
+                        monthlyRestEightHour:window.P79MonthlyRest?.monthlyRestReportApplies?.(restMeta?.overtimeReport,restMeta)===true,
                         amendment:globalThis.P79OvertimeReason?.amended?.(restMeta?.overtimeReport,restMeta)||null,
                         reportVerified:p79WorkOvertimeOfficialReport(restMeta?.overtimeReport,restMeta),
                         savedOvertimeHistory:typeof p79WorkOvertimeSavedHistory==='function'?p79WorkOvertimeSavedHistory(restMeta):null,
@@ -14105,7 +14107,7 @@ async function p79ExportOvertimeComparison(printMode){
                     const attendanceIssue=(meta.p79AttendanceRestRecovered?'':meta.overtimeReport.attendanceReview)||observedIssue||
                        (stalePlanned&&observedMinutes===null?'已有正式申報；原預排標記未更新，出勤待核對':'');
                     rows.push({empId:employee.empId,attNo:employee.attNo,name:employee.name,dept:employee.dept||'一般',jobTitle:employee.jobTitle||employee.deptDetail||'',dateKey:date,rosterDate:date,
-                     overtimeDate:meta.overtimeDate||meta.overtimeReport?.overtimeDate||'',workMonthKey:date.slice(0,7),monthKey:String(meta.overtimeReport?.overtimeDate||date).slice(0,7),sortTime:Date.parse(date+'T00:00:00+08:00'),clockIn:observed?.clockIn||null,clockOut:observed?.clockOut||null,totalMinutes:observedMinutes??0,overtimeMinutes:0,overtimeReport:meta.overtimeReport,amendment:globalThis.P79OvertimeReason?.amended?.(meta.overtimeReport,meta)||null,reportVerified:p79WorkOvertimeOfficialReport(meta.overtimeReport,meta),forEmpId:meta.forEmpId||'',planned:meta.overtimeReport.planned===true&&date>=todayTaipei,attendanceIssue,timeCheckRequired:!!attendanceIssue,overDailyLimit:false});
+                     overtimeDate:meta.overtimeDate||meta.overtimeReport?.overtimeDate||'',workMonthKey:date.slice(0,7),monthKey:String(meta.overtimeReport?.overtimeDate||date).slice(0,7),sortTime:Date.parse(date+'T00:00:00+08:00'),clockIn:observed?.clockIn||null,clockOut:observed?.clockOut||null,totalMinutes:observedMinutes??0,overtimeMinutes:0,overtimeReport:meta.overtimeReport,monthlyRestEightHour:window.P79MonthlyRest?.monthlyRestReportApplies?.(meta.overtimeReport,meta)===true,amendment:globalThis.P79OvertimeReason?.amended?.(meta.overtimeReport,meta)||null,reportVerified:p79WorkOvertimeOfficialReport(meta.overtimeReport,meta),forEmpId:meta.forEmpId||'',planned:meta.overtimeReport.planned===true&&date>=todayTaipei,attendanceIssue,timeCheckRequired:!!attendanceIssue,overDailyLimit:false});
                 });
             });
             const confirmedPageRows=rows.filter(row=>!p79WorkOvertimeIsUnconfirmedPlan(row));
@@ -14409,6 +14411,26 @@ function p79OvertimePeriodLabel(report){
             }
             let unknown=0;for(const item of result.values()){item.days=Math.round(item.days*100)/100;if(item.unknown)unknown++;}
             return {byTitle:result,loaded:true,unknown};
+        }
+
+        function p79OvertimeEightHourAlertRows(rows){
+            const api=window.P79MonthlyRest,items=[],seen=new Set();
+            if(!api?.monthlyRestHoursIssue)return items;
+            for(const row of rows||[]){
+                const r=row.overtimeReport;
+                if(!row.reportVerified||!r?.id||!(row.monthlyRestEightHour||api.monthlyRestReportApplies(r)))continue;
+                const date=String(row.rosterDate||row.dateKey||'').replaceAll('/','-').slice(0,10),key=String(row.empId)+'|'+date+'|'+r.id;
+                if(seen.has(key))continue;seen.add(key);
+                const issue=api.monthlyRestHoursIssue(r);if(!issue)continue;
+                items.push({name:row.name||row.empId,date,code:r.code||'',issue,planned:r.planned===true});
+            }
+            return items;
+        }
+        function p79RenderOvertimeEightHourAlert(rows,month){
+            const panel=document.getElementById('p79OvertimeEightHourAlert');if(!panel)return;
+            const items=p79OvertimeEightHourAlertRows((rows||[]).filter(r=>month==='ALL'||p79WorkOvertimeLedgerMonth(r)===month));
+            panel.classList.toggle('hidden',!items.length);
+            panel.innerHTML=items.length?'<strong class="block mb-1">⚠ 未休假加班申報時段異常 '+items.length+' 筆（須滿 8 小時）</strong><div style="max-height:220px;overflow:auto">'+items.map(x=>'<div class="py-1 border-b border-red-200">'+escapeHtml(x.name)+'｜'+escapeHtml(x.date)+'｜'+(x.planned?'預排':'正式申報')+'｜'+escapeHtml(x.code)+'｜'+escapeHtml(x.issue)+'</div>').join('')+'</div>':'';
         }
 
         // 和「換算加班時數」統計使用相同的正式申報、時數與去重條件。
@@ -15266,6 +15288,7 @@ function p79OvertimePeriodLabel(report){
             document.getElementById('overtimePendingEstimateHours').textContent = formatDurationMinutes(pendingEstimate.minutes);
             document.getElementById('overtimeOver12Count').textContent = over12Count;
             p79RenderOvertimeMissingConversion(completedRows,loadingWithoutRows);
+            p79RenderOvertimeEightHourAlert(allOvertimeRows,month);
             if(loadingWithoutRows){for(const id of ['overtimeEmployeeCount','overtimeShiftCount','overtimeTotalHours','overtimeRawReportedHours','overtimePendingEstimateHours','overtimeOver12Count'])document.getElementById(id).textContent='載入中…';}
             const monthRosterState=p79WorkOvertimeMonths.get(month);
             const titleLeave=p79BuildOvertimeTitleLeaveDays(
@@ -17717,6 +17740,8 @@ function p79DirectAttendanceTimestamp(record){
 }
 async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  p79AssertDirectReportActive(draft.directOperation);
+ const hoursIssue=window.P79MonthlyRest?.monthlyRestDraftHoursIssue?.(draft);
+ if(hoursIssue)throw Error(hoursIssue);
  const electionIssue=window.P79MonthlyRest?.electionMonthlyRestWriteIssue?.(draft);
  if(electionIssue)throw Error(electionIssue);
  const token=currentPort79SsoToken();if(!token||!p79CanReportOvertime())throw Error('沒有申報權限');
@@ -17751,6 +17776,8 @@ async function p79SaveWorkOvertimeDraft(draft,batch=null,lockRetry=0){
  const employeeId=String(draft.empId).trim().toUpperCase();
  const existingMeta=cloud.schedules?.find(row=>String(row.empId).trim().toUpperCase()===employeeId)?.schedule?.__meta?.[draft.date]||{};
  const existingReport=existingMeta.overtimeReport;
+ const existingHoursIssue=window.P79MonthlyRest?.monthlyRestDraftHoursIssue?.(draft,existingMeta);
+ if(existingHoursIssue){window.alert?.('申報時段警示：'+draft.empId+'｜'+draft.date+'｜'+existingHoursIssue);throw Error(existingHoursIssue);}
  const existingElectionIssue=window.P79MonthlyRest?.electionMonthlyRestWriteIssue?.(draft,existingMeta);
  if(existingElectionIssue)throw Error(existingElectionIssue);
  const independentAdjusted=draft.adjustedIndependentReview===true;
