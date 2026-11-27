@@ -1326,7 +1326,8 @@ async function retryPreplanRead(read,onRetry,wait=ms=>new Promise(resolve=>g.set
   }
  }
 }
-function showPreplanProgress(parent,total){
+function showPreplanProgress(parent,total,mode='plan'){
+ const filing=mode==='report',noun=filing?'正式申報':'預排';
  const dialog=document.createElement('dialog');
  dialog.id='p79MonthlyRestPreplanProgress';
  dialog.dataset.state='working';
@@ -1367,8 +1368,8 @@ function showPreplanProgress(parent,total){
  const finish=(confirmed,failure,notes='',onContinue=null)=>{
   finished=true;const remaining=total-confirmed,success=remaining===0&&!failure&&!notes;
   dialog.dataset.state=success?'success':confirmed?'warning':'error';icon.textContent=success?'✓':confirmed?'!':'×';
-  title.textContent=success?'預排儲存完成':confirmed?'預排處理結果':'預排尚未確認完成';
-  update('本次雲端已確認 '+confirmed+' 筆預排。'+(remaining?'另有 '+remaining+' 筆尚未確認，請核對後再試。':'')+' 預排不等於正式加班申報。',confirmed);
+  title.textContent=success?(filing?'正式申報完成':'預排儲存完成'):confirmed?noun+'處理結果':noun+'尚未確認完成';
+  update('本次雲端已確認 '+confirmed+' 筆'+noun+'。'+(remaining?'另有 '+remaining+' 筆尚未確認，請核對後再試。':'')+(filing?' 正式申報不等於主管核准或薪資結算。':' 預排不等於正式加班申報。'),confirmed);
   detail.textContent=[failure,notes].filter(Boolean).join('\n');button.disabled=false;
   const canContinue=remaining>0&&typeof onContinue==='function';
   continueButton.hidden=!canContinue;continueButton.disabled=!canContinue;
@@ -1379,7 +1380,8 @@ function showPreplanProgress(parent,total){
  dialog.addEventListener('cancel',event=>{if(!finished)event.preventDefault();});
  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
  button.onclick=()=>{if(finished)dialog.close();};
- parent.appendChild(dialog);dialog.showModal();update('正在核對雲端版本與額度，尚未寫入資料。');
+ if(filing)title.textContent='正在正式申報';
+ parent.appendChild(dialog);dialog.showModal();update(filing?'正在核對雲端版本與實際出勤，尚未寫入資料。':'正在核對雲端版本與額度，尚未寫入資料。');
  return {update,finish};
 }
 async function open(settings={}){
@@ -2179,6 +2181,6 @@ async function open(settings={}){
  // 開啟時只讀核對，優先重用同帳號已核對的本機月份資料；沒有使用者確認不呼叫 saveReport。
  q('#mrLoad').onclick({preferLocal:true});
 }
-g.P79MonthlyRest={open,plan,balance,monthlyRestHoursIssue,monthlyRestReportApplies,monthlyRestDraftHoursIssue,monthlyRestElectionDay,electionMonthlyRestWriteIssue,abnormalMonthlyRestPlans,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
+g.P79MonthlyRest={open,plan,balance,showPreplanProgress,monthlyRestHoursIssue,monthlyRestReportApplies,monthlyRestDraftHoursIssue,monthlyRestElectionDay,electionMonthlyRestWriteIssue,abnormalMonthlyRestPlans,selectedRestCandidateKey,matchSelectedRestCandidates,rematchSelectedRestCandidates,personPeriodSuggestions,rosterPeriodReferences,manualRestPlanIssue,existingRestOvertimeRows,automaticSupplementReviewRows,restQuotaExemptDates,rosterReviewRows,reviewAllUnits,ruleFor,rosterRestPeriod,restPeriodMatches,sortRows,reportProgress,personQuotaProgress,quotaProgressText,auditText,personSummary,workflowStage,workflowAudit,previousMonth,backfillContext,fullDayRule,fullDayEvidence,latestReportedDate,validReportCutoff,forwardReportStart,monthEndWindowDate,weeklyRestReview,futureWeekRestProtected,weeklyCycleAnchor,weeklyCycleWindow,weeklyReviewSummary,weeklyRoster,weeklyPlanIssue,originalRestDesignation,automaticRestCategory,documentedFutureRestCategory,futureRestPlanIssue,canAutoSuggestFuture};
 
 })(window);
