@@ -1290,6 +1290,28 @@ function showSubmissionResult(parent,selected,failure){
  parent.appendChild(result);
  result.showModal();
 }
+function showPreplanProgress(parent,total){
+ const dialog=document.createElement('dialog');
+ dialog.id='p79MonthlyRestPreplanProgress';
+ dialog.setAttribute('aria-labelledby','mrPreplanProgressTitle');
+ dialog.setAttribute('aria-describedby','mrPreplanProgressStatus');
+ dialog.style.cssText='width:min(470px,calc(100% - 32px));max-height:85vh;overflow:auto;box-sizing:border-box;padding:24px;border:1px solid #cbd5e1;border-radius:14px;color:#123451;background:#fff;box-shadow:0 18px 55px #23395055';
+ dialog.innerHTML='<h2 id="mrPreplanProgressTitle" style="margin:0 0 12px;font-size:20px">正在儲存預排</h2><p data-count style="font-weight:bold"></p><progress style="width:100%;height:16px" aria-label="雲端已確認筆數"></progress><p id="mrPreplanProgressStatus" role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere"></p><p data-detail style="white-space:pre-wrap;overflow-wrap:anywhere;color:#475569"></p><div style="display:flex;justify-content:flex-end"><button type="button" disabled style="padding:8px 18px;border:0;border-radius:8px;background:#0864c8;color:#fff">確定</button></div>';
+ const title=dialog.querySelector('h2'),count=dialog.querySelector('[data-count]'),bar=dialog.querySelector('progress'),status=dialog.querySelector('[role=status]'),detail=dialog.querySelector('[data-detail]'),button=dialog.querySelector('button');
+ let finished=false;bar.max=total;bar.value=0;
+ const update=(message,confirmed=0)=>{count.textContent='雲端已確認 '+confirmed+'／'+total+' 筆（'+Math.round(confirmed/total*100)+'%）';bar.value=confirmed;status.textContent=message;};
+ const finish=(confirmed,failure,notes='')=>{
+  finished=true;const remaining=total-confirmed;
+  title.textContent=remaining===0&&!failure&&!notes?'預排儲存完成':confirmed?'預排處理結果':'預排尚未確認完成';
+  update('本次雲端已確認 '+confirmed+' 筆預排。'+(remaining?'另有 '+remaining+' 筆尚未確認，請核對後再試。':'')+' 預排不等於正式加班申報。',confirmed);
+  detail.textContent=[failure,notes].filter(Boolean).join('\n');button.disabled=false;button.focus();
+ };
+ dialog.addEventListener('cancel',event=>{if(!finished)event.preventDefault();});
+ dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+ button.onclick=()=>{if(finished)dialog.close();};
+ parent.appendChild(dialog);dialog.showModal();update('正在核對雲端版本與額度，尚未寫入資料。');
+ return {update,finish};
+}
 async function open(settings={}){
  const a=g.p79MonthlyRestContext;if(!a?.canReport())return alert('沒有申報加班權限');
  if(document.getElementById('p79MonthlyRest'))return;styles();
@@ -1805,7 +1827,7 @@ async function open(settings={}){
     const reason=meta.overtimeReport?'原日期已有加班或預排，保留原編號，未另建':blocked(row)||row.attempted?'原寫入尚待核對，不另建日期':!roster?'缺少正式班表':!balanceRow?'班表不完整，無法計算額度':!balanceRow.remaining[row.category]?'最新雲端'+row.category+'剩餘額度為0':mode==='plan'&&sameCategoryFormal.length>=balanceRow.remaining[row.category]?'缺額已有 '+sameCategoryFormal.length+' 筆實際出勤候選，請先正式申報':'原班表 '+(roster[row.date]||'未排')+'；'+([...new Set(reasons)].slice(0,1).join('／')||'本月無符合原假別及8小時規則的候選');
     rejected.push((row.name||row.empId)+' '+row.date+'：'+reason);
    }
-   if(!matched.length){setStatus('重新核對後，'+rejected.length+' 筆暫無符合'+(mode==='plan'?'預排':'正式申報')+'資格的日期。未寫入資料。'+(rejected.length?' '+rejected.slice(0,2).join('；'):''));return;}
+   if(!matched.length){const message='重新核對後，'+rejected.length+' 筆暫無符合'+(mode==='plan'?'預排':'正式申報')+'資格的日期。未寫入資料。'+(rejected.length?' '+rejected.slice(0,2).join('；'):'');setStatus(message);if(mode==='plan')g.alert?.(message);return;}
    // Preserve unrelated rows and only select exact matched candidates.
    const untouched=mode==='plan'?model.rows:model.plannedRows;
    if(mode==='plan')next.rows=untouched;else next.plannedRows=untouched;
@@ -1904,8 +1926,11 @@ async function open(settings={}){
   const selected=visiblePlannedRows().filter(r=>r.checked&&!r.saved);if(!selected.length)return;
   if(!confirm('將勾選的 '+selected.length+' 筆建議儲存為預排？尚未確認出勤，不會列為正式加班；例休週期待核項目仍需核對。'+(typeof batchSummary==='string'?batchSummary:'')))return;
   busy=true;stop=false;el.dataset.preplanLocked='true';controls(true);let failure='',latest=null,verified=null,activeRow=null;
-  setStatus('正在一次核對 '+selected.length+' 筆預排的雲端版本與額度…');
+  let progressWindow=null;
+  const updatePreplanStatus=message=>{setStatus(message);progressWindow?.update(message,selected.filter(r=>r.saved).length);};
   try{
+   progressWindow=showPreplanProgress(el,selected.length);
+   updatePreplanStatus('正在一次核對 '+selected.length+' 筆預排的雲端版本與額度…');
    latest=await a.snapshot(loadedMonth,false,false,true);
    if(latest?.provisional===true||latest?.readOnlyDueAttendance===true||latest?.attendanceEvidence?.complete!==true)throw Error('正式考勤未完整核對，不能儲存預排');
    const batch=latest.saveContext;
@@ -1926,13 +1951,13 @@ async function open(settings={}){
     if(r.date<today())throw Error('預排日期已過，請重新讀取');
     const progress='預排 '+(selected.indexOf(r)+1)+'／'+selected.length+'：'+r.name+' '+r.date;
     if(!r.acknowledged){
-     const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),manualPlan:true,preventReplace:false,note:'每月未休假加班預排（正式配休）',createdAt:Date.now(),directRow:true,onProgress:stage=>setStatus(progress+'｜'+stage)};
-     r.attempted=true;r.status='儲存預排中／待雲端讀回';setStatus(progress+'｜上傳雲端');paint();controls(true);
+     const draft={id:r.id,empId:r.empId,date:r.date,rule:g.P79Overtime.report(r.rule),manualPlan:true,preventReplace:false,note:'每月未休假加班預排（正式配休）',createdAt:Date.now(),directRow:true,onProgress:stage=>updatePreplanStatus(progress+'｜'+stage)};
+     r.attempted=true;r.status='儲存預排中／待雲端讀回';updatePreplanStatus(progress+'｜上傳雲端');paint();controls(true);
      const result=await a.saveReport(draft,batch);
      if(result?.ok!==true||result.directOvertimeSaved!==true||result.id!==r.id||result.report?.planned!==true)throw Error('雲端未確認儲存為預排');
      r.acknowledged=true;
     }
-    r.status='雲端已接收／待雲端讀回';setStatus(progress+'｜核對原申報編號');paint();controls(true);
+    r.status='雲端已接收／待雲端讀回';updatePreplanStatus(progress+'｜核對原申報編號');paint();controls(true);
     const fresh=await a.snapshot(loadedMonth,true,false,true);
     if(fresh?.provisional===true||!Array.isArray(fresh?.schedules))throw Error('正式班表讀回未確認');
     const meta=fresh.schedules.find(x=>id(x.empId)===id(r.empId))?.schedule?.__meta?.[r.date];
@@ -1941,7 +1966,7 @@ async function open(settings={}){
     verified=fresh;
     r.saved=true;r.checked=false;r.status='預排已儲存（未正式申報）';
     snapshot={...latest,schedules:fresh.schedules,leaveDates:fresh.leaveDates,leaveCoverAssignments:fresh.leaveCoverAssignments,approvedLeaves:fresh.approvedLeaves,saveContext:null};
-    setStatus('已確認 '+selected.filter(x=>x.saved).length+'／'+selected.length+' 筆｜'+r.name+' '+r.date+' 預排成功');
+    updatePreplanStatus('已確認 '+selected.filter(x=>x.saved).length+'／'+selected.length+' 筆｜'+r.name+' '+r.date+' 預排成功');
     paint();controls(true);
     activeRow=null;
     // Yield between records so the visible list updates before the next write.
@@ -1967,7 +1992,12 @@ async function open(settings={}){
     }catch(error){failure='預排已確認，但畫面額度更新未完成：'+String(error.message||error);}
    }
    setStatus('本次已確認雲端儲存 '+saved+' 筆預排；成功項目已移至已預排／待核對（未正式申報加班）。'+(failure?'未完成：'+failure:'')+(selected.some(r=>!r.saved)?'其餘保留選取，請核對後重試。':''));
-   busy=false;delete el.dataset.preplanLocked;try{paint();}finally{controls(false);}
+   busy=false;delete el.dataset.preplanLocked;
+   try{paint();}catch(error){failure+=(failure?'；':'')+'畫面更新未完成：'+String(error.message||error);}finally{
+    controls(false);
+    if(progressWindow)progressWindow.finish(saved,failure,typeof batchSummary==='string'?batchSummary.trim():'');
+    else g.alert?.('本次已確認 '+saved+'／'+selected.length+' 筆預排。'+(failure?'\n'+failure:''));
+   }
    g.setTimeout?.(()=>{try{a.refresh?.();}catch(error){console.warn('預排已核對，統計更新失敗',error);}},0);
   }
  };
