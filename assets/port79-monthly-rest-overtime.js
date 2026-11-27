@@ -1202,7 +1202,7 @@ async function open(settings={}){
  // DOM-free so official calculation modules also run safely in Node tests.
  if(!g.P79MonthlyRestDashboard&&!document.getElementById('mrUxLoader')){
   const script=document.createElement('script');script.id='mrUxLoader';
-  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1';
+  script.src='../assets/port79-monthly-rest-dashboard.js?v=20261125-cloud-preplan-v44&reasonHelp=20261125-v2&localPreplan=20261125-v1&compactReason=20261126-v1&cutoffPicker=20261127-v1&savedPreplan=20261127-v1&jobFilter=20261127-v1';
   script.onload=()=>{const active=document.getElementById('p79MonthlyRest');if(active)g.P79MonthlyRestDashboard?.mount(active);};
   script.onerror=()=>console.warn('未休假簡化介面未載入，保留原本正式申報視窗');
   document.head.appendChild(script);
@@ -1254,8 +1254,9 @@ async function open(settings={}){
  q('#mrDept').onchange=jobs;q('#mrJob').onchange=names;q('#mrEmp').onchange=()=>{if(model&&!busy)paint();};
  q('#mrMonth').onchange=()=>{if(!busy){q('#mrCutoff').value='';q('#mrLoad').click();}};
  q('#mrCutoff').onchange=()=>{if(busy)return;const input=q('#mrCutoff');input.value=validReportCutoff(q('#mrMonth').value,input.value);manualPeople.clear();q('#mrLoad').click();};jobs();
- function controls(disabled){
+ function controls(disabled,allowFilters=false){
   el.querySelectorAll('.filters input,.filters select,.filters button,#mrAll,#mrRows input,#mrRows select,#mrPlanAll,#mrPlannedRows input,#mrSavePlans,#mrNeedRows input,#mrManualRows button,#mrManualMode,#mrAutoMode,#mrNewPlan').forEach(e=>e.disabled=disabled);
+  if(allowFilters){q('#mrDept').disabled=false;q('#mrJob').disabled=false;q('#mrEmp').disabled=false;}
   const allowed=model?.workflow?.canSubmit===true;
   const selectedFormal=allowed&&model?.rows.some(r=>r.checked&&!r.saved&&!r.planned);
   q('#mrSave').disabled=disabled||isReadOnlySource()||!(selectedFormal||
@@ -1445,7 +1446,7 @@ async function open(settings={}){
  };
  q('#mrAll').onchange=()=>{if(!model?.workflow?.canSubmit)return;model.quotaPreviewSuppressed=false;visibleRows().forEach(({r})=>{if(!r.saved&&!r.planned)r.checked=q('#mrAll').checked;});paint();};
  q('#mrLoad').onclick=async(loadOptions={})=>{
-  if(busy)return;invalidate();busy=true;controls(true);setStatus('正在同時讀取班表、出勤及雲端加班選項…');
+  if(busy)return;invalidate();busy=true;controls(true,true);setStatus('正在同時讀取班表、出勤及雲端加班選項…');
   try{const requestedMonth=q('#mrMonth').value;
    if(loadedMonth&&loadedMonth!==requestedMonth)manualPeople.clear();
    loadedMonth=requestedMonth;
