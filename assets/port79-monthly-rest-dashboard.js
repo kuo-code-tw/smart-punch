@@ -404,7 +404,7 @@ function mount(el){
   if(!row.disabled&&/可申報/.test(row.status))return 'ready';
   return 'review';
  }
- function label(row){if(row.kind==='plan'&&/儲存預排中|待雲端讀回|雲端已接收|讀回未確認|失敗/.test(row.status))return row.status;if(row.kind==='roster')return compactRosterStatus(row);if(row.kind==='existing'&&/^預排/.test(row.status))return row.status;const type=kind(row);return {ready:'可申報',review:'待核對',missing:'缺資料',plan:'預排建議',done:'已完成'}[type];}
+ function label(row){if(row.kind==='plan'&&/儲存預排中|待雲端讀回|雲端已接收|讀回未確認|預排未確認|失敗/.test(row.status))return row.status;if(row.kind==='roster')return compactRosterStatus(row);if(row.kind==='existing'&&/^預排/.test(row.status))return row.status;const type=kind(row);return {ready:'可申報',review:'待核對',missing:'缺資料',plan:'預排建議',done:'已完成'}[type];}
  function currentView(){const data=rows();let shown=state.tab==='done'?data.verified:state.tab==='audit'?data.audit:data.pending;
   if(state.name)shown=shown.filter(r=>norm(r.name).includes(norm(state.name)));
   if(state.status&&state.tab!=='done')shown=shown.filter(r=>kind(r)===state.status);
@@ -413,6 +413,8 @@ function mount(el){
  function render(){
   if(state.disposed||state.rendering)return;state.rendering=true;
   try{
+   const locked=el.dataset.preplanLocked==='true';
+   for(const control of el.querySelectorAll('[data-preplan-ui-disabled]')){control.disabled=control.dataset.preplanUiDisabled==='true';delete control.dataset.preplanUiDisabled;}
    const originalState=text(el,'#mrStatus');
    const month=originalMonth.value;
    if(q('#mrUxMonth').value!==month)q('#mrUxMonth').value=month;
@@ -509,6 +511,10 @@ function mount(el){
    }).join('')||'<tr><td colspan="8" style="padding:24px;color:#64748b">'+(sourceFailed?'讀取失敗，請按上方 ↻ 重新讀取。':!sourceLoaded?'正在讀取雲端資料，完成後顯示名單。':'目前篩選沒有資料；請確認月份、部門或雲端核對狀態。')+'</td></tr>';
    q('#mrUxListHint').textContent='顯示 '+countLabel(shown)+(state.tab==='pending'&&audit.some(r=>r.residualOnly)?'｜尚無日期的缺額請見「已預排／待核對」':'');
    q('#mrUxExport').disabled=!shown.length;
+   if(locked){
+    for(const root of [shell,actionFooter].filter(Boolean))for(const control of root.querySelectorAll('button,input,select,textarea')){control.dataset.preplanUiDisabled=String(control.disabled);control.disabled=true;}
+    q('#mrUxHint').textContent=info||'正在逐筆確認預排，完成後自動解鎖';
+   }
   }finally{state.rendering=false;}
  }
  function updatePick(row,checked){
@@ -641,6 +647,9 @@ function mount(el){
   global.setTimeout(()=>URL.revokeObjectURL(url),1000);
  };
  const observers=[];
+ const lockObserver=new MutationObserver(()=>render());
+ lockObserver.observe(el,{attributes:true,attributeFilter:['data-preplan-locked']});
+ observers.push(lockObserver);
  // Observe the actual filter controls so the visible mirror unlocks immediately.
  for(const control of [originalDept,originalJob]){
   const observer=new MutationObserver(()=>render());
