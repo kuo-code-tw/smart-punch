@@ -1891,9 +1891,9 @@ window.p79ApplyBuildVersion=function(version){
   const skip=new Set(['SCRIPT','STYLE','NOSCRIPT','TEXTAREA','INPUT']);
   const cv=(s)=>{
     s=String(s||'');
-    s=s.replace(/\b((?:19|20)\d{2})([\/-])(\d{1,2})\2(\d{1,2})\b/g,(m,y,sep,mo,d)=>`民國${Number(y)-1911}${sep}${mo}${sep}${d}`);
-    s=s.replace(/\b((?:19|20)\d{2})([\/-])(\d{1,2})(?![\/-]\d)/g,(m,y,sep,mo)=>`民國${Number(y)-1911}${sep}${mo}`);
-    s=s.replace(/\b((?:19|20)\d{2})年/g,(m,y)=>`民國${Number(y)-1911}年`);
+    s=s.replace(/\b((?:19|20)\d{2})([\/-])(\d{1,2})\2(\d{1,2})\b/g,(m,y,sep,mo,d)=>`${Number(y)-1911}${sep}${mo}${sep}${d}`);
+    s=s.replace(/\b((?:19|20)\d{2})([\/-])(\d{1,2})(?![\/-]\d)/g,(m,y,sep,mo)=>`${Number(y)-1911}${sep}${mo}`);
+    s=s.replace(/\b((?:19|20)\d{2})年/g,(m,y)=>`${Number(y)-1911}年`);
     return s;
   };
   let busy=false;
