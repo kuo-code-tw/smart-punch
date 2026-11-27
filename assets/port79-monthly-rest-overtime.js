@@ -1672,8 +1672,21 @@ async function open(settings={}){
      if(!rechecked)break;
      current=rechecked;
     }
+    // A successful revocation can leave the old shift behind. If the fresh
+    // archive proves the exact original, repair it in this same operation.
+    if(!current.restoreRevoked){
+     const leftover=abnormalMonthlyRestPlans(fresh,a.employees(),month).repair.find(r=>r.restoreRevoked===true&&r.empId===current.empId&&r.date===current.date&&r.id===current.id&&r.original===current.original&&JSON.stringify(r.report)===JSON.stringify(current.report));
+     if(leftover){
+      if(!el.isConnected||loadedMonth!==month||!service.canRevoke())throw Error('視窗、月份或權限已變更');
+      current=leftover;revokeError=null;
+      setStatus('異常預排修正 '+processed+'／'+candidates.length+'｜'+current.name+'｜補還原已撤銷班別');
+      try{const result=await service.revoke({...current,repairPreplan:true},fresh);if(result?.ok!==true||result.revocationVerified!==true)throw Error('補還原回應未確認');}
+      catch(error){revokeError=error;}
+      fresh=await readRepairSnapshot();
+     }
+    }
     const roster=fresh.schedules?.find(r=>id(r.empId)===current.empId)?.schedule,meta=roster?.__meta?.[current.date]||{};
-    if(!roster||(meta.overtimeReport?.id===current.id&&(!current.restoreRevoked||confirmedReport(meta,meta.overtimeReport)))||meta.overtimeReports?.some?.(r=>r?.id===current.id&&confirmedReport(meta,r))||!meta.overtimeRevocations?.some(r=>r.confirmed===true&&String(r.reportId)===String(current.id))||String(roster[current.date]||'').trim()!==current.original){
+    if(!roster||(meta.overtimeReport?.id===current.id&&(!current.restoreRevoked||confirmedReport(meta,meta.overtimeReport)))||meta.overtimeReports?.some?.(r=>r?.id===current.id&&confirmedReport(meta,r))||!meta.overtimeRevocations?.some(r=>r.confirmed===true&&String(r.reportId)===String(current.id))||(current.restoreRevoked&&JSON.stringify(meta.overtimeRevocations?.find(r=>String(r.reportId)===String(current.id)))!==JSON.stringify(current.archive))||String(roster[current.date]||'').trim()!==current.original){
      failed.push(current.name+' '+current.date+'：撤銷或原班別未確認'+(revokeError?'：'+String(revokeError.message||revokeError):''));
      // A fresh authoritative snapshot is available. Isolate this employee/date
      // and proceed with other candidates; never repeat this uncertain write.
